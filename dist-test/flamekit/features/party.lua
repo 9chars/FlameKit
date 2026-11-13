@@ -130,27 +130,27 @@ local function server_has_it()
   return ok and (version or 0) ~= 0
 end
 
-function F.panel(world)
-  local host = hosting(world)
-  local can = host or server_has_it()
+-- The test players' rows, for the Debug section of the Experimental tab (features/experimental.lua): keys "N" (0 off).
+function F.test_rows(world)
   local rows = {
-    { heading = "Test players" },
-    { text = "Made-up players for testing the party window and the minimap alone. The server sends them to you the "
-      .. "same way as real players (only you see them). They walk around you; some are far away, at the minimap's edge." },
+    { text = "Test players: made-up players for testing the party window and the minimap alone. The server sends them "
+      .. "to you the same way as real players (only you see them). They walk around you; some are far away, at the "
+      .. "minimap's edge." },
   }
-  if not can then
+  if not (hosting(world) or server_has_it()) then
     rows[#rows + 1] = { dim = true, text = "This server does not run FlameKit (or not this version): test players need it." }
     return rows
   end
   for _, n in ipairs({ 0, 1, 3, 6 }) do
-    rows[#rows + 1] = { button = "test:" .. n, text = n == 0 and "Off" or tostring(n), selected = test_wanted == n, same_line = n ~= 0,
+    rows[#rows + 1] = { button = tostring(n), text = n == 0 and "Off" or tostring(n), selected = test_wanted == n, same_line = n ~= 0,
       tooltip = n == 0 and "No test players" or ("Ask for " .. n .. " test player" .. (n == 1 and "" or "s")) }
   end
   return rows
 end
 
-function F.click(world, key)
-  local n = tonumber(key:match("^test:(%d+)$") or "")
+-- A click on one of those rows.
+function F.set_test(world, n)
+  n = tonumber(n)
   if n then ask_test(world, n) end
 end
 

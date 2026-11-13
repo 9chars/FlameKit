@@ -142,15 +142,6 @@ end
 
 local ZOOM_STEPS = 7  -- the setting map_zoom: 0 closest .. 6 farthest
 
--- A key setting as a player would say it: "the + key on the number pad".
-local function key_name(setting, default)
-  local key = tostring(kit.setting(setting, default))
-  if key == "" then return "no key (set one in the Mods tab)" end
-  if key == "NumpadAdd" then return "the + key on the number pad" end
-  if key == "NumpadSubtract" then return "the - key on the number pad" end
-  return "the " .. key .. " key"
-end
-
 function F.panel(world)
   local rows = {}
   local moving = kit.setting("map_move", false) == true
@@ -164,7 +155,8 @@ function F.panel(world)
   end
   local placed = (tonumber(kit.setting("map_x", -1)) or -1) >= 0
   rows[#rows + 1] = { button = "reset", text = "Back to its corner", same_line = true, disabled = not placed,
-                      tooltip = "Puts the minimap back in its corner of the screen (the corner is in FlameKit's settings)." }
+                      tooltip = "Puts the minimap back in its corner of the screen (the corner is below)." }
+  for _, r in ipairs(require("features.settings").rows({ "map_corner", "map_margin" })) do rows[#rows + 1] = r end
   rows[#rows + 1] = { separator = true }
   rows[#rows + 1] = { heading = "Size" }
   local size = tonumber(kit.setting("map_size", 300)) or 300
@@ -180,8 +172,6 @@ function F.panel(world)
   rows[#rows + 1] = { button = "zoom:out", text = "Zoom out", same_line = true, disabled = zoom >= ZOOM_STEPS - 1,
                       tooltip = "Shows a bigger piece of the world." }
   rows[#rows + 1] = { text = string.format("Zoom level %d of %d", ZOOM_STEPS - zoom, ZOOM_STEPS), same_line = true }
-  rows[#rows + 1] = { dim = true, text = "While you play: " .. key_name("map_zoom_in_key", "NumpadAdd") .. " zooms in and "
-    .. key_name("map_zoom_out_key", "NumpadSubtract") .. " zooms out." }
   rows[#rows + 1] = { separator = true }
   rows[#rows + 1] = { heading = "What it shows" }
   for _, s in ipairs(SWITCHES) do
@@ -211,13 +201,15 @@ function F.panel(world)
     end
   end
   rows[#rows + 1] = { separator = true }
-  rows[#rows + 1] = { dim = true,
-    text = "Any other size, the corner and the keys are in FlameKit's settings (the Mods tab), group Minimap. "
-      .. "The minimap needs the FlameKit Native part in your game." }
+  rows[#rows + 1] = { heading = "Keys" }
+  for _, r in ipairs(require("features.settings").rows({ "map_toggle_key", "map_zoom_in_key", "map_zoom_out_key" })) do rows[#rows + 1] = r end
+  rows[#rows + 1] = { separator = true }
+  rows[#rows + 1] = { dim = true, text = "The minimap needs the FlameKit Native part in your game." }
   return rows
 end
 
 function F.click(world, key)
+  if key:sub(1, 4) == "set:" then return require("features.settings").click(world, key:sub(5)) end  -- a settings row
   if key == "move" then
     emf.set_setting("map_move", not (kit.setting("map_move", false) == true))
   elseif key == "reset" then

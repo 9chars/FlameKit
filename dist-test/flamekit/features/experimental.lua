@@ -542,7 +542,26 @@ local function hosting(world)
   return kit.is_host() or world:is_server()
 end
 
-function F.panel(world)
+-- The Debug section at the bottom of the tab: the test players (features/party.lua) and FlameKit's log level
+-- (debug.txt: off, normal, full; the same as Ctrl+Shift+F12 in the game). Keys "dbg:...".
+local function debug_rows(world, rows)
+  rows[#rows + 1] = { separator = true }
+  rows[#rows + 1] = { heading = "Debug" }
+  for _, r in ipairs(require("features.party").test_rows(world)) do
+    if r.button then r.button = "dbg:test:" .. r.button end
+    rows[#rows + 1] = r
+  end
+  local level = kit.debug_level(true)
+  rows[#rows + 1] = { text = "FlameKit's log level (Ctrl+Shift+F12 in the game also switches it):" }
+  for i, l in ipairs({ { "off", "Off", "Errors and warnings only" }, { "normal", "Normal", "Also what happens: windows, updates, clicks" },
+                       { "full", "Full", "Also every detail: for finding a problem" } }) do
+    rows[#rows + 1] = { button = "dbg:log:" .. l[1], text = l[2], selected = level == l[1], same_line = i > 1, tooltip = l[3] }
+  end
+  rows[#rows + 1] = { dim = true, text = "The logs are in emf\\mods\\flamekit\\logs in the game's folder (the last 10 games)." }
+  return rows
+end
+
+local function panel_rows(world)
   local v
   if hosting(world) then
     load_saved()
@@ -557,7 +576,7 @@ function F.panel(world)
   if not v then
     rows[#rows + 1] = { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."
       or "This server does not run FlameKit (or not this version), so there is nothing to switch here." }
-    return rows
+    return debug_rows(world, rows)
   end
   rows[#rows + 1] = { separator = true }
   for _, s in ipairs(SWITCHES) do
@@ -573,10 +592,26 @@ function F.panel(world)
   rows[#rows + 1] = { button = "spire", text = "Nearest Ancient Spire", same_line = true,
     tooltip = "Takes you to the nearest Ancient Spire on your map, unlocked or not. Works inside the shroud too." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
-  return rows
+  return debug_rows(world, rows)
+end
+
+function F.panel(world)
+  return panel_rows(world)
 end
 
 function F.click(world, key)
+  if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
+  local level = key:match("^dbg:log:(%a+)$")
+  if level then
+    local f = io.open(emf.dir .. "\\debug.txt", "w")
+    if f then
+      f:write(level)
+      f:close()
+    end
+    kit.debug("warn", "log: debug level %s (Experimental tab, Debug)", level)
+    kit.debug_level(true)
+    return
+  end
   if key == "home" then
     note = nil
     if hosting(world) then

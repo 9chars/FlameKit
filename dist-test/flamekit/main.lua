@@ -9,12 +9,12 @@
 local kit = require("core.kit")
 
 kit.start({
-  "features.loot_filter",   -- the tabs of FlameKit's window come in this order (then the DLL's own Windows tab)
+  "features.changes",       -- What's New. The tabs of FlameKit's window come in this order (then the DLL's own Windows tab)
+  "features.loot_filter",
   "features.minimap",
-  "features.experimental",
-  "features.party",
+  "features.experimental",  -- its Debug section has the party's test players
   "features.settings",
-  "features.changes",       -- What's New
+  "features.party",         -- no tab of its own
   "features.native_ui",
   "features.server_save",
   -- "features.my_next_feature",

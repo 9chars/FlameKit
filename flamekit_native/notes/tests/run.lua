@@ -235,6 +235,7 @@ do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","aut
   .. '{"key":"map_toggle_key","type":"keybind","default":"F10","label":"Key that shows and hides the minimap","group":"Minimap"},'
   .. '{"key":"map_size","type":"slider","min":120,"max":480,"step":20,"default":300,"label":"Size","group":"Minimap"},'
   .. '{"key":"map_hide","type":"text","default":"-","label":"Hidden kinds","group":"Minimap"},'
+  .. '{"key":"lf_keep_hotbar","type":"bool","default":true,"label":"Never touch the action bar","group":"Auto Junk List"},'
   .. '{"key":"map_clock","type":"bool","default":true,"label":"Show the clock under the minimap","group":"Minimap"}]}'); m:close() end
 dofile(MOD .. "/main.lua")
 local server = require("features.loot_filter.server")
@@ -283,7 +284,7 @@ local panel_tab = 1
 local function panel_list()
   local kit = require("core.kit")
   local list = {}
-  for _, f in ipairs(kit.features) do if f.panel and kit.enabled(f) then list[#list + 1] = f end end
+  for _, f in ipairs(kit.features) do if f.panel and kit.enabled(f) and f.id ~= "changes" then list[#list + 1] = f end end  -- (What's New: not used here)
   return list
 end
 local function panel_rows()
@@ -680,19 +681,19 @@ local function party_text()
   if f then f:close() end
   return t
 end
-ui_action("view", "party")
+ui_action("view", "experimental")
 step(12)
 tabs_text = read_tabs()
-local pgen = tabs_text:match("view\tparty\t(%d+)")
-check(pgen ~= nil, "the Party tab's rows are written")
+local pgen = tabs_text:match("view\texperimental\t(%d+)")
+check(pgen ~= nil, "the Experimental tab's rows are written")
 local three
 for line in tabs_text:gmatch("[^\n]+") do
   local f = {}
   for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
   if f[1] == "r" and f[2] == "b" and f[9] == "3" then three = f[8] end
 end
-check(three ~= nil, "the Party tab has a button for 3 test players")
-ui_action("tab", "party/" .. pgen .. "/" .. three)
+check(three ~= nil, "the Experimental tab's Debug section has a button for 3 test players")
+ui_action("tab", "experimental/" .. pgen .. "/" .. three)
 step(70)
 local tp = require("core.test_players")
 if JOINED then
@@ -714,17 +715,17 @@ else
 end
 ui_action("view", "-")
 step(12)
-ui_action("view", "party")
+ui_action("view", "experimental")
 step(12)
 tabs_text = read_tabs()
-pgen = tabs_text:match("view\tparty\t(%d+)")
+pgen = tabs_text:match("view\texperimental\t(%d+)")
 local off
 for line in tabs_text:gmatch("[^\n]+") do
   local f = {}
   for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
-  if f[1] == "r" and f[2] == "b" and f[9] == "Off" then off = f[8] end
+  if f[1] == "r" and f[2] == "b" and f[9] == "Off" and not off then off = f[8] end  -- the first Off: the test players' (the log level's comes later)
 end
-ui_action("tab", "party/" .. pgen .. "/" .. off)
+ui_action("tab", "experimental/" .. pgen .. "/" .. off)
 step(70)
 check(not party_text():find("Test ", 1, true) and tp.count(PLAYER) == 0 and (not JOINED or last_ask == "0"), "Off: the test players are gone")
 -- the Settings tab (features/settings.lua): a switch, a slider, a choice and a key, as FlameKit's window clicks them
@@ -734,20 +735,39 @@ do
   for _, r in ipairs(window.def.rows) do if r.text == "Settings" then tab = r.button end end
   check(tab ~= nil, "FlameKit's window has a Settings tab")
   click(tab)
-  local clock_row = find_row("Show the clock under the minimap")
-  check(clock_row and clock_row.selected and clock_row.text:find("^On"), "a switch shows its value")
-  click(clock_row.button)
-  check(settings.map_clock == false, "clicking a switch changes the setting")
-  click(find_row("^%+ 20", ":n:map_size:").button)
-  check(settings.map_size == 320, "+ moves a slider by its step")
+  check(find_row("Show the clock") == nil and find_row("Key that shows and hides the minimap") == nil, "the Settings tab has no feature's settings")
   click(find_row("^Right Ctrl$").button)
   check(settings.pointer_key == "right_ctrl", "a choice sets the option's value")
-  click(find_row("^Change$", ":k:map_toggle_key:").button)
+  click("tab:2")  -- the Minimap tab has the minimap's keys
+  click(find_row("^Change$", ":set:k:map_toggle_key:").button)
   check(find_row("press a key now") ~= nil, "Change waits for a key")
   require("features.settings").key(UI, "F9")
   check(settings.map_toggle_key == "F9", "the next key pressed in the window becomes the key")
-  click(find_row("^No key$", ":k:map_toggle_key:").button)
+  click(find_row("^No key$", ":set:k:map_toggle_key:").button)
   check(settings.map_toggle_key == "", "No key clears it")
+  toggle_panel()
+end
+-- the Auto Junk List's own settings are buttons on its view (ui_list.dat P lines, clicks as "opt"); the log level in Debug
+do
+  step(12)
+  local f = io.open(TMP .. "\\ui_list.dat", "r")
+  local list_text = f and f:read("a") or ""
+  if f then f:close() end
+  check(list_text:find("\nP b:lf_keep_hotbar 1 Never touch the action bar: ON", 1, true) ~= nil, "the Auto Junk List's view has its action bar switch")
+  ui_action("opt", "b:lf_keep_hotbar")
+  step(6)
+  check(settings.lf_keep_hotbar == false, "clicking it switches the setting")
+  ui_action("opt", "b:lf_keep_hotbar")
+  step(6)
+  check(settings.lf_keep_hotbar == true, "and back")
+  toggle_panel()
+  local tab
+  for _, r in ipairs(window.def.rows) do if r.text == "Experimental" then tab = r.button end end
+  click(tab)
+  click(find_row("^Full$", ":dbg:log:full").button)
+  check(require("core.kit").debug_level(true) == "full", "the Debug section sets the log level")
+  click(find_row("^Normal$", ":dbg:log:normal").button)
+  check(require("core.kit").debug_level(true) == "normal", "and back to normal")
   toggle_panel()
 end
 -- a world save on request from the restart helper (features/server_save.lua)

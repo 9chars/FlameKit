@@ -3030,6 +3030,11 @@ struct WindowLayer : Layer {
         std::string id;
         std::wstring title;
     };
+    struct Opt {  // the Auto Junk List's own settings, as buttons on its view ("P" lines of ui_list.dat)
+        std::string key;  // what a click sends back: "opt <key>"
+        bool lit = false;
+        std::wstring label;
+    };
     struct Row {
         char kind = 't';  // h heading, t text, b button, s separator
         bool same = false, selected = false, disabled = false, dim = false;
@@ -3038,7 +3043,7 @@ struct WindowLayer : Layer {
         int number = 0;  // a button's number in its generation
         std::wstring text, tip;
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose, kOpt };
     struct Hit {
         RECT r;
         Kind kind;
@@ -3074,6 +3079,8 @@ struct WindowLayer : Layer {
     RECT track_r{}, thumb_r{};
     // the Auto Junk List tab
     std::vector<Entry> bag, junk;
+    std::vector<Opt> opts;
+    int opts_y = 0;  // where the option buttons are: beside Auto / Dump Junk / Drop when they fit, else a line under them
     bool auto_on = false, delete_junk = false;
     size_t bag_page = 0, junk_page = 0;
     int mouse_x = -1, mouse_y = -1;
@@ -3109,6 +3116,7 @@ struct WindowLayer : Layer {
         FILE* fp = _wfsopen((g_flamekit_dir + L"ui_list.dat").c_str(), L"rb", _SH_DENYNO);
         if (!fp) return false;
         std::vector<Entry> b, j;
+        std::vector<Opt> o;
         bool a = false, del = false, complete = false;
         char line[1024];
         while (fgets(line, sizeof line, fp)) {
@@ -3126,6 +3134,8 @@ struct WindowLayer : Layer {
             } else if ((line[0] == 'B' || line[0] == 'J') &&
                        sscanf_s(line + 1, " %x %d %399s %n", &id, &count, key, static_cast<unsigned>(sizeof key), &used) == 3 && used > 0) {
                 (line[0] == 'B' ? b : j).push_back({id, count, key, widen(line + 1 + used)});
+            } else if (line[0] == 'P' && sscanf_s(line + 1, " %399s %d %n", key, static_cast<unsigned>(sizeof key), &on, &used) == 2 && used > 0) {
+                o.push_back({key, on != 0, widen(line + 1 + used)});  // one of the feature's settings, as a button
             }
         }
         fclose(fp);
@@ -3135,6 +3145,7 @@ struct WindowLayer : Layer {
         }
         bag = std::move(b);
         junk = std::move(j);
+        opts = std::move(o);
         auto_on = a;
         delete_junk = del;
         FK_LOG(fklog::kDebug, "window: ui_list.dat read: %d in the bag, %d on the junk list, auto %d, %s", static_cast<int>(bag.size()),
@@ -3508,9 +3519,6 @@ struct WindowLayer : Layer {
             L"the pointer while you play. Then a pinned window can be dragged by",
             L"its title bar, resized from its lower right corner,",
             L"collapsed with \u2013 or hidden with \u00D7. Let go of the key to play on.",
-            L"",
-            L"Ctrl+Shift+F12: FlameKit's log level (normal, full, off).",
-            L"The logs: emf\\mods\\flamekit\\logs in the game's folder.",
         };
         for (const wchar_t* l : kHelp) {
             text.draw(canvas, kPad, y, l, 190, 195, 205);
@@ -3527,6 +3535,12 @@ struct WindowLayer : Layer {
         button(dump_x, by, dump_w, L"Dump Junk", false, kDump);
         const int auto_w = text.width(L"Auto: OFF") + 28;
         button(dump_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
+        int ox = kPad;  // the feature's other settings
+        for (size_t i = 0; i < opts.size(); ++i) {
+            const int w = text.width(opts[i].label) + 22;
+            button(ox, opts_y, w, opts[i].label, opts[i].lit, kOpt, i);
+            ox += w + 8;
+        }
         section(L"In your bag", 255, 210, 122, bag, bag_page, kBagRows, kBagHead, kBagTop, kBagItem, kBagPrev, kBagNext);
         section(L"Your junk list", 255, 74, 61, junk, junk_page, kJunkRows, kJunkHead, kJunkTop, kJunkItem, kJunkPrev, kJunkNext);
         if (drop_open) {  // the drop-down's options, over what is below
@@ -3559,7 +3573,14 @@ struct WindowLayer : Layer {
         const int grid_rows = std::max(2, (grid_h + 2 * kGap) / (kIcon + kGap));
         kBagRows = std::max(1, (grid_rows * 5 + 4) / 9);
         kJunkRows = std::max(1, grid_rows - kBagRows);
-        kBagHead = kTop + 52;
+        {  // the Auto Junk List's option buttons: at the left of its top row when they fit, else a line under it
+            int need = 0, right = 0;
+            for (const Opt& o : opts) need += text.width(o.label) + 22 + 8;
+            right = std::max(text.width(L"Delete \u25BE"), text.width(L"Drop \u25BE")) + 28 + 8 + text.width(L"Dump Junk") + 28 + 8 +
+                    text.width(L"Auto: OFF") + 28 + 8;
+            opts_y = kPad + need + right <= kW - kPad ? kTop + 10 : kTop + 48;
+        }
+        kBagHead = kTop + 52 + (opts_y > kTop + 10 ? 38 : 0);
         kBagTop = kBagHead + 30;
         kJunkHead = kBagTop + kBagRows * kIcon + (kBagRows - 1) * kGap + kPad;
         kJunkTop = kJunkHead + 30;
@@ -3713,8 +3734,8 @@ struct WindowLayer : Layer {
             close_asked = true;
             return;
         }
-        // any other key, while a tab of rows shows: to that tab's feature (the Settings tab's Change takes it as a key)
-        if (current == "loot_filter" || current == "windows") return;
+        // any other key: to the Lua part (a setting's Change takes it as the setting's key; else the shown tab's feature)
+        if (current == "windows") return;
         std::string name = emf::keys::detail::key_name(static_cast<uint32_t>(vk));
         if (name.rfind("key ", 0) == 0) name = name.substr(4);  // "key 0xba": the setting is written "0xba"
         act("key", name);
@@ -3796,6 +3817,9 @@ struct WindowLayer : Layer {
                 break;
             case kClose:
                 close_asked = true;
+                break;
+            case kOpt:
+                if (h.index < opts.size()) act("opt", opts[h.index].key);
                 break;
             case kScrollThumb:
                 thumb_drag = true;
