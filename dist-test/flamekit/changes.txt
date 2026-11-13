@@ -1,3 +1,6 @@
+0.15.31 Nov 13, 2026
+- Long lines in FlameKit's windows wrap to the next line instead of being cut off (in a window wider than its first size, for example the What's New tab).
+
 0.15.30 Nov 13, 2026
 - After an update, FlameKit's window opens by itself on the What's New tab, once, the first time you are in a world. What's New is also the tab the window opens on the first time in a game.
 - New setting (Settings tab): open FlameKit's window every time you enter a world (off unless you switch it on).

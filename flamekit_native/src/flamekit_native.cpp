@@ -1632,7 +1632,9 @@ struct Canvas {
 // Text, drawn by Windows into a small picture of its own and laid over the canvas (Windows' text drawing does not
 // write transparency, so its brightness is used as coverage).
 struct TextPainter {
-    static constexpr int kW = 640, kH = 64;
+    // The scratch picture Windows draws one line into. 2048 wide: a line is never cut off in a wide window (it was 640
+    // until 0.15.31, and width() said no line was wider, so the wrapping never wrapped and long lines were cut off).
+    static constexpr int kW = 2048, kH = 64;
     HDC dc = nullptr;
     HBITMAP bitmap = nullptr;
     uint32_t* bits = nullptr;
@@ -1671,10 +1673,10 @@ struct TextPainter {
         return true;
     }
 
-    int width(const std::wstring& text) {
+    int width(const std::wstring& text) {  // the line's real width (for wrapping); drawing stops at kW
         SIZE sz{};
         GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &sz);
-        return std::min<int>(sz.cx, kW);
+        return sz.cx;
     }
 
     // Draws `text` with its top left corner at (x, y), in colour r g b over a dark shadow.
@@ -1711,7 +1713,7 @@ struct TextPainter {
     }
 
     void draw(Canvas& c, int x, int y, const std::wstring& text, float r, float g, float b, float alpha = 1.0f) {
-        const int wide = width(text), tall = std::min(kH, font_px + font_px / 2 + 2);
+        const int wide = std::min(width(text), kW - 2), tall = std::min(kH, font_px + font_px / 2 + 2);
         for (int row = 0; row < tall; ++row) std::fill(bits + row * kW, bits + row * kW + wide + 2, 0u);
         TextOutW(dc, 0, 0, text.c_str(), static_cast<int>(text.size()));
         GdiFlush();
