@@ -1,3 +1,6 @@
+0.15.27 Nov 13, 2026
+- FlameKit's window (F6): long tabs (Settings, Minimap, Experimental, Party, What's New) scroll instead of showing pages: with the mouse wheel, or the scroll bar at the right (drag it, or click above or below it).
+
 0.15.26 Nov 13, 2026
 - FlameKit's window (F6) has a Settings tab with every FlameKit setting: switches, choices, sizes with - and +, and keys (Change, then press the new key). They are the same settings as in EMF's Mods tab.
 - The old FlameKit panel that EMF drew (F4) is gone: everything is in FlameKit's own window. Its key is a setting now (Key that opens FlameKit's window, F6).

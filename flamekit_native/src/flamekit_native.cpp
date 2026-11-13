@@ -2200,6 +2200,7 @@ struct Layer {
     virtual bool wants_keys() const { return false; }   // takes the keyboard: the overlay becomes the front window
     virtual void mouse(UINT msg, int x, int y) {}       // x, y: in the layer's own picture
     virtual void mouse_left() {}
+    virtual void wheel(int delta, int x, int y) {}      // the mouse wheel over the layer (delta: WHEEL_DELTA a notch)
     virtual void key(WPARAM vk) {}
     virtual void lost_front() {}                        // another window took the front while the layer had the keys
 
@@ -3006,7 +3007,7 @@ struct WindowLayer : Layer {
         int number = 0;  // a button's number in its generation
         std::wstring text, tip;
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb };
     struct Hit {
         RECT r;
         Kind kind;
@@ -3028,6 +3029,10 @@ struct WindowLayer : Layer {
     uint64_t generation = 0;
     std::vector<Row> rows;
     size_t rows_page = 0;
+    int rows_scroll = 0, max_scroll = 0;  // a tab of rows: how far it is scrolled down (pixels), and how far it can be
+    bool thumb_drag = false;
+    int thumb_grab = 0;
+    RECT track_r{}, thumb_r{};
     // the Auto Junk List tab
     std::vector<Entry> bag, junk;
     bool auto_on = false, delete_junk = false;
@@ -3166,6 +3171,7 @@ struct WindowLayer : Layer {
         tabs = std::move(t);
         tabs.push_back({"windows", L"Windows"});  // this DLL's own tab: the pinned windows
         if (of != rows_of || gen != generation) rows_page = of == rows_of ? rows_page : 0;
+        if (of != rows_of) rows_scroll = 0;
         rows_of = of;
         generation = gen;
         rows = std::move(r);
@@ -3325,75 +3331,121 @@ struct WindowLayer : Layer {
 
     // The rows of a generic tab: laid out top to bottom, buttons along a line while they fit (same_line), a new page
     // where the window ends. Draws the page shown.
+    // A tab of rows (every feature's tab but the Auto Junk List and Windows): laid out top to bottom and scrolled
+    // (mouse wheel, the scroll bar at the right: drag its thumb, or click above or below it). Rows outside the view are
+    // cut off by draw() (clear_outside). The page control (pager, "< 1/2 >") stays for views that want pages.
+    static constexpr int kViewTop = kTop + 2, kViewBottom = kH - kPad, kBarW = 10;
     void draw_rows() {
-        const int left = kPad, right = kW - kPad, top = kTop + 12, bottom = kH - kPad - 40;
         struct Placed {
             const Row* row;
-            int page, x, y, w, h;
+            int x, y, w, h;
             std::vector<std::wstring> lines;
         };
         std::vector<Placed> placed;
-        int page = 0, x = left, y = top, line_h = 0;
-        auto newline = [&] {
-            if (line_h > 0) y += line_h + 6;
-            x = left;
-            line_h = 0;
-        };
-        auto fit = [&](int h) {  // a new page when this does not fit any more
-            if (y + h > bottom && y > top) {
-                ++page;
-                y = top;
+        int content_h = 0;
+        auto layout = [&](int right) {  // y from 0; the content's height into content_h
+            placed.clear();
+            const int left = kPad;
+            int x = left, y = 10, line_h = 0;
+            auto newline = [&] {
+                if (line_h > 0) y += line_h + 6;
                 x = left;
                 line_h = 0;
-            }
-        };
-        for (const Row& r : rows) {
-            if (r.kind == 'b') {
-                const int w = std::max(34, text.width(r.text) + 22);
-                if (!(r.same && x > left && x + w <= right)) newline();
-                fit(30);
-                placed.push_back({&r, page, x, y, w, 30, {}});
-                x += w + 6;
-                line_h = 30;
-            } else {
-                newline();
-                if (r.kind == 's') {
-                    fit(14);
-                    placed.push_back({&r, page, left, y + 6, right - left, 1, {}});
-                    y += 14;
+            };
+            for (const Row& r : rows) {
+                if (r.kind == 'b') {
+                    const int w = std::max(34, text.width(r.text) + 22);
+                    if (!(r.same && x > left && x + w <= right)) newline();
+                    placed.push_back({&r, x, y, w, 30, {}});
+                    x += w + 6;
+                    line_h = 30;
                 } else {
-                    std::vector<std::wstring> lines = wrap(r.text, right - left);
-                    const int lh = r.kind == 'h' ? 26 : 22;
-                    const int h = lh * static_cast<int>(lines.size()) + (r.kind == 'h' ? 4 : 0);
-                    fit(h);
-                    placed.push_back({&r, page, left, y + (r.kind == 'h' ? 4 : 0), right - left, h, std::move(lines)});
-                    y += h + 2;
+                    newline();
+                    if (r.kind == 's') {
+                        placed.push_back({&r, left, y + 6, right - left, 1, {}});
+                        y += 14;
+                    } else {
+                        std::vector<std::wstring> lines = wrap(r.text, right - left);
+                        const int lh = r.kind == 'h' ? 26 : 22;
+                        const int h = lh * static_cast<int>(lines.size()) + (r.kind == 'h' ? 4 : 0);
+                        placed.push_back({&r, left, y + (r.kind == 'h' ? 4 : 0), right - left, h, std::move(lines)});
+                        y += h + 2;
+                    }
                 }
             }
-        }
-        const size_t n = static_cast<size_t>(page) + 1;
-        rows_page = std::min(rows_page, n - 1);
+            newline();
+            content_h = y + 10;
+        };
+        const int view = kViewBottom - kViewTop;
+        layout(kW - kPad);
+        const bool bar = content_h > view;
+        if (bar) layout(kW - kPad - kBarW - 8);  // room for the scroll bar
+        max_scroll = std::max(0, content_h - view);
+        rows_scroll = std::clamp(rows_scroll, 0, max_scroll);
+        const size_t first_hit = hits.size();
         for (const Placed& p : placed) {
-            if (p.page != static_cast<int>(rows_page)) continue;
+            const int y = kViewTop + p.y - rows_scroll;
+            if (y + p.h < kViewTop || y > kViewBottom) continue;  // out of view
             const Row& r = *p.row;
             if (r.kind == 'b') {
-                button(p.x, p.y, p.w, r.text, r.selected, kRowButton, static_cast<size_t>(r.number), r.disabled, &r);
+                button(p.x, y, p.w, r.text, r.selected, kRowButton, static_cast<size_t>(r.number), r.disabled, &r);
             } else if (r.kind == 's') {
-                box(p.x, p.y, p.x + p.w, p.y + 1, 90, 90, 100, 1.0f);
+                box(p.x, y, p.x + p.w, y + 1, 90, 90, 100, 1.0f);
             } else {
                 float cr = 220, cg = 220, cb = 225;
                 if (r.kind == 'h') cr = 255, cg = 210, cb = 122;
                 if (r.dim) cr = cg = cb = 150;
                 if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
-                int ly = p.y;
+                int ly = y;
                 for (const std::wstring& l : p.lines) {
                     text.draw(canvas, p.x, ly, l, cr, cg, cb);
                     ly += r.kind == 'h' ? 26 : 22;
                 }
             }
         }
-        if (n > 1) pager(kH - kPad - 32, rows_page, n, kRowPrev, kRowNext);
-        if (rows.empty()) text.draw(canvas, left, top + 4, rows_of == current ? L"Nothing here" : L"...", 150, 150, 160);
+        for (size_t i = first_hit; i < hits.size();) {  // a button half out of view takes clicks only on its visible part
+            const RECT v{0, kViewTop, kW, kViewBottom};
+            if (!IntersectRect(&hits[i].r, &hits[i].r, &v)) hits.erase(hits.begin() + static_cast<std::ptrdiff_t>(i));
+            else ++i;
+        }
+        if (bar) {  // the scroll bar: a track, and a thumb as tall as the part in view
+            const int x0 = kW - kPad - kBarW, x1 = kW - kPad;
+            const int track_h = view - 8, thumb_h = std::max(30, track_h * view / content_h);
+            const int thumb_y = kViewTop + 4 + (max_scroll ? (track_h - thumb_h) * rows_scroll / max_scroll : 0);
+            track_r = {x0, kViewTop + 4, x1, kViewTop + 4 + track_h};
+            thumb_r = {x0, thumb_y, x1, thumb_y + thumb_h};
+            box(track_r.left, track_r.top, track_r.right, track_r.bottom, 40, 42, 50, 1.0f);
+            const bool over = thumb_drag || inside(thumb_r);
+            box(thumb_r.left + 1, thumb_r.top, thumb_r.right - 1, thumb_r.bottom, over ? 150.0f : 110.0f, over ? 160.0f : 118.0f, over ? 185.0f : 135.0f, 1.0f);
+            hits.push_back({track_r, kScrollTrack, 0});
+            hits.push_back({thumb_r, kScrollThumb, 0});
+        } else {
+            track_r = thumb_r = RECT{};
+        }
+        if (rows.empty()) text.draw(canvas, kPad, kViewTop + 14, rows_of == current ? L"Nothing here" : L"...", 150, 150, 160);
+    }
+
+    // Everything drawn above and below the scrolled view goes: the background is drawn there again.
+    void clear_outside() {
+        for (int y = 0; y < kH; ++y) {
+            if (y >= kViewTop && y < kViewBottom) continue;
+            std::fill(pixels.begin() + static_cast<std::ptrdiff_t>(y) * kW, pixels.begin() + static_cast<std::ptrdiff_t>(y + 1) * kW, 0u);
+        }
+        box(0, 0, kW, kViewTop, 18, 18, 22, 0.94f);
+        box(0, kViewBottom, kW, kH, 18, 18, 22, 0.94f);
+    }
+
+    void scroll_to(int to) {
+        const int v = std::clamp(to, 0, max_scroll);
+        if (v != rows_scroll) {
+            rows_scroll = v;
+            dirty = true;
+        }
+    }
+
+    void wheel(int delta, int x, int y) override {
+        if (current == "loot_filter" || current == "windows") return;
+        scroll_to(rows_scroll - delta * 66 / WHEEL_DELTA);  // 3 lines a notch
     }
 
     // The Windows tab (this DLL's own): each pinned window with Show/Hide and Reset, and how to move them.
@@ -3452,6 +3504,11 @@ struct WindowLayer : Layer {
         hits.clear();
         std::fill(pixels.begin(), pixels.end(), 0u);
         box(0, 0, kW, kH, 18, 18, 22, 0.94f);
+        const bool rows_tab = current != "loot_filter" && current != "windows";
+        if (rows_tab) {  // first, so the tab bar is drawn over what is scrolled out at the top
+            draw_rows();
+            clear_outside();
+        }
         // the tab bar
         int tx = kPad;
         for (size_t i = 0; i < tabs.size(); ++i) {
@@ -3471,7 +3528,6 @@ struct WindowLayer : Layer {
         box(kPad, kTop - 6, kW - kPad, kTop - 5, 70, 110, 170, 1.0f);
         if (current == "loot_filter") draw_junk();
         else if (current == "windows") draw_windows();
-        else draw_rows();
         for (const Hit& h : hits) {  // under the pointer: an item's name, or a button's tooltip
             if (!inside(h.r)) continue;
             std::wstring tip;
@@ -3566,9 +3622,20 @@ struct WindowLayer : Layer {
     }
     void mouse(UINT msg, int x, int y) override {
         if (msg == WM_MOUSEMOVE) {
+            if (thumb_drag) {  // the scroll bar's thumb follows the pointer
+                const int track_h = track_r.bottom - track_r.top, thumb_h = thumb_r.bottom - thumb_r.top;
+                if (track_h > thumb_h) scroll_to((y - thumb_grab - track_r.top) * max_scroll / (track_h - thumb_h));
+            }
             if (x != mouse_x || y != mouse_y) {
                 mouse_x = x;
                 mouse_y = y;
+                dirty = true;
+            }
+            return;
+        }
+        if (msg == WM_LBUTTONUP) {
+            if (thumb_drag) {
+                thumb_drag = false;
                 dirty = true;
             }
             return;
@@ -3585,6 +3652,7 @@ struct WindowLayer : Layer {
                 if (h.index < tabs.size() && tabs[h.index].id != current) {
                     current = tabs[h.index].id;
                     rows_page = 0;
+                    rows_scroll = 0;
                     FK_LOG(fklog::kInfo, "window: tab %s", current.c_str());
                     tell_view();
                 }
@@ -3605,6 +3673,13 @@ struct WindowLayer : Layer {
                     g_layout.save();
                     FK_LOG(fklog::kInfo, "window: pinned window %s back to its default place", g_pinned[h.index]->id.c_str());
                 }
+                break;
+            case kScrollThumb:
+                thumb_drag = true;
+                thumb_grab = y - thumb_r.top;
+                break;
+            case kScrollTrack:  // above or below the thumb: a view's height up or down
+                scroll_to(rows_scroll + (y < thumb_r.top ? -1 : 1) * (kViewBottom - kViewTop - 40));
                 break;
             case kCheckUpdates:
                 web_update::g_check_now = true;
@@ -4039,6 +4114,13 @@ LRESULT CALLBACK overlay_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             g_mouse_capture = nullptr;
             ReleaseCapture();
         }
+        return 0;
+    }
+    case WM_MOUSEWHEEL: {  // the position comes in screen coordinates
+        POINT pt{static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp))};
+        ScreenToClient(h, &pt);
+        if (Layer* l = g_mouse_capture ? g_mouse_capture : g_compositor.mouse_layer(pt.x, pt.y))
+            l->wheel(GET_WHEEL_DELTA_WPARAM(wp), pt.x - l->rect.left, pt.y - l->rect.top);
         return 0;
     }
     case WM_CAPTURECHANGED:
