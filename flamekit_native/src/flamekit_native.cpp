@@ -14,6 +14,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cctype>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -3007,6 +3008,7 @@ struct MessagesLayer : PinnedLayer {
 };
 
 std::string version_in(const std::wstring& mod_json);  // (the monitor's, further down)
+std::string read_text(const std::wstring& path, size_t max);
 
 // ---- FlameKit's window: a tab per feature ----
 // This layer only draws and takes clicks: it never reads the game. What it shows comes from the Lua part
@@ -3067,7 +3069,7 @@ struct WindowLayer : Layer {
     bool open = false, close_asked = false, dirty = true, drop_open = false;
     // the tabs
     std::vector<Tab> tabs;
-    std::string current = "loot_filter";  // the tab shown
+    std::string current = "changes";      // the tab shown: What's New the first time in a game, after that the last one
     std::string viewing;                  // what the Lua part was last told it shows ("" none)
     std::string rows_of;                  // the tab the rows belong to
     uint64_t generation = 0;
@@ -3079,6 +3081,10 @@ struct WindowLayer : Layer {
     RECT track_r{}, thumb_r{};
     // the Auto Junk List tab
     std::vector<Entry> bag, junk;
+    // what the player just moved, while the window is open: a gold frame on it, and its list goes to its page
+    std::unordered_set<std::string> moved_junk, moved_bag;
+    std::string show_junk, show_bag;  // just moved: go to its page once the new list is read
+    uint64_t next_open_check = 0;
     std::vector<Opt> opts;
     int opts_y = 0;  // where the option buttons are: beside Auto / Dump Junk / Drop when they fit, else a line under them
     bool auto_on = false, delete_junk = false;
@@ -3328,6 +3334,8 @@ struct WindowLayer : Layer {
         }
         const RECT r{x, y, x + kIcon, y + kIcon};
         if (inside(r)) frame_box(x, y, x + kIcon, y + kIcon, 2, 235, 225, 205);
+        if ((kind == kJunkItem && moved_junk.count(e.key)) || (kind == kBagItem && moved_bag.count(e.key)))
+            frame_box(x - 3, y - 3, x + kIcon + 3, y + kIcon + 3, 3, 255, 200, 60);  // just moved here: a gold frame
         hits.push_back({r, kind, index});
     }
     void section(const std::wstring& heading, float r, float g, float b, const std::vector<Entry>& list, size_t& page, int rows_n, int head_y,
@@ -3661,6 +3669,10 @@ struct WindowLayer : Layer {
 
     void close(const char* why) {
         open = close_asked = drop_open = false;
+        moved_junk.clear();
+        moved_bag.clear();
+        show_junk.clear();
+        show_bag.clear();
         mouse_x = mouse_y = -1;
         visible = false;
         changed = true;
@@ -3669,6 +3681,22 @@ struct WindowLayer : Layer {
     }
 
     void update(const Frame& f) override {
+        // the Lua part asks for the window on a tab (after an update: What's New; features/changes.lua): ui_open.dat
+        // holds the tab's id; opened once, the file is deleted
+        if (!open && f.now >= next_open_check) {
+            next_open_check = f.now + 500;
+            const std::wstring file = g_flamekit_dir + L"ui_open.dat";
+            if (f.in_world && f.game_front && GetFileAttributesW(file.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                const std::string tab = read_text(file, 64);
+                DeleteFileW(file.c_str());
+                std::string id;
+                for (char c : tab)
+                    if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') id += c;
+                if (!id.empty()) current = id;
+                g_ui_request = true;
+                FK_LOG(fklog::kInfo, "window: opened by the Lua part on tab %s", current.c_str());
+            }
+        }
         if (g_ui_request.exchange(false)) {
             if (!open && f.game_front) {
                 open = true;
@@ -3687,6 +3715,15 @@ struct WindowLayer : Layer {
         if (ls != list_stamp && read_list()) {
             list_stamp = ls;
             dirty = true;
+            auto go_to = [&](std::string& key, const std::vector<Entry>& list, size_t& page, int rows_n) {
+                for (size_t i = 0; i < list.size() && !key.empty(); ++i)
+                    if (list[i].key == key) {
+                        page = i / static_cast<size_t>(std::max(1, kCols * rows_n));
+                        key.clear();
+                    }
+            };
+            go_to(show_junk, junk, junk_page, kJunkRows);
+            go_to(show_bag, bag, bag_page, kBagRows);
         }
         if (ts != tabs_stamp && read_tabs()) {
             tabs_stamp = ts;
@@ -3838,10 +3875,20 @@ struct WindowLayer : Layer {
             case kRowPrev: if (rows_page > 0) --rows_page; break;
             case kRowNext: ++rows_page; break;
             case kBagItem:
-                if (h.index < bag.size()) act("junk", bag[h.index].key);
+                if (h.index < bag.size()) {
+                    act("junk", bag[h.index].key);
+                    moved_junk.insert(bag[h.index].key);
+                    moved_bag.erase(bag[h.index].key);
+                    show_junk = bag[h.index].key;
+                }
                 break;
             case kJunkItem:
-                if (h.index < junk.size()) act("keep", junk[h.index].key);
+                if (h.index < junk.size()) {
+                    act("keep", junk[h.index].key);
+                    moved_bag.insert(junk[h.index].key);
+                    moved_junk.erase(junk[h.index].key);
+                    show_bag = junk[h.index].key;
+                }
                 break;
             case kAuto: act("auto", auto_on ? "0" : "1"); break;
             case kDump: act("dump", "-"); break;

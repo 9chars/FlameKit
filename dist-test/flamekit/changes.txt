@@ -1,3 +1,8 @@
+0.15.30 Nov 13, 2026
+- After an update, FlameKit's window opens by itself on the What's New tab, once, the first time you are in a world. What's New is also the tab the window opens on the first time in a game.
+- New setting (Settings tab): open FlameKit's window every time you enter a world (off unless you switch it on).
+- Auto Junk List: an item you just moved gets a gold frame, and the list it moved to shows the page it is on, so you can see what you just moved. In both directions (to the junk list and back to the bag). The frames go when the window closes.
+
 0.15.29 Nov 13, 2026
 - FlameKit's window: What's New is the first tab. The Party tab is gone; its test players are in a new Debug section at the bottom of the Experimental tab, with FlameKit's log level (Off, Normal, Full; Ctrl+Shift+F12 still works) and where the logs are.
 - Each feature's settings are in its own tab only: the minimap's corner, distance from the edge and keys are in the Minimap tab; the Auto Junk List's "never touch the action bar" switch and its dump key are buttons on its tab. The Settings tab keeps FlameKit's own settings and the switches that turn a feature on or off (a feature switched off has no tab).

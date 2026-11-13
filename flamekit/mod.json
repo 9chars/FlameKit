@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.29",
+  "version": "0.15.30",
   "description": "One toolkit, many features (F6 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -50,6 +50,15 @@
       "default": true,
       "label": "Show FlameKit's messages (the Messages window)",
       "help": "What a feature just did, for example \"Junk discarded: Twigs x3\", in FlameKit's Messages window for a few seconds (hold the pointer key to see the last ones).",
+      "live": true,
+      "group": "FlameKit"
+    },
+    {
+      "key": "open_on_start",
+      "type": "bool",
+      "default": false,
+      "label": "Open FlameKit's window when you enter a world",
+      "help": "It opens on the What's New tab. After an update it opens once by itself anyway.",
       "live": true,
       "group": "FlameKit"
     },

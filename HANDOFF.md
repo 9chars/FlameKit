@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.29.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.30.
 
 ## What FlameKit is
 
@@ -71,7 +71,8 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.29. Client: 0.15.29 through the GitHub updater (needs a game restart).
+- Local server: 0.15.30. Client: 0.15.30 through the GitHub updater (needs a game restart).
+- 0.15.30 (owner): (1) after an update the window opens by itself on What's New: changes.lua writes the tab id into `ui_open.dat` (once per game: after an update, or every game with the new setting `open_on_start`); the DLL opens the window on that tab and deletes the file. `WindowLayer::current` starts as "changes". (2) Auto Junk List: a moved item gets a 3 px gold frame (`moved_junk` / `moved_bag`, cleared when the window closes) and its list goes to the item's page (`show_junk` / `show_bag`, after the next ui_list.dat read).
 - 0.15.29 (owner: reorganize; no setting in two tabs): tab order from main.lua, What's New first. Rule: **each feature's settings live in that feature's tab only**; the Settings tab shows only groups "FlameKit" and "FlameKit label" plus each feature's `enabled_setting` (a feature switched off has no tab, so its switch must stay there). `settings.lua` gives other tabs settings rows (`F.rows(keys)`, keys "set:...", the feature's click hands them to `settings.click`); the Auto Junk List's DLL view gets its settings as `P <click key> <lit> <label>` lines in ui_list.dat, clicks come back as `opt <click key>`; keys pressed in the window go to a setting waiting for one first (native_ui `key`). Party has no tab: its test players are in Experimental → Debug (`party.test_rows` / `set_test`, keys "dbg:test:N"), with the log level buttons (`dbg:log:off|normal|full` write debug.txt). Debug things belong in that Debug section.
 - 0.15.28 (owner: the F6 window was getting out of control): WindowLayer has a title bar (FlameKit vX, x closes), a frame, drag by the title bar, resize from the lower right corner (kMinW 560, kMinH 440); size and place in ui_layout.txt as "window" (LayoutEntry got a 7th field, the height; 6-field lines still read). The former constants kW/kH/kTop/kCols/kBagRows/... are members set by `lay_out()` each draw: tabs wrap to more rows (narrower padding first), the junk grids fit the size. Check for updates is in the What's New tab (`current == "changes"`, the view starts 44 px lower). Tab order from main.lua. Pinned windows: the grip also sets the height (`LayoutEntry::h` = at most this tall; content scrolls with the wheel, thin scroll bar). Party gold frame: bottom line at y+73 (the mana bar ends at y+71).
 - 0.15.27 (owner: a scroll bar for the F6 window, but keep the page control for other windows): `WindowLayer::draw_rows` lays all rows out and scrolls them (`rows_scroll`, mouse wheel through the new `Layer::wheel` / WM_MOUSEWHEEL, scroll bar thumb drag, click on the track = a view up or down); `clear_outside` cuts off what is scrolled out of the view; buttons half out of view take clicks only on their visible part. The Auto Junk List's icon grids keep their pages; `pager()` stays for other views.

@@ -62,7 +62,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { open_on_start = false, window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
@@ -769,6 +769,13 @@ do
   click(find_row("^Normal$", ":dbg:log:normal").button)
   check(require("core.kit").debug_level(true) == "normal", "and back to normal")
   toggle_panel()
+end
+-- after an update FlameKit's window is asked to open on What's New (once)
+do
+  local f = io.open(TMP .. "\\ui_open.dat", "r")
+  local what = f and f:read("a") or ""
+  if f then f:close() end
+  check(what == "changes", "after an update FlameKit's window is asked to open on the What's New tab")
 end
 -- a world save on request from the restart helper (features/server_save.lua)
 do
