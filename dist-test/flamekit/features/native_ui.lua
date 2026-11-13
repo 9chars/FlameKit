@@ -14,6 +14,14 @@
 --                     junk <debug name> | keep <debug name> | dump - | auto 0|1 | action drop|delete
 --                   The numbers only grow. A number not seen before is done once. At a (re)load the numbers already
 --                   in the file are taken as done, so a click is never done twice.
+--   ui_tabs.dat     written here when it changed: the window's tabs and, while the DLL shows one of the generic tabs,
+--                   that tab's rows (the same rows the old panel draws, from the feature's panel(world)); fields are
+--                   separated by tabs, newlines in a text are written as \n; then "end"
+--                     tab <feature id> <title>
+--                     view <feature id> <generation>          (the rows below belong to this generation)
+--                     r <kind h|t|b|s> <same line 0|1> <selected 0|1> <disabled 0|1> <dim 0|1> <colour rrggbb|-> <button number|0> <text> <tooltip>
+--   ui_actions.txt  also: view <feature id>|- (the DLL shows that tab, or none) and tab <feature id>/<generation>/<button
+--                   number> (a click on a row's button: done only when the generation is still the one shown)
 -- Both are runtime files: never deployed or diffed.
 
 local F = { id = "native_ui", title = "Native UI" }
@@ -22,6 +30,12 @@ local kit, junk_list
 local steps = 0
 local last_list = nil   -- ui_list.dat as last written
 local done = nil        -- the highest action number done (nil: the file is not read yet since this load)
+local view_id = nil     -- the generic tab the DLL shows (nil: none)
+local generation = 0    -- of the rows written for it
+local keys = {}         -- generation -> { button number -> the feature's key }
+local last_rows = nil   -- the rows part as last written (a change makes a new generation)
+local last_tabs = nil   -- ui_tabs.dat as last written
+local tabs_now = true   -- write ui_tabs.dat on the next step (a view or a click changed it)
 
 function F.setup(k)
   kit = k
@@ -57,6 +71,68 @@ local function write_list(world)
     tostring(opts.auto), opts.action)
 end
 
+local function clean(text)
+  return (tostring(text or ""):gsub("[\t\r]", " "):gsub("\n", "\\n"))
+end
+
+local function tab_features()  -- the features with a tab, switched on
+  local list = {}
+  for _, f in ipairs(kit.features) do
+    if f.panel and kit.enabled(f) then list[#list + 1] = f end
+  end
+  return list
+end
+
+local function feature(id)
+  for _, f in ipairs(kit.features) do
+    if f.id == id then return f end
+  end
+end
+
+local function write_tabs(world)
+  local lines = {}
+  for _, f in ipairs(tab_features()) do lines[#lines + 1] = "tab\t" .. f.id .. "\t" .. clean(f.title) end
+  local f = view_id and feature(view_id)
+  if f and view_id ~= "loot_filter" then  -- the Auto Junk List has its own view in the DLL (ui_list.dat)
+    local rows = kit.call(f, "panel", world)
+    if type(rows) == "table" then
+      local body, map = {}, {}
+      for _, r in ipairs(rows) do
+        local kind = r.separator and "s" or r.heading and "h" or (r.button or r.slot) and "b" or "t"
+        local number = 0
+        if kind == "b" then
+          map[#map + 1] = r.button or r.slot
+          number = #map
+        end
+        local colour = type(r.color) == "string" and r.color:match("^#?(%x%x%x%x%x%x)$") or "-"
+        body[#body + 1] = table.concat({ "r", kind, r.same_line and "1" or "0", r.selected and "1" or "0", r.disabled and "1" or "0",
+          r.dim and "1" or "0", colour, tostring(number), clean(r.heading or r.text), clean(r.tooltip) }, "\t")
+      end
+      local text = table.concat(body, "\n")
+      if text ~= last_rows then
+        last_rows = text
+        generation = generation + 1
+        keys[generation] = map
+        keys[generation - 3] = nil
+        kit.debug("debug", "native ui: tab %s: %d row(s), generation %d", view_id, #rows, generation)
+      end
+      lines[#lines + 1] = "view\t" .. view_id .. "\t" .. generation
+      lines[#lines + 1] = text
+    end
+  end
+  lines[#lines + 1] = "end"
+  local text = table.concat(lines, "\n") .. "\n"
+  if text == last_tabs then return end
+  local out = io.open(emf.dir .. "\\ui_tabs.dat", "w")
+  if not out then
+    kit.debug("warn", "native ui: ui_tabs.dat could not be written")
+    return
+  end
+  out:write(text)
+  out:close()
+  last_tabs = text
+end
+
 local function act(world, what, arg)
   kit.debug("info", "native ui: click from FlameKit's window: %s %s", tostring(what), tostring(arg))
   if what == "junk" or what == "keep" then
@@ -65,6 +141,22 @@ local function act(world, what, arg)
     junk_list.ui_dump(world)
   elseif what == "auto" or what == "action" then
     junk_list.ui_option(world, what, arg)
+  elseif what == "view" then
+    view_id = arg ~= "-" and arg or nil
+    last_rows = nil
+    tabs_now = true
+  elseif what == "tab" then
+    local id, gen, number = tostring(arg):match("^([%w_]+)/(%d+)/(%d+)$")
+    local map = gen and keys[tonumber(gen)]
+    local key = map and map[tonumber(number)]
+    local f = id and feature(id)
+    if f and key then
+      kit.call(f, "click", world, key)
+    else
+      kit.debug("info", "native ui: a click on %s was dropped (the tab changed before it arrived)", tostring(arg))
+    end
+    last_rows = nil
+    tabs_now = true
   end
 end
 
@@ -91,6 +183,10 @@ function F.client_tick(world)
   steps = steps + 1
   if steps % 3 == 0 then read_actions(world) end
   if steps % 10 == 0 or last_list == nil then write_list(world) end
+  if steps % 10 == 5 or tabs_now then
+    tabs_now = false
+    write_tabs(world)
+  end
 end
 
 return F

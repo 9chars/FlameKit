@@ -2353,47 +2353,72 @@ struct MinimapLayer : Layer {
     }
 };
 
-// ---- the Auto Junk List layer ----
+// ---- FlameKit's window: a tab per feature ----
 // This layer only draws and takes clicks: it never reads the game. What it shows comes from the Lua part
-// (features/native_ui.lua) in emf\mods\flamekit\ui_list.dat, and every click goes back to the Lua part as a line in
-// emf\mods\flamekit\ui_actions.txt; the Lua part does exactly what the panel's buttons do. Each file has one writer;
-// native_ui.lua describes both. EMF has no channel between a native mod and a Lua mod yet (EMF_REQUESTS.md, 8): when
-// it has, only read_list and act change. F6 (while the game is in front) opens it and it takes the keyboard and mouse;
-// F6 or Esc closes it, and so does another window taking the front (Alt+Tab).
-struct JunkLayer : Layer {
-    const char* name() const override { return "junk list"; }
+// (features/native_ui.lua), and every click goes back to the Lua part as a line in emf\mods\flamekit\ui_actions.txt;
+// the Lua part does exactly what the old panel's buttons do. Each file has one writer; native_ui.lua describes them:
+//   ui_tabs.dat   the tabs, and the rows of the tab shown (the same rows the old panel draws, from the feature's
+//                 panel(world)): headings, texts, buttons, separators, drawn here by one general row drawer
+//   ui_list.dat   the Auto Junk List tab's own view: the bag and the junk list as icons, Auto, Dump Junk, Drop/Delete
+// EMF has no channel between a native mod and a Lua mod yet (EMF_REQUESTS.md, 8): when it has, only the read_* and
+// act functions change. F6 (while the game is in front) opens the window and it takes the keyboard and mouse; F6 or
+// Esc closes it, and so does another window taking the front (Alt+Tab). Long tabs show in pages, never scroll.
+struct WindowLayer : Layer {
+    const char* name() const override { return "FlameKit window"; }
     struct Entry {
         uint32_t id = 0;    // item id; 0: the game does not know the item (a grey square)
         int count = 0;      // how many you carry
         std::string key;    // the game's debug name: what the Lua part knows the item by
         std::wstring name;  // the game's own name for it
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext };
+    struct Tab {
+        std::string id;
+        std::wstring title;
+    };
+    struct Row {
+        char kind = 't';  // h heading, t text, b button, s separator
+        bool same = false, selected = false, disabled = false, dim = false;
+        bool has_colour = false;
+        uint8_t r = 0, g = 0, b = 0;
+        int number = 0;  // a button's number in its generation
+        std::wstring text, tip;
+    };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext };
     struct Hit {
         RECT r;
         Kind kind;
         size_t index;
+        const std::wstring* tip = nullptr;
     };
-    static constexpr int kIcon = 64, kGap = 8, kCols = 10, kPad = 16, kBagRows = 5, kJunkRows = 4;
+    static constexpr int kIcon = 64, kGap = 8, kCols = 10, kPad = 16, kBagRows = 5, kJunkRows = 4, kTop = 46;
     static constexpr int kW = 2 * kPad + kCols * kIcon + (kCols - 1) * kGap;
     static constexpr int kBagGrid = kBagRows * kIcon + (kBagRows - 1) * kGap, kJunkGrid = kJunkRows * kIcon + (kJunkRows - 1) * kGap;
-    static constexpr int kBagHead = 56, kBagTop = kBagHead + 30, kJunkHead = kBagTop + kBagGrid + kPad;
+    static constexpr int kBagHead = kTop + 52, kBagTop = kBagHead + 30, kJunkHead = kBagTop + kBagGrid + kPad;
     static constexpr int kJunkTop = kJunkHead + 30, kH = kJunkTop + kJunkGrid + kPad;
 
     bool open = false, close_asked = false, dirty = true, drop_open = false;
+    // the tabs
+    std::vector<Tab> tabs;
+    std::string current = "loot_filter";  // the tab shown
+    std::string viewing;                  // what the Lua part was last told it shows ("" none)
+    std::string rows_of;                  // the tab the rows belong to
+    uint64_t generation = 0;
+    std::vector<Row> rows;
+    size_t rows_page = 0;
+    // the Auto Junk List tab
     std::vector<Entry> bag, junk;
     bool auto_on = false, delete_junk = false;
     size_t bag_page = 0, junk_page = 0;
     int mouse_x = -1, mouse_y = -1;
     std::vector<Hit> hits;
     std::vector<std::string> actions;
-    uint64_t last_action = 0, list_stamp = 0;
-    TextPainter title, text;
+    uint64_t last_action = 0, list_stamp = 0, tabs_stamp = 0;
+    TextPainter text;
     bool fonts = false;
     ItemIcons icons;
     std::unordered_map<uint32_t, std::vector<uint8_t>> pictures;  // an empty one: no picture to be had
 
-    JunkLayer() {
+    WindowLayer() {
         icons.open = [](const char* file, void*) {
             std::wstring wide(file, file + std::strlen(file));
             return _wfsopen((g_game_dir + wide).c_str(), L"rb", _SH_DENYNO);
@@ -2404,6 +2429,12 @@ struct JunkLayer : Layer {
             while (fgets(line, sizeof line, fp)) last_action = std::max<uint64_t>(last_action, std::strtoull(line, nullptr, 10));
             fclose(fp);
         }
+    }
+
+    static uint64_t stamp_of(const std::wstring& file) {
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        if (!GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)) return 2;
+        return ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1;
     }
 
     // Reads ui_list.dat. False (and nothing changed) while the file is missing or half written.
@@ -2432,15 +2463,90 @@ struct JunkLayer : Layer {
         }
         fclose(fp);
         if (!complete) {
-            FK_LOG(fklog::kDebug, "junk list: ui_list.dat is half written, read again later");
+            FK_LOG(fklog::kDebug, "window: ui_list.dat is half written, read again later");
             return false;
         }
         bag = std::move(b);
         junk = std::move(j);
         auto_on = a;
         delete_junk = del;
-        FK_LOG(fklog::kDebug, "junk list: ui_list.dat read: %d in the bag, %d on the junk list, auto %d, %s", static_cast<int>(bag.size()),
+        FK_LOG(fklog::kDebug, "window: ui_list.dat read: %d in the bag, %d on the junk list, auto %d, %s", static_cast<int>(bag.size()),
                static_cast<int>(junk.size()), auto_on, delete_junk ? "delete" : "drop");
+        return true;
+    }
+
+    static std::wstring unescape(const std::string& s) {  // "\n" in the file is a line break
+        std::string out;
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (s[i] == '\\' && i + 1 < s.size() && s[i + 1] == 'n') {
+                out += '\n';
+                ++i;
+            } else {
+                out += s[i];
+            }
+        }
+        return widen(out);
+    }
+
+    // Reads ui_tabs.dat. False (and nothing changed) while the file is missing or half written.
+    bool read_tabs() {
+        FILE* fp = _wfsopen((g_flamekit_dir + L"ui_tabs.dat").c_str(), L"rb", _SH_DENYNO);
+        if (!fp) return false;
+        std::vector<Tab> t;
+        std::vector<Row> r;
+        std::string of;
+        uint64_t gen = 0;
+        bool complete = false;
+        std::string line;
+        char buf[4096];
+        while (fgets(buf, sizeof buf, fp)) {
+            line = buf;
+            while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) line.pop_back();
+            if (line == "end") {
+                complete = true;
+                break;
+            }
+            std::vector<std::string> f;
+            for (size_t at = 0;;) {
+                const size_t tab = line.find('\t', at);
+                f.push_back(line.substr(at, tab == std::string::npos ? std::string::npos : tab - at));
+                if (tab == std::string::npos) break;
+                at = tab + 1;
+            }
+            if (f[0] == "tab" && f.size() >= 3) {
+                t.push_back({f[1], widen(f[2])});
+            } else if (f[0] == "view" && f.size() >= 3) {
+                of = f[1];
+                gen = std::strtoull(f[2].c_str(), nullptr, 10);
+            } else if (f[0] == "r" && f.size() >= 10) {
+                Row row;
+                row.kind = f[1].empty() ? 't' : f[1][0];
+                row.same = f[2] == "1";
+                row.selected = f[3] == "1";
+                row.disabled = f[4] == "1";
+                row.dim = f[5] == "1";
+                if (f[6].size() == 6) {
+                    const unsigned long rgb = std::strtoul(f[6].c_str(), nullptr, 16);
+                    row.has_colour = true;
+                    row.r = static_cast<uint8_t>(rgb >> 16);
+                    row.g = static_cast<uint8_t>(rgb >> 8);
+                    row.b = static_cast<uint8_t>(rgb);
+                }
+                row.number = std::atoi(f[7].c_str());
+                row.text = unescape(f[8]);
+                row.tip = unescape(f[9]);
+                r.push_back(std::move(row));
+            }
+        }
+        fclose(fp);
+        if (!complete) return false;
+        tabs = std::move(t);
+        if (of != rows_of || gen != generation) rows_page = of == rows_of ? rows_page : 0;
+        rows_of = of;
+        generation = gen;
+        rows = std::move(r);
+        FK_LOG(fklog::kDebug, "window: ui_tabs.dat read: %d tab(s); rows of '%s' (generation %llu): %d", static_cast<int>(tabs.size()), rows_of.c_str(),
+               generation, static_cast<int>(rows.size()));
         return true;
     }
 
@@ -2462,8 +2568,16 @@ struct JunkLayer : Layer {
             ok = fclose(fp) == 0 && ok;
         }
         ok = ok && MoveFileExW(tmp.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
-        if (ok) FK_LOG(fklog::kInfo, "junk list: click: %s %s (action %llu)", what.c_str(), arg.c_str(), last_action);
-        else FK_LOG(fklog::kError, "junk list: click: %s %s: ui_actions.txt could not be written (error %lu)", what.c_str(), arg.c_str(), GetLastError());
+        if (ok) FK_LOG(fklog::kInfo, "window: click: %s %s (action %llu)", what.c_str(), arg.c_str(), last_action);
+        else FK_LOG(fklog::kError, "window: click: %s %s: ui_actions.txt could not be written (error %lu)", what.c_str(), arg.c_str(), GetLastError());
+    }
+
+    // Tells the Lua part which generic tab is shown (it writes that tab's rows only then).
+    void tell_view() {
+        const std::string want = open && current != "loot_filter" ? current : "";
+        if (want == viewing) return;
+        viewing = want;
+        act("view", want.empty() ? "-" : want);
     }
 
     static size_t pages(size_t n, int rows) { return std::max<size_t>(1, (n + kCols * rows - 1) / (kCols * rows)); }
@@ -2494,7 +2608,7 @@ struct JunkLayer : Layer {
             }
         } else {
             pic.clear();
-            FK_LOG(fklog::kDebug, "junk list: no picture for item %08x", id);
+            FK_LOG(fklog::kDebug, "window: no picture for item %08x", id);
         }
         auto& kept = pictures[id] = std::move(pic);
         return kept.empty() ? nullptr : &kept;
@@ -2511,14 +2625,19 @@ struct JunkLayer : Layer {
         box(x1 - t, y0, x1, y1, r, g, b, 1.0f);
     }
     bool inside(const RECT& r) const { return mouse_x >= r.left && mouse_y >= r.top && mouse_x < r.right && mouse_y < r.bottom; }
-    void button(int x, int y, int w, const std::wstring& label, bool lit, Kind kind, size_t index = 0) {
+    void button(int x, int y, int w, const std::wstring& label, bool lit, Kind kind, size_t index = 0, bool disabled = false,
+                const Row* row = nullptr) {
         const RECT r{x, y, x + w, y + 30};
-        const bool over = inside(r);
-        if (lit) box(r.left, r.top, r.right, r.bottom, 70, 140, 80, 1.0f);
+        const bool over = inside(r) && !disabled;
+        if (lit && row && row->has_colour) box(r.left, r.top, r.right, r.bottom, row->r * 0.45f, row->g * 0.45f, row->b * 0.45f, 1.0f);
+        else if (lit) box(r.left, r.top, r.right, r.bottom, 70, 140, 80, 1.0f);
         else box(r.left, r.top, r.right, r.bottom, over ? 74.0f : 52.0f, over ? 74.0f : 52.0f, over ? 84.0f : 60.0f, 1.0f);
         if (over) frame_box(r.left, r.top, r.right, r.bottom, 1, 200, 200, 210);
-        text.draw(canvas, x + (w - text.width(label)) / 2, y + 5, label, 240, 240, 240);
-        hits.push_back({r, kind, index});
+        float tr = 240, tg = 240, tb = 240;
+        if (disabled) tr = tg = tb = 120;
+        else if (!lit && row && row->has_colour) tr = row->r, tg = row->g, tb = row->b;
+        text.draw(canvas, x + (w - text.width(label)) / 2, y + 5, label, tr, tg, tb);
+        hits.push_back({r, kind, index, row && !row->tip.empty() ? &row->tip : nullptr});
     }
     void tile(const Entry& e, int x, int y, Kind kind, size_t index) {
         if (const std::vector<uint8_t>* pic = picture(e.id)) canvas.picture(pic->data(), kIcon, x + kIcon * 0.5f, y + kIcon * 0.5f, 1.0f);
@@ -2531,60 +2650,190 @@ struct JunkLayer : Layer {
         if (inside(r)) frame_box(x, y, x + kIcon, y + kIcon, 2, 235, 225, 205);
         hits.push_back({r, kind, index});
     }
-    void section(const std::wstring& heading, float r, float g, float b, const std::vector<Entry>& list, size_t& page, int rows, int head_y,
+    void section(const std::wstring& heading, float r, float g, float b, const std::vector<Entry>& list, size_t& page, int rows_n, int head_y,
                  int top, Kind item, Kind prev, Kind next) {
         text.draw(canvas, kPad, head_y + 4, heading + L" (" + std::to_wstring(list.size()) + L")", r, g, b);
-        const size_t n = pages(list.size(), rows), per = static_cast<size_t>(kCols * rows);
+        const size_t n = pages(list.size(), rows_n), per = static_cast<size_t>(kCols * rows_n);
         page = std::min(page, n - 1);
-        if (n > 1) {
-            const std::wstring where = std::to_wstring(page + 1) + L"/" + std::to_wstring(n);
-            const int right = kW - kPad, ww = text.width(where) + 16;
-            button(right - 30, head_y, 30, L">", false, next);
-            text.draw(canvas, right - 30 - ww + 8, head_y + 5, where, 200, 200, 210);
-            button(right - 30 - ww - 30, head_y, 30, L"<", false, prev);
-        }
+        if (n > 1) pager(head_y, page, n, prev, next);
         if (list.empty()) text.draw(canvas, kPad, top + kIcon / 2 - 10, L"Empty", 150, 150, 160);
         for (size_t i = page * per; i < list.size() && i < (page + 1) * per; ++i) {
             const size_t k = i - page * per;
             tile(list[i], kPad + static_cast<int>(k % kCols) * (kIcon + kGap), top + static_cast<int>(k / kCols) * (kIcon + kGap), item, i);
         }
     }
+    void pager(int y, size_t page, size_t n, Kind prev, Kind next) {  // "< 2/3 >" at the right
+        const std::wstring where = std::to_wstring(page + 1) + L"/" + std::to_wstring(n);
+        const int right = kW - kPad, ww = text.width(where) + 16;
+        button(right - 30, y, 30, L">", false, next);
+        text.draw(canvas, right - 30 - ww + 8, y + 5, where, 200, 200, 210);
+        button(right - 30 - ww - 30, y, 30, L"<", false, prev);
+    }
+
+    // Lines of `s` that fit in `width` pixels (words kept whole where they can be).
+    std::vector<std::wstring> wrap(const std::wstring& s, int width) {
+        std::vector<std::wstring> out;
+        size_t start = 0;
+        while (start <= s.size()) {
+            const size_t nl = s.find(L'\n', start);
+            const std::wstring para = s.substr(start, nl == std::wstring::npos ? std::wstring::npos : nl - start);
+            std::wstring line;
+            size_t at = 0;
+            while (at < para.size()) {
+                size_t sp = para.find(L' ', at);
+                if (sp == std::wstring::npos) sp = para.size();
+                const std::wstring word = para.substr(at, sp - at);
+                const std::wstring tryline = line.empty() ? word : line + L" " + word;
+                if (!line.empty() && text.width(tryline) > width) {
+                    out.push_back(line);
+                    line = word;
+                } else {
+                    line = tryline;
+                }
+                at = sp + 1;
+            }
+            out.push_back(line);
+            if (nl == std::wstring::npos) break;
+            start = nl + 1;
+        }
+        return out;
+    }
+
+    // The rows of a generic tab: laid out top to bottom, buttons along a line while they fit (same_line), a new page
+    // where the window ends. Draws the page shown.
+    void draw_rows() {
+        const int left = kPad, right = kW - kPad, top = kTop + 12, bottom = kH - kPad - 40;
+        struct Placed {
+            const Row* row;
+            int page, x, y, w, h;
+            std::vector<std::wstring> lines;
+        };
+        std::vector<Placed> placed;
+        int page = 0, x = left, y = top, line_h = 0;
+        auto newline = [&] {
+            if (line_h > 0) y += line_h + 6;
+            x = left;
+            line_h = 0;
+        };
+        auto fit = [&](int h) {  // a new page when this does not fit any more
+            if (y + h > bottom && y > top) {
+                ++page;
+                y = top;
+                x = left;
+                line_h = 0;
+            }
+        };
+        for (const Row& r : rows) {
+            if (r.kind == 'b') {
+                const int w = std::max(34, text.width(r.text) + 22);
+                if (!(r.same && x > left && x + w <= right)) newline();
+                fit(30);
+                placed.push_back({&r, page, x, y, w, 30, {}});
+                x += w + 6;
+                line_h = 30;
+            } else {
+                newline();
+                if (r.kind == 's') {
+                    fit(14);
+                    placed.push_back({&r, page, left, y + 6, right - left, 1, {}});
+                    y += 14;
+                } else {
+                    std::vector<std::wstring> lines = wrap(r.text, right - left);
+                    const int lh = r.kind == 'h' ? 26 : 22;
+                    const int h = lh * static_cast<int>(lines.size()) + (r.kind == 'h' ? 4 : 0);
+                    fit(h);
+                    placed.push_back({&r, page, left, y + (r.kind == 'h' ? 4 : 0), right - left, h, std::move(lines)});
+                    y += h + 2;
+                }
+            }
+        }
+        const size_t n = static_cast<size_t>(page) + 1;
+        rows_page = std::min(rows_page, n - 1);
+        for (const Placed& p : placed) {
+            if (p.page != static_cast<int>(rows_page)) continue;
+            const Row& r = *p.row;
+            if (r.kind == 'b') {
+                button(p.x, p.y, p.w, r.text, r.selected, kRowButton, static_cast<size_t>(r.number), r.disabled, &r);
+            } else if (r.kind == 's') {
+                box(p.x, p.y, p.x + p.w, p.y + 1, 90, 90, 100, 1.0f);
+            } else {
+                float cr = 220, cg = 220, cb = 225;
+                if (r.kind == 'h') cr = 255, cg = 210, cb = 122;
+                if (r.dim) cr = cg = cb = 150;
+                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                int ly = p.y;
+                for (const std::wstring& l : p.lines) {
+                    text.draw(canvas, p.x, ly, l, cr, cg, cb);
+                    ly += r.kind == 'h' ? 26 : 22;
+                }
+            }
+        }
+        if (n > 1) pager(kH - kPad - 32, rows_page, n, kRowPrev, kRowNext);
+        if (rows.empty()) text.draw(canvas, left, top + 4, rows_of == current ? L"Nothing here" : L"...", 150, 150, 160);
+    }
+
+    void draw_junk() {
+        const std::wstring drop_label = std::wstring(delete_junk ? L"Delete" : L"Drop") + L" ▾";
+        const int drop_w = std::max(text.width(L"Delete ▾"), text.width(L"Drop ▾")) + 28;
+        const int drop_x = kW - kPad - drop_w, by = kTop + 10;
+        button(drop_x, by, drop_w, drop_label, false, kDrop);
+        const int dump_w = text.width(L"Dump Junk") + 28, dump_x = drop_x - 8 - dump_w;
+        button(dump_x, by, dump_w, L"Dump Junk", false, kDump);
+        const int auto_w = text.width(L"Auto: OFF") + 28;
+        button(dump_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
+        section(L"In your bag", 255, 210, 122, bag, bag_page, kBagRows, kBagHead, kBagTop, kBagItem, kBagPrev, kBagNext);
+        section(L"Your junk list", 255, 74, 61, junk, junk_page, kJunkRows, kJunkHead, kJunkTop, kJunkItem, kJunkPrev, kJunkNext);
+        if (drop_open) {  // the drop-down's options, over what is below
+            box(drop_x - 1, by + 29, drop_x + drop_w + 1, by + 30 + 2 * 30 + 1, 200, 200, 210, 1.0f);
+            button(drop_x, by + 30, drop_w, L"Drop", !delete_junk, kDropOption, 0);
+            button(drop_x, by + 60, drop_w, L"Delete", delete_junk, kDropOption, 1);
+        }
+    }
 
     void draw() {
         if (!fonts) {
             fonts = true;
-            title.ready(g_screen, 22);
             text.ready(g_screen, 16);
         }
         resize(kW, kH);
         hits.clear();
         std::fill(pixels.begin(), pixels.end(), 0u);
         box(0, 0, kW, kH, 18, 18, 22, 0.94f);
-        title.draw(canvas, kPad, 11, L"Auto Junk List", 235, 225, 205);
-        const std::wstring drop_label = std::wstring(delete_junk ? L"Delete" : L"Drop") + L" ▾";
-        const int drop_w = std::max(text.width(L"Delete ▾"), text.width(L"Drop ▾")) + 28;
-        const int drop_x = kW - kPad - drop_w;
-        button(drop_x, 12, drop_w, drop_label, false, kDrop);
-        const int dump_w = text.width(L"Dump Junk") + 28, dump_x = drop_x - 8 - dump_w;
-        button(dump_x, 12, dump_w, L"Dump Junk", false, kDump);
-        const int auto_w = text.width(L"Auto: OFF") + 28;
-        button(dump_x - 8 - auto_w, 12, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
-        section(L"In your bag", 255, 210, 122, bag, bag_page, kBagRows, kBagHead, kBagTop, kBagItem, kBagPrev, kBagNext);
-        section(L"Your junk list", 255, 74, 61, junk, junk_page, kJunkRows, kJunkHead, kJunkTop, kJunkItem, kJunkPrev, kJunkNext);
-        if (drop_open) {  // the drop-down's options, over what is below
-            box(drop_x - 1, 41, drop_x + drop_w + 1, 42 + 2 * 30 + 1, 200, 200, 210, 1.0f);
-            button(drop_x, 42, drop_w, L"Drop", !delete_junk, kDropOption, 0);
-            button(drop_x, 72, drop_w, L"Delete", delete_junk, kDropOption, 1);
+        // the tab bar
+        int tx = kPad;
+        for (size_t i = 0; i < tabs.size(); ++i) {
+            const int w = text.width(tabs[i].title) + 28;
+            const bool on = tabs[i].id == current;
+            const RECT r{tx, 8, tx + w, 38};
+            const bool over = inside(r);
+            box(r.left, r.top, r.right, r.bottom, on ? 46.0f : over ? 50.0f : 32.0f, on ? 92.0f : over ? 56.0f : 36.0f, on ? 150.0f : over ? 70.0f : 44.0f, 1.0f);
+            text.draw(canvas, tx + 14, 13, tabs[i].title, on ? 235.0f : 170.0f, on ? 240.0f : 190.0f, 255);
+            hits.push_back({r, kTab, i});
+            tx += w + 4;
         }
-        for (const Hit& h : hits) {  // the name of the item under the pointer
-            if ((h.kind != kBagItem && h.kind != kJunkItem) || !inside(h.r)) continue;
-            const Entry& e = h.kind == kBagItem ? bag[h.index] : junk[h.index];
-            const std::wstring tip = e.name.empty() ? widen(e.key) : e.name;
-            const int tw = text.width(tip) + 16, th = 28;
-            const int tx = std::clamp(mouse_x + 14, 0, kW - tw), ty = std::clamp(mouse_y + 20, 0, kH - th);
-            box(tx, ty, tx + tw, ty + th, 30, 30, 36, 1.0f);
-            frame_box(tx, ty, tx + tw, ty + th, 1, 120, 120, 130);
-            text.draw(canvas, tx + 8, ty + 4, tip, 240, 240, 240);
+        box(kPad, kTop - 6, kW - kPad, kTop - 5, 70, 110, 170, 1.0f);
+        if (current == "loot_filter") draw_junk();
+        else draw_rows();
+        for (const Hit& h : hits) {  // under the pointer: an item's name, or a button's tooltip
+            if (!inside(h.r)) continue;
+            std::wstring tip;
+            if (h.kind == kBagItem && h.index < bag.size()) tip = bag[h.index].name.empty() ? widen(bag[h.index].key) : bag[h.index].name;
+            else if (h.kind == kJunkItem && h.index < junk.size()) tip = junk[h.index].name.empty() ? widen(junk[h.index].key) : junk[h.index].name;
+            else if (h.tip) tip = *h.tip;
+            if (tip.empty()) continue;
+            const std::vector<std::wstring> lines = wrap(tip, 420);
+            int tw = 0;
+            for (const std::wstring& l : lines) tw = std::max(tw, text.width(l));
+            tw += 16;
+            const int th = 22 * static_cast<int>(lines.size()) + 8;
+            const int tx2 = std::clamp(mouse_x + 14, 0, std::max(0, kW - tw)), ty = std::clamp(mouse_y + 20, 0, std::max(0, kH - th));
+            box(tx2, ty, tx2 + tw, ty + th, 30, 30, 36, 1.0f);
+            frame_box(tx2, ty, tx2 + tw, ty + th, 1, 120, 120, 130);
+            int ly = ty + 4;
+            for (const std::wstring& l : lines) {
+                text.draw(canvas, tx2 + 8, ly, l, 240, 240, 240);
+                ly += 22;
+            }
             break;
         }
         changed = true;
@@ -2595,30 +2844,38 @@ struct JunkLayer : Layer {
         mouse_x = mouse_y = -1;
         visible = false;
         changed = true;
-        FK_LOG(fklog::kInfo, "junk list: closed (%s)", why);
+        tell_view();
+        FK_LOG(fklog::kInfo, "window: closed (%s)", why);
     }
 
     void update(const Frame& f) override {
         if (g_ui_request.exchange(false)) {
             if (!open && f.game_front) {
                 open = true;
-                list_stamp = 0;  // read at once
+                list_stamp = tabs_stamp = 0;  // read at once
                 dirty = true;
-                FK_LOG(fklog::kInfo, "junk list: opened (F6)");
+                FK_LOG(fklog::kInfo, "window: opened (F6), tab %s", current.c_str());
             } else if (!open) {
-                FK_LOG(fklog::kInfo, "junk list: F6 ignored: the game's window is not the front window");
+                FK_LOG(fklog::kInfo, "window: F6 ignored: the game's window is not the front window");
             }
         }
         if (open && (close_asked || !f.in_world)) close(close_asked ? "F6, Esc or another window took the front" : "the world ended");
         if (!open) return;
-        WIN32_FILE_ATTRIBUTE_DATA info{};
-        const uint64_t stamp =
-            GetFileAttributesExW((g_flamekit_dir + L"ui_list.dat").c_str(), GetFileExInfoStandard, &info)
-                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
-                : 2;
-        if (stamp != list_stamp && read_list()) {
-            list_stamp = stamp;
+        tell_view();
+        const uint64_t ls = stamp_of(g_flamekit_dir + L"ui_list.dat"), ts = stamp_of(g_flamekit_dir + L"ui_tabs.dat");
+        if (ls != list_stamp && read_list()) {
+            list_stamp = ls;
             dirty = true;
+        }
+        if (ts != tabs_stamp && read_tabs()) {
+            tabs_stamp = ts;
+            dirty = true;
+            bool known = false;
+            for (const Tab& t : tabs) known = known || t.id == current;
+            if (!known && !tabs.empty()) {
+                current = tabs[0].id;
+                tell_view();
+            }
         }
         if (dirty) {
             dirty = false;
@@ -2657,6 +2914,19 @@ struct JunkLayer : Layer {
             const Hit& h = *it;
             if (x < h.r.left || y < h.r.top || x >= h.r.right || y >= h.r.bottom) continue;
             switch (h.kind) {
+            case kTab:
+                if (h.index < tabs.size() && tabs[h.index].id != current) {
+                    current = tabs[h.index].id;
+                    rows_page = 0;
+                    FK_LOG(fklog::kInfo, "window: tab %s", current.c_str());
+                    tell_view();
+                }
+                break;
+            case kRowButton:
+                act("tab", rows_of + "/" + std::to_string(generation) + "/" + std::to_string(h.index));
+                break;
+            case kRowPrev: if (rows_page > 0) --rows_page; break;
+            case kRowNext: ++rows_page; break;
             case kBagItem:
                 if (h.index < bag.size()) act("junk", bag[h.index].key);
                 break;
@@ -2676,6 +2946,53 @@ struct JunkLayer : Layer {
         }
     }
 };
+
+// ---- the backdrop: the whole game window takes the pointer while FlameKit's window is open ----
+// Fully clear pixels of a layered window let the mouse through to the game, which hides its pointer over its own
+// window. While FlameKit's window is open, this layer covers the game window with pixels that are as good as clear
+// (alpha 1 of 255) so the pointer stays visible everywhere; a click outside FlameKit's window does nothing.
+struct BackdropLayer : Layer {
+    const char* name() const override { return "backdrop"; }
+    const Layer* window = nullptr;
+    void update(const Frame& f) override {
+        const bool want = window && window->visible && f.gw > 0 && f.gh > 0;
+        if (want != visible) {
+            visible = want;
+            changed = true;
+            FK_LOG(fklog::kDebug, "backdrop: %s", want ? "on (the pointer shows over the whole game window)" : "off");
+        }
+        if (!visible) return;
+        if (canvas.w != f.gw || canvas.h != f.gh) {
+            resize(f.gw, f.gh);
+            std::fill(pixels.begin(), pixels.end(), 0x01000000u);
+        }
+        place(0, 0);
+    }
+    bool wants_mouse() const override { return visible; }
+};
+
+// The game's own mouse pointer, so FlameKit's windows look like the game's: taken from Windows while the game shows its
+// pointer (in its menus) the first time; until then (or if the game draws its pointer itself) Windows' arrow.
+HCURSOR g_game_cursor = nullptr;
+void look_for_game_cursor() {
+    if (g_game_cursor) return;
+    CURSORINFO ci{};
+    ci.cbSize = sizeof(ci);
+    if (!GetCursorInfo(&ci) || !(ci.flags & CURSOR_SHOWING) || !ci.hCursor) return;
+    static const LPCSTR kSystem[] = {IDC_ARROW, IDC_IBEAM, IDC_WAIT, IDC_CROSS, IDC_UPARROW, IDC_SIZENWSE, IDC_SIZENESW, IDC_SIZEWE,
+                                     IDC_SIZENS, IDC_SIZEALL, IDC_NO, IDC_HAND, IDC_APPSTARTING, IDC_HELP};
+    for (LPCSTR id : kSystem)
+        if (ci.hCursor == LoadCursorA(nullptr, id)) return;  // one of Windows' own: not the game's
+    g_game_cursor = static_cast<HCURSOR>(CopyIcon(ci.hCursor));
+    ICONINFO ii{};
+    BITMAP bm{};
+    if (g_game_cursor && GetIconInfo(g_game_cursor, &ii)) {
+        GetObject(ii.hbmColor ? ii.hbmColor : ii.hbmMask, sizeof bm, &bm);
+        if (ii.hbmColor) DeleteObject(ii.hbmColor);
+        if (ii.hbmMask) DeleteObject(ii.hbmMask);
+    }
+    FK_LOG(fklog::kInfo, "cursor: the game's pointer is used for FlameKit's windows (%ldx%ld)", bm.bmWidth, bm.bmHeight);
+}
 
 // ---- the lower left corner: the status line, the FlameKit label, the update line, the debug level ----
 // The label and the status line come from the Lua part in emf\mods\flamekit\ui_hud.dat (kit.lua describes it); the
@@ -2971,7 +3288,7 @@ LRESULT CALLBACK overlay_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         return g_compositor.keys_layer() ? MA_ACTIVATE : MA_NOACTIVATE;
     case WM_SETCURSOR:
         if (g_presenter.interactive) {
-            SetCursor(LoadCursorA(nullptr, IDC_ARROW));
+            SetCursor(g_game_cursor ? g_game_cursor : LoadCursorA(nullptr, IDC_ARROW));
             return TRUE;
         }
         break;
@@ -3123,8 +3440,10 @@ void ui_thread_body() {
 
     MinimapLayer minimap;
     HudLayer hud;
-    JunkLayer junk;
-    g_compositor.layers = {&minimap, &hud, &junk};  // bottom first
+    WindowLayer window;
+    BackdropLayer backdrop;
+    backdrop.window = &window;
+    g_compositor.layers = {&minimap, &hud, &backdrop, &window};  // bottom first
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
@@ -3177,6 +3496,7 @@ void ui_thread_body() {
         if (f12 && !f12_was) fklog::set_mode((fklog::g_mode.load() + 1) % 3);
         f12_was = f12;
 
+        if (f.game_front) look_for_game_cursor();  // the game's pointer, while the game shows it in its menus
         for (Layer* l : g_compositor.layers) l->update(f);
 
         // the keyboard and the mouse: to the overlay while a layer takes them

@@ -560,4 +560,44 @@ kit.debug("info", "test info")
 kit.debug("warn", "test warning")
 check(lines_with("INFO test info") == 0 and lines_with("WARN test warning") == 1, "at off only warnings and errors are written")
 os.remove(TMP .. "\\debug.txt")
+-- FlameKit's own window: the tab list, the rows of the tab shown, a click on one of its buttons (native_ui.lua)
+local function read_tabs()
+  local f = io.open(TMP .. "\\ui_tabs.dat", "r")
+  local t = f and f:read("a") or ""
+  if f then f:close() end
+  return t
+end
+local action_n = 9000000000000
+local action_lines = {}
+local function ui_action(what, arg)
+  action_n = action_n + 1
+  action_lines[#action_lines + 1] = action_n .. " " .. what .. " " .. arg
+  local f = io.open(TMP .. "\\ui_actions.txt", "w"); f:write(table.concat(action_lines, "\n") .. "\n"); f:close()
+end
+step(12)
+check(read_tabs():find("tab\tminimap\tMinimap", 1, true) ~= nil, "ui_tabs.dat lists the Minimap tab")
+check(read_tabs():find("\nview\t", 1, true) == nil, "no rows while the window shows no generic tab")
+ui_action("view", "minimap")
+step(12)
+local tabs_text = read_tabs()
+local gen = tabs_text:match("view\tminimap\t(%d+)")
+check(gen ~= nil, "the Minimap tab's rows are written once the window shows it")
+local number
+for line in tabs_text:gmatch("[^\n]+") do
+  local f = {}
+  for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
+  if f[1] == "r" and f[2] == "b" and f[9] == "Ancient Spires" then number = f[8] end
+end
+check(number ~= nil, "the marker filter Ancient Spires is a button")
+local before = settings.map_hide
+ui_action("tab", "minimap/" .. gen .. "/" .. number)
+step(6)
+local after = settings.map_hide
+check(after ~= before and after:find("sp", 1, true) ~= nil, "a click in FlameKit's window does what the panel's button does")
+ui_action("tab", "minimap/0/" .. number)
+step(6)
+check(settings.map_hide == after, "a click for rows the window no longer shows is dropped")
+ui_action("view", "-")
+step(12)
+check(read_tabs():find("\nview\t", 1, true) == nil, "no rows once the window is closed")
 print("ALL PASSED (" .. MODE .. ")")

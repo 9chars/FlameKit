@@ -1,3 +1,11 @@
+0.15.19 Nov 13, 2026
+- FlameKit's window (F6, client) has tabs: Auto Junk List, Minimap and Experimental. The Minimap and Experimental tabs have the same buttons as in the old panel and do the same things; any feature with a tab shows up there.
+- Long tabs show in pages (< 1/2 >) instead of scrolling. Hovering a button shows its explanation.
+- While FlameKit's window is open the mouse pointer shows over the whole game window, not only over FlameKit's window; a click outside FlameKit's window does nothing.
+- FlameKit's windows use the game's own mouse pointer once the game has shown it (in the bag, the map or any menu); until then Windows' arrow.
+- The client writes the tabs and the rows of the tab shown into ui_tabs.dat for FlameKit's window; clicks come back through ui_actions.txt.
+- Tests: the tab bridge (rows written only while the tab is shown, a click does what the panel's button does, a click for rows no longer shown is dropped).
+
 0.15.18 Nov 13, 2026
 - FlameKit's log (client) no longer records other programs' window titles: a window that is not the game's is logged only by its program's file name (e.g. notepad.exe) and window class.
 - FlameKit's log never contains the Windows user name: it is written as <user> (it appears in folder paths).

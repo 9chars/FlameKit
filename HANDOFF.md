@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.18.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.19.
 
 ## What FlameKit is
 
@@ -44,7 +44,7 @@ Folder names on the owner's PC are not in this repository (it is public). `<work
 - **Production server:** G-Portal, last given 0.14.1/0.14.2 by the owner. Upload only when asked.
 - **Logs:** `emf\emf_core.log` in the client and in the server folder.
 
-Runtime files that are never deployed, diffed or overwritten: `junk_list.json`, `seen_version.json`, `far_players.dat`, `experimental.json` (server), `item_details.dat`, `icon_requests.txt`, `icons\`, `panel_open.dat`, `update_status.txt`, `update_channel.txt`, `ui_list.dat`, `ui_actions.txt`, `ui_hud.dat`, `debug.txt`, `logs\`, `ui_bag.dat` (no longer written).
+Runtime files that are never deployed, diffed or overwritten: `junk_list.json`, `seen_version.json`, `far_players.dat`, `experimental.json` (server), `item_details.dat`, `icon_requests.txt`, `icons\`, `panel_open.dat`, `update_status.txt`, `update_channel.txt`, `ui_list.dat`, `ui_tabs.dat`, `ui_actions.txt`, `ui_hud.dat`, `debug.txt`, `logs\`, `ui_bag.dat` (no longer written).
 
 ## How to build and publish a version
 
@@ -65,7 +65,8 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.18. Client: 0.15.18 through the GitHub updater (needs a game restart).
+- Local server: 0.15.19. Client: 0.15.19 through the GitHub updater (needs a game restart).
+- 0.15.19: FlameKit's window (F6) is tabbed (`WindowLayer`): Auto Junk List keeps its own icon view (ui_list.dat); every other feature with `panel(world)` is drawn by a general row drawer from `ui_tabs.dat` (headings, texts, buttons, separators; pages, tooltips), clicks go to the feature's `click(world, key)` through ui_actions.txt (`view <id>`, `tab <id>/<generation>/<button>`). `BackdropLayer` keeps the pointer over the whole game window while the window is open; the game's own pointer is copied from Windows once the game shows it (`look_for_game_cursor`). Next: settings that are only in EMF's Mods tab (keys, corner, margin, label, status lines), then F4 opens FlameKit's window and the EMF panel (`kit.hub`) goes.
 - Overlay test (0.15.18, owner's client, 2026-11-13): Alt+Tab, Steam overlay, menus, F6/Esc, Ctrl+Shift+F12: the owner could not break it; watchdog 0 failures (193 checks in the busiest minute).
 - TO DO when the settings tabs are built: show the debug-level hotkey (Ctrl+Shift+F12: off / normal / full) and where the logs are, in FlameKit's own UI; the owner and players will forget it otherwise.
 - Privacy rule (owner, 0.15.18): no personal data in this public repository (folder names: `LOCAL_PATHS.md` on the PC only). For FlameKit's log: only data relevant to the processes involved and needed for adequate logging. Other programs' windows: program file name and class only, never titles; the Windows user name is replaced by `<user>` in every line (fk_log.hpp).
