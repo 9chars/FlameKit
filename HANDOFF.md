@@ -1,0 +1,92 @@
+# FlameKit: handoff note
+
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.18.
+
+## What FlameKit is
+
+One mod suite for Enshrouded by Ninechars, one version number for the whole product. Two parts:
+
+- **The Lua part** (`flamekit/`): the panel and the features. Runs in the player's game (the "client") and on the dedicated server.
+- **The native part** (`flamekit_native/src/`, built into `flamekit_native.dll`, mod "FlameKit Native"): the minimap overlay, item details, item icons and the updater. Client only, never on a server.
+
+It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Features: Auto Junk List, Minimap, Experimental options (per player), change log window, self-update.
+
+## How the owner wants the work done (follow these exactly)
+
+1. **Confirm before changing anything.** Say in a line or two what you are about to change and wait for a yes. Reading logs and files to answer a question needs no confirmation.
+2. **A question is a question.** Asking for information is not a request to change something.
+3. **Take instructions literally.** Do what was named, nothing wider. No assumptions, no extra options, no "while I'm here".
+4. **Be specific.** When asking the owner to check something, say exactly where to look and what the expected result is, the first time.
+5. **One version per round of work.** Every time anything changes, the version goes up; one version can hold many changes. Never leave changed code under an old number.
+6. **The change log lists everything.** `flamekit/changes.txt` gets a line for every change in every version. Nothing is trimmed, merged or hidden. Format: a line `0.15.8 Nov 13, 2026`, then `- ` lines, then an empty line; newest first.
+7. **Test the way production works.** Nothing is copied onto the owner's client by hand. New versions reach the client only through the updater.
+8. **No release package until told.** Do not build zips or touch `dist` (the players' channel) until the owner says to roll to production.
+9. **Do not modify game data.** Read only. Prefer few frameworks. When a game update breaks something, fall back to a generic label or icon; disable a feature only if needed to prevent a crash.
+10. **Short labels, short chat lines, no explanatory text in the panel.** Always say "client" or "server" explicitly.
+11. **Keep replies short** and lead with the result.
+12. **No EMF for any UI.** Nothing FlameKit shows on screen is drawn by EMF, whatever exists today or was used before. Every piece of code that uses EMF to show UI (`emf.hud`, `emf.notify`, the F4 panel and its tabs, `kit.hub`) is to be removed and replaced by FlameKit's own UI framework in `flamekit_native.dll`, step by step. Keep it simple; FlameKit's UI must not interfere with other mods or the game's own functions. Later: an output box for status messages.
+13. **The DLL never reads the game for the UI.** The Lua part (fields looked up by name at runtime, so it survives game updates) owns all game data and all changes; the DLL only draws and takes clicks. Stable and reliable over clever; no hacky code.
+14. **When something needs to be run on the owner's PC** (the build watcher, a program, a restart of the local server), do not hand it to the owner as a chore: ask for permission to run it yourself (computer use or the shell), and on a yes, do it.
+15. **Name things explicitly.** In every message to the owner, name exactly what is meant: the file, the program, the tool, the window, the setting, the version. No "it", "this", "that" or "things" where the owner would have to guess; write the name instead (e.g. "the tool that copies files onto your PC", not "it").
+
+## Where everything is
+
+Folder names on the owner's PC are not in this repository (it is public). `<work folder>`, `<game folder>` and `<server folder>` below are listed in `LOCAL_PATHS.md` next to HANDOFF.md on the owner's PC (never pushed).
+
+- **GitHub:** `9chars/FlameKit` (public). Source, notes, tools, and the update channels. The Claude GitHub App is installed on it; pushing works.
+  - `dist-test/`: development versions. The owner's PC downloads from here (it has `emf\mods\flamekit\update_channel.txt` containing `test`).
+  - `dist/`: players' versions. Does not exist yet; create it only on release.
+- **Owner's PC working copies:** `<work folder>\flamekit` (Lua), `<work folder>\flamekit_native` (C++: `src\`, `build.cmd`, `notes\`).
+- **Client install:** `<game folder>\emf\mods\{lua, flamekit, flamekit_native}`.
+- **Local dedicated server:** `<server folder>\emf\mods\{lua, flamekit}`.
+- **Production server:** G-Portal, last given 0.14.1/0.14.2 by the owner. Upload only when asked.
+- **Logs:** `emf\emf_core.log` in the client and in the server folder.
+
+Runtime files that are never deployed, diffed or overwritten: `junk_list.json`, `seen_version.json`, `far_players.dat`, `experimental.json` (server), `item_details.dat`, `icon_requests.txt`, `icons\`, `panel_open.dat`, `update_status.txt`, `update_channel.txt`, `ui_list.dat`, `ui_actions.txt`, `ui_hud.dat`, `debug.txt`, `logs\`, `ui_bag.dat` (no longer written).
+
+## How to build and publish a version
+
+1. Change the source. Bump `version` in `flamekit/mod.json` and `flamekit_native/mod.json` to the same number. Add the lines to `flamekit/changes.txt`.
+2. Lua tests: `flamekit_native/notes/tests/run.lua` (run for `host` and `joined`; both must print `ALL PASSED`).
+3. Native build, on the owner's PC: put the sources in `flamekit_native\src\`, then write `go` into `flamekit_native\build.request`; `build_watch.cmd` must be running there. Result in `build.log` (`BUILD OK`) and `out\flamekit_native\`. The build never copies into the client.
+4. Lua part for the local server: copy the changed files into the server's `emf\mods\flamekit` (the server reloads Lua live).
+5. Publish for the owner's client: `python3 flamekit_native/notes/make_dist.py <repo> dist-test <built dll> <its mod.json>`, commit, push. The client downloads it within 10 minutes or 15 seconds after a game start. Nothing changes in a running game: everything switches at the next game start.
+
+## How the updater works
+
+`flamekit_native/src/web_update.hpp`: the DLL fetches `https://raw.githubusercontent.com/9chars/FlameKit/main/<channel>/update.txt` (version, then `<size> <hash> <path>` per file), downloads what differs, checks size and FNV-1a hash, then installs: the DLL by renaming the loaded one to `.old` (used from the next start); the Lua part is held in `emf\flamekit_update\` and put in place at the next start, `mod.json` last (since 0.15.17). It never downgrades. Status goes to `update_status.txt`, which the label at the bottom left shows.
+
+The older updater through the game server was removed in 0.15.9 (with `make_update.py`, `flamekit/client/` and `flamekit/update.txt`). Players on older versions reinstall by hand.
+
+**Proven (0.15.10, owner's client):** the in-game download from `dist-test`, the DLL swap on restart, and the Lua part applying live; all files arrived byte-identical.
+**Not yet tested:** holding the Lua part until the next start (0.15.17); failures (GitHub unreachable, a bad file, a crash while installing; since 0.15.16 every check and failure is in FlameKit's log), the download message on the label, the `dist` channel, any PC other than the owner's.
+
+## State right now
+
+- Local server: 0.15.18. Client: 0.15.18 through the GitHub updater (needs a game restart).
+- Privacy rule (owner, 0.15.18): no personal data in this public repository (folder names: `LOCAL_PATHS.md` on the PC only). For FlameKit's log: only data relevant to the processes involved and needed for adequate logging. Other programs' windows: program file name and class only, never titles; the Windows user name is replaced by `<user>` in every line (fk_log.hpp).
+- 0.15.17: the owner does not want a running game to change at all on an update (the Lua part used to switch live while the DLL waited: confusing). The updater now holds the Lua part in `emf\flamekit_update\` (+ `ready.txt` list) and the DLL puts it in place at the next start (`web_update::install_pending`, first thing in emf_mod_load). update_status.txt is `<kind>|<text>` (ready green, failed red, busy orange).
+- 0.15.16: ONE overlay window for all of FlameKit's UI (`ui_thread` in flamekit_native.cpp: Layer / Compositor / WindowPresenter; layers MinimapLayer, HudLayer, JunkLayer). The surface is plain BGRA memory so a Vulkan presenter can replace WindowPresenter (owner's requirement: keep that path open). "In front" = the front window belongs to the game's process; SetWinEventHook(EVENT_SYSTEM_FOREGROUND) reorders at once; Watchdog checks 4x/s (shown, topmost, above the game window, covering the client area), logs WARN on failure with the covering window, repairs. If the watchdog cannot be brought to zero failures, the owner wants the Vulkan route.
+- Logging (owner: for EVERYTHING, kept for the long term, switchable in production): `fk_log.hpp`; logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB cap); `debug.txt` off/normal/full (default normal), Ctrl+Shift+F12 cycles; errors and warnings always. Monitor thread copies emf_core.log (incl. Lua lines) in, logs system/process stats; the updater logs every check. Lua: `kit.debug(level, fmt, ...)`, `kit.debug_level()`.
+- UI test (0.15.11) proved it: the DLL's own window takes the front and the mouse, F6/Esc give it back, Alt+Tab closes it, the data arrives from Lua.
+- 0.15.12: the Auto Junk List on F6 in FlameKit's own window (`ui_thread` in `flamekit_native.cpp`; `features/native_ui.lua`). Design rule: **the DLL never reads the game for the UI**; the Lua part (which looks fields up by name at runtime, so it survives game updates) owns all data and all changes; the DLL only draws and takes clicks. The bridge is two files, one writer each (`ui_list.dat` Lua -> DLL, `ui_actions.txt` DLL -> Lua, numbered clicks, never replayed); it is replaced in one place when EMF adds request 8. The old EMF panel stays until the new window has everything it has.
+- 0.15.13 tested by the owner on the client: works, looks right, behaves the same as the F4 panel.
+- 0.15.13: junk items leave "In your bag"; names on hover; Auto ON/OFF, Dump Junk, Drop/Delete drop-down; pages instead of scrolling (the owner wants no scrolling). On hold: the panel's warnings (server without FlameKit, Auto-Collect Scattered Loot). Next: tabs in this window for the minimap and experimental settings.
+- 0.15.14: the lower-left lines are drawn by the DLL (`hud_thread`), no longer by EMF's emf.hud: status line, label, update line (under the label, as the owner asked). Data: `ui_hud.dat` from kit.lua; the update line from `update_status.txt`. Fixed spot (EMF's HUD editor no longer moves them); a position setting can come with the settings tabs. 0.15.14 drew them behind the game (put on top only once); 0.15.15 re-asserts topmost every 0.5 s like the minimap and logs `hud: shown/hidden`.
+- Still EMF UI, to be replaced (rule 12): `emf.notify` (loot_filter client: the auto loot banner, list full, info; kit), the F4 panel (`kit.hub`) with its tabs. The owner wants an output box for status messages later.
+- Known risk, noted, not changed: the minimap reads the player's position and item data through layouts compiled into the DLL (EMF SDK generated from game build 1283531); a game update can break those until a rebuild with a newer SDK.
+- No more work on the old EMF windows: they are all replaced by FlameKit's own UI.
+- Decided, not started: **FlameKit's own UI**, drawn by the DLL, replacing every EMF window. Step 1 is a prototype: our own window on F4 with the Auto Junk List as two icon grids, where clicking an item moves it between "In your bag" and "Your junk list". Two risks to prove first: taking the mouse while the game runs, and getting the panel's data from Lua into the DLL.
+- Being watched: EMF allows 128 pictures per game session; the log records icon counts (`item icons: N in use`).
+
+## Things learned the hard way
+
+- Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
+
+- A Large Backpack is its own container with four rows; the player's inventory links only the first. `core/bag.lua` follows the backpack's own `InventorySetup`, and items in its rows are taken with the backpack as owner.
+- Item definitions (2088 bytes, game build 1287369): rarity at `+0x17`, category `+0xcc`, sub-category `+0xcd`, level range `+0x674/+0x678`. Icons: `UiTextureResource` under the item's GUID, in zstd-compressed chunks; pixels are BC7, 256 or 512 px.
+- EMF limits met so far: 128 pictures per session and no unloading; windows are a flat list of rows (no scroll area, no fixed height, no row spacing); icons only on `slot` and `row` rows; no controller buttons for mod keys; `emf.take` only accepts slots linked directly to the named entity. See `flamekit_native/notes/EMF_REQUESTS.md`.
+- Never hide eternal arrows or spells from protection: they are high-end items and stay un-junkable. Runes and Legendary Runes are never junkable (those two items only).
+- Windows macros `far` and `small` cannot be used as C++ names.
+
+More detail: `flamekit_native/notes/STATUS.md` (to-do list), `memory_layouts.md`, `EMF_REQUESTS.md`.

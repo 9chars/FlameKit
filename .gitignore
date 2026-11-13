@@ -1,0 +1,24 @@
+# Build output of the native part
+flamekit_native/obj/
+flamekit_native/out/
+flamekit_native/build.log
+flamekit_native/build.done
+flamekit_native/build.request
+
+# Files the mod writes while it runs on a player's PC or a server
+junk_list.json
+seen_version.json
+experimental.json
+far_players.dat
+item_details.dat
+icon_requests.txt
+panel_open.dat
+upd_*.tmp
+icons/
+
+# Never part of this repository: other people's software, packages that contain it, a world's saves
+EMF-*/
+EMF-*.zip
+release/
+test mods/
+g-portal backup data/

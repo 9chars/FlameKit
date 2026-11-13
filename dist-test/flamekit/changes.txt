@@ -1,0 +1,92 @@
+0.15.18 Nov 13, 2026
+- FlameKit's log (client) no longer records other programs' window titles: a window that is not the game's is logged only by its program's file name (e.g. notepad.exe) and window class.
+- FlameKit's log never contains the Windows user name: it is written as <user> (it appears in folder paths).
+
+0.15.17 Nov 13, 2026
+- A new version no longer changes anything in a running game: the updater downloads it, holds FlameKit's Lua part in emf\flamekit_update until the next game start and puts it in place then, so FlameKit's label keeps showing the version you are running until you restart (client).
+- The update line in the lower left corner is green when an update is ready and says "Update v... is ready: restart the game"; red when an update failed, orange while downloading.
+
+0.15.16 Nov 13, 2026
+- FlameKit's UI (client) is drawn in one overlay window instead of three: the minimap, the Auto Junk List window (F6) and the lines in the lower left corner are layers of one picture. The picture is plain memory, so it can later be drawn inside the game's own frame (Vulkan) instead.
+- The overlay counts as "in front" whenever any window of the game is the front window (it went missing after Alt+Tab), and Windows now tells FlameKit at once when the front window changes.
+- A watchdog checks 4 times a second that the overlay is shown and in front of the game; every failure is logged with the window that was in the way, and repaired.
+- FlameKit's own log (client): emf\mods\flamekit\logs\flamekit_<date>_<time>.log, one per game session, the newest 10 kept, up to 50 MB each. It has FlameKit's DLL, EMF's log (with the Lua part's lines), Windows and screen details, the game's memory and CPU use, the updater, the UI and the watchdog.
+- Debug level in emf\mods\flamekit\debug.txt: off, normal (the default) or full; changes while the game runs. Ctrl+Shift+F12 in the game steps through the levels. Errors and warnings are always logged. The level shows in the lower left corner when it is not normal.
+- The updater logs every check (up to date, failed and why), not only downloads.
+- The Lua part (client and server) logs at the debug level too: clicks from FlameKit's window, the junk list going to the server half, files written for the DLL.
+- A crash in one of FlameKit's own threads is logged with where it happened.
+- Tests: the debug level is read from debug.txt, and off writes only warnings and errors.
+
+0.15.15 Nov 13, 2026
+- Fix: the lines in the lower left corner (FlameKit label, update line, status line) were hidden behind the game (client); they now stay in front of it, as the minimap does.
+- The client log says when those lines show or hide, where and why.
+
+0.15.14 Nov 13, 2026
+- The lines in the lower left corner (client) are drawn by FlameKit itself, no longer by EMF: the status line on top, then the FlameKit label, then the update line.
+- The update line ("updated to v...: restart the game to finish") has its own line under the FlameKit label instead of being added to the end of it.
+- The client writes the label and the status line into ui_hud.dat for FlameKit's DLL.
+- Removed: the code that cleared a top-right line left by very old versions (it used EMF).
+- Tests: the lower-left lines are checked in ui_hud.dat, and no line may be drawn by EMF.
+
+0.15.13 Nov 13, 2026
+- FlameKit's own Auto Junk List window (F6, client): an item on your junk list is no longer shown under "In your bag"; it is only under "Your junk list", with how many you carry. The red frame is gone.
+- Hovering an item shows its name.
+- New buttons in that window: Auto (ON: junk is removed as you loot it), Dump Junk, and a Drop/Delete list. They change the same settings as the panel's buttons.
+- Long lists show in pages (< 1/3 >) instead of "+N more"; the window keeps one size.
+
+0.15.12 Nov 13, 2026
+- F6 opens the Auto Junk List in FlameKit's own window (client): "In your bag" and "Your junk list" as icons. Clicking an item in your bag puts it on your junk list or takes it off (red frame = on the list); clicking an item on your junk list takes it off.
+- Changes made in that window are the same as in the panel: saved to your list and sent to the server.
+- The window's content comes from the Lua part through ui_list.dat, and clicks go back through ui_actions.txt (client); ui_bag.dat is no longer written.
+- The client log no longer says the game did not get the front back after the window closed (it was checked too early).
+
+0.15.11 Nov 13, 2026
+- Test: F6 opens FlameKit's own window (client), drawn without EMF: the items in your bag as icons. F6 or Esc closes it.
+- Test: clicking an icon in that window writes the item to the game's log (client).
+- The client writes the bag into ui_bag.dat for FlameKit's own window.
+
+0.15.10 Nov 13, 2026
+- The game's log says "the native part of FlameKit" when FlameKit Native loads (it said "the minimap part").
+
+0.15.9 Nov 13, 2026
+- The native part is renamed from FlameKit Minimap (flamekit_map) to FlameKit Native (flamekit_native): minimap, item details, item icons and updates.
+- The old updater through the game server is removed: updates come only from FlameKit's page on GitHub.
+
+0.15.8 Nov 13, 2026
+- Updates now download straight from FlameKit's page on GitHub, in seconds.
+- The FlameKit label at the bottom left shows the download as it runs, and says when a restart finishes an update.
+
+0.15.7 Nov 13, 2026
+- The minimap hides while the FlameKit panel is open, so it no longer covers it.
+
+0.15.6 Nov 12, 2026
+- Updates download much faster: several pieces are fetched at once.
+
+0.15.5 Nov 12, 2026
+- The mod's log records how many item icons a play session uses, to see whether EMF's limit of 128 pictures is reached.
+
+0.15.4 Nov 12, 2026
+- Auto Junk List: your bag is shown as a grid of item icons, like the game's bag.
+- Auto Junk List: each icon sits on the color of the item's rarity.
+
+0.15.3 Nov 12, 2026
+- Auto Junk List: the list shows item names only. The quantity is in the tooltip.
+
+0.15.2 Nov 12, 2026
+- This window lists every earlier version now, not only the last five.
+
+0.15.1 Nov 12, 2026
+- Auto Junk List: everything in your backpack is listed and can be junked.
+- Auto Junk List: Runes and Legendary Runes can never be junked.
+- Auto Junk List: tooltips show item level, rarity and type, and names are colored by rarity.
+
+0.15.0 Nov 12, 2026
+- FlameKit now updates itself when you join the server. No more copying files.
+- After an update this window tells you what changed.
+
+0.14.2 Nov 12, 2026
+- Auto Junk List: the items in your backpack's extra row are listed now.
+- Minimap: nearby players have their names next to their dots.
+
+0.14.1 Nov 12, 2026
+- Enhanced Glider Mode works with a controller: pull the stick back to climb, press jump for another updraft.

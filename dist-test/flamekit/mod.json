@@ -1,0 +1,338 @@
+{
+  "id": "flamekit",
+  "name": "FlameKit",
+  "version": "0.15.18",
+  "description": "One toolkit, many features (F4 opens its panel). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
+  "authors": [
+    "Ninechars"
+  ],
+  "emf": 29,
+  "main": "main.lua",
+  "depends": {
+    "lua": ">=1.21"
+  },
+  "settings": [
+    {
+      "key": "hub_key",
+      "type": "keybind",
+      "default": "F4",
+      "label": "Key that opens the FlameKit panel",
+      "help": "Open your bag, then press this key: the panel sits beside it.",
+      "live": true,
+      "group": "FlameKit"
+    },
+    {
+      "key": "hub_place",
+      "type": "select",
+      "default": "right",
+      "label": "Where the panel opens",
+      "live": true,
+      "group": "FlameKit",
+      "options": [
+        {
+          "value": "right",
+          "label": "Right (beside the bag)"
+        },
+        {
+          "value": "centre",
+          "label": "Centre"
+        },
+        {
+          "value": "left",
+          "label": "Left"
+        }
+      ]
+    },
+    {
+      "key": "notify",
+      "type": "bool",
+      "default": true,
+      "label": "Show a status line when a feature does something",
+      "help": "For example \"Junk discarded: Twigs x3\" in the lower left corner when the Auto Junk List removes what you picked up.",
+      "live": true,
+      "group": "FlameKit"
+    },
+    {
+      "key": "lf_enabled",
+      "type": "bool",
+      "default": true,
+      "label": "Auto Junk List",
+      "live": true,
+      "group": "Auto Junk List"
+    },
+    {
+      "key": "lf_auto",
+      "type": "bool",
+      "default": true,
+      "label": "Remove junk as soon as you loot it",
+      "help": "Off: junk stays until you press Dump junk (the panel's button or the key below).",
+      "live": true,
+      "group": "Auto Junk List",
+      "enabledWhen": {
+        "setting": "lf_enabled",
+        "equals": true
+      }
+    },
+    {
+      "key": "lf_action",
+      "type": "select",
+      "default": "drop",
+      "label": "What happens to junk",
+      "live": true,
+      "group": "Auto Junk List",
+      "options": [
+        {
+          "value": "drop",
+          "label": "Drop it at your feet"
+        },
+        {
+          "value": "delete",
+          "label": "Delete it for good"
+        }
+      ],
+      "help": "IMPORTANT for dropping: turn off \"Auto-Collect Scattered Loot\" in the game settings, or the game picks dropped junk straight back up. Deleted junk is gone: there is no undo.",
+      "enabledWhen": {
+        "setting": "lf_enabled",
+        "equals": true
+      }
+    },
+    {
+      "key": "lf_dump_key",
+      "type": "keybind",
+      "default": "",
+      "label": "Key: dump junk now",
+      "help": "No key by default, so nothing is deleted by a stray key press.",
+      "live": true,
+      "group": "Auto Junk List",
+      "enabledWhen": {
+        "setting": "lf_enabled",
+        "equals": true
+      }
+    },
+    {
+      "key": "lf_keep_hotbar",
+      "type": "bool",
+      "default": true,
+      "label": "Never touch the action bar",
+      "live": true,
+      "help": "Weapons, armour, rings, tools and summoning items are never junked, wherever they are.",
+      "group": "Auto Junk List",
+      "enabledWhen": {
+        "setting": "lf_enabled",
+        "equals": true
+      }
+    },
+    {
+      "key": "map_show",
+      "type": "bool",
+      "default": true,
+      "label": "Show the minimap",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_toggle_key",
+      "type": "keybind",
+      "default": "F10",
+      "label": "Key that shows and hides the minimap",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_zoom",
+      "type": "slider",
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "default": 2,
+      "label": "Zoom (0 closest, 6 farthest; also the zoom keys and the Minimap tab)",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_zoom_in_key",
+      "type": "keybind",
+      "default": "NumpadAdd",
+      "label": "Key that zooms in",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_zoom_out_key",
+      "type": "keybind",
+      "default": "NumpadSubtract",
+      "label": "Key that zooms out",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_undiscovered",
+      "type": "bool",
+      "default": false,
+      "label": "Show undiscovered map locations",
+      "help": "In grey with a small question mark, in the shape of the game's own icon for what is there. A spoiler: off unless you switch it on.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_big_text",
+      "type": "bool",
+      "default": false,
+      "label": "Minimaps larger than Large magnify the map",
+      "help": "Off: a minimap bigger than Large shows more of the world, with the map, the icons and the text as big as on Large. On: it shows the same piece of the world, with everything bigger (for very high screen resolutions).",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_hide",
+      "type": "text",
+      "default": "-",
+      "maxLength": 200,
+      "label": "Marker kinds that are switched off",
+      "help": "Set from the Minimap tab of the FlameKit panel (its Marker filters): short names with commas between, - for none.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_labels",
+      "type": "bool",
+      "default": true,
+      "label": "Display map marker labels while zoomed in",
+      "help": "Under the markers at all but the two farthest zoom steps, in small letters: the game's own names for places (in English), the names you gave your own markers, and the names players gave to flame altars near you.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_players",
+      "type": "bool",
+      "default": true,
+      "label": "Show other players",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_clock",
+      "type": "bool",
+      "default": true,
+      "label": "Show the clock under the minimap",
+      "help": "The time of day, and how many minutes are left until night or day.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_altitude",
+      "type": "bool",
+      "default": true,
+      "label": "Show your altitude at the end of the clock line",
+      "help": "How high you are, in metres: useful while gliding, climbing and digging.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_where",
+      "type": "bool",
+      "default": true,
+      "label": "Show where you are under the minimap",
+      "help": "The region (for example Springlands: the one whose Ancient Spire is nearest) and under it the named place you are in, or else the nearest one you have found (a village, a lake, a camp, a flame altar) while it is within the minimap's view; nothing when none is that close.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_hide_in_menus",
+      "type": "bool",
+      "default": true,
+      "label": "Hide the minimap while the big map, the bag or any menu is open",
+      "help": "The big map, the bag and every other screen that shows the mouse pointer.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_move",
+      "type": "bool",
+      "default": false,
+      "label": "Move the minimap with the mouse",
+      "help": "Switch it on while a menu is open (so the mouse pointer shows), drag the minimap and let go: it stays there and this switches itself off. The FlameKit panel's Minimap tab has a button for it.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_x",
+      "type": "slider",
+      "min": -1,
+      "max": 1000,
+      "step": 1,
+      "default": -1,
+      "label": "Place across the screen (0 left to 1000 right; -1: use the corner below)",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_y",
+      "type": "slider",
+      "min": -1,
+      "max": 1000,
+      "step": 1,
+      "default": -1,
+      "label": "Place down the screen (0 top to 1000 bottom; -1: use the corner below)",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_corner",
+      "type": "select",
+      "default": "bottom_right",
+      "label": "Corner",
+      "live": true,
+      "group": "Minimap",
+      "options": [
+        {
+          "value": "top_right",
+          "label": "Top right"
+        },
+        {
+          "value": "bottom_right",
+          "label": "Bottom right"
+        },
+        {
+          "value": "bottom_left",
+          "label": "Bottom left"
+        },
+        {
+          "value": "top_left",
+          "label": "Top left"
+        }
+      ]
+    },
+    {
+      "key": "map_size",
+      "type": "slider",
+      "min": 120,
+      "max": 480,
+      "step": 20,
+      "default": 300,
+      "label": "Size (pixels)",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "map_margin",
+      "type": "slider",
+      "min": 0,
+      "max": 300,
+      "step": 4,
+      "default": 24,
+      "label": "Distance from the screen edge (pixels)",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "show_label",
+      "type": "bool",
+      "default": true,
+      "label": "Show FlameKit mod version",
+      "help": "On by default. Switch it off to take the label off your screen; FlameKit keeps working.",
+      "live": true,
+      "group": "FlameKit label"
+    }
+  ]
+}
