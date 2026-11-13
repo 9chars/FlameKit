@@ -180,7 +180,9 @@ function Build {
     $doneB = Join-Path $dir 'build.done'
     if (Test-Path $doneB) { Remove-Item $doneB }
     Log 'build: building FlameKit Native'
-    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call build.cmd > build.log 2>&1' -WorkingDirectory $dir -WindowStyle Hidden -Wait -PassThru
+    # Not Start-Process -Wait: that also waits for the compiler's helper (mspdbsrv.exe), which stays running for minutes
+    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call build.cmd > build.log 2>&1' -WorkingDirectory $dir -WindowStyle Hidden -PassThru
+    if (-not $p.WaitForExit(600000)) { Log 'build: FAILED: not done after 10 minutes'; return $false }
     Set-Content -Path $doneB -Value $p.ExitCode -Encoding ASCII
     Log "build: $(if ($p.ExitCode -eq 0) { 'OK' } else { "FAILED with code $($p.ExitCode) (see build.log)" })"
     return $p.ExitCode -eq 0
