@@ -4,19 +4,29 @@
 # and writes the result to restart.done ("ok <text>" or "failed <text>"). The request is one word, nothing else is
 # ever run from it:
 #   client  close the game client (like Alt+F4) and start it again through Steam
-#   server  stop the local dedicated server with Ctrl+C (it saves the world first), start it again, wait for its world
-#   both    close the game client, restart the server, then start the game client
+#   server  close the game client, have the server save its world, stop it and start it again, then start the client
+#   both    the same as server
 #   stop    stop this helper
-# Nothing is ever killed by force: a program that does not close within its time is left running and the request
-# fails. The places are in restart_paths.txt next to this file (on this PC only; never in the public repository):
+# Whenever a file chime.request appears, it plays a chime: Claude is done and waits for the owner.
+#
+# Stopping the server: Ctrl+C cannot be sent to it reliably from another program, so FlameKit on the server saves the
+# world on request (features/server_save.lua: save_now.request -> emf.request_save -> save_now.done). With the game
+# client closed (no player connected), the server process is ended only once a save file newer than the request
+# exists; without one within 90 s nothing is stopped and the request fails. The game client is never ended by force.
+# The places are in restart_paths.txt next to this file (on this PC only; never in the public repository):
 #   server_folder = <the local dedicated server's folder>
 #   game_app_id = 1203220
+#   chime_sound = <a .wav file>          (optional; default C:\Windows\Media\chimes.wav)
+# When this file changes, the helper exits with code 10 and restart_watch.cmd starts it again.
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
+$self = $MyInvocation.MyCommand.Path
+$selfTime = (Get-Item $self).LastWriteTime
 $request = Join-Path $here 'restart.request'
 $doneFile = Join-Path $here 'restart.done'
 $logFile = Join-Path $here 'restart.log'
+$chimeRequest = Join-Path $here 'chime.request'
 
 function Log([string]$text) {
     $line = '{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $text
@@ -31,9 +41,26 @@ if (Test-Path $cfgFile) {
 }
 $serverDir = $cfg['server_folder']
 $appId = if ($cfg['game_app_id']) { $cfg['game_app_id'] } else { '1203220' }
+$chimeSound = if ($cfg['chime_sound']) { $cfg['chime_sound'] } else { Join-Path $env:WINDIR 'Media\chimes.wav' }
 $serverExe = if ($serverDir) { Join-Path $serverDir 'enshrouded_server.exe' } else { $null }
 $emfLog = if ($serverDir) { Join-Path $serverDir 'emf\emf_core.log' } else { $null }
 $saveDir = if ($serverDir) { Join-Path $serverDir 'savegame' } else { $null }
+$modDir = if ($serverDir) { Join-Path $serverDir 'emf\mods\flamekit' } else { $null }
+
+function Chime {
+    try {
+        if (Test-Path $chimeSound) {
+            $player = New-Object System.Media.SoundPlayer $chimeSound
+            $player.PlaySync()
+            Start-Sleep -Milliseconds 250
+            $player.PlaySync()
+        } else {
+            [System.Media.SystemSounds]::Exclamation.Play()
+        }
+    } catch {
+        [System.Media.SystemSounds]::Exclamation.Play()
+    }
+}
 
 function Newest-Save {
     if (-not $saveDir -or -not (Test-Path $saveDir)) { return $null }
@@ -66,15 +93,32 @@ function Start-Client {
 function Stop-Server {
     $p = Get-Process -Name 'enshrouded_server' -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $p) { Log 'server: not running'; return $true }
+    if (Get-Process -Name 'enshrouded' -ErrorAction SilentlyContinue) { Log 'server: FAILED: the game client still runs (left the server running)'; return $false }
+    $number = [string][DateTimeOffset]::Now.ToUnixTimeSeconds()
+    $asked = Get-Date
     $before = Newest-Save
-    Log "server: sending Ctrl+C (process $($p.Id)); newest save before: $(if ($before) { '{0} {1:HH:mm:ss}' -f $before.Name, $before.LastWriteTime } else { 'none found' })"
-    $c = Start-Process powershell -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $here 'ctrl_c.ps1'), $p.Id) -WindowStyle Hidden -Wait -PassThru
-    if ($c.ExitCode -ne 0) { Log "server: FAILED: Ctrl+C could not be sent (code $($c.ExitCode))"; return $false }
-    if (-not $p.WaitForExit(120000)) { Log 'server: FAILED: still running 120 s after Ctrl+C (left running)'; return $false }
-    $after = Newest-Save
-    $saved = $after -and (-not $before -or $after.LastWriteTime -gt $before.LastWriteTime)
-    Log "server: stopped; newest save after: $(if ($after) { '{0} {1:HH:mm:ss}' -f $after.Name, $after.LastWriteTime } else { 'none found' }) ($(if ($saved) { 'saved on stop' } else { 'NOT newer than before' }))"
-    return $true
+    Log "server: asking FlameKit on the server to save the world (request $number); newest save before: $(if ($before) { '{0} {1:HH:mm:ss}' -f $before.Name, $before.LastWriteTime } else { 'none found' })"
+    Set-Content -Path (Join-Path $modDir 'save_now.request') -Value $number -Encoding ASCII -NoNewline
+    $answered = $false
+    for ($i = 0; $i -lt 45; $i++) {
+        Start-Sleep -Seconds 2
+        $doneNow = Join-Path $modDir 'save_now.done'
+        if (-not $answered -and (Test-Path $doneNow) -and ((Get-Content $doneNow -Raw) -as [string]).Trim() -eq $number) {
+            $answered = $true
+            Log 'server: FlameKit on the server asked the game to save'
+        }
+        $now = Newest-Save
+        if ($now -and $now.LastWriteTime -gt $asked) {
+            Log ("server: world saved ({0} {1:HH:mm:ss}); ending the server process" -f $now.Name, $now.LastWriteTime)
+            Start-Sleep -Seconds 2  # the save files are closed
+            Stop-Process -Id $p.Id -Force
+            if (-not $p.WaitForExit(30000)) { Log 'server: FAILED: still running 30 s after it was ended'; return $false }
+            Log 'server: stopped'
+            return $true
+        }
+    }
+    Log "server: FAILED: no new save within 90 s ($(if ($answered) { 'FlameKit answered' } else { 'FlameKit did not answer: is the server on 0.15.23?' })); the server was left running"
+    return $false
 }
 
 function Start-Server {
@@ -97,8 +141,13 @@ function Finish([bool]$ok, [string]$text) {
     Log "done: $(if ($ok) { 'ok' } else { 'FAILED' }): $text"
 }
 
-Log "restart helper started; server folder: $(if ($serverDir) { if (Test-Path $serverExe) { 'found' } else { 'enshrouded_server.exe NOT found' } } else { 'not set' }); game app id $appId"
+Log "restart helper started; server folder: $(if ($serverDir) { if (Test-Path $serverExe) { 'found' } else { 'enshrouded_server.exe NOT found' } } else { 'not set' }); game app id $appId; chime: $(if (Test-Path $chimeSound) { Split-Path $chimeSound -Leaf } else { 'Windows exclamation sound' })"
 while ($true) {
+    if (Test-Path $chimeRequest) {
+        Remove-Item $chimeRequest
+        Log 'chime: Claude waits for you'
+        Chime
+    }
     if (Test-Path $request) {
         $what = ((Get-Content $request -Raw) -as [string]).Trim().ToLowerInvariant()
         Remove-Item $request
@@ -107,8 +156,7 @@ while ($true) {
         try {
             switch ($what) {
                 'client' { $ok = (Close-Client) -and (Start-Client); Finish $ok 'client restart' }
-                'server' { $ok = (Stop-Server) -and (Start-Server); Finish $ok 'server restart' }
-                'both' {
+                { $_ -eq 'server' -or $_ -eq 'both' } {
                     $ok = (Close-Client) -and (Stop-Server) -and (Start-Server) -and (Start-Client)
                     Finish $ok 'client and server restart'
                 }
@@ -119,5 +167,6 @@ while ($true) {
             Finish $false "error: $($_.Exception.Message)"
         }
     }
+    if ((Get-Item $self).LastWriteTime -ne $selfTime) { Log 'restart helper: its script changed: starting again'; exit 10 }
     Start-Sleep -Seconds 2
 }

@@ -244,7 +244,7 @@ local function step(n)
     local asks = ptest_up
     ptest_up = {}
     for _, data in ipairs(asks) do channels.party_test.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
-    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
+    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
     side = "client"
     msgs = to_client
     to_client = {}
@@ -668,4 +668,13 @@ end
 ui_action("tab", "party/" .. pgen .. "/" .. off)
 step(70)
 check(not party_text():find("Test ", 1, true) and tp.count(PLAYER) == 0 and (not JOINED or last_ask == "0"), "Off: the test players are gone")
+-- a world save on request from the restart helper (features/server_save.lua)
+do
+  local f = io.open(TMP .. "\\save_now.request", "w"); f:write("1234\n"); f:close()
+  step(40)
+  local d = io.open(TMP .. "\\save_now.done", "r")
+  local done_text = d and d:read("a") or ""
+  if d then d:close() end
+  check(done_text == "1234", "a save request from the restart helper is answered with its number")
+end
 print("ALL PASSED (" .. MODE .. ")")
