@@ -2,13 +2,15 @@
 --
 -- A feature is a Lua file that returns a table:
 --   id               "loot_filter"  (letters, digits, _)
---   title            "Auto Junk List"  (its tab in the panel)
+--   title            "Auto Junk List"  (its tab in FlameKit's window, F6)
 --   enabled_setting  the bool setting in mod.json that switches it on and off (optional)
 --   setup(kit)       once, while the mod loads: register events, keys and commands here (wrap them in kit.guard)
 --   tick(world)      every step of a world you host (the server world): gameplay changes go here
 --   client_tick(world)  every step of your own screen's world (HUD lines)
---   panel(world)     the rows of its tab in the panel (see emf.window in EMF's lua.md); keys are the feature's own
---   click(world, key, right_click)  a click on one of its rows
+--   panel(world)     the rows of its tab in FlameKit's window (features/native_ui.lua: heading, text, button,
+--                    separator; same_line, selected, disabled, dim, tooltip, color); keys are the feature's own
+--   click(world, key)  a click on one of its rows' buttons
+--   key(world, name) a key pressed in FlameKit's window while its tab shows (the key's name as EMF's settings write it)
 --   setting_changed(key)
 --   connected(world) false while this feature cannot reach its server half on a joined server (the label says so)
 -- Every call is protected: a feature that raises an error is switched off until the next reload, the others go on.
@@ -18,8 +20,9 @@ local kit = { features = {}, name = "FlameKit", version = "?", author = "" }
 kit.store = require("core.store")
 kit.items = require("core.items")
 kit.bag = require("core.bag")
-local hub = require("core.hub")
-kit.hub = hub
+-- FlameKit's window draws a tab's text this many text heights wide: for features that fit lines of their own. (The old
+-- panel that EMF drew, core/hub.lua, was removed in 0.15.26: FlameKit's UI is drawn by FlameKit's DLL only.)
+kit.hub = { WIDTH = 46 }
 
 local server_seen = 0  -- os.time() of the last server step: a server world runs only in a game you host
 
@@ -77,20 +80,42 @@ function kit.setting(key, default)
   return default
 end
 
-local STATUS_STEPS = 480  -- how long a status line stays: about 8 seconds
-local status_left = 0     -- client steps until the status line goes
-local status_text, status_colour = "", "ffb060"
+local messages = {}       -- the last messages, oldest first: {n, colour, text}
+local message_n = 0       -- the number of the newest message (they only grow; a new number shows the Messages window)
+local messages_dirty = false
 local hud_written = nil   -- ui_hud.dat as last written
+local MOST_MESSAGES = 20
 
--- A status line in the lower left corner for a few seconds, above the FlameKit label: what a feature just did
--- ("Junk discarded: Twigs x3"), in `colour` ("#rrggbb"; orange without). The player can switch these off. Also
--- written to emf_core.log.
-function kit.note(text, colour)
-  emf.log(text)
-  if not kit.setting("notify", true) then return end
-  status_text = tostring(text):gsub("[%c]", " ")
-  status_colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060"
-  status_left = STATUS_STEPS
+-- A message in FlameKit's Messages window (drawn by FlameKit's DLL; it shows itself for a few seconds when a message
+-- comes, and with the last ones while the pointer key is held): what a feature just did ("Junk discarded: Twigs x3"),
+-- in `colour` ("#rrggbb"; orange without). The player can switch these off (setting notify), except the ones with
+-- `always` (warnings the player has to see). Also written to the log. emf\mods\flamekit\ui_messages.dat:
+--   m <number> <rrggbb> <text>     (the last 20, oldest first)
+--   end                            (a file without it is half written: the DLL reads it again later)
+function kit.note(text, colour, always)
+  emf.log(tostring(text))
+  if not always and not kit.setting("notify", true) then return end
+  message_n = message_n + 1
+  messages[#messages + 1] = { n = message_n, colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060",
+    text = (tostring(text):gsub("[%c]", " ")) }
+  if #messages > MOST_MESSAGES then table.remove(messages, 1) end
+  messages_dirty = true
+end
+
+local function write_messages()
+  if not messages_dirty then return end
+  local lines = {}
+  for _, m in ipairs(messages) do lines[#lines + 1] = string.format("m %d %s %s", m.n, m.colour, m.text) end
+  lines[#lines + 1] = "end"
+  local f = io.open(emf.dir .. "\\ui_messages.dat", "w")
+  if not f then
+    kit.debug("warn", "messages: ui_messages.dat could not be written")
+    return
+  end
+  f:write(table.concat(lines, "\n") .. "\n")
+  f:close()
+  messages_dirty = false
+  kit.debug("debug", "messages: ui_messages.dat written (%d message(s), newest %d)", #messages, message_n)
 end
 
 -- True when every feature that talks to a server half can reach it (always in a world you host).
@@ -103,14 +128,13 @@ function kit.connected(world)
 end
 
 -- Each step of your own screen's world: the lines in the lower left corner, drawn by FlameKit's DLL (not by EMF): the
--- "FlameKit v1.2.3 by Name" label and the status line, written into emf\mods\flamekit\ui_hud.dat when they change:
+-- "FlameKit v1.2.3 by Name" label and the notice, written into emf\mods\flamekit\ui_hud.dat when they change:
 --   label <text>              ("" when the player switched the label off)
 --   notice <text>             (orange, under the label: this server does not run FlameKit)
---   status <rrggbb> <text>    (only while a status line is shown)
 --   end                       (a file without it is half written: the DLL reads it again later)
 -- The updater's line under the label comes from the DLL itself. ui_hud.dat is a runtime file: never deployed.
 local function hud_tick(world)
-  if status_left > 0 then status_left = status_left - 1 end
+  write_messages()
   local label = ""
   if kit.setting("show_label", true) then
     label = string.format("%s v%s", kit.name, kit.version)
@@ -118,7 +142,6 @@ local function hud_tick(world)
   end
   local lines = { "label " .. label }
   if not kit.connected(world) then lines[#lines + 1] = "notice This server does not run FlameKit: some features are off" end
-  if status_left > 0 then lines[#lines + 1] = "status " .. status_colour .. " " .. status_text end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"
   if text == hud_written then return end
@@ -130,7 +153,7 @@ local function hud_tick(world)
   f:write(text)
   f:close()
   hud_written = text
-  kit.debug("debug", "hud: ui_hud.dat written: label '%s'%s", label, status_left > 0 and (", status '" .. status_text .. "'") or "")
+  kit.debug("debug", "hud: ui_hud.dat written: label '%s'", label)
 end
 
 -- The version and author come from mod.json, so the label never disagrees with the file.
@@ -154,7 +177,7 @@ end
 local function fail(f, where, err)
   f.broken = tostring(err)
   kit.debug("error", "feature %s stopped in %s: %s", f.id, where, f.broken)
-  emf.notify(kit.name .. ": " .. f.title .. " stopped after an error (see emf_core.log). Save a file to reload.")
+  kit.note(kit.name .. ": " .. f.title .. " stopped after an error (see FlameKit's log). Save a file to reload.", "#ff5a50")
 end
 
 -- Wraps a callback of feature `f` (an event, a key, a command): skipped while the feature is off, and an error stops
@@ -202,7 +225,6 @@ function kit.start(modules)
       if not ok then fail(f, "setup", err) end
     end
   end
-  hub.setup(kit)
 
   emf.on_tick(function(world)
     if world:is_server() then
@@ -212,7 +234,6 @@ function kit.start(modules)
       each("client_tick", world)
       hud_tick(world)
     end
-    hub.tick(world)
   end)
 
   emf.on_setting_changed(function(key)

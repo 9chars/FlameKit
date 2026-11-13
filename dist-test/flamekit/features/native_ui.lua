@@ -21,7 +21,8 @@
 --                     view <feature id> <generation>          (the rows below belong to this generation)
 --                     r <kind h|t|b|s> <same line 0|1> <selected 0|1> <disabled 0|1> <dim 0|1> <colour rrggbb|-> <button number|0> <text> <tooltip>
 --   ui_actions.txt  also: view <feature id>|- (the DLL shows that tab, or none) and tab <feature id>/<generation>/<button
---                   number> (a click on a row's button: done only when the generation is still the one shown)
+--                   number> (a click on a row's button: done only when the generation is still the one shown) and
+--                   key <name> (a key pressed in the window while that tab shows: given to the feature's key(world, name))
 -- Both are runtime files: never deployed or diffed.
 
 local F = { id = "native_ui", title = "Native UI" }
@@ -155,6 +156,11 @@ local function act(world, what, arg)
     else
       kit.debug("info", "native ui: a click on %s was dropped (the tab changed before it arrived)", tostring(arg))
     end
+    last_rows = nil
+    tabs_now = true
+  elseif what == "key" then  -- a key pressed in the window while a tab of rows is shown (the Settings tab's Change)
+    local f = view_id and feature(view_id)
+    if f then kit.call(f, "key", world, arg) end
     last_rows = nil
     tabs_now = true
   end

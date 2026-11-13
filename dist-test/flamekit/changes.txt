@@ -1,3 +1,12 @@
+0.15.26 Nov 13, 2026
+- FlameKit's window (F6) has a Settings tab with every FlameKit setting: switches, choices, sizes with - and +, and keys (Change, then press the new key). They are the same settings as in EMF's Mods tab.
+- The old FlameKit panel that EMF drew (F4) is gone: everything is in FlameKit's own window. Its key is a setting now (Key that opens FlameKit's window, F6).
+- The pointer key for the pinned windows is a setting: Right Alt (as before), Right Ctrl or Caps Lock.
+- A Messages window (pinned, top left): what FlameKit just did, for example "Junk discarded: Twigs x3", shows for 12 seconds; hold the pointer key to see the last 10. Warnings that EMF used to show at the top of the screen are there too. It can be moved, resized, collapsed or hidden like the party window.
+- After an update, a message says so; what is new is in the What's New tab of FlameKit's window (instead of a window that opened by itself).
+- Party window: a player with 0 health is marked DOWN in red, and has a red ring on the minimap.
+- Party window: hold the pointer key and click a player to follow them on the minimap (a gold ring, and their name even at the minimap's edge); click them again to stop.
+
 0.15.25 Nov 13, 2026
 - The party window shows where each player is, under their name: the region, and for the other players how far away and in which direction from you (for example "Revelwood · 320 m NE"). For you it shows the region and the named place you are in or near, the same as under the minimap (client and server).
 

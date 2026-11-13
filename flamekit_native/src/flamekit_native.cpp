@@ -55,6 +55,8 @@ struct Settings {
     int margin = 24;         // distance from the game window's edges in pixels
     int corner = 1;          // 0 top right, 1 bottom right, 2 bottom left, 3 top left
     uint32_t toggle_vk = VK_F10;
+    uint32_t window_vk = VK_F6;   // opens and closes FlameKit's window (setting window_key)
+    int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
     int zoom = 2;            // index into kRanges
     bool markers = true;     // altars and the map markers you have found
@@ -107,6 +109,10 @@ void read_settings() {
     const std::string zout = emf::setting_text(kKit, "map_zoom_out_key", "NumpadSubtract");
     s.zoom_out_vk = zout.empty() ? 0 : emf::keys::parse_key(std::wstring(zout.begin(), zout.end()));
     s.zoom = std::clamp(static_cast<int>(emf::setting_float(kKit, "map_zoom", 2.0) + 0.5), 0, kRangeCount - 1);
+    const std::string wkey = emf::setting_text(kKit, "window_key", "F6");
+    s.window_vk = wkey.empty() ? 0 : emf::keys::parse_key(std::wstring(wkey.begin(), wkey.end()));
+    const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
+    s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
     s.markers = true;  // its own switch is gone: the marker filters (map_hide) decide
     s.water = true;  // its own switch is gone: the marker filters (map_hide) decide
     s.players = emf::setting_bool(kKit, "map_players", true);
@@ -171,6 +177,11 @@ struct Shared {
     std::vector<Spire> spires;        // every Ancient Spire known, with its region's name (for region_at)
 };
 Shared g_shared;
+
+// The party window and the minimap (both on the UI thread): the player followed on the minimap (clicked in the party
+// window; "" none), and the players whose health is 0.
+std::string g_tracked;
+std::unordered_set<std::string> g_down;
 
 // The region at a place (x east, z north, in metres): the one of the nearest Ancient Spire, the same rule as for the
 // player's own region on the minimap. Empty when no spire is known yet.
@@ -568,7 +579,7 @@ void on_world_tick(emf::World w) {
         emf::set_setting(kKit, "map_zoom", std::to_string(s.zoom + 1).c_str());
 
     static emf::keys::Edge ui_key;  // FlameKit's own UI (ui_thread)
-    if (ui_key.pressed(emf::keys::down(VK_F6))) g_ui_request = true;
+    if (ui_key.pressed(emf::keys::down(s.window_vk))) g_ui_request = true;
     const auto* t = w.get<gen::CurrentTransform>(emf::local_player());
     if (!t) return;
     // Item details for FlameKit's panel (a Lua mod cannot read the game's item definitions): once per game start,
@@ -2000,8 +2011,11 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
             continue;
         }
         const PlayerStyle st = player_style(k.name);
+        const bool tracked = !g_tracked.empty() && k.name == g_tracked, down = g_down.count(k.name) > 0;
+        if (tracked) c.disc(sx, sy, u * 1.15f + 4.5f, 255, 214, 90, 0.95f);  // followed (party window): a gold ring
+        if (down) c.disc(sx, sy, u * 1.15f + 2.0f, 235, 40, 40, 1.0f);       // health 0: a red ring
         draw_player_mark(c, sx, sy, u * 1.15f, st);
-        if (!outside && names.ready(nullptr, name_px)) {
+        if ((!outside || tracked) && names.ready(nullptr, name_px)) {
             const std::wstring name = widen(k.name);
             names.draw(c, static_cast<int>(sx) - names.width(name) / 2, static_cast<int>(sy - u * 0.6f) - names.font_px - 4, name, st.r, st.g, st.b);
         }
@@ -2482,6 +2496,7 @@ struct PinnedLayer : Layer {
     std::string id;
     std::wstring title;
     int default_w = 300, min_w = 220, max_w = 640;
+    int def_x_pm = 12, def_y_pm = 333;  // the first place: per mille of the game window's width and height
     static constexpr int kHead = 28, kGrip = 14;
     TextPainter text, little;  // ("small" is a macro in Windows' headers)
     bool fonts = false, dirty = true, was_pointer = false;
@@ -2498,6 +2513,7 @@ struct PinnedLayer : Layer {
     virtual int content_height(int width) = 0;                  // the content's height at this width
     virtual void draw_content(int top, int width) = 0;          // into canvas, below the title bar
     virtual bool refresh(const Frame& f) { return false; }      // read new data; true when the content changed
+    virtual void content_click(int x, int y) {}                 // a click on the content (y from the content's top)
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -2542,13 +2558,13 @@ struct PinnedLayer : Layer {
 
     void update(const Frame& f) override {
         LayoutEntry& e = lay();
+        if (refresh(f)) dirty = true;
         const bool want = !e.hidden && active(f) && f.gw > 0;
         if (want != visible) {
             visible = want;
             changed = true;
             FK_LOG(fklog::kDebug, "pinned: %s %s", id.c_str(), want ? "shown" : "hidden");
         }
-        if (refresh(f)) dirty = true;
         if (!visible) return;
         if (was_pointer != g_pointer_mode) {
             was_pointer = g_pointer_mode;
@@ -2559,7 +2575,7 @@ struct PinnedLayer : Layer {
             dirty = false;
             draw_all();
         }
-        int x = e.x >= 0 ? e.x : f.gw * 12 / 1000, y = e.y >= 0 ? e.y : f.gh / 3;
+        int x = e.x >= 0 ? e.x : f.gw * def_x_pm / 1000, y = e.y >= 0 ? e.y : f.gh * def_y_pm / 1000;
         x = std::clamp(x, 0, std::max(0, f.gw - canvas.w));
         y = std::clamp(y, 0, std::max(0, f.gh - canvas.h));
         place(x, y);
@@ -2623,6 +2639,8 @@ struct PinnedLayer : Layer {
             grab = {x, y};
             e.x = rect.left;
             e.y = rect.top;
+        } else if (!e.collapsed) {
+            content_click(x, y - (kHead + 4));
         }
     }
 };
@@ -2741,14 +2759,29 @@ struct PartyLayer : PinnedLayer {
         });
         members = std::move(list);
         server = from_server;
+        g_down.clear();
+        for (const Member& m : members)
+            if (m.hp == 0 && m.hp_max > 0) g_down.insert(m.name);
         FK_LOG(fklog::kDebug, "party: %d player(s), from %s", static_cast<int>(members.size()), server ? "the server half" : "this game alone");
         return true;
     }
 
     int content_height(int width) override {
         int h = static_cast<int>(std::max<size_t>(members.size(), 1)) * kRow;
-        if (!server) h += 36;  // the note about the server
+        if (!server) h += 36;           // the note about the server
+        if (g_pointer_mode) h += 22;    // how to follow a player
         return h;
+    }
+
+    // A click on a player (pointer out): follow that player on the minimap (a gold ring, the name even at the edge);
+    // a click on the followed player stops it.
+    void content_click(int x, int y) override {
+        const int row = y / kRow;
+        if (y < 0 || row >= static_cast<int>(members.size())) return;
+        const std::string& name = members[static_cast<size_t>(row)].name;
+        g_tracked = g_tracked == name ? std::string() : name;
+        dirty = true;
+        FK_LOG(fklog::kInfo, "party: %s", g_tracked.empty() ? "no player followed on the minimap" : ("following " + g_tracked + " on the minimap").c_str());
     }
 
     // A bar in the game's style: a dark frame, the fill with a lighter top, a notch every 100 points, a bright end, and
@@ -2782,13 +2815,26 @@ struct PartyLayer : PinnedLayer {
         }
         for (const Member& m : members) {
             const PlayerStyle st = player_style(m.name);
+            const bool tracked = !g_tracked.empty() && m.name == g_tracked;
+            const bool down = m.hp == 0 && m.hp_max > 0;
+            if (tracked) {  // followed on the minimap: a gold frame
+                box(3, y - 2, width - 3, y - 1, 255, 214, 90, 1.0f);
+                box(3, y + kRow - 5, width - 3, y + kRow - 4, 255, 214, 90, 1.0f);
+                box(3, y - 2, 4, y + kRow - 4, 255, 214, 90, 1.0f);
+                box(width - 4, y - 2, width - 3, y + kRow - 4, 255, 214, 90, 1.0f);
+            }
+            if (down) box(4, y - 1, width - 4, y + kRow - 5, 120, 20, 20, 0.45f);  // health 0: a red glow
             draw_player_mark(canvas, 16.0f, static_cast<float>(y + 11), 13.0f, st);
             const std::wstring nm = widen(m.name) + (m.you ? L" (you)" : L"");
             text.draw(canvas, 30, y + 2, nm, st.r, st.g, st.b);
+            int right = width - 10;
             if (m.level >= 0) {
                 const std::wstring lv = L"Lv " + std::to_wstring(m.level);
-                text.draw(canvas, width - 10 - text.width(lv), y + 2, lv, 200, 200, 210);
+                right -= text.width(lv);
+                text.draw(canvas, right, y + 2, lv, 200, 200, 210);
+                right -= 10;
             }
+            if (down) text.draw(canvas, right - text.width(L"DOWN"), y + 2, L"DOWN", 255, 70, 60);
             if (!m.where.empty()) little.draw(canvas, 30, y + 23, m.where, 170, 175, 185);  // where they are
             bar(10, y + 42, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
             bar(10, y + 60, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
@@ -2797,6 +2843,135 @@ struct PartyLayer : PinnedLayer {
         if (!server) {
             little.draw(canvas, 10, y + 2, L"Mana, level and other players need", 255, 176, 96);
             little.draw(canvas, 10, y + 18, L"FlameKit on the server", 255, 176, 96);
+            y += 36;
+        }
+        if (g_pointer_mode) little.draw(canvas, 10, y + 3, L"Click a player to follow them on the minimap", 160, 190, 230);
+    }
+};
+
+// ---- the Messages window: what FlameKit's features just did ----
+// From the Lua part (kit.note in core/kit.lua) in emf\mods\flamekit\ui_messages.dat: "m <number> <rrggbb> <text>" lines,
+// the last 20, oldest first, then "end". A message with a number not seen before shows the window for 12 s (the new
+// ones, at most 5); while the pointer is out it shows the last 10. Hidden with its x button, it stays hidden (FlameKit's
+// window, tab Windows, shows it again).
+struct MessagesLayer : PinnedLayer {
+    struct Msg {
+        int n = 0;
+        uint8_t r = 255, g = 176, b = 96;
+        std::wstring text;
+        uint64_t at = 0;  // GetTickCount64 when it came; 0: before this game start
+    };
+    std::vector<Msg> all;
+    std::vector<size_t> shown;               // indices into all
+    std::vector<std::pair<size_t, std::wstring>> lines;  // the wrapped lines of the shown messages (message index, text)
+    int newest = 0;
+    bool first = true;
+    uint64_t stamp = 0, next_read = 0;
+    static constexpr int kLine = 18, kShowMs = 12000, kNew = 5, kAll = 10;
+
+    MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_y_pm = 60; }
+
+    bool active(const Frame& f) override { return f.in_world && !shown.empty(); }
+
+    void read_file(uint64_t now) {
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        const std::wstring file = g_flamekit_dir + L"ui_messages.dat";
+        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
+                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
+                                : 2;
+        if (st == stamp) return;
+        FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
+        if (!fp) return;
+        std::vector<Msg> list;
+        bool complete = false;
+        char line[1024];
+        while (fgets(line, sizeof line, fp)) {
+            line[std::strcspn(line, "\r\n")] = 0;
+            if (std::strcmp(line, "end") == 0) {
+                complete = true;
+                break;
+            }
+            Msg m;
+            unsigned rgb = 0;
+            int used = 0;
+            if (sscanf_s(line, "m %d %6x %n", &m.n, &rgb, &used) == 2 && used > 0) {
+                m.r = static_cast<uint8_t>(rgb >> 16), m.g = static_cast<uint8_t>(rgb >> 8), m.b = static_cast<uint8_t>(rgb);
+                m.text = widen(line + used);
+                list.push_back(std::move(m));
+            }
+        }
+        fclose(fp);
+        if (!complete) return;
+        stamp = st;
+        int top = 0;
+        for (const Msg& m : list) top = std::max(top, m.n);
+        const bool reset = top < newest;  // the Lua part was loaded again: its numbers start again at 1
+        for (Msg& m : list) {
+            bool known = false;
+            for (const Msg& old : all)
+                if (old.n == m.n && old.text == m.text) {
+                    m.at = old.at;
+                    known = true;
+                }
+            if (!known) m.at = first ? 0 : (reset || m.n > newest) ? now : 0;
+        }
+        first = false;
+        newest = top;
+        all = std::move(list);
+        FK_LOG(fklog::kDebug, "messages: %d in ui_messages.dat, newest %d", static_cast<int>(all.size()), newest);
+    }
+
+    bool refresh(const Frame& f) override {
+        if (f.now >= next_read) {
+            next_read = f.now + 250;
+            read_file(f.now);
+        }
+        std::vector<size_t> want;
+        if (g_pointer_mode) {
+            for (size_t i = all.size() > kAll ? all.size() - kAll : 0; i < all.size(); ++i) want.push_back(i);
+        } else {
+            for (size_t i = 0; i < all.size(); ++i)
+                if (all[i].at && f.now - all[i].at < kShowMs) want.push_back(i);
+            if (want.size() > kNew) want.erase(want.begin(), want.end() - kNew);
+        }
+        if (want == shown) return false;
+        shown = std::move(want);
+        return true;
+    }
+
+    int content_height(int width) override {
+        lines.clear();
+        for (size_t i : shown) {  // each message wrapped to the width, words kept whole where they can be
+            const std::wstring& t = all[i].text;
+            std::wstring cur;
+            size_t at = 0;
+            while (at <= t.size()) {
+                size_t sp = t.find(L' ', at);
+                if (sp == std::wstring::npos) sp = t.size();
+                const std::wstring word = t.substr(at, sp - at);
+                const std::wstring tryline = cur.empty() ? word : cur + L" " + word;
+                if (!cur.empty() && little.width(tryline) > width - 20) {
+                    lines.push_back({i, cur});
+                    cur = word;
+                } else {
+                    cur = tryline;
+                }
+                at = sp + 1;
+            }
+            lines.push_back({i, cur});
+        }
+        return std::max<int>(1, static_cast<int>(lines.size())) * kLine + static_cast<int>(shown.size()) * 2 + 4;
+    }
+
+    void draw_content(int top, int width) override {
+        int y = top;
+        size_t last = static_cast<size_t>(-1);
+        for (const auto& [i, l] : lines) {
+            const Msg& m = all[i];
+            if (i != last && last != static_cast<size_t>(-1)) y += 2;  // a little room between two messages
+            last = i;
+            little.draw(canvas, 10, y, l, m.r, m.g, m.b);
+            y += kLine;
         }
     }
 };
@@ -3236,10 +3411,10 @@ struct WindowLayer : Layer {
         }
         y += 10;
         static const wchar_t* kHelp[] = {
-            L"Hold Right Alt to get the pointer while you play. Then a pinned",
-            L"window can be dragged by its title bar, made wider or narrower",
-            L"from its lower right corner, collapsed with \u2013 or hidden with \u00D7.",
-            L"Let go of Right Alt to play on.",
+            L"Hold the pointer key (Right Alt unless changed in Settings) to get",
+            L"the pointer while you play. Then a pinned window can be dragged by",
+            L"its title bar, made wider or narrower from its lower right corner,",
+            L"collapsed with \u2013 or hidden with \u00D7. Let go of the key to play on.",
             L"",
             L"Ctrl+Shift+F12: FlameKit's log level (normal, full, off).",
             L"The logs: emf\\mods\\flamekit\\logs in the game's folder.",
@@ -3371,7 +3546,16 @@ struct WindowLayer : Layer {
     bool wants_mouse() const override { return open; }
     bool wants_keys() const override { return open; }
     void key(WPARAM vk) override {
-        if (vk == VK_F6 || vk == VK_ESCAPE) close_asked = true;
+        const uint32_t wk = settings().window_vk;
+        if (vk == VK_ESCAPE || (wk && vk == wk)) {
+            close_asked = true;
+            return;
+        }
+        // any other key, while a tab of rows shows: to that tab's feature (the Settings tab's Change takes it as a key)
+        if (current == "loot_filter" || current == "windows") return;
+        std::string name = emf::keys::detail::key_name(static_cast<uint32_t>(vk));
+        if (name.rfind("key ", 0) == 0) name = name.substr(4);  // "key 0xba": the setting is written "0xba"
+        act("key", name);
     }
     void lost_front() override {
         if (open) close_asked = true;
@@ -3969,7 +4153,8 @@ void ui_thread_body() {
     BackdropLayer backdrop;
     backdrop.window = &window;
     PartyLayer party;
-    g_compositor.layers = {&minimap, &hud, &backdrop, &party, &window};  // bottom first (pinned windows over the backdrop)
+    MessagesLayer messages;
+    g_compositor.layers = {&minimap, &hud, &backdrop, &party, &messages, &window};  // bottom first (pinned windows over the backdrop)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
@@ -4024,11 +4209,13 @@ void ui_thread_body() {
         if (f12 && !f12_was) fklog::set_mode((fklog::g_mode.load() + 1) % 3);
         f12_was = f12;
 
-        // Right Alt held while the game's process is in front: the pointer is out for the pinned windows
-        const bool hold = f.ours_front && f.in_world && (GetAsyncKeyState(VK_RMENU) & 0x8000) != 0;
+        // The pointer key (setting pointer_key: Right Alt, Right Ctrl or Caps Lock) held while the game's process is in
+        // front: the pointer is out for the pinned windows
+        const int pointer_vk = settings().pointer_vk;
+        const bool hold = f.ours_front && f.in_world && (GetAsyncKeyState(pointer_vk) & 0x8000) != 0;
         if (hold != g_pointer_hold) {
             g_pointer_hold = hold;
-            FK_LOG(fklog::kInfo, "pointer: Right Alt %s", hold ? "held: the pinned windows take the mouse" : "let go");
+            FK_LOG(fklog::kInfo, "pointer: the pointer key (vk %02x) %s", pointer_vk, hold ? "held: the pinned windows take the mouse" : "let go");
         }
         // The pointer comes back where it was the last time the pointer was out (Right Alt or FlameKit's window), so it
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the

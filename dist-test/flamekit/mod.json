@@ -1,8 +1,8 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.25",
-  "description": "One toolkit, many features (F4 opens its panel). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
+  "version": "0.15.26",
+  "description": "One toolkit, many features (F6 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
   ],
@@ -13,33 +13,34 @@
   },
   "settings": [
     {
-      "key": "hub_key",
+      "key": "window_key",
       "type": "keybind",
-      "default": "F4",
-      "label": "Key that opens the FlameKit panel",
-      "help": "Open your bag, then press this key: the panel sits beside it.",
+      "default": "F6",
+      "label": "Key that opens FlameKit's window",
+      "help": "FlameKit's own window: the Auto Junk List, the other features' tabs, Settings and What's New. The same key or Esc closes it.",
       "live": true,
       "group": "FlameKit"
     },
     {
-      "key": "hub_place",
+      "key": "pointer_key",
       "type": "select",
-      "default": "right",
-      "label": "Where the panel opens",
+      "default": "right_alt",
+      "label": "Hold this key to get the mouse pointer for FlameKit's pinned windows",
+      "help": "While it is held the pinned windows (Party, Messages) can be moved, resized, collapsed and hidden, and the game gets no input. Caps Lock also switches capital letters on and off each time.",
       "live": true,
       "group": "FlameKit",
       "options": [
         {
-          "value": "right",
-          "label": "Right (beside the bag)"
+          "value": "right_alt",
+          "label": "Right Alt"
         },
         {
-          "value": "centre",
-          "label": "Centre"
+          "value": "right_ctrl",
+          "label": "Right Ctrl"
         },
         {
-          "value": "left",
-          "label": "Left"
+          "value": "caps_lock",
+          "label": "Caps Lock"
         }
       ]
     },
@@ -47,8 +48,8 @@
       "key": "notify",
       "type": "bool",
       "default": true,
-      "label": "Show a status line when a feature does something",
-      "help": "For example \"Junk discarded: Twigs x3\" in the lower left corner when the Auto Junk List removes what you picked up.",
+      "label": "Show FlameKit's messages (the Messages window)",
+      "help": "What a feature just did, for example \"Junk discarded: Twigs x3\", in FlameKit's Messages window for a few seconds (hold the pointer key to see the last ones).",
       "live": true,
       "group": "FlameKit"
     },

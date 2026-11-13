@@ -24,10 +24,8 @@ local drawn_junk = {}      -- the junk rows of the panel as last drawn: index ->
 local auto_loot = nil      -- the game's auto loot setting as the server reports it (nil: not known yet)
 local warning_shown = false
 
--- The game calls its auto loot setting "Auto-Collect Scattered Loot". The banner is two short lines (each emf.notify
--- is one line of the same note); the panel has room for one sentence.
--- A mod cannot set a note's colour or background, but EMF shows a line red when it reads like an error (it looks
--- for words such as " failed"): "(drop failed)" at the end of the first line is there for that.
+-- The game calls its auto loot setting "Auto-Collect Scattered Loot". The banner: one red message in FlameKit's
+-- Messages window (kit.note), at most once a minute; the tab has room for one sentence.
 local AUTO_LOOT_BANNER = { "FlameKit Junk List: dropped junk is coming back into your bag (drop failed).",
                            "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings." }
 local AUTO_LOOT_WARNING = "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings: dropped junk comes back into your bag."
@@ -37,34 +35,20 @@ local function auto_loot_problem()
   return auto_loot == true and emf.setting("lf_action") ~= "delete" and emf.setting("lf_enabled") ~= false
 end
 
--- The banner at the top of the screen. EMF shows a note for a few seconds (6 unless the player changed EMF's "Notes
--- stay"), so for a longer banner it is shown again just after it went.
-local BANNER_SHOWS = 2     -- times the note is shown when the problem is first seen (about 13 seconds)
-local BANNER_EVERY = 7     -- seconds between two shows (just after the last one went)
-local banner_left, banner_at = 0, 0
+-- The banner: a red message, at most once a minute (FlameKit's Messages window keeps it in its list).
+local banner_at = 0
 
--- Shows the banner `times` times in a row; nothing while one is still on screen (EMF would show the line twice).
-local function banner(times)
+local function banner()
   if os.time() < banner_at then return end
-  for _, line in ipairs(AUTO_LOOT_BANNER) do emf.notify(line) end
-  banner_left, banner_at = times - 1, os.time() + BANNER_EVERY
+  kit.note(table.concat(AUTO_LOOT_BANNER, " "), "#ff5a50", true)
+  banner_at = os.time() + 60
 end
 
 local function refresh_warning()
   local show = auto_loot_problem()
   if show == warning_shown then return end
   warning_shown = show
-  banner_left = 0
-  if show then banner(BANNER_SHOWS) end
-end
-
-local function banner_tick()
-  if banner_left <= 0 or os.time() < banner_at then return end
-  if not auto_loot_problem() then
-    banner_left = 0
-    return
-  end
-  banner(banner_left)
+  if show then banner() end
 end
 
 -- ---- the list ----
@@ -98,7 +82,7 @@ local function set_junk(name, on)
   kit.debug("info", "junk list (client): %s %s", on and "junk" or "keep", tostring(name))
   if on and items.is_keeper(name) then return end  -- weapons, armour, rings, tools, summoning items: always kept
   if on and not junk[name] and #sorted_names() >= server.MAX_ITEMS then
-    emf.notify("Auto Junk List: your junk list is full (" .. server.MAX_ITEMS .. " items).")
+    kit.note("Auto Junk List: your junk list is full (" .. server.MAX_ITEMS .. " items).", "#ff9050", true)
     return
   end
   junk[name] = on and true or nil
@@ -179,12 +163,12 @@ function C.receive(world, msg)
   kit.debug("debug", "junk list (client): from the server half: %s", tostring(msg.op))
   if msg.op == "done" and type(msg.total) == "number" then
     kit.note(server.summary(msg), JUNK_RED)
-    if msg.action == "drop" and auto_loot_problem() then banner(1) end  -- each time junk is dropped into auto loot
+    if msg.action == "drop" and auto_loot_problem() then banner() end  -- each time junk is dropped into auto loot (once a minute at most)
   elseif msg.op == "autoloot" then
     auto_loot = msg.on == true
     refresh_warning()
   elseif msg.op == "info" and type(msg.text) == "string" then
-    emf.notify(msg.text)
+    kit.note(msg.text, nil, true)
   elseif msg.op == "list" and type(msg.items) == "table" then  -- the chat command changed your list
     junk = {}
     for _, name in ipairs(msg.items) do
@@ -199,11 +183,11 @@ end
 local function dump(world)
   local where = link(world)
   if not where then
-    emf.notify("Auto Junk List: this server does not run FlameKit, so nothing can be removed here.")
+    kit.note("Auto Junk List: this server does not run FlameKit, so nothing can be removed here.", "#ff9050", true)
     return
   end
   if dirty then sync(world) end
-  if not request(world, { op = "dump" }) then emf.notify("Auto Junk List: the server could not be reached.") end
+  if not request(world, { op = "dump" }) then kit.note("Auto Junk List: the server could not be reached.", "#ff9050", true) end
 end
 
 -- ---- the feature's callbacks (init.lua hands them on) ----
@@ -226,7 +210,6 @@ end
 -- A step of your own screen's world. On a joined server: say hello with your list once the server has greeted this
 -- game, after every change, and now and then again.
 function C.client_tick(world)
-  banner_tick()
   if kit.is_host() then return end
   local ok, version = pcall(emf.net.peer, nil, 0, server.CHANNEL)
   version = ok and version or 0

@@ -62,7 +62,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { hub_key = "F4", hub_place = "right", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
@@ -74,15 +74,22 @@ local channels, exp_up, exp_down, hit_rules, next_rule, ADMIN, casts = {}, {}, {
 local window, gives, next_pickup = nil, {}, 5000
 local emf_hud = {}  -- what the mod asked EMF to show (nothing since 0.15.14: FlameKit draws its own lines)
 -- The lower-left lines as the DLL would draw them: ui_hud.dat in the mod's folder (kit.lua writes it).
+-- status: the newest message in FlameKit's Messages window (ui_messages.dat, kit.note), messages: how many there are
 local hud = setmetatable({}, { __index = function(_, key)
-  local t = { label = nil, status = "", status_colour = nil }
+  local t = { label = nil, status = "", status_colour = nil, messages = 0, newest = 0 }
   local f = io.open(TMP .. "\\ui_hud.dat", "r")
   if f then
     for line in f:lines() do
       local label = line:match("^label (.*)$")
-      local rgb, status = line:match("^status (%x%x%x%x%x%x) (.*)$")
       if label then t.label = label end
-      if status then t.status, t.status_colour = status, "#" .. rgb end
+    end
+    f:close()
+  end
+  f = io.open(TMP .. "\\ui_messages.dat", "r")
+  if f then
+    for line in f:lines() do
+      local n, rgb, text = line:match("^m (%d+) (%x%x%x%x%x%x) (.*)$")
+      if n then t.status, t.status_colour, t.messages, t.newest = text, "#" .. rgb, t.messages + 1, tonumber(n) end
     end
     f:close()
   end
@@ -223,7 +230,12 @@ emf = {
   window_close = function(id) local w = window; window = nil; if w then w.fn(nil, { kind = "closed", reason = "mod" }) end; return w ~= nil end,
 }
 
-do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","authors":["Tester"]}'); m:close() end
+do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","authors":["Tester"],"settings":['
+  .. '{"key":"pointer_key","type":"select","default":"right_alt","label":"Pointer key","group":"FlameKit","options":[{"value":"right_alt","label":"Right Alt"},{"value":"right_ctrl","label":"Right Ctrl"}]},'
+  .. '{"key":"map_toggle_key","type":"keybind","default":"F10","label":"Key that shows and hides the minimap","group":"Minimap"},'
+  .. '{"key":"map_size","type":"slider","min":120,"max":480,"step":20,"default":300,"label":"Size","group":"Minimap"},'
+  .. '{"key":"map_hide","type":"text","default":"-","label":"Hidden kinds","group":"Minimap"},'
+  .. '{"key":"map_clock","type":"bool","default":true,"label":"Show the clock under the minimap","group":"Minimap"}]}'); m:close() end
 dofile(MOD .. "/main.lua")
 local server = require("features.loot_filter.server")
 
@@ -265,6 +277,48 @@ local function count(inv_id, item)
   for _, s in ipairs(comps.Inventory[inv_id].slots) do if s.id == item then n = n + s.data.count end end
   return n
 end
+-- The panel as the tests use it: the features' tabs (panel / click), as FlameKit's window shows them. (EMF's panel,
+-- core/hub.lua, was removed in 0.15.26; these tests keep its "tab:<n>" and "f<n>:<key>" keys.)
+local panel_tab = 1
+local function panel_list()
+  local kit = require("core.kit")
+  local list = {}
+  for _, f in ipairs(kit.features) do if f.panel and kit.enabled(f) then list[#list + 1] = f end end
+  return list
+end
+local function panel_rows()
+  local kit = require("core.kit")
+  local list, rows = panel_list(), {}
+  if panel_tab > #list then panel_tab = 1 end
+  for i, f in ipairs(list) do rows[#rows + 1] = { button = "tab:" .. i, text = f.title, same_line = i > 1, selected = i == panel_tab } end
+  rows[#rows + 1] = { separator = true }
+  local own = kit.call(list[panel_tab], "panel", UI) or {}
+  for _, r in ipairs(own) do
+    local c = {}
+    for k, v in pairs(r) do c[k] = v end
+    for _, fld in ipairs({ "button", "row", "slot", "key" }) do if type(c[fld]) == "string" then c[fld] = "f" .. panel_tab .. ":" .. c[fld] end end
+    rows[#rows + 1] = c
+  end
+  check_def({ place = "centre", rows = rows })
+  return rows
+end
+local function toggle_panel()
+  if window then window = nil return end
+  local kit = require("core.kit")
+  window = {
+    def = setmetatable({}, { __index = function(_, k)
+      if k == "rows" then return panel_rows() end
+      if k == "title" then return string.format("%s v%s by %s", kit.name, kit.version, kit.author) end
+    end }),
+    fn = function(w, ev)
+      local tab = ev.key:match("^tab:(%d+)$")
+      if tab then panel_tab = tonumber(tab) return end
+      local n, own = ev.key:match("^f(%d+):(.+)$")
+      local f = n and panel_list()[tonumber(n)]
+      if f then kit.call(f, "click", w, own, false) end
+    end,
+  }
+end
 local function click(key) window.fn(UI, { kind = "click", key = key }) end
 local function find_row(pattern, key)
   for _, r in ipairs(window.def.rows) do
@@ -277,8 +331,8 @@ local SYNC = JOINED and 40 or 3  -- steps until a change has reached the server 
 step(3)
 
 -- the panel: open it, mark Twigs as junk by clicking its bag row
-keys.hub_key(UI)
-check(window ~= nil, "panel opens on its key")
+toggle_panel()
+check(window ~= nil, "panel opens")
 if JOINED then check(find_row("Connected to this server") ~= nil, "the panel says the server has Flamekit") end
 local twigs = find_row("Twigs")
 check(twigs and twigs.button == "f1:t:11" and not twigs.selected, "bag chip for Twigs, not junk yet")
@@ -317,16 +371,17 @@ check(hud.status == "Junk discarded: Twigs x37", "a status line says what was di
 check(hud.status_colour == "#ff4a3d", "the status line is red")
 check(hud.label == "FlameKit v9.9.9 by Tester", "the label shows name, version and author: " .. tostring(hud.label))
 step(500)
-check(hud.status == "", "the status line goes away after a few seconds")
+check(hud.messages >= 1, "the message stays in the Messages window's list")
 settings.show_label = false
 step(1)
 check(hud.label == "", "the label can be switched off")
 settings.show_label = true
 settings.notify = false
+local newest_before = hud.newest
 comps.Inventory[201].slots[1] = stack(0x11, 4)
 pickup({ itemId = 0x11, itemCount = 4, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
-check(count(201, 0x11) == 0 and hud.status == "", "with status lines off the junk still goes, silently")
+check(count(201, 0x11) == 0 and hud.newest == newest_before, "with messages off the junk still goes, silently")
 check(next(emf_hud) == nil, "nothing is drawn by EMF: no emf.hud line")
 settings.notify = true
 
@@ -355,7 +410,7 @@ check(count(201, 0x33) == 1 and count(201, 0x55) == 1 and count(201, 0x66) == 1,
 check(count(203, 0x33) == 1, "worn equipment is never touched")
 click("f1:dump")
 step(5)
-check(notes[#notes] == "No junk in your bag.", "a dump with nothing to do says so: " .. tostring(notes[#notes]))
+check(hud.status == "No junk in your bag.", "a dump with nothing to do says so: " .. tostring(hud.status))
 
 -- drop mode: handed to emf.give at once; a drop the game's auto loot takes straight back gets one warning
 reset_world()
@@ -378,24 +433,24 @@ step(70)
 check(find_row("Auto%-Collect Scattered Loot") ~= nil, "auto loot on and junk dropped: the panel warns in red")
 local function yells()
   local n = 0
-  for _, t in ipairs(notes) do if t:find("Auto%-Collect Scattered Loot") then n = n + 1 end end
+  local f = io.open(TMP .. "\\ui_messages.dat", "r")
+  if not f then return 0 end
+  for line in f:lines() do if line:find("Auto%-Collect Scattered Loot") then n = n + 1 end end
+  f:close()
   return n
 end
-check(yells() == 1, "and a banner note came")
+check(yells() == 1, "and a red message came")
 check((hud.autoloot or "") == "", "no extra line is left on the screen")
 clock = clock + 8
 step(2)
-check(yells() == 2, "the banner is shown a second time after the first went")
-clock = clock + 8
-step(2)
-check(yells() == 2, "and not a third time")
+check(yells() == 1, "the message is not repeated within a minute")
 click("f1:action")
 check(find_row("Auto%-Collect Scattered Loot") == nil, "junk set to delete: the warning goes")
 click("f1:action")
 check(find_row("Auto%-Collect Scattered Loot") ~= nil, "back to drop: the warning is back")
 step(SYNC)
 -- each drop into auto loot brings the banner back
-clock = clock + 20
+clock = clock + 60
 local before = yells()
 comps.Inventory[201].slots[1] = stack(0x11, 5)
 pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
@@ -404,7 +459,7 @@ check(yells() == before + 1, "junk dropped while auto loot is on: the banner com
 pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 comps.Inventory[201].slots[2] = stack(0x11, 5)
 step(10)
-check(yells() == before + 1, "but not twice while it is still on screen")
+check(yells() == before + 1, "but not twice within a minute")
 comps.PlayerInput[PLAYER].fromClientSettings.flags = 0x0853
 step(70)
 check(find_row("Auto%-Collect Scattered Loot") == nil, "auto loot switched off in the game: the warning goes")
@@ -548,8 +603,8 @@ click("tab:1")
 step(2)
 
 -- closing with the same key does not reopen
-keys.hub_key(UI)
-check(window == nil, "the key closes the panel")
+toggle_panel()
+check(window == nil, "the panel closes")
 -- the debug level (debug.txt), read by the Lua part as by the DLL
 local kit = require("core.kit")
 local function lines_with(word)
@@ -672,6 +727,29 @@ end
 ui_action("tab", "party/" .. pgen .. "/" .. off)
 step(70)
 check(not party_text():find("Test ", 1, true) and tp.count(PLAYER) == 0 and (not JOINED or last_ask == "0"), "Off: the test players are gone")
+-- the Settings tab (features/settings.lua): a switch, a slider, a choice and a key, as FlameKit's window clicks them
+do
+  toggle_panel()
+  local tab
+  for _, r in ipairs(window.def.rows) do if r.text == "Settings" then tab = r.button end end
+  check(tab ~= nil, "FlameKit's window has a Settings tab")
+  click(tab)
+  local clock_row = find_row("Show the clock under the minimap")
+  check(clock_row and clock_row.selected and clock_row.text:find("^On"), "a switch shows its value")
+  click(clock_row.button)
+  check(settings.map_clock == false, "clicking a switch changes the setting")
+  click(find_row("^%+ 20", ":n:map_size:").button)
+  check(settings.map_size == 320, "+ moves a slider by its step")
+  click(find_row("^Right Ctrl$").button)
+  check(settings.pointer_key == "right_ctrl", "a choice sets the option's value")
+  click(find_row("^Change$", ":k:map_toggle_key:").button)
+  check(find_row("press a key now") ~= nil, "Change waits for a key")
+  require("features.settings").key(UI, "F9")
+  check(settings.map_toggle_key == "F9", "the next key pressed in the window becomes the key")
+  click(find_row("^No key$", ":k:map_toggle_key:").button)
+  check(settings.map_toggle_key == "", "No key clears it")
+  toggle_panel()
+end
 -- a world save on request from the restart helper (features/server_save.lua)
 do
   local f = io.open(TMP .. "\\save_now.request", "w"); f:write("1234\n"); f:close()

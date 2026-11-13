@@ -16,5 +16,6 @@ kit.start({
   "features.native_ui",
   "features.party",
   "features.server_save",
+  "features.settings",
   -- "features.my_next_feature",
 })
