@@ -13,6 +13,8 @@ It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Fea
 
 ## How the owner wants the work done (follow these exactly)
 
+**KEY DIRECTIVE: protect personal, sensitive and confidential information.** If anything the owner asks for, or anything about to be done, could leak personal, sensitive or confidential information (into the public GitHub repository, into logs players send, into files shared with anyone), STOP before doing it and warn the owner clearly and forcefully: say exactly what could leak and where, and wait for the owner's decision. This comes before every other rule.
+
 1. **Confirm before changing anything.** Say in a line or two what you are about to change and wait for a yes. Reading logs and files to answer a question needs no confirmation.
 2. **A question is a question.** Asking for information is not a request to change something.
 3. **Take instructions literally.** Do what was named, nothing wider. No assumptions, no extra options, no "while I'm here".
