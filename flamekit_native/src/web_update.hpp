@@ -1,7 +1,10 @@
 // web_update.hpp: FlameKit updates itself from its own repository on GitHub.
 //
-// A thread looks at https://raw.githubusercontent.com/9chars/FlameKit/main/<channel>/update.txt shortly after the
-// game starts and every ten minutes after that. The list has the version on its first line, then a line
+// A thread looks at the repository 15 seconds after the game starts and then every ten minutes (every minute on the
+// test channel; and at once when the player asks, check_now). It first asks GitHub for the newest commit of main, through
+// git's own address for that (https://github.com/9chars/FlameKit.git/info/refs, what every git clone uses: not cached),
+// then reads https://raw.githubusercontent.com/9chars/FlameKit/<commit>/<channel>/update.txt and the files at that
+// exact commit, which never change, so no cache can hand out an old copy. (Without the commit: main, as before.) The list has the version on its first line, then a line
 // "<size> <hash> <path>" per file, the path as it lies under emf\mods (flamekit/core/bag.lua,
 // flamekit_native/flamekit_native.dll). When the version is newer than what is installed, every file that differs is
 // downloaded, checked against the list (size and FNV-1a hash), and only when all of them are right put in place. A new
@@ -11,7 +14,7 @@
 //   else, this DLL checks the held files against the list and puts them in place (install_pending), mod.json last
 // The channel is "dist", or "dist-test" where emf\mods\flamekit\update_channel.txt says "test" (the developer's PC).
 // A game never takes an older version, and never writes outside emf\mods\flamekit and emf\mods\flamekit_native.
-// What it is doing is written to emf\mods\flamekit\update_status.txt as "<kind>|<text>" (kind: busy, failed or
+// What it is doing is written to emf\mods\flamekit\update_status.txt as "<kind>|<text>" (kind: busy, failed, ok or
 // ready) for the lower left corner; empty while there is nothing to say.
 #pragma once
 
@@ -91,18 +94,18 @@ inline bool newer(const std::string& a, const std::string& b) {
     return false;
 }
 
-// One file over HTTPS from raw.githubusercontent.com; `got` counts the bytes as they arrive.
+// One file over HTTPS (from raw.githubusercontent.com unless `host` says otherwise); `got` counts the bytes as they arrive.
 // Why the last fetch on this thread failed (for the log).
 inline thread_local std::string g_fetch_error;
 
-inline bool fetch(const std::wstring& path, std::vector<uint8_t>& out, std::atomic<uint64_t>* got) {
+inline bool fetch(const std::wstring& path, std::vector<uint8_t>& out, std::atomic<uint64_t>* got, const wchar_t* host = L"raw.githubusercontent.com") {
     out.clear();
     bool ok = false;
     g_fetch_error = "no connection (WinHTTP error ";
     const HINTERNET session = WinHttpOpen(L"FlameKit", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) return false;
     WinHttpSetTimeouts(session, 8000, 8000, 15000, 30000);
-    const HINTERNET connect = WinHttpConnect(session, L"raw.githubusercontent.com", INTERNET_DEFAULT_HTTPS_PORT, 0);
+    const HINTERNET connect = WinHttpConnect(session, host, INTERNET_DEFAULT_HTTPS_PORT, 0);
     const HINTERNET request = connect ? WinHttpOpenRequest(connect, L"GET", path.c_str(), nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
                                                            WINHTTP_FLAG_SECURE | WINHTTP_FLAG_REFRESH)
                                       : nullptr;
@@ -239,42 +242,68 @@ inline void install_pending(const std::wstring& mods, void (*log)(const char*)) 
     }
 }
 
+// The newest commit of main (40 hex digits), from git's reference list; empty when it could not be had.
+inline std::string newest_commit() {
+    std::vector<uint8_t> raw;
+    if (!fetch(L"/9chars/FlameKit.git/info/refs?service=git-upload-pack", raw, nullptr, L"github.com")) return {};
+    const std::string text(raw.begin(), raw.end());
+    const size_t at = text.find(" refs/heads/main");
+    if (at == std::string::npos || at < 40) return {};
+    const std::string sha = text.substr(at - 40, 40);
+    for (char c : sha)
+        if (!std::isxdigit(static_cast<unsigned char>(c))) return {};
+    return sha;
+}
+
+// Set by the "Check for updates" button: the updater looks at once.
+inline std::atomic<bool> g_check_now{false};
+
 struct Updater {
     std::wstring mods;     // ...\emf\mods\ (ends with a backslash)
     std::string last_status = "?";  // so the first status, even an empty one, is written: the file tells the panel this updater is here
-    void (*log)(const char* text) = nullptr;
+    void (*log)(int level, const char* text) = nullptr;  // level: 0 what happens, 1 a detail, 2 a problem
+    std::string last_seen;  // the version and commit of the last check (a repeated "up to date" is a detail)
+    bool asked = false;     // this check was asked for with the button
 
     void status(const std::string& text) {
         if (text == last_status) return;
         last_status = text;
         write_file(mods + L"flamekit\\update_status.txt", std::vector<uint8_t>(text.begin(), text.end()));
     }
-    void say(const std::string& text) {
-        if (log) log(text.c_str());
+    void say(const std::string& text, int level = 0) {
+        if (log) log(level, text.c_str());
     }
 
     // One look at the repository. Returns false when it could not be reached or the update failed.
     bool check() {
         std::vector<uint8_t> flag;
         const bool test = read_file(mods + L"flamekit\\update_channel.txt", flag) && flag.size() >= 4 && std::memcmp(flag.data(), "test", 4) == 0;
-        const std::wstring base = std::wstring(L"/9chars/FlameKit/main/") + (test ? L"dist-test/" : L"dist/");
+        const std::string commit = newest_commit();
+        if (commit.empty()) say("update: the newest commit could not be read (" + g_fetch_error + "): main is used (may be a few minutes old)", 2);
+        const std::wstring base = L"/9chars/FlameKit/" + (commit.empty() ? std::wstring(L"main") : wide(commit)) + (test ? L"/dist-test/" : L"/dist/");
         std::vector<uint8_t> raw;
         const std::string channel = test ? "dist-test" : "dist";
         if (!fetch(base + L"update.txt", raw, nullptr)) {
-            say("update: check failed: could not read " + channel + "/update.txt from GitHub: " + g_fetch_error + " (tried again in 10 minutes)");
+            say("update: check failed: could not read " + channel + "/update.txt from GitHub: " + g_fetch_error + " (tried again later)", 2);
+            if (asked) status("failed|Could not reach GitHub: tried again later");
             return false;
         }
         const std::string text(raw.begin(), raw.end());
         const size_t eol = text.find('\n');
         if (eol == std::string::npos) {
-            say("update: check failed: " + channel + "/update.txt has no version line");
+            say("update: check failed: " + channel + "/update.txt has no version line", 2);
             return false;
         }
         std::string version = text.substr(0, eol);
         while (!version.empty() && (version.back() == '\r' || version.back() == ' ')) version.pop_back();
         const std::string have_lua = version_of(mods + L"flamekit\\mod.json"), have_map = version_of(mods + L"flamekit_native\\mod.json");
         if (!newer(version, have_lua) && !newer(version, have_map)) {  // up to date (or ahead of it)
-            say("update: checked " + channel + ": v" + version + " there, here v" + have_lua + " (Lua) and v" + have_map + " (native): up to date");
+            const std::string seen = version + " " + commit;
+            say("update: checked " + channel + " at commit " + (commit.empty() ? std::string("main") : commit.substr(0, 7)) + ": v" + version +
+                    " there, here v" + have_lua + " (Lua) and v" + have_map + " (native): up to date",
+                seen == last_seen && !asked ? 1 : 0);
+            last_seen = seen;
+            if (asked) status("ok|FlameKit is up to date (v" + have_lua + ")");
             return true;
         }
 
@@ -289,14 +318,14 @@ struct Updater {
             File f;
             char path[200] = "";
             if (sscanf(line.c_str(), "%u %x %199s", &f.size, &f.hash, path) != 3 || !safe(path) || files.size() >= 200) {
-                say("update: check failed: a line of " + channel + "/update.txt was refused: " + line);
+                say("update: check failed: a line of " + channel + "/update.txt was refused: " + line, 2);
                 return false;
             }
             f.path = path;
             files.push_back(std::move(f));
         }
         if (files.empty()) {
-            say("update: check failed: " + channel + "/update.txt lists no files");
+            say("update: check failed: " + channel + "/update.txt lists no files", 2);
             return false;
         }
 
@@ -319,7 +348,7 @@ struct Updater {
         for (File* f : want) {
             status("busy|Downloading update v" + version + ": " + std::to_string(total ? got.load() * 100 / total : 100) + "%");
             if (!fetch(base + wide(f->path), f->data, &got) || f->data.size() != f->size || fnv(f->data) != f->hash) {
-                say("update: download failed: " + f->path + " did not arrive as listed (" + (g_fetch_error.empty() ? std::string("wrong size or fingerprint") : g_fetch_error) + "): nothing was changed");
+                say("update: download failed: " + f->path + " did not arrive as listed (" + (g_fetch_error.empty() ? std::string("wrong size or fingerprint") : g_fetch_error) + "): nothing was changed", 2);
                 status("failed|Update v" + version + " failed: it is tried again later");
                 return false;
             }
@@ -360,7 +389,7 @@ struct Updater {
         }
         if (ok) ok = write_file(hold + L"ready.txt", std::vector<uint8_t>(list.begin(), list.end()));
         if (!ok) {
-            say("update: install failed: a file could not be written (error " + std::to_string(GetLastError()) + ")");
+            say("update: install failed: a file could not be written (error " + std::to_string(GetLastError()) + ")", 2);
             status("failed|Update v" + version + " failed: it is tried again later");
             return false;
         }
@@ -377,9 +406,30 @@ struct Updater {
         DeleteFileW((mods + L"flamekit_native\\flamekit_native.dll.old").c_str());  // the DLL an update replaced, now unused
         status("");
         Sleep(15000);
+        uint64_t clear_at = 0;  // when a button answer ("up to date", "could not reach") goes away again
         for (;;) {
-            if (!waiting_for_restart) check();
-            Sleep(10 * 60 * 1000);
+            asked = g_check_now.exchange(false);
+            if (!waiting_for_restart) {
+                if (asked) {
+                    say("update: check asked for with the button");
+                    status("busy|Checking for updates...");
+                }
+                check();
+                if (asked && last_status.rfind("ready|", 0) != 0) clear_at = GetTickCount64() + 8000;
+            } else if (asked) {
+                say("update: the button was pressed while an update waits for the restart: nothing to check");
+            }
+            // the next look: every minute on the test channel, every 10 minutes for players; the button cuts it short
+            std::vector<uint8_t> flag;
+            const bool test = read_file(mods + L"flamekit\\update_channel.txt", flag) && flag.size() >= 4 && std::memcmp(flag.data(), "test", 4) == 0;
+            const uint64_t next = GetTickCount64() + (test ? 60ull : 600ull) * 1000;
+            while (GetTickCount64() < next && !g_check_now.load()) {
+                if (clear_at && GetTickCount64() >= clear_at) {
+                    clear_at = 0;
+                    if (last_status.rfind("ok|", 0) == 0 || last_status.rfind("failed|Could not reach", 0) == 0) status("");
+                }
+                Sleep(250);
+            }
         }
     }
 };

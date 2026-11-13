@@ -1,3 +1,9 @@
+0.15.20 Nov 13, 2026
+- Updates arrive without GitHub's cache delay: the updater first asks GitHub for the newest commit and then downloads the files at that exact commit (client). Before, GitHub could hand out an old update list for up to 5 minutes after a new version.
+- The test channel checks for updates every minute; players' games still check every 10 minutes.
+- A "Check for updates" button in FlameKit's window (F6) checks at once; the lower left corner then says "FlameKit is up to date" for a few seconds, or shows the green "ready" line.
+- FlameKit's log: a repeated "up to date" check is a detail (full level only); failed checks are warnings.
+
 0.15.19 Nov 13, 2026
 - FlameKit's window (F6, client) has tabs: Auto Junk List, Minimap and Experimental. The Minimap and Experimental tabs have the same buttons as in the old panel and do the same things; any feature with a tab shows up there.
 - Long tabs show in pages (< 1/2 >) instead of scrolling. Hovering a button shows its explanation.

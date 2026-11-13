@@ -2383,7 +2383,7 @@ struct WindowLayer : Layer {
         int number = 0;  // a button's number in its generation
         std::wstring text, tip;
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates };
     struct Hit {
         RECT r;
         Kind kind;
@@ -2811,6 +2811,10 @@ struct WindowLayer : Layer {
             hits.push_back({r, kTab, i});
             tx += w + 4;
         }
+        {  // at the right of the tab bar: the updater's normal check, at once (web_update::g_check_now)
+            const int cw = text.width(L"Check for updates") + 24;
+            button(kW - kPad - cw, 8, cw, L"Check for updates", false, kCheckUpdates);
+        }
         box(kPad, kTop - 6, kW - kPad, kTop - 5, 70, 110, 170, 1.0f);
         if (current == "loot_filter") draw_junk();
         else draw_rows();
@@ -2921,6 +2925,10 @@ struct WindowLayer : Layer {
                     FK_LOG(fklog::kInfo, "window: tab %s", current.c_str());
                     tell_view();
                 }
+                break;
+            case kCheckUpdates:
+                web_update::g_check_now = true;
+                FK_LOG(fklog::kInfo, "window: Check for updates");
                 break;
             case kRowButton:
                 act("tab", rows_of + "/" + std::to_string(generation) + "/" + std::to_string(h.index));
@@ -3039,7 +3047,7 @@ struct HudLayer : Layer {
                 status_rgb = rgb;
             }
         }
-        update_line.clear();  // "<kind>|<text>" (web_update.hpp): ready green, failed red, busy orange
+        update_line.clear();  // "<kind>|<text>" (web_update.hpp): ready green, ok pale green, failed red, busy orange
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"update_status.txt").c_str(), L"rb", _SH_DENYNO)) {
             char line[256] = "";
             if (fgets(line, sizeof line, fp)) {
@@ -3047,7 +3055,8 @@ struct HudLayer : Layer {
                 const char* bar = std::strchr(line, '|');
                 if (bar && bar[1]) {
                     update_line = widen(bar + 1);
-                    update_rgb = std::strncmp(line, "ready", 5) == 0 ? 0x5adc6eu : std::strncmp(line, "failed", 6) == 0 ? 0xff5a50u : 0xffb060u;
+                    update_rgb = std::strncmp(line, "ready", 5) == 0 ? 0x5adc6eu : std::strncmp(line, "failed", 6) == 0 ? 0xff5a50u
+                               : std::strncmp(line, "ok", 2) == 0 ? 0xb4e6b4u : 0xffb060u;
                 }
             }
             fclose(fp);
@@ -3690,9 +3699,8 @@ void monitor_thread() { fklog::guarded("monitor", monitor_body); }
 void updater_body() {
     web_update::Updater updater;
     updater.mods = g_game_dir + L"emf\\mods\\";
-    updater.log = [](const char* text) {
-        const bool bad = std::strstr(text, "failed") || std::strstr(text, "could not") || std::strstr(text, "did not");
-        FK_LOG(bad ? fklog::kWarn : fklog::kInfo, "%s", text);
+    updater.log = [](int level, const char* text) {
+        FK_LOG(level == 2 ? fklog::kWarn : level == 1 ? fklog::kDebug : fklog::kInfo, "%s", text);
     };
     updater.run();
 }

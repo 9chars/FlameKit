@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.19.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.20.
 
 ## What FlameKit is
 
@@ -56,7 +56,7 @@ Runtime files that are never deployed, diffed or overwritten: `junk_list.json`, 
 
 ## How the updater works
 
-`flamekit_native/src/web_update.hpp`: the DLL fetches `https://raw.githubusercontent.com/9chars/FlameKit/main/<channel>/update.txt` (version, then `<size> <hash> <path>` per file), downloads what differs, checks size and FNV-1a hash, then installs: the DLL by renaming the loaded one to `.old` (used from the next start); the Lua part is held in `emf\flamekit_update\` and put in place at the next start, `mod.json` last (since 0.15.17). It never downgrades. Status goes to `update_status.txt`, which the label at the bottom left shows.
+`flamekit_native/src/web_update.hpp`: the DLL reads the newest commit of main, then fetches `https://raw.githubusercontent.com/9chars/FlameKit/<commit>/<channel>/update.txt` (version, then `<size> <hash> <path>` per file), downloads what differs, checks size and FNV-1a hash, then installs: the DLL by renaming the loaded one to `.old` (used from the next start); the Lua part is held in `emf\flamekit_update\` and put in place at the next start, `mod.json` last (since 0.15.17). It never downgrades. Status goes to `update_status.txt`, which the label at the bottom left shows.
 
 The older updater through the game server was removed in 0.15.9 (with `make_update.py`, `flamekit/client/` and `flamekit/update.txt`). Players on older versions reinstall by hand.
 
@@ -65,7 +65,8 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.19. Client: 0.15.19 through the GitHub updater (needs a game restart).
+- Local server: 0.15.20. Client: 0.15.20 through the GitHub updater (needs a game restart).
+- 0.15.20 (owner: the cache waits were too slow): the updater reads the newest commit from `github.com/9chars/FlameKit.git/info/refs` (git's own address, not cached) and downloads from `raw.githubusercontent.com/9chars/FlameKit/<commit>/...` (immutable); falls back to main if the commit cannot be read. Test channel checks every 60 s, players every 10 min. "Check for updates" button in the window (`web_update::g_check_now`). Same download/verify/hold path as production.
 - 0.15.19: FlameKit's window (F6) is tabbed (`WindowLayer`): Auto Junk List keeps its own icon view (ui_list.dat); every other feature with `panel(world)` is drawn by a general row drawer from `ui_tabs.dat` (headings, texts, buttons, separators; pages, tooltips), clicks go to the feature's `click(world, key)` through ui_actions.txt (`view <id>`, `tab <id>/<generation>/<button>`). `BackdropLayer` keeps the pointer over the whole game window while the window is open; the game's own pointer is copied from Windows once the game shows it (`look_for_game_cursor`). Next: settings that are only in EMF's Mods tab (keys, corner, margin, label, status lines), then F4 opens FlameKit's window and the EMF panel (`kit.hub`) goes.
 - Overlay test (0.15.18, owner's client, 2026-11-13): Alt+Tab, Steam overlay, menus, F6/Esc, Ctrl+Shift+F12: the owner could not break it; watchdog 0 failures (193 checks in the busiest minute).
 - TO DO when the settings tabs are built: show the debug-level hotkey (Ctrl+Shift+F12: off / normal / full) and where the logs are, in FlameKit's own UI; the owner and players will forget it otherwise.

@@ -1,7 +1,7 @@
 {
   "id": "flamekit_native",
   "name": "FlameKit Native",
-  "version": "0.15.19",
+  "version": "0.15.20",
   "description": "FlameKit's native part: minimap, item details, item icons and updates (it needs the FlameKit mod; its settings are in FlameKit's settings, group Minimap). Only needed in your game, not on a server.",
   "authors": [
     "Ninechars"
