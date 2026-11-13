@@ -1,3 +1,6 @@
+0.15.32 Nov 13, 2026
+- What's New tab: the line beside Check for updates says how often FlameKit looks for updates (every 10 minutes; every minute on the test channel).
+
 0.15.31 Nov 13, 2026
 - Long lines in FlameKit's windows wrap to the next line instead of being cut off (in a window wider than its first size, for example the What's New tab).
 

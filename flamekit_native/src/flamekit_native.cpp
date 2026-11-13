@@ -3638,7 +3638,10 @@ struct WindowLayer : Layer {
         else if (current == "windows") draw_windows();
         if (current == "changes") {  // the updater's normal check, at once (web_update::g_check_now)
             const int cw = text.width(L"Check for updates") + 24;
-            text.draw(canvas, kPad, kTop + 9, L"FlameKit looks for updates by itself; this looks now.", 150, 155, 165);
+            // how often the updater looks (web_update.hpp): every minute on the test channel, every 10 minutes for players
+            const bool test = read_text(g_flamekit_dir + L"update_channel.txt", 16).rfind("test", 0) == 0;
+            text.draw(canvas, kPad, kTop + 9, test ? L"FlameKit looks for updates every minute (test channel)." : L"FlameKit looks for updates every 10 minutes.",
+                      150, 155, 165);
             button(kW - kPad - cw, kTop + 4, cw, L"Check for updates", false, kCheckUpdates);
         }
         // the frame, and the grip in the lower right corner that resizes the window
