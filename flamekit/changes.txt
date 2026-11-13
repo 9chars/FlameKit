@@ -1,3 +1,10 @@
+0.15.21 Nov 13, 2026
+- A party window, pinned on the screen while you play (client): every player in the game, you first, each with their level, a green health bar and a blue mana bar with the exact numbers. Each player's name has its own colour and symbol, the same as on the minimap.
+- Hold Right Alt while playing to get the mouse pointer: then the party window can be dragged by its title bar, made wider or narrower from its lower right corner, collapsed (–) or hidden (×). Let go of Right Alt to play on. Where it is and how it looks is kept for the next game.
+- FlameKit's window (F6) has a Windows tab: show or hide each pinned window, or put it back in its first place. It also shows the log level key (Ctrl+Shift+F12) and where the logs are.
+- The minimap marks other players with their own symbol and colour instead of a white dot.
+- On a server without FlameKit: an orange line under the FlameKit label says some features are off; the party window then shows only you and your health, and says what is missing.
+
 0.15.20 Nov 13, 2026
 - Updates arrive without GitHub's cache delay: the updater first asks GitHub for the newest commit and then downloads the files at that exact commit (client). Before, GitHub could hand out an old update list for up to 5 minutes after a new version.
 - The test channel checks for updates every minute; players' games still check every 10 minutes.

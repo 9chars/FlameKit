@@ -14,5 +14,6 @@ kit.start({
   "features.experimental",
   "features.changes",
   "features.native_ui",
+  "features.party",
   -- "features.my_next_feature",
 })

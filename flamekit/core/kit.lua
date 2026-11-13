@@ -105,6 +105,7 @@ end
 -- Each step of your own screen's world: the lines in the lower left corner, drawn by FlameKit's DLL (not by EMF): the
 -- "FlameKit v1.2.3 by Name" label and the status line, written into emf\mods\flamekit\ui_hud.dat when they change:
 --   label <text>              ("" when the player switched the label off)
+--   notice <text>             (orange, under the label: this server does not run FlameKit)
 --   status <rrggbb> <text>    (only while a status line is shown)
 --   end                       (a file without it is half written: the DLL reads it again later)
 -- The updater's line under the label comes from the DLL itself. ui_hud.dat is a runtime file: never deployed.
@@ -114,9 +115,9 @@ local function hud_tick(world)
   if kit.setting("show_label", true) then
     label = string.format("%s v%s", kit.name, kit.version)
     if kit.author ~= "" then label = label .. " by " .. kit.author end
-    if not kit.connected(world) then label = label .. " (not connected to this server)" end
   end
   local lines = { "label " .. label }
+  if not kit.connected(world) then lines[#lines + 1] = "notice This server does not run FlameKit: some features are off" end
   if status_left > 0 then lines[#lines + 1] = "status " .. status_colour .. " " .. status_text end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"

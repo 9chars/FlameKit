@@ -119,6 +119,7 @@ local function enc(v)
 end
 
 local logged = {}  -- emf.log lines
+local party_down = {}  -- party lists the server half sent to the player's game
 emf = {
   id = "flamekit", dir = TMP,
   log = function(...) logged[#logged + 1] = table.concat({ ... }, " "); print("[log]", ...) end,
@@ -164,7 +165,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" then assert(def.to == "players") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
+      if name == "map" or name == "party" then assert(def.to == "players") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -181,6 +182,7 @@ emf = {
       if not JOINED then return false end
       assert(player == PLAYER and w:is_server())
       if name == "exp" then exp_down[#exp_down + 1] = data; return true end
+      if name == "party" then party_down[#party_down + 1] = data; return true end
       to_client[#to_client + 1] = data
       return true
     end,
@@ -600,4 +602,12 @@ check(settings.map_hide == after, "a click for rows the window no longer shows i
 ui_action("view", "-")
 step(12)
 check(read_tabs():find("\nview\t", 1, true) == nil, "no rows once the window is closed")
+-- the party window's data (party.lua): you are in the list, marked
+step(40)
+for _, data in ipairs(party_down) do channels.party.on_player(nil, { player = 0 }, data) end
+local pf = io.open(TMP .. "\\ui_party.dat", "r")
+local party = pf and pf:read("a") or ""
+if pf then pf:close() end
+check(party:find("^source %a+\n") ~= nil and party:find("\nend\n$") ~= nil, "ui_party.dat is written, complete")
+check(party:find("\np\t1\t", 1, true) ~= nil, "you are in the party list, marked as you")
 print("ALL PASSED (" .. MODE .. ")")

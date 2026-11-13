@@ -1698,6 +1698,46 @@ std::wstring widen(const std::string& utf8) {
     return out;
 }
 
+// A player's symbol and colour: worked out from the player's name, so the same player gets the same pair on every
+// PC and in every session, on the minimap and in the party window alike. 6 shapes x 8 colours.
+struct PlayerStyle {
+    int shape;  // 0 circle, 1 square, 2 diamond, 3 triangle up, 4 triangle down, 5 star
+    uint8_t r, g, b;
+};
+PlayerStyle player_style(const std::string& name) {
+    uint32_t h = 2166136261u;
+    for (unsigned char c : name) h = (h ^ c) * 16777619u;
+    static const uint8_t kColours[8][3] = {{255, 170, 60}, {255, 230, 90}, {255, 120, 190}, {100, 220, 255},
+                                           {190, 140, 255}, {170, 240, 100}, {255, 110, 90}, {240, 240, 240}};
+    const uint8_t* c = kColours[(h / 6) % 8];
+    return {static_cast<int>(h % 6), c[0], c[1], c[2]};
+}
+// Draws the symbol centred on (cx, cy), `size` pixels across, with a dark outline.
+void draw_player_mark(Canvas& c, float cx, float cy, float size, const PlayerStyle& st) {
+    auto shape = [&](float half, float r, float g, float b) {
+        switch (st.shape) {
+        case 0: c.disc(cx, cy, half, r, g, b, 1.0f); break;
+        case 1:
+            c.triangle(cx - half, cy - half, cx + half, cy - half, cx + half, cy + half, r, g, b, 1.0f);
+            c.triangle(cx - half, cy - half, cx + half, cy + half, cx - half, cy + half, r, g, b, 1.0f);
+            break;
+        case 2:
+            c.triangle(cx, cy - half * 1.25f, cx + half * 1.25f, cy, cx, cy + half * 1.25f, r, g, b, 1.0f);
+            c.triangle(cx, cy - half * 1.25f, cx, cy + half * 1.25f, cx - half * 1.25f, cy, r, g, b, 1.0f);
+            break;
+        case 3: c.triangle(cx, cy - half * 1.2f, cx + half * 1.15f, cy + half * 0.9f, cx - half * 1.15f, cy + half * 0.9f, r, g, b, 1.0f); break;
+        case 4: c.triangle(cx, cy + half * 1.2f, cx - half * 1.15f, cy - half * 0.9f, cx + half * 1.15f, cy - half * 0.9f, r, g, b, 1.0f); break;
+        default:
+            c.triangle(cx, cy - half * 1.25f, cx + half * 1.1f, cy + half * 0.65f, cx - half * 1.1f, cy + half * 0.65f, r, g, b, 1.0f);
+            c.triangle(cx, cy + half * 1.25f, cx - half * 1.1f, cy - half * 0.65f, cx + half * 1.1f, cy - half * 0.65f, r, g, b, 1.0f);
+            break;
+        }
+    };
+    const float half = size * 0.5f;
+    shape(half + 1.6f, 16, 18, 24);
+    shape(half, st.r, st.g, st.b);
+}
+
 // What draw_dial lays over the ground: a copy of g_shared taken once a frame.
 struct Overlay {
     std::vector<Marker> markers;
@@ -1925,14 +1965,19 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
             c.disc(sx, sy, u * 0.26f, 232, 250, 255, 1.0f);
         }
     }
-    for (const Other& k : ov.players) {  // other players: a white dot, at the edge when far away, and the name
+    for (const Other& k : ov.players) {  // other players: their symbol and colour (as in the party window), at the edge when
+                                         // far away, and the name; a white dot for a player whose name is not known
         if (!place(k.x, k.z, u, true, sx, sy, outside)) continue;
-        c.disc(sx, sy, u * 0.5f + 1.5f, 20, 22, 28, 1.0f);
-        c.disc(sx, sy, u * 0.5f, 246, 246, 250, 1.0f);
-        if (!outside && !k.name.empty() && names.ready(nullptr, name_px)) {
+        if (k.name.empty()) {
+            c.disc(sx, sy, u * 0.5f + 1.5f, 20, 22, 28, 1.0f);
+            c.disc(sx, sy, u * 0.5f, 246, 246, 250, 1.0f);
+            continue;
+        }
+        const PlayerStyle st = player_style(k.name);
+        draw_player_mark(c, sx, sy, u * 1.15f, st);
+        if (!outside && names.ready(nullptr, name_px)) {
             const std::wstring name = widen(k.name);
-            names.draw(c, static_cast<int>(sx) - names.width(name) / 2, static_cast<int>(sy - u * 0.5f) - names.font_px - 4, name, 240,
-                      240, 246);
+            names.draw(c, static_cast<int>(sx) - names.width(name) / 2, static_cast<int>(sy - u * 0.6f) - names.font_px - 4, name, st.r, st.g, st.b);
         }
     }
 
@@ -2353,6 +2398,326 @@ struct MinimapLayer : Layer {
     }
 };
 
+// ---- pinned windows: shown while the player plays ----
+// A pinned window stays on the screen and never takes the mouse or the keyboard, so the game is played as usual. While
+// the pointer is out (FlameKit's window is open, or Right Alt is held: g_pointer_mode) every pinned window can be dragged
+// by its title bar, made wider or narrower from its lower right corner, collapsed to its title bar (the "-" button) or
+// hidden (the "x" button; FlameKit's window, tab Windows, shows it again). Where each one is, its width and whether it is
+// collapsed or hidden are kept in emf\mods\flamekit\ui_layout.txt (this DLL is its one writer):
+//   <window id> <x> <y> <width> <collapsed 0|1> <hidden 0|1>     (x, y: its top left corner in the game window; -1: default)
+bool g_pointer_mode = false;  // the pointer is out: FlameKit's window is open or Right Alt is held (UI thread)
+bool g_pointer_hold = false;  // Right Alt is held while the game's process is in front (UI thread)
+
+struct LayoutEntry {
+    int x = -1, y = -1, w = 0;
+    bool collapsed = false, hidden = false;
+};
+struct Layout {
+    std::unordered_map<std::string, LayoutEntry> entries;
+    bool loaded = false;
+    void load() {
+        loaded = true;
+        if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_layout.txt").c_str(), L"rb", _SH_DENYNO)) {
+            char id[64];
+            int x, y, w, c, h;
+            while (fscanf_s(fp, "%63s %d %d %d %d %d", id, static_cast<unsigned>(sizeof id), &x, &y, &w, &c, &h) == 6)
+                entries[id] = {x, y, w, c != 0, h != 0};
+            fclose(fp);
+        }
+        FK_LOG(fklog::kInfo, "pinned: layout read: %d window(s)", static_cast<int>(entries.size()));
+    }
+    void save() {
+        std::string text;
+        for (const auto& [id, e] : entries) {
+            char line[160];
+            snprintf(line, sizeof line, "%s %d %d %d %d %d\n", id.c_str(), e.x, e.y, e.w, e.collapsed ? 1 : 0, e.hidden ? 1 : 0);
+            text += line;
+        }
+        const std::wstring file = g_flamekit_dir + L"ui_layout.txt", tmp = file + L".tmp";
+        bool ok = false;
+        if (FILE* fp = _wfsopen(tmp.c_str(), L"wb", _SH_DENYNO)) {
+            ok = fwrite(text.data(), 1, text.size(), fp) == text.size();
+            ok = fclose(fp) == 0 && ok;
+        }
+        ok = ok && MoveFileExW(tmp.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+        if (!ok) FK_LOG(fklog::kError, "pinned: ui_layout.txt could not be written (error %lu)", GetLastError());
+    }
+    LayoutEntry& get(const std::string& id) {
+        if (!loaded) load();
+        return entries[id];
+    }
+};
+Layout g_layout;
+
+struct PinnedLayer;
+std::vector<PinnedLayer*> g_pinned;  // every pinned window, for the Windows tab
+
+struct PinnedLayer : Layer {
+    std::string id;
+    std::wstring title;
+    int default_w = 300, min_w = 220, max_w = 640;
+    static constexpr int kHead = 28, kGrip = 14;
+    TextPainter text, little;  // ("small" is a macro in Windows' headers)
+    bool fonts = false, dirty = true, was_pointer = false;
+    enum Drag { kNone, kMove, kSize } drag = kNone;
+    POINT grab{};
+    int mouse_x = -1, mouse_y = -1;
+    RECT collapse_r{}, hide_r{};
+
+    PinnedLayer(std::string i, std::wstring t, int w) : id(std::move(i)), title(std::move(t)), default_w(w) { g_pinned.push_back(this); }
+    const char* name() const override { return id.c_str(); }
+    LayoutEntry& lay() { return g_layout.get(id); }
+
+    virtual bool active(const Frame& f) { return f.in_world; }  // shown at all now (besides hidden)
+    virtual int content_height(int width) = 0;                  // the content's height at this width
+    virtual void draw_content(int top, int width) = 0;          // into canvas, below the title bar
+    virtual bool refresh(const Frame& f) { return false; }      // read new data; true when the content changed
+
+    void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
+        for (int y = y0; y < y1; ++y)
+            for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
+    }
+
+    void draw_all() {
+        if (!fonts) {
+            fonts = true;
+            text.ready(g_screen, 16);
+            little.ready(g_screen, 13);
+        }
+        LayoutEntry& e = lay();
+        const int w = std::clamp(e.w > 0 ? e.w : default_w, min_w, max_w);
+        const int h = kHead + (e.collapsed ? 0 : content_height(w) + 8);
+        resize(w, h);
+        std::fill(pixels.begin(), pixels.end(), 0u);
+        box(0, 0, w, h, 14, 15, 19, 0.78f);                         // the body
+        box(0, 0, w, kHead, 30, 34, 44, 0.92f);                     // the title bar
+        if (g_pointer_mode) {                                       // movable now: a lit frame
+            box(0, 0, w, 1, 120, 160, 220, 1.0f);
+            box(0, h - 1, w, h, 120, 160, 220, 1.0f);
+            box(0, 0, 1, h, 120, 160, 220, 1.0f);
+            box(w - 1, 0, w, h, 120, 160, 220, 1.0f);
+        }
+        text.draw(canvas, 8, 5, title, 235, 225, 205);
+        // the buttons at the right of the title bar: "-" collapse (or "+" open), "x" hide
+        hide_r = {w - 26, 3, w - 4, kHead - 3};
+        collapse_r = {w - 52, 3, w - 30, kHead - 3};
+        auto knob = [&](const RECT& r, const wchar_t* label) {
+            const bool over = g_pointer_mode && mouse_x >= r.left && mouse_y >= r.top && mouse_x < r.right && mouse_y < r.bottom;
+            box(r.left, r.top, r.right, r.bottom, over ? 80.0f : 50.0f, over ? 84.0f : 54.0f, over ? 96.0f : 64.0f, 1.0f);
+            text.draw(canvas, r.left + (r.right - r.left - text.width(label)) / 2, r.top + 1, label, 230, 230, 235);
+        };
+        knob(collapse_r, e.collapsed ? L"+" : L"–");
+        knob(hide_r, L"×");
+        if (!e.collapsed) draw_content(kHead + 4, w);
+        if (g_pointer_mode && !e.collapsed)  // the resize grip: a small stair in the lower right corner
+            for (int k = 0; k < kGrip; k += 3) box(w - kGrip + k, h - 2 - k / 3, w - 2, h - 1 - k / 3, 140, 170, 220, 0.9f);
+        changed = true;
+    }
+
+    void update(const Frame& f) override {
+        LayoutEntry& e = lay();
+        const bool want = !e.hidden && active(f) && f.gw > 0;
+        if (want != visible) {
+            visible = want;
+            changed = true;
+            FK_LOG(fklog::kDebug, "pinned: %s %s", id.c_str(), want ? "shown" : "hidden");
+        }
+        if (refresh(f)) dirty = true;
+        if (!visible) return;
+        if (was_pointer != g_pointer_mode) {
+            was_pointer = g_pointer_mode;
+            dirty = true;
+            if (!g_pointer_mode && drag != kNone) end_drag();
+        }
+        if (dirty) {
+            dirty = false;
+            draw_all();
+        }
+        int x = e.x >= 0 ? e.x : f.gw * 12 / 1000, y = e.y >= 0 ? e.y : f.gh / 3;
+        x = std::clamp(x, 0, std::max(0, f.gw - canvas.w));
+        y = std::clamp(y, 0, std::max(0, f.gh - canvas.h));
+        place(x, y);
+    }
+
+    void end_drag() {
+        drag = kNone;
+        LayoutEntry& e = lay();
+        e.x = rect.left;
+        e.y = rect.top;
+        e.w = canvas.w;
+        g_layout.save();
+        FK_LOG(fklog::kInfo, "pinned: %s placed at %d,%d, %d wide", id.c_str(), e.x, e.y, e.w);
+    }
+
+    bool wants_mouse() const override { return visible && g_pointer_mode; }
+    void mouse_left() override {
+        mouse_x = mouse_y = -1;
+        dirty = true;
+    }
+    void mouse(UINT msg, int x, int y) override {
+        LayoutEntry& e = lay();
+        auto in = [&](const RECT& r) { return x >= r.left && y >= r.top && x < r.right && y < r.bottom; };
+        if (msg == WM_MOUSEMOVE) {
+            if (drag == kMove) {
+                e.x = rect.left + x - grab.x;
+                e.y = rect.top + y - grab.y;
+            } else if (drag == kSize) {
+                e.w = std::clamp(x + static_cast<int>(grab.x), min_w, max_w);
+                dirty = true;
+            }
+            if (x != mouse_x || y != mouse_y) {
+                const bool hover_change = in(collapse_r) != (mouse_x >= collapse_r.left && mouse_y >= collapse_r.top && mouse_x < collapse_r.right && mouse_y < collapse_r.bottom) ||
+                                          in(hide_r) != (mouse_x >= hide_r.left && mouse_y >= hide_r.top && mouse_x < hide_r.right && mouse_y < hide_r.bottom);
+                mouse_x = x;
+                mouse_y = y;
+                if (hover_change) dirty = true;
+            }
+            return;
+        }
+        if (msg == WM_LBUTTONUP) {
+            if (drag != kNone) end_drag();
+            return;
+        }
+        if (msg != WM_LBUTTONDOWN) return;
+        if (in(hide_r)) {
+            e.hidden = true;
+            g_layout.save();
+            dirty = true;
+            FK_LOG(fklog::kInfo, "pinned: %s hidden with its x button", id.c_str());
+        } else if (in(collapse_r)) {
+            e.collapsed = !e.collapsed;
+            g_layout.save();
+            dirty = true;
+            FK_LOG(fklog::kInfo, "pinned: %s %s", id.c_str(), e.collapsed ? "collapsed" : "opened");
+        } else if (!e.collapsed && x >= canvas.w - kGrip && y >= canvas.h - kGrip) {
+            drag = kSize;
+            grab = {canvas.w - x, 0};
+        } else if (y < kHead) {
+            drag = kMove;
+            grab = {x, y};
+            e.x = rect.left;
+            e.y = rect.top;
+        }
+    }
+};
+
+// ---- the party window: every player in the game, with health, mana and level ----
+// From the Lua part (features/party.lua) in emf\mods\flamekit\ui_party.dat. Each player has a symbol and a colour from
+// their name (player_style), the same as on the minimap. You first, then the others by name.
+struct PartyLayer : PinnedLayer {
+    struct Member {
+        bool you = false;
+        int hp = -1, hp_max = -1, mana = -1, mana_max = -1, level = -1;
+        std::string name;
+    };
+    std::vector<Member> members;
+    bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
+    uint64_t stamp = 0, next_read = 0;
+    static constexpr int kRow = 58;
+
+    PartyLayer() : PinnedLayer("party", L"Party", 300) {}
+
+    bool refresh(const Frame& f) override {
+        if (f.now < next_read) return false;
+        next_read = f.now + 250;
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        const std::wstring file = g_flamekit_dir + L"ui_party.dat";
+        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
+                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
+                                : 2;
+        if (st == stamp) return false;
+        FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
+        if (!fp) return false;
+        std::vector<Member> list;
+        bool from_server = false, complete = false;
+        char line[512];
+        while (fgets(line, sizeof line, fp)) {
+            line[std::strcspn(line, "\r\n")] = 0;
+            if (std::strcmp(line, "end") == 0) {
+                complete = true;
+                break;
+            }
+            if (std::strncmp(line, "source ", 7) == 0) {
+                from_server = std::strcmp(line + 7, "server") == 0;
+                continue;
+            }
+            if (line[0] != 'p' || line[1] != '\t') continue;
+            Member m;
+            int you = 0, used = 0;
+            if (sscanf_s(line + 2, "%d\t%d\t%d\t%d\t%d\t%d\t%n", &you, &m.hp, &m.hp_max, &m.mana, &m.mana_max, &m.level, &used) == 6 && used > 0) {
+                m.you = you != 0;
+                m.name = line + 2 + used;
+                list.push_back(std::move(m));
+            }
+        }
+        fclose(fp);
+        if (!complete) return false;
+        stamp = st;
+        std::sort(list.begin(), list.end(), [](const Member& a, const Member& b) {
+            if (a.you != b.you) return a.you;
+            return _stricmp(a.name.c_str(), b.name.c_str()) < 0;
+        });
+        members = std::move(list);
+        server = from_server;
+        FK_LOG(fklog::kDebug, "party: %d player(s), from %s", static_cast<int>(members.size()), server ? "the server half" : "this game alone");
+        return true;
+    }
+
+    int content_height(int width) override {
+        int h = static_cast<int>(std::max<size_t>(members.size(), 1)) * kRow;
+        if (!server) h += 36;  // the note about the server
+        return h;
+    }
+
+    // A bar in the game's style: a dark frame, the fill with a lighter top, a notch every 100 points, a bright end, and
+    // the exact values in the middle ("742 / 980"); grey when not known.
+    void bar(int x, int y, int w, int h, int cur, int max, float r, float g, float b) {
+        box(x, y, x + w, y + h, 10, 12, 14, 0.9f);
+        box(x, y, x + w, y + 1, 70, 74, 80, 1.0f);
+        const bool known = cur >= 0 && max > 0;
+        const int inner = w - 4;
+        const int fill = known ? std::clamp(static_cast<int>(static_cast<long long>(inner) * cur / max), 0, inner) : 0;
+        for (int yy = y + 2; yy < y + h - 2; ++yy) {
+            const float t = static_cast<float>(yy - y - 2) / std::max(1, h - 5);
+            const float shade = 1.15f - 0.35f * t;  // lighter at the top
+            for (int xx = x + 2; xx < x + 2 + fill; ++xx) canvas.blend(xx, yy, std::min(255.0f, r * shade), std::min(255.0f, g * shade), std::min(255.0f, b * shade), 1.0f);
+        }
+        if (known && max >= 200)
+            for (int k = 100; k < max; k += 100) {
+                const int nx = x + 2 + static_cast<int>(static_cast<long long>(inner) * k / max);
+                if (nx < x + 2 + fill) box(nx, y + 2, nx + 1, y + h - 2, r * 0.45f, g * 0.45f, b * 0.45f, 0.9f);
+            }
+        if (fill > 2) box(x + fill, y + 2, x + 2 + fill, y + h - 2, 235, 255, 235, 0.9f);  // the bright end
+        const std::wstring v = known ? std::to_wstring(cur) + L" / " + std::to_wstring(max) : std::wstring(L"?");
+        little.draw(canvas, x + (w - little.width(v)) / 2, y + (h - little.font_px) / 2 - 2, v, 245, 245, 245);
+    }
+
+    void draw_content(int top, int width) override {
+        int y = top;
+        if (members.empty()) {
+            text.draw(canvas, 10, y + 4, L"...", 150, 150, 160);
+            y += kRow;
+        }
+        for (const Member& m : members) {
+            const PlayerStyle st = player_style(m.name);
+            draw_player_mark(canvas, 16.0f, static_cast<float>(y + 11), 13.0f, st);
+            const std::wstring nm = widen(m.name) + (m.you ? L" (you)" : L"");
+            text.draw(canvas, 30, y + 2, nm, st.r, st.g, st.b);
+            if (m.level >= 0) {
+                const std::wstring lv = L"Lv " + std::to_wstring(m.level);
+                text.draw(canvas, width - 10 - text.width(lv), y + 2, lv, 200, 200, 210);
+            }
+            bar(10, y + 24, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
+            bar(10, y + 42, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
+            y += kRow;
+        }
+        if (!server) {
+            little.draw(canvas, 10, y + 2, L"Mana, level and other players need", 255, 176, 96);
+            little.draw(canvas, 10, y + 18, L"FlameKit on the server", 255, 176, 96);
+        }
+    }
+};
+
 // ---- FlameKit's window: a tab per feature ----
 // This layer only draws and takes clicks: it never reads the game. What it shows comes from the Lua part
 // (features/native_ui.lua), and every click goes back to the Lua part as a line in emf\mods\flamekit\ui_actions.txt;
@@ -2383,7 +2748,7 @@ struct WindowLayer : Layer {
         int number = 0;  // a button's number in its generation
         std::wstring text, tip;
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset };
     struct Hit {
         RECT r;
         Kind kind;
@@ -2541,6 +2906,7 @@ struct WindowLayer : Layer {
         fclose(fp);
         if (!complete) return false;
         tabs = std::move(t);
+        tabs.push_back({"windows", L"Windows"});  // this DLL's own tab: the pinned windows
         if (of != rows_of || gen != generation) rows_page = of == rows_of ? rows_page : 0;
         rows_of = of;
         generation = gen;
@@ -2574,7 +2940,7 @@ struct WindowLayer : Layer {
 
     // Tells the Lua part which generic tab is shown (it writes that tab's rows only then).
     void tell_view() {
-        const std::string want = open && current != "loot_filter" ? current : "";
+        const std::string want = open && current != "loot_filter" && current != "windows" ? current : "";
         if (want == viewing) return;
         viewing = want;
         act("view", want.empty() ? "-" : want);
@@ -2772,6 +3138,35 @@ struct WindowLayer : Layer {
         if (rows.empty()) text.draw(canvas, left, top + 4, rows_of == current ? L"Nothing here" : L"...", 150, 150, 160);
     }
 
+    // The Windows tab (this DLL's own): each pinned window with Show/Hide and Reset, and how to move them.
+    void draw_windows() {
+        int y = kTop + 14;
+        text.draw(canvas, kPad, y, L"Pinned windows", 255, 210, 122);
+        y += 34;
+        for (size_t i = 0; i < g_pinned.size(); ++i) {
+            PinnedLayer* p = g_pinned[i];
+            const bool hidden = p->lay().hidden;
+            text.draw(canvas, kPad, y + 5, p->title, 230, 230, 235);
+            button(kPad + 200, y, 110, hidden ? L"Show" : L"Hide", !hidden, kPinShow, i);
+            button(kPad + 320, y, 150, L"Reset place", false, kPinReset, i);
+            y += 40;
+        }
+        y += 10;
+        static const wchar_t* kHelp[] = {
+            L"Hold Right Alt to get the pointer while you play. Then a pinned",
+            L"window can be dragged by its title bar, made wider or narrower",
+            L"from its lower right corner, collapsed with \u2013 or hidden with \u00D7.",
+            L"Let go of Right Alt to play on.",
+            L"",
+            L"Ctrl+Shift+F12: FlameKit's log level (normal, full, off).",
+            L"The logs: emf\\mods\\flamekit\\logs in the game's folder.",
+        };
+        for (const wchar_t* l : kHelp) {
+            text.draw(canvas, kPad, y, l, 190, 195, 205);
+            y += 24;
+        }
+    }
+
     void draw_junk() {
         const std::wstring drop_label = std::wstring(delete_junk ? L"Delete" : L"Drop") + L" ▾";
         const int drop_w = std::max(text.width(L"Delete ▾"), text.width(L"Drop ▾")) + 28;
@@ -2817,6 +3212,7 @@ struct WindowLayer : Layer {
         }
         box(kPad, kTop - 6, kW - kPad, kTop - 5, 70, 110, 170, 1.0f);
         if (current == "loot_filter") draw_junk();
+        else if (current == "windows") draw_windows();
         else draw_rows();
         for (const Hit& h : hits) {  // under the pointer: an item's name, or a button's tooltip
             if (!inside(h.r)) continue;
@@ -2926,6 +3322,23 @@ struct WindowLayer : Layer {
                     tell_view();
                 }
                 break;
+            case kPinShow:
+                if (h.index < g_pinned.size()) {
+                    LayoutEntry& e = g_pinned[h.index]->lay();
+                    e.hidden = !e.hidden;
+                    g_pinned[h.index]->dirty = true;
+                    g_layout.save();
+                    FK_LOG(fklog::kInfo, "window: pinned window %s %s", g_pinned[h.index]->id.c_str(), e.hidden ? "hidden" : "shown");
+                }
+                break;
+            case kPinReset:
+                if (h.index < g_pinned.size()) {
+                    g_pinned[h.index]->lay() = LayoutEntry{};
+                    g_pinned[h.index]->dirty = true;
+                    g_layout.save();
+                    FK_LOG(fklog::kInfo, "window: pinned window %s back to its default place", g_pinned[h.index]->id.c_str());
+                }
+                break;
             case kCheckUpdates:
                 web_update::g_check_now = true;
                 FK_LOG(fklog::kInfo, "window: Check for updates");
@@ -2963,7 +3376,7 @@ struct BackdropLayer : Layer {
     const char* name() const override { return "backdrop"; }
     const Layer* window = nullptr;
     void update(const Frame& f) override {
-        const bool want = window && window->visible && f.gw > 0 && f.gh > 0;
+        const bool want = ((window && window->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
         if (want != visible) {
             visible = want;
             changed = true;
@@ -2977,6 +3390,9 @@ struct BackdropLayer : Layer {
         place(0, 0);
     }
     bool wants_mouse() const override { return visible; }
+    // While Right Alt is held the overlay is the front window, so the game gets no mouse moves (it would turn the
+    // camera) and its own pointer lock is let go; the game gets the front back when Right Alt is let go.
+    bool wants_keys() const override { return visible && g_pointer_hold; }
 };
 
 // The game's own mouse pointer, so FlameKit's windows look like the game's: taken from Windows while the game shows its
@@ -3016,14 +3432,14 @@ struct HudLayer : Layer {
     TextPainter text;
     bool font = false;
     std::vector<Line> shown;
-    std::wstring label, status, update_line;
+    std::wstring label, status, notice, update_line;
     uint32_t status_rgb = 0xffb060, update_rgb = 0xffb060;
     uint64_t next_read = 0;
 
     void read_files(uint64_t now) {
         next_read = now + 500;
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_hud.dat").c_str(), L"rb", _SH_DENYNO)) {
-            std::wstring new_label, new_status;
+            std::wstring new_label, new_status, new_notice;
             uint32_t rgb = 0xffb060;
             bool complete = false;
             char line[512];
@@ -3035,6 +3451,8 @@ struct HudLayer : Layer {
                 }
                 if (std::strncmp(line, "label ", 6) == 0) {
                     new_label = widen(line + 6);
+                } else if (std::strncmp(line, "notice ", 7) == 0) {
+                    new_notice = widen(line + 7);
                 } else if (std::strncmp(line, "status ", 7) == 0 && std::strlen(line) > 14) {
                     rgb = static_cast<uint32_t>(std::strtoul(std::string(line + 7, 6).c_str(), nullptr, 16));
                     new_status = widen(line + 14);
@@ -3044,6 +3462,7 @@ struct HudLayer : Layer {
             if (complete) {
                 label = new_label;
                 status = new_status;
+                notice = new_notice;
                 status_rgb = rgb;
             }
         }
@@ -3068,6 +3487,7 @@ struct HudLayer : Layer {
         std::vector<Line> want;
         if (!status.empty()) want.push_back({status, static_cast<uint8_t>(status_rgb >> 16), static_cast<uint8_t>(status_rgb >> 8), static_cast<uint8_t>(status_rgb)});
         if (!label.empty()) want.push_back({label, 235, 225, 205});
+        if (!notice.empty()) want.push_back({notice, 255, 150, 50});  // orange: e.g. the server does not run FlameKit
         if (!update_line.empty()) want.push_back({update_line, static_cast<uint8_t>(update_rgb >> 16), static_cast<uint8_t>(update_rgb >> 8), static_cast<uint8_t>(update_rgb)});
         const int mode = fklog::g_mode.load();
         if (mode != fklog::kNormal) want.push_back({std::wstring(L"FlameKit debug: ") + (mode == fklog::kOff ? L"off" : L"full"), 120, 200, 255});
@@ -3301,6 +3721,19 @@ LRESULT CALLBACK overlay_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return TRUE;
         }
         break;
+    case WM_SYSKEYDOWN:  // Alt (Right Alt: the pointer for the pinned windows) and Alt+key: never Windows' window menu
+    case WM_SYSKEYUP:
+    case WM_SYSCHAR:
+        if (msg == WM_SYSKEYDOWN && wp == VK_F4) {  // Alt+F4 over FlameKit: the game's own close, never the overlay's
+            if (HWND g = game_window()) PostMessageW(g, WM_CLOSE, 0, 0);
+            FK_LOG(fklog::kInfo, "overlay: Alt+F4 passed to the game's window");
+        }
+        return 0;
+    case WM_CLOSE:  // only the game closes the overlay (with itself)
+        return 0;
+    case WM_SYSCOMMAND:
+        if ((wp & 0xFFF0) == SC_KEYMENU) return 0;
+        break;
     case WM_KEYDOWN:
         if (Layer* l = g_compositor.keys_layer()) {
             FK_LOG(fklog::kDebug, "overlay: key %llu to %s", static_cast<unsigned long long>(wp), l->name());
@@ -3452,7 +3885,8 @@ void ui_thread_body() {
     WindowLayer window;
     BackdropLayer backdrop;
     backdrop.window = &window;
-    g_compositor.layers = {&minimap, &hud, &backdrop, &window};  // bottom first
+    PartyLayer party;
+    g_compositor.layers = {&minimap, &hud, &backdrop, &party, &window};  // bottom first (pinned windows over the backdrop)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
@@ -3504,6 +3938,14 @@ void ui_thread_body() {
                          (GetAsyncKeyState(VK_SHIFT) & 0x8000);
         if (f12 && !f12_was) fklog::set_mode((fklog::g_mode.load() + 1) % 3);
         f12_was = f12;
+
+        // Right Alt held while the game's process is in front: the pointer is out for the pinned windows
+        const bool hold = f.ours_front && f.in_world && (GetAsyncKeyState(VK_RMENU) & 0x8000) != 0;
+        if (hold != g_pointer_hold) {
+            g_pointer_hold = hold;
+            FK_LOG(fklog::kInfo, "pointer: Right Alt %s", hold ? "held: the pinned windows take the mouse" : "let go");
+        }
+        g_pointer_mode = hold || window.open;
 
         if (f.game_front) look_for_game_cursor();  // the game's pointer, while the game shows it in its menus
         for (Layer* l : g_compositor.layers) l->update(f);

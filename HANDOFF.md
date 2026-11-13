@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.20.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.21.
 
 ## What FlameKit is
 
@@ -65,7 +65,9 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.20. Client: 0.15.20 through the GitHub updater (needs a game restart).
+- Local server: 0.15.21. Client: 0.15.21 through the GitHub updater (needs a game restart).
+- 0.15.21 (owner: pinned windows, party window): `PinnedLayer` in flamekit_native.cpp is the base for windows that stay on screen while playing: title bar with – (collapse) and × (hide), drag by the title bar, resize from the lower right corner, layout in `emf\mods\flamekit\ui_layout.txt` (the DLL is its one writer). They take the mouse only in pointer mode (`g_pointer_mode`: F6 window open, or **Right Alt held** while the game's process is in front, `g_pointer_hold`); while Right Alt is held the backdrop takes the keyboard, so the overlay is the front window and the game gets no mouse moves; Alt's menu keys are swallowed, Alt+F4 is passed to the game. Not yet tested whether the game still turns the camera with raw input while the overlay is in front. `PartyLayer` reads `ui_party.dat` (features/party.lua: the hosting side reads name, emf.health, emf.attribute mana/max_mana/level every 30 steps and sends each player the list on channel `party`; a server without FlameKit: `source local`, only you with health, plus an orange note). `player_style(name)` gives each player a symbol and colour, used by the party window and the minimap. F6 window has a DLL-own **Windows** tab (show/hide, reset place, Right Alt help, Ctrl+Shift+F12 and the log folder). HUD: `notice <text>` line in ui_hud.dat, drawn orange under the label (kit.lua writes it when the server does not run FlameKit). TO DO (owner, later): a controller binding for pointer mode; a setting for the pointer key (Right Alt default, Caps Lock as an option).
+- Tests: run.lua writes files named `<tmp>\ui_*.txt` (backslash paths on Linux land next to the tmp folder, not in it): delete `<tmp>\*` between runs, or a stale ui_actions.txt makes the tab test fail.
 - 0.15.20 (owner: the cache waits were too slow): the updater reads the newest commit from `github.com/9chars/FlameKit.git/info/refs` (git's own address, not cached) and downloads from `raw.githubusercontent.com/9chars/FlameKit/<commit>/...` (immutable); falls back to main if the commit cannot be read. Test channel checks every 60 s, players every 10 min. "Check for updates" button in the window (`web_update::g_check_now`). Same download/verify/hold path as production.
 - 0.15.19: FlameKit's window (F6) is tabbed (`WindowLayer`): Auto Junk List keeps its own icon view (ui_list.dat); every other feature with `panel(world)` is drawn by a general row drawer from `ui_tabs.dat` (headings, texts, buttons, separators; pages, tooltips), clicks go to the feature's `click(world, key)` through ui_actions.txt (`view <id>`, `tab <id>/<generation>/<button>`). `BackdropLayer` keeps the pointer over the whole game window while the window is open; the game's own pointer is copied from Windows once the game shows it (`look_for_game_cursor`). Next: settings that are only in EMF's Mods tab (keys, corner, margin, label, status lines), then F4 opens FlameKit's window and the EMF panel (`kit.hub`) goes.
 - Overlay test (0.15.18, owner's client, 2026-11-13): Alt+Tab, Steam overlay, menus, F6/Esc, Ctrl+Shift+F12: the owner could not break it; watchdog 0 failures (193 checks in the busiest minute).
