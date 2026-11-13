@@ -3891,6 +3891,8 @@ void ui_thread_body() {
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
     bool said_game = false, keys_had = false, f12_was = false;
+    POINT pointer_at{-1, -1};  // where the pointer was when it was last put away (game window coordinates; -1: never)
+    int restore_rounds = 0;    // rounds left to put the pointer back there
     uint64_t frames = 0, frame_us = 0, frame_max_us = 0;
 
     for (;;) {
@@ -3945,7 +3947,31 @@ void ui_thread_body() {
             g_pointer_hold = hold;
             FK_LOG(fklog::kInfo, "pointer: Right Alt %s", hold ? "held: the pinned windows take the mouse" : "let go");
         }
-        g_pointer_mode = hold || window.open;
+        // The pointer comes back where it was the last time the pointer was out (Right Alt or FlameKit's window), so it
+        // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
+        // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
+        {
+            const bool mode = hold || window.open;
+            if (mode && !g_pointer_mode) {
+                restore_rounds = 5;
+            } else if (!mode && g_pointer_mode) {
+                POINT p{};
+                if (GetCursorPos(&p) && f.gw > 0) {
+                    pointer_at = {p.x - f.origin.x, p.y - f.origin.y};
+                    FK_LOG(fklog::kDebug, "pointer: left at %ld,%ld in the game window", pointer_at.x, pointer_at.y);
+                }
+            }
+            g_pointer_mode = mode;
+            if (restore_rounds > 0 && g_pointer_mode && f.gw > 0 && f.gh > 0) {
+                --restore_rounds;
+                const LONG x = pointer_at.x >= 0 ? std::clamp<LONG>(pointer_at.x, 0, f.gw - 1) : f.gw / 2;
+                const LONG y = pointer_at.y >= 0 ? std::clamp<LONG>(pointer_at.y, 0, f.gh - 1) : f.gh / 2;
+                SetCursorPos(f.origin.x + x, f.origin.y + y);
+                if (restore_rounds == 4) FK_LOG(fklog::kDebug, "pointer: put back at %ld,%ld in the game window", x, y);
+            } else if (!g_pointer_mode) {
+                restore_rounds = 0;
+            }
+        }
 
         if (f.game_front) look_for_game_cursor();  // the game's pointer, while the game shows it in its menus
         for (Layer* l : g_compositor.layers) l->update(f);

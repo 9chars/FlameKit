@@ -1,3 +1,6 @@
+0.15.24 Nov 13, 2026
+- When you hold Right Alt (or open FlameKit's window), the mouse pointer appears where it was the last time, instead of somewhere else each time; the first time, in the middle of the screen (client).
+
 0.15.23 Nov 13, 2026
 - For FlameKit's development: the server saves the world at once when FlameKit's restart helper asks for it, before a restart of the local dedicated server (server). Nothing changes in the game.
 

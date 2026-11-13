@@ -6,6 +6,8 @@
 #   client  close the game client (like Alt+F4) and start it again through Steam
 #   server  close the game client, have the server save its world, stop it and start it again, then start the client
 #   both    the same as server
+#   build   build FlameKit's DLL: ..\flamekit_native\build.cmd, its output in build.log and its result code in build.done
+#           there (the same as build_watch.cmd, which is no longer needed)
 #   stop    stop this helper
 # Whenever a file chime.request appears, it plays a chime: Claude is done and waits for the owner.
 #
@@ -172,6 +174,18 @@ function Start-Server {
     return $false
 }
 
+function Build {
+    $dir = Join-Path (Split-Path -Parent $here) 'flamekit_native'
+    if (-not (Test-Path (Join-Path $dir 'build.cmd'))) { Log "build: FAILED: build.cmd not found in $dir"; return $false }
+    $doneB = Join-Path $dir 'build.done'
+    if (Test-Path $doneB) { Remove-Item $doneB }
+    Log 'build: building FlameKit Native'
+    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call build.cmd > build.log 2>&1' -WorkingDirectory $dir -WindowStyle Hidden -Wait -PassThru
+    Set-Content -Path $doneB -Value $p.ExitCode -Encoding ASCII
+    Log "build: $(if ($p.ExitCode -eq 0) { 'OK' } else { "FAILED with code $($p.ExitCode) (see build.log)" })"
+    return $p.ExitCode -eq 0
+}
+
 function Finish([bool]$ok, [string]$text) {
     Set-Content -Path $doneFile -Value ("{0} {1}" -f $(if ($ok) { 'ok' } else { 'failed' }), $text) -Encoding UTF8
     Log "done: $(if ($ok) { 'ok' } else { 'FAILED' }): $text"
@@ -196,8 +210,9 @@ while ($true) {
                     $ok = (Close-Client) -and (Stop-Server) -and (Start-Server) -and (Start-Client)
                     Finish $ok 'client and server restart'
                 }
+                'build' { $ok = Build; Finish $ok 'build' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"
