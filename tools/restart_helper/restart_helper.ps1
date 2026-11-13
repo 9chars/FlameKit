@@ -15,8 +15,8 @@
 # exists; without one within 90 s nothing is stopped and the request fails. The game client is never ended by force.
 # The places are in restart_paths.txt next to this file (on this PC only; never in the public repository):
 #   server_folder = <the local dedicated server's folder>
-#   game_app_id = 1203220
-#   chime_sound = <a .wav file>          (optional; default C:\Windows\Media\chimes.wav)
+#   game_app_id = 1203620
+#   chime_sound = <a .wav file>          (optional; default C:\Windows\Media\Alarm01.wav, else chimes.wav)
 # When this file changes, the helper exits with code 10 and restart_watch.cmd starts it again.
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -40,8 +40,44 @@ if (Test-Path $cfgFile) {
     foreach ($l in Get-Content $cfgFile) { if ($l -match '^\s*(\w+)\s*=\s*(.+?)\s*$') { $cfg[$matches[1]] = $matches[2] } }
 }
 $serverDir = $cfg['server_folder']
-$appId = if ($cfg['game_app_id']) { $cfg['game_app_id'] } else { '1203220' }
-$chimeSound = if ($cfg['chime_sound']) { $cfg['chime_sound'] } else { Join-Path $env:WINDIR 'Media\chimes.wav' }
+$appId = if ($cfg['game_app_id']) { $cfg['game_app_id'] } else { '1203620' }
+$chimeSound = if ($cfg['chime_sound']) { $cfg['chime_sound'] } elseif (Test-Path (Join-Path $env:WINDIR 'Media\Alarm01.wav')) { Join-Path $env:WINDIR 'Media\Alarm01.wav' } else { Join-Path $env:WINDIR 'Media\chimes.wav' }
+
+# The game's own window: the process also has FlameKit's overlay window (class FlameKitOverlay), which ignores a
+# close, so the close goes to the game's largest visible window of another class.
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class FkWindows {
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    struct RECT { public int L, T, R, B; }
+    public static IntPtr GameWindow(uint pid) {
+        IntPtr best = IntPtr.Zero;
+        long bestArea = -1;
+        EnumWindows((h, l) => {
+            uint p;
+            GetWindowThreadProcessId(h, out p);
+            if (p != pid || !IsWindowVisible(h)) return true;
+            var c = new StringBuilder(256);
+            GetClassName(h, c, 256);
+            if (c.ToString() == "FlameKitOverlay") return true;
+            RECT r;
+            GetWindowRect(h, out r);
+            long area = (long)(r.R - r.L) * (r.B - r.T);
+            if (area > bestArea) { bestArea = area; best = h; }
+            return true;
+        }, IntPtr.Zero);
+        return best;
+    }
+}
+"@
 $serverExe = if ($serverDir) { Join-Path $serverDir 'enshrouded_server.exe' } else { $null }
 $emfLog = if ($serverDir) { Join-Path $serverDir 'emf\emf_core.log' } else { $null }
 $saveDir = if ($serverDir) { Join-Path $serverDir 'savegame' } else { $null }
@@ -51,8 +87,6 @@ function Chime {
     try {
         if (Test-Path $chimeSound) {
             $player = New-Object System.Media.SoundPlayer $chimeSound
-            $player.PlaySync()
-            Start-Sleep -Milliseconds 250
             $player.PlaySync()
         } else {
             [System.Media.SystemSounds]::Exclamation.Play()
@@ -71,7 +105,9 @@ function Close-Client {
     $p = Get-Process -Name 'enshrouded' -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $p) { Log 'client: not running'; return $true }
     Log "client: closing (process $($p.Id)), the same as Alt+F4"
-    if (-not $p.CloseMainWindow()) { Log 'client: FAILED: it has no window to close'; return $false }
+    $win = [FkWindows]::GameWindow([uint32]$p.Id)
+    if ($win -eq [IntPtr]::Zero) { Log 'client: FAILED: its window was not found'; return $false }
+    [FkWindows]::PostMessage($win, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null  # WM_CLOSE
     if (-not $p.WaitForExit(90000)) { Log 'client: FAILED: still running after 90 s (left running)'; return $false }
     Log 'client: closed'
     Start-Sleep -Seconds 3  # Steam notes the game ended before it is started again
