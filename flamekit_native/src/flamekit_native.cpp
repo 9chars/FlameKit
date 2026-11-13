@@ -2445,13 +2445,16 @@ struct MinimapLayer : Layer {
 // by its title bar, made wider or narrower from its lower right corner, collapsed to its title bar (the "-" button) or
 // hidden (the "x" button; FlameKit's window, tab Windows, shows it again). Where each one is, its width and whether it is
 // collapsed or hidden are kept in emf\mods\flamekit\ui_layout.txt (this DLL is its one writer):
-//   <window id> <x> <y> <width> <collapsed 0|1> <hidden 0|1>     (x, y: its top left corner in the game window; -1: default)
+//   <window id> <x> <y> <width> <collapsed 0|1> <hidden 0|1> <height>   (x, y: its top left corner in the game window, -1:
+//   default; height: 0 as tall as the content, else at most this tall, the content then scrolls). "window" is FlameKit's
+//   own window (F6), which can be moved and resized the same way.
 bool g_pointer_mode = false;  // the pointer is out: FlameKit's window is open or Right Alt is held (UI thread)
 bool g_pointer_hold = false;  // Right Alt is held while the game's process is in front (UI thread)
 
 struct LayoutEntry {
     int x = -1, y = -1, w = 0;
     bool collapsed = false, hidden = false;
+    int h = 0;  // the height the player gave it (0: as tall as its content); a pinned window is at most this tall
 };
 struct Layout {
     std::unordered_map<std::string, LayoutEntry> entries;
@@ -2459,10 +2462,12 @@ struct Layout {
     void load() {
         loaded = true;
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_layout.txt").c_str(), L"rb", _SH_DENYNO)) {
-            char id[64];
-            int x, y, w, c, h;
-            while (fscanf_s(fp, "%63s %d %d %d %d %d", id, static_cast<unsigned>(sizeof id), &x, &y, &w, &c, &h) == 6)
-                entries[id] = {x, y, w, c != 0, h != 0};
+            char line[256], id[64];
+            while (fgets(line, sizeof line, fp)) {
+                int x, y, w, c, hid, h = 0;  // the height came in 0.15.28: older lines have 6 fields
+                if (sscanf_s(line, "%63s %d %d %d %d %d %d", id, static_cast<unsigned>(sizeof id), &x, &y, &w, &c, &hid, &h) >= 6)
+                    entries[id] = {x, y, w, c != 0, hid != 0, h};
+            }
             fclose(fp);
         }
         FK_LOG(fklog::kInfo, "pinned: layout read: %d window(s)", static_cast<int>(entries.size()));
@@ -2471,7 +2476,7 @@ struct Layout {
         std::string text;
         for (const auto& [id, e] : entries) {
             char line[160];
-            snprintf(line, sizeof line, "%s %d %d %d %d %d\n", id.c_str(), e.x, e.y, e.w, e.collapsed ? 1 : 0, e.hidden ? 1 : 0);
+            snprintf(line, sizeof line, "%s %d %d %d %d %d %d\n", id.c_str(), e.x, e.y, e.w, e.collapsed ? 1 : 0, e.hidden ? 1 : 0, e.h);
             text += line;
         }
         const std::wstring file = g_flamekit_dir + L"ui_layout.txt", tmp = file + L".tmp";
@@ -2505,6 +2510,7 @@ struct PinnedLayer : Layer {
     POINT grab{};
     int mouse_x = -1, mouse_y = -1;
     RECT collapse_r{}, hide_r{};
+    int scroll = 0, max_scroll = 0;  // the content scrolls (mouse wheel, pointer out) when the window is shorter than it
 
     PinnedLayer(std::string i, std::wstring t, int w) : id(std::move(i)), title(std::move(t)), default_w(w) { g_pinned.push_back(this); }
     const char* name() const override { return id.c_str(); }
@@ -2529,10 +2535,23 @@ struct PinnedLayer : Layer {
         }
         LayoutEntry& e = lay();
         const int w = std::clamp(e.w > 0 ? e.w : default_w, min_w, max_w);
-        const int h = kHead + (e.collapsed ? 0 : content_height(w) + 8);
+        const int natural = kHead + (e.collapsed ? 0 : content_height(w) + 8);
+        const int h = e.collapsed ? kHead : e.h > 0 ? std::min(natural, std::max(e.h, kHead + 40)) : natural;  // e.h: at most this tall
+        max_scroll = std::max(0, natural - h);
+        scroll = std::clamp(scroll, 0, max_scroll);
         resize(w, h);
         std::fill(pixels.begin(), pixels.end(), 0u);
         box(0, 0, w, h, 14, 15, 19, 0.78f);                         // the body
+        if (!e.collapsed) {
+            draw_content(kHead + 4 - scroll, w - (max_scroll ? 10 : 0));
+            std::fill(pixels.begin(), pixels.begin() + static_cast<std::ptrdiff_t>(kHead) * w, 0u);  // scrolled up under the title bar
+            if (max_scroll) {  // a thin scroll bar at the right
+                const int track = h - kHead - 6, thumb = std::max(20, track * (h - kHead) / std::max(1, natural - kHead));
+                const int ty = kHead + 3 + (track - thumb) * scroll / max_scroll;
+                box(w - 8, kHead + 3, w - 3, kHead + 3 + track, 40, 42, 50, 1.0f);
+                box(w - 8, ty, w - 3, ty + thumb, 120, 128, 145, 1.0f);
+            }
+        }
         box(0, 0, w, kHead, 30, 34, 44, 0.92f);                     // the title bar
         if (g_pointer_mode) {                                       // movable now: a lit frame
             box(0, 0, w, 1, 120, 160, 220, 1.0f);
@@ -2549,9 +2568,8 @@ struct PinnedLayer : Layer {
             box(r.left, r.top, r.right, r.bottom, over ? 80.0f : 50.0f, over ? 84.0f : 54.0f, over ? 96.0f : 64.0f, 1.0f);
             text.draw(canvas, r.left + (r.right - r.left - text.width(label)) / 2, r.top + 1, label, 230, 230, 235);
         };
-        knob(collapse_r, e.collapsed ? L"+" : L"–");
-        knob(hide_r, L"×");
-        if (!e.collapsed) draw_content(kHead + 4, w);
+        knob(collapse_r, e.collapsed ? L"+" : L"\u2013");
+        knob(hide_r, L"\u00D7");
         if (g_pointer_mode && !e.collapsed)  // the resize grip: a small stair in the lower right corner
             for (int k = 0; k < kGrip; k += 3) box(w - kGrip + k, h - 2 - k / 3, w - 2, h - 1 - k / 3, 140, 170, 220, 0.9f);
         changed = true;
@@ -2589,7 +2607,16 @@ struct PinnedLayer : Layer {
         e.y = rect.top;
         e.w = canvas.w;
         g_layout.save();
-        FK_LOG(fklog::kInfo, "pinned: %s placed at %d,%d, %d wide", id.c_str(), e.x, e.y, e.w);
+        FK_LOG(fklog::kInfo, "pinned: %s placed at %d,%d, %d wide, at most %d tall", id.c_str(), e.x, e.y, e.w, e.h);
+    }
+
+    void wheel(int delta, int x, int y) override {
+        if (!max_scroll) return;
+        const int to = std::clamp(scroll - delta * 40 / WHEEL_DELTA, 0, max_scroll);
+        if (to != scroll) {
+            scroll = to;
+            dirty = true;
+        }
     }
 
     bool wants_mouse() const override { return visible && g_pointer_mode; }
@@ -2604,8 +2631,9 @@ struct PinnedLayer : Layer {
             if (drag == kMove) {
                 e.x = rect.left + x - grab.x;
                 e.y = rect.top + y - grab.y;
-            } else if (drag == kSize) {
+            } else if (drag == kSize) {  // wider or narrower, and taller or shorter (at most as tall as the content)
                 e.w = std::clamp(x + static_cast<int>(grab.x), min_w, max_w);
+                e.h = std::max(kHead + 40, y + static_cast<int>(grab.y));
                 dirty = true;
             }
             if (x != mouse_x || y != mouse_y) {
@@ -2634,14 +2662,14 @@ struct PinnedLayer : Layer {
             FK_LOG(fklog::kInfo, "pinned: %s %s", id.c_str(), e.collapsed ? "collapsed" : "opened");
         } else if (!e.collapsed && x >= canvas.w - kGrip && y >= canvas.h - kGrip) {
             drag = kSize;
-            grab = {canvas.w - x, 0};
+            grab = {canvas.w - x, canvas.h - y};
         } else if (y < kHead) {
             drag = kMove;
             grab = {x, y};
             e.x = rect.left;
             e.y = rect.top;
         } else if (!e.collapsed) {
-            content_click(x, y - (kHead + 4));
+            content_click(x, y - (kHead + 4) + scroll);
         }
     }
 };
@@ -2819,12 +2847,13 @@ struct PartyLayer : PinnedLayer {
             const bool tracked = !g_tracked.empty() && m.name == g_tracked;
             const bool down = m.hp == 0 && m.hp_max > 0;
             if (tracked) {  // followed on the minimap: a gold frame
+                // the mana bar ends at y + 71: the bottom line one pixel under it (y + 73), as the top line is above the name
                 box(3, y - 2, width - 3, y - 1, 255, 214, 90, 1.0f);
-                box(3, y + kRow - 5, width - 3, y + kRow - 4, 255, 214, 90, 1.0f);
-                box(3, y - 2, 4, y + kRow - 4, 255, 214, 90, 1.0f);
-                box(width - 4, y - 2, width - 3, y + kRow - 4, 255, 214, 90, 1.0f);
+                box(3, y + kRow - 3, width - 3, y + kRow - 2, 255, 214, 90, 1.0f);
+                box(3, y - 2, 4, y + kRow - 2, 255, 214, 90, 1.0f);
+                box(width - 4, y - 2, width - 3, y + kRow - 2, 255, 214, 90, 1.0f);
             }
-            if (down) box(4, y - 1, width - 4, y + kRow - 5, 120, 20, 20, 0.45f);  // health 0: a red glow
+            if (down) box(4, y - 1, width - 4, y + kRow - 3, 120, 20, 20, 0.45f);  // health 0: a red glow
             draw_player_mark(canvas, 16.0f, static_cast<float>(y + 11), 13.0f, st);
             const std::wstring nm = widen(m.name) + (m.you ? L" (you)" : L"");
             text.draw(canvas, 30, y + 2, nm, st.r, st.g, st.b);
@@ -2977,6 +3006,8 @@ struct MessagesLayer : PinnedLayer {
     }
 };
 
+std::string version_in(const std::wstring& mod_json);  // (the monitor's, further down)
+
 // ---- FlameKit's window: a tab per feature ----
 // This layer only draws and takes clicks: it never reads the game. What it shows comes from the Lua part
 // (features/native_ui.lua), and every click goes back to the Lua part as a line in emf\mods\flamekit\ui_actions.txt;
@@ -3007,18 +3038,26 @@ struct WindowLayer : Layer {
         int number = 0;  // a button's number in its generation
         std::wstring text, tip;
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose };
     struct Hit {
         RECT r;
         Kind kind;
         size_t index;
         const std::wstring* tip = nullptr;
     };
-    static constexpr int kIcon = 64, kGap = 8, kCols = 10, kPad = 16, kBagRows = 5, kJunkRows = 4, kTop = 46;
-    static constexpr int kW = 2 * kPad + kCols * kIcon + (kCols - 1) * kGap;
-    static constexpr int kBagGrid = kBagRows * kIcon + (kBagRows - 1) * kGap, kJunkGrid = kJunkRows * kIcon + (kJunkRows - 1) * kGap;
-    static constexpr int kBagHead = kTop + 52, kBagTop = kBagHead + 30, kJunkHead = kBagTop + kBagGrid + kPad;
-    static constexpr int kJunkTop = kJunkHead + 30, kH = kJunkTop + kJunkGrid + kPad;
+    static constexpr int kIcon = 64, kGap = 8, kPad = 16, kTitle = 32, kGrip = 16, kBarW = 10;
+    static constexpr int kDefW = 2 * kPad + 10 * kIcon + 9 * kGap, kDefH = 860, kMinW = 560, kMinH = 440;
+    // The window's size and layout now (lay_out). They were constants before the window could be resized (0.15.28),
+    // hence the k names. The size comes from ui_layout.txt ("window"), else the default.
+    int kW = kDefW, kH = kDefH;
+    int kTop = 82;  // where a tab's content starts: under the title bar and the tab rows
+    int kCols = 10, kBagRows = 5, kJunkRows = 4, kBagHead = 0, kBagTop = 0, kJunkHead = 0, kJunkTop = 0;
+    int kViewTop = 0, kViewBottom = 0;  // a tab of rows: the part of the window it scrolls in
+    std::vector<RECT> tab_r;           // where each tab is in the tab rows
+    RECT close_r{};
+    enum WinDrag { kStill, kMoving, kSizing } win_drag = kStill;
+    POINT win_grab{};
+    std::string version;  // FlameKit's version, for the title bar (mod.json)
 
     bool open = false, close_asked = false, dirty = true, drop_open = false;
     // the tabs
@@ -3210,7 +3249,7 @@ struct WindowLayer : Layer {
         act("view", want.empty() ? "-" : want);
     }
 
-    static size_t pages(size_t n, int rows) { return std::max<size_t>(1, (n + kCols * rows - 1) / (kCols * rows)); }
+    size_t pages(size_t n, int rows) const { return std::max<size_t>(1, (n + kCols * rows - 1) / (kCols * rows)); }
 
     const std::vector<uint8_t>* picture(uint32_t id) {
         if (id == 0) return nullptr;
@@ -3334,7 +3373,6 @@ struct WindowLayer : Layer {
     // A tab of rows (every feature's tab but the Auto Junk List and Windows): laid out top to bottom and scrolled
     // (mouse wheel, the scroll bar at the right: drag its thumb, or click above or below it). Rows outside the view are
     // cut off by draw() (clear_outside). The page control (pager, "< 1/2 >") stays for views that want pages.
-    static constexpr int kViewTop = kTop + 2, kViewBottom = kH - kPad, kBarW = 10;
     void draw_rows() {
         struct Placed {
             const Row* row;
@@ -3461,11 +3499,14 @@ struct WindowLayer : Layer {
             button(kPad + 320, y, 150, L"Reset place", false, kPinReset, i);
             y += 40;
         }
+        text.draw(canvas, kPad, y + 5, L"FlameKit window", 230, 230, 235);
+        button(kPad + 320, y, 150, L"Reset place", false, kPinReset, g_pinned.size());  // its place and size
+        y += 40;
         y += 10;
         static const wchar_t* kHelp[] = {
             L"Hold the pointer key (Right Alt unless changed in Settings) to get",
             L"the pointer while you play. Then a pinned window can be dragged by",
-            L"its title bar, made wider or narrower from its lower right corner,",
+            L"its title bar, resized from its lower right corner,",
             L"collapsed with \u2013 or hidden with \u00D7. Let go of the key to play on.",
             L"",
             L"Ctrl+Shift+F12: FlameKit's log level (normal, full, off).",
@@ -3495,6 +3536,37 @@ struct WindowLayer : Layer {
         }
     }
 
+    // Lays the window out at its size now: the tab rows (as many as the tabs need), where a tab's content starts, the
+    // part a tab of rows scrolls in, and the Auto Junk List's grids (as many icons across and rows down as fit).
+    void lay_out() {
+        tab_r.clear();
+        int total = 0;
+        for (const Tab& t : tabs) total += text.width(t.title) + 32;
+        const int pad = total <= kW - 2 * kPad ? 28 : 18;  // narrower tabs first, then a second row
+        int tx = kPad, ty = kTitle + 6;
+        for (const Tab& t : tabs) {
+            const int w = text.width(t.title) + pad;
+            if (tx > kPad && tx + w > kW - kPad) {
+                tx = kPad;
+                ty += 34;
+            }
+            tab_r.push_back({tx, ty, tx + w, ty + 30});
+            tx += w + 4;
+        }
+        kTop = ty + 30 + 14;
+        kCols = std::max(1, (kW - 2 * kPad + kGap) / (kIcon + kGap));
+        const int grid_h = kH - kTop - 52 - 30 - kPad - 30 - kPad;
+        const int grid_rows = std::max(2, (grid_h + 2 * kGap) / (kIcon + kGap));
+        kBagRows = std::max(1, (grid_rows * 5 + 4) / 9);
+        kJunkRows = std::max(1, grid_rows - kBagRows);
+        kBagHead = kTop + 52;
+        kBagTop = kBagHead + 30;
+        kJunkHead = kBagTop + kBagRows * kIcon + (kBagRows - 1) * kGap + kPad;
+        kJunkTop = kJunkHead + 30;
+        kViewTop = kTop + 2 + (current == "changes" ? 44 : 0);  // What's New: the Check for updates button above
+        kViewBottom = kH - kPad;
+    }
+
     void draw() {
         if (!fonts) {
             fonts = true;
@@ -3503,31 +3575,44 @@ struct WindowLayer : Layer {
         resize(kW, kH);
         hits.clear();
         std::fill(pixels.begin(), pixels.end(), 0u);
+        lay_out();
         box(0, 0, kW, kH, 18, 18, 22, 0.94f);
         const bool rows_tab = current != "loot_filter" && current != "windows";
-        if (rows_tab) {  // first, so the tab bar is drawn over what is scrolled out at the top
+        if (rows_tab) {  // first, so the title bar and the tabs are drawn over what is scrolled out at the top
             draw_rows();
             clear_outside();
         }
-        // the tab bar
-        int tx = kPad;
-        for (size_t i = 0; i < tabs.size(); ++i) {
-            const int w = text.width(tabs[i].title) + 28;
+        // the title bar: FlameKit and its version, the x that closes the window; dragged to move the window
+        box(0, 0, kW, kTitle, 30, 34, 44, 0.95f);
+        text.draw(canvas, 12, 7, version.empty() ? std::wstring(L"FlameKit") : L"FlameKit v" + widen(version), 235, 225, 205);
+        close_r = {kW - 32, 5, kW - 8, kTitle - 5};
+        {
+            const bool over = inside(close_r);
+            box(close_r.left, close_r.top, close_r.right, close_r.bottom, over ? 170.0f : 50.0f, over ? 60.0f : 54.0f, over ? 60.0f : 64.0f, 1.0f);
+            text.draw(canvas, close_r.left + (close_r.right - close_r.left - text.width(L"\u00D7")) / 2, close_r.top + 1, L"\u00D7", 235, 235, 240);
+            hits.push_back({close_r, kClose, 0});
+        }
+        // the tab rows
+        for (size_t i = 0; i < tabs.size() && i < tab_r.size(); ++i) {
+            const RECT& r = tab_r[i];
             const bool on = tabs[i].id == current;
-            const RECT r{tx, 8, tx + w, 38};
             const bool over = inside(r);
             box(r.left, r.top, r.right, r.bottom, on ? 46.0f : over ? 50.0f : 32.0f, on ? 92.0f : over ? 56.0f : 36.0f, on ? 150.0f : over ? 70.0f : 44.0f, 1.0f);
-            text.draw(canvas, tx + 14, 13, tabs[i].title, on ? 235.0f : 170.0f, on ? 240.0f : 190.0f, 255);
+            text.draw(canvas, r.left + (r.right - r.left - text.width(tabs[i].title)) / 2, r.top + 5, tabs[i].title, on ? 235.0f : 170.0f,
+                      on ? 240.0f : 190.0f, 255);
             hits.push_back({r, kTab, i});
-            tx += w + 4;
-        }
-        {  // at the right of the tab bar: the updater's normal check, at once (web_update::g_check_now)
-            const int cw = text.width(L"Check for updates") + 24;
-            button(kW - kPad - cw, 8, cw, L"Check for updates", false, kCheckUpdates);
         }
         box(kPad, kTop - 6, kW - kPad, kTop - 5, 70, 110, 170, 1.0f);
         if (current == "loot_filter") draw_junk();
         else if (current == "windows") draw_windows();
+        if (current == "changes") {  // the updater's normal check, at once (web_update::g_check_now)
+            const int cw = text.width(L"Check for updates") + 24;
+            text.draw(canvas, kPad, kTop + 9, L"FlameKit looks for updates by itself; this looks now.", 150, 155, 165);
+            button(kW - kPad - cw, kTop + 4, cw, L"Check for updates", false, kCheckUpdates);
+        }
+        // the frame, and the grip in the lower right corner that resizes the window
+        frame_box(0, 0, kW, kH, 1, 120, 160, 220);
+        for (int k = 0; k < kGrip; k += 3) box(kW - kGrip + k, kH - 2 - k / 3, kW - 2, kH - 1 - k / 3, 140, 170, 220, 0.9f);
         for (const Hit& h : hits) {  // under the pointer: an item's name, or a button's tooltip
             if (!inside(h.r)) continue;
             std::wstring tip;
@@ -3566,6 +3651,7 @@ struct WindowLayer : Layer {
         if (g_ui_request.exchange(false)) {
             if (!open && f.game_front) {
                 open = true;
+                if (version.empty()) version = version_in(g_flamekit_dir + L"mod.json");
                 list_stamp = tabs_stamp = 0;  // read at once
                 dirty = true;
                 FK_LOG(fklog::kInfo, "window: opened (F6), tab %s", current.c_str());
@@ -3591,12 +3677,32 @@ struct WindowLayer : Layer {
                 tell_view();
             }
         }
+        LayoutEntry& e = g_layout.get("window");  // its size and place: the player's (ui_layout.txt), else the defaults
+        const int w = std::clamp(e.w > 0 ? e.w : kDefW, kMinW, std::max(kMinW, f.gw));
+        const int h = std::clamp(e.h > 0 ? e.h : kDefH, kMinH, std::max(kMinH, f.gh));
+        if (w != kW || h != kH) {
+            kW = w;
+            kH = h;
+            dirty = true;
+        }
         if (dirty) {
             dirty = false;
             draw();
         }
         visible = true;
-        place((f.gw - kW) / 2, (f.gh - kH) / 2);
+        const int x = e.x >= 0 ? e.x : (f.gw - kW) / 2, y = e.y >= 0 ? e.y : (f.gh - kH) / 2;
+        place(std::clamp(x, 0, std::max(0, f.gw - kW)), std::clamp(y, 0, std::max(0, f.gh - kH)));
+    }
+
+    void end_win_drag() {
+        win_drag = kStill;
+        LayoutEntry& e = g_layout.get("window");
+        e.x = rect.left;
+        e.y = rect.top;
+        e.w = kW;
+        e.h = kH;
+        g_layout.save();
+        FK_LOG(fklog::kInfo, "window: placed at %d,%d, %dx%d", e.x, e.y, e.w, e.h);
     }
 
     bool wants_mouse() const override { return open; }
@@ -3622,6 +3728,15 @@ struct WindowLayer : Layer {
     }
     void mouse(UINT msg, int x, int y) override {
         if (msg == WM_MOUSEMOVE) {
+            if (win_drag == kMoving) {  // dragged by its title bar
+                LayoutEntry& e = g_layout.get("window");
+                e.x = rect.left + x - win_grab.x;
+                e.y = rect.top + y - win_grab.y;
+            } else if (win_drag == kSizing) {  // resized from its lower right corner
+                LayoutEntry& e = g_layout.get("window");
+                e.w = x + win_grab.x;
+                e.h = y + win_grab.y;
+            }
             if (thumb_drag) {  // the scroll bar's thumb follows the pointer
                 const int track_h = track_r.bottom - track_r.top, thumb_h = thumb_r.bottom - thumb_r.top;
                 if (track_h > thumb_h) scroll_to((y - thumb_grab - track_r.top) * max_scroll / (track_h - thumb_h));
@@ -3634,6 +3749,7 @@ struct WindowLayer : Layer {
             return;
         }
         if (msg == WM_LBUTTONUP) {
+            if (win_drag != kStill) end_win_drag();
             if (thumb_drag) {
                 thumb_drag = false;
                 dirty = true;
@@ -3667,12 +3783,19 @@ struct WindowLayer : Layer {
                 }
                 break;
             case kPinReset:
-                if (h.index < g_pinned.size()) {
+                if (h.index == g_pinned.size()) {  // FlameKit's window: the middle of the screen, its first size
+                    g_layout.get("window") = LayoutEntry{};
+                    g_layout.save();
+                    FK_LOG(fklog::kInfo, "window: back to its first place and size");
+                } else if (h.index < g_pinned.size()) {
                     g_pinned[h.index]->lay() = LayoutEntry{};
                     g_pinned[h.index]->dirty = true;
                     g_layout.save();
                     FK_LOG(fklog::kInfo, "window: pinned window %s back to its default place", g_pinned[h.index]->id.c_str());
                 }
+                break;
+            case kClose:
+                close_asked = true;
                 break;
             case kScrollThumb:
                 thumb_drag = true;
@@ -3706,6 +3829,17 @@ struct WindowLayer : Layer {
             case kJunkNext: ++junk_page; break;
             }
             return;
+        }
+        // nothing to click there: the lower right corner resizes the window, the title bar moves it
+        if (x >= kW - kGrip && y >= kH - kGrip) {
+            win_drag = kSizing;
+            win_grab = {kW - x, kH - y};
+        } else if (y < kTitle) {
+            win_drag = kMoving;
+            win_grab = {x, y};
+            LayoutEntry& e = g_layout.get("window");
+            e.x = rect.left;
+            e.y = rect.top;
         }
     }
 };

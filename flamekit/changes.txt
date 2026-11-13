@@ -1,3 +1,11 @@
+0.15.28 Nov 13, 2026
+- FlameKit's window (F6) looks like the pinned windows: a title bar with FlameKit's version and an x that closes it, and a frame. Drag it by the title bar, and resize it from its lower right corner; it opens where and as big as you left it (the Windows tab can put it back in the middle).
+- The Auto Junk List's icon grids fit the window's size: more icons across and more rows when the window is bigger.
+- The tabs no longer run off the window: narrower tabs, and a second row when they still do not fit. The tabs are now Auto Junk List, Minimap, Experimental, Party, Settings, What's New, Windows.
+- "Check for updates" moved into the What's New tab.
+- Pinned windows (Party, Messages) can also be made shorter: their content then scrolls with the mouse wheel while the pointer key is held.
+- Party window: the gold frame around the followed player sits one pixel under the mana bar instead of on it.
+
 0.15.27 Nov 13, 2026
 - FlameKit's window (F6): long tabs (Settings, Minimap, Experimental, Party, What's New) scroll instead of showing pages: with the mouse wheel, or the scroll bar at the right (drag it, or click above or below it).
 
