@@ -164,8 +164,26 @@ struct Shared {
     float minutes_left = -1;  // real minutes until night (by day) or day (by night); -1 not known
     std::vector<uint32_t> announced;  // the ids of the places the game announced, oldest first (from its events)
     std::string region, place;        // where the player is: the region, and the named place inside it if any
+    struct Spire {
+        float x, z;
+        std::string region;
+    };
+    std::vector<Spire> spires;        // every Ancient Spire known, with its region's name (for region_at)
 };
 Shared g_shared;
+
+// The region at a place (x east, z north, in metres): the one of the nearest Ancient Spire, the same rule as for the
+// player's own region on the minimap. Empty when no spire is known yet.
+std::string region_at(float x, float z) {
+    std::lock_guard<std::mutex> l(g_shared.lock);
+    const Shared::Spire* best = nullptr;
+    float best_d = 0;
+    for (const Shared::Spire& sp : g_shared.spires) {
+        const float d = (sp.x - x) * (sp.x - x) + (sp.z - z) * (sp.z - z);
+        if (!best || d < best_d) best = &sp, best_d = d;
+    }
+    return best ? best->region : std::string();
+}
 
 // The game's own name for the place whose name tag has this id (see Loca below); false when it is not known.
 bool place_name(uint32_t id, std::string& out);
@@ -667,6 +685,7 @@ void on_world_tick(emf::World w) {
         // (the game marks that one), else the nearest named place the player has found.
         static std::unordered_set<uint32_t> place_ids, spire_ids;
         std::string place, nearest_region;
+        std::vector<Shared::Spire> spires;
         // a place counts as near while it is on the dial (but at least 150 m, so the closest zoom steps still name things)
         const double reach = std::max(150.0, static_cast<double>(kRanges[s.zoom]));
         double nearest = 1e18, nearest_place = reach * reach;
@@ -700,6 +719,12 @@ void on_world_tick(emf::World w) {
                             const auto* rt = w.get<gen::RenderTransform>(id);
                             const auto* ct = rt ? nullptr : w.get<gen::CurrentTransform>(id);
                             const bool placed = rt || ct;
+                            if (placed) {
+                                std::string name;
+                                if (place_name(tid, name))
+                                    spires.push_back({static_cast<float>(meters((rt ? rt->transform : ct->transform).position.x)),
+                                                      static_cast<float>(meters((rt ? rt->transform : ct->transform).position.z)), std::move(name)});
+                            }
                             const double dx = placed ? meters((rt ? rt->transform : ct->transform).position.x) - g_x.load() : 1e9;
                             const double dz = placed ? meters((rt ? rt->transform : ct->transform).position.z) - g_z.load() : 1e9;
                             if (dx * dx + dz * dz < nearest) {
@@ -852,6 +877,7 @@ void on_world_tick(emf::World w) {
         g_shared.region = nearest_region;
         g_shared.place = place == nearest_region ? std::string() : place;
         g_shared.markers.swap(markers);
+        g_shared.spires.swap(spires);
     }
     // the waypoint, the other players' places and the clock: ten times a second
     if (now - updated > 100) {
@@ -2608,18 +2634,68 @@ struct PartyLayer : PinnedLayer {
     struct Member {
         bool you = false;
         int hp = -1, hp_max = -1, mana = -1, mana_max = -1, level = -1;
+        float x = -1, z = -1;  // where (metres, x east, z north); -1: not known
         std::string name;
+        std::wstring where;    // the location line, made when the list is read
     };
     std::vector<Member> members;
     bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
     uint64_t stamp = 0, next_read = 0;
-    static constexpr int kRow = 58;
+    static constexpr int kRow = 76;
 
     PartyLayer() : PinnedLayer("party", L"Party", 300) {}
 
     bool refresh(const Frame& f) override {
         if (f.now < next_read) return false;
         next_read = f.now + 250;
+        const bool read = read_list();
+        return update_where() || read;
+    }
+
+    // Each player's location line: the region (the one of the nearest Ancient Spire, as on the minimap), and for the
+    // others how far away and in which direction from you ("320 m NE"); for you, the named place you are in or near.
+    bool update_where() {
+        const float mx = g_x.load(), mz = g_z.load();
+        std::string my_region, my_place;
+        {
+            std::lock_guard<std::mutex> l(g_shared.lock);
+            my_region = g_shared.region;
+            my_place = g_shared.place;
+        }
+        bool changed = false;
+        for (Member& m : members) {
+            std::wstring w;
+            if (m.you) {
+                w = widen(my_region);
+                if (!my_place.empty()) w += (w.empty() ? L"" : L" \u00B7 ") + widen(my_place);
+            } else if (m.x >= 0 && m.z >= 0) {
+                const std::string r = region_at(m.x, m.z);
+                const float dx = m.x - mx, dz = m.z - mz, d = std::sqrt(dx * dx + dz * dz);
+                std::wstring away;
+                if (d < 15.0f) {
+                    away = L"next to you";
+                } else {
+                    static const wchar_t* kDir[] = {L"N", L"NE", L"E", L"SE", L"S", L"SW", L"W", L"NW"};
+                    const float deg = std::atan2(dx, dz) * 57.29578f;  // 0 north, 90 east
+                    const int k = (static_cast<int>(std::floor((deg + 360.0f + 22.5f) / 45.0f))) % 8;
+                    wchar_t buf[48];
+                    if (d < 1000.0f) swprintf_s(buf, L"%d m %s", static_cast<int>(d + 0.5f), kDir[k]);
+                    else swprintf_s(buf, L"%.1f km %s", d / 1000.0f, kDir[k]);
+                    away = buf;
+                }
+                w = r.empty() ? away : widen(r) + L" \u00B7 " + away;
+            } else {
+                w = L"location not known";
+            }
+            if (w != m.where) {
+                m.where = std::move(w);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    bool read_list() {
         WIN32_FILE_ATTRIBUTE_DATA info{};
         const std::wstring file = g_flamekit_dir + L"ui_party.dat";
         const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
@@ -2644,7 +2720,13 @@ struct PartyLayer : PinnedLayer {
             if (line[0] != 'p' || line[1] != '\t') continue;
             Member m;
             int you = 0, used = 0;
-            if (sscanf_s(line + 2, "%d\t%d\t%d\t%d\t%d\t%d\t%n", &you, &m.hp, &m.hp_max, &m.mana, &m.mana_max, &m.level, &used) == 6 && used > 0) {
+            // since 0.15.25 with the place: "... <level> <x> <z> <name>"; before: "... <level> <name>"
+            int with_place = 0;
+            for (const char* t = line + 2; *t; ++t) with_place += *t == '\t';
+            const bool ok = with_place >= 8
+                                ? sscanf_s(line + 2, "%d\t%d\t%d\t%d\t%d\t%d\t%f\t%f\t%n", &you, &m.hp, &m.hp_max, &m.mana, &m.mana_max, &m.level, &m.x, &m.z, &used) == 8
+                                : sscanf_s(line + 2, "%d\t%d\t%d\t%d\t%d\t%d\t%n", &you, &m.hp, &m.hp_max, &m.mana, &m.mana_max, &m.level, &used) == 6;
+            if (ok && used > 0) {
                 m.you = you != 0;
                 m.name = line + 2 + used;
                 list.push_back(std::move(m));
@@ -2707,8 +2789,9 @@ struct PartyLayer : PinnedLayer {
                 const std::wstring lv = L"Lv " + std::to_wstring(m.level);
                 text.draw(canvas, width - 10 - text.width(lv), y + 2, lv, 200, 200, 210);
             }
-            bar(10, y + 24, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
-            bar(10, y + 42, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
+            if (!m.where.empty()) little.draw(canvas, 30, y + 23, m.where, 170, 175, 185);  // where they are
+            bar(10, y + 42, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
+            bar(10, y + 60, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
             y += kRow;
         }
         if (!server) {

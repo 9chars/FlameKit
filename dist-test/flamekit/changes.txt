@@ -1,3 +1,6 @@
+0.15.25 Nov 13, 2026
+- The party window shows where each player is, under their name: the region, and for the other players how far away and in which direction from you (for example "Revelwood · 320 m NE"). For you it shows the region and the named place you are in or near, the same as under the minimap (client and server).
+
 0.15.24 Nov 13, 2026
 - When you hold Right Alt (or open FlameKit's window), the mouse pointer appears where it was the last time, instead of somewhere else each time; the first time, in the middle of the screen (client).
 

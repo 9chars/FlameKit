@@ -4,7 +4,8 @@
 -- mana and level twice a second and sends the list to each player's game on the channel "flamekit/party" (mana and
 -- level can only be read there). A player's game writes the list to emf\mods\flamekit\ui_party.dat:
 --   source server|local
---   p <you 0|1> <health> <max health> <mana> <max mana> <level> <name>   (fields separated by tabs; -1: not known)
+--   p <you 0|1> <health> <max health> <mana> <max mana> <level> <x> <z> <name>   (fields separated by tabs; -1: not
+--     known; x east and z north in metres: the DLL shows the region and how far away and where from you)
 --   end
 -- On a server without FlameKit the game writes what it knows itself ("source local"): only you, with your health.
 -- ui_party.dat is a runtime file: never deployed or diffed.
@@ -80,8 +81,9 @@ function F.tick(world)
         return oka and v or nil
       end
       present[id] = true
+      local okp, x, _, z = pcall(world.position, world, id)
       here[#here + 1] = { id = id, name = player_name(world, id), hp = okh and hp or nil, hp_max = okh and hp_max or nil,
-        mana = attr("mana"), mana_max = attr("max_mana"), level = attr("level") }
+        mana = attr("mana"), mana_max = attr("max_mana"), level = attr("level"), x = okp and x or nil, z = okp and z or nil }
     end
   end
   test_players.keep_only(present)
@@ -89,10 +91,11 @@ function F.tick(world)
     local lines = {}
     for _, p in ipairs(here) do
       lines[#lines + 1] = table.concat({ "p", p.id == to.id and "1" or "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max),
-        num(p.level), clean(p.name) }, "\t")
+        num(p.level), num(p.x), num(p.z), clean(p.name) }, "\t")
     end
     for _, p in ipairs(test_players.list(world, to.id)) do  -- this player's own test players, sent like real ones
-      lines[#lines + 1] = table.concat({ "p", "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max), num(p.level), clean(p.name) }, "\t")
+      lines[#lines + 1] = table.concat({ "p", "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max), num(p.level), num(p.x), num(p.z),
+        clean(p.name) }, "\t")
     end
     local text = table.concat(lines, "\n")
     if to.id == me then
@@ -158,7 +161,9 @@ function F.client_tick(world)
   local me = emf.local_player()
   if not me or me == 0 then return end
   local ok, hp, hp_max = pcall(emf.health, world, me)
-  local line = table.concat({ "p", "1", num(ok and hp or nil), num(ok and hp_max or nil), "-1", "-1", "-1", clean(player_name(world, me)) }, "\t")
+  local okp, x, _, z = pcall(world.position, world, me)
+  local line = table.concat({ "p", "1", num(ok and hp or nil), num(ok and hp_max or nil), "-1", "-1", "-1", num(okp and x or nil),
+    num(okp and z or nil), clean(player_name(world, me)) }, "\t")
   write("source local\n" .. line .. "\nend\n")
 end
 

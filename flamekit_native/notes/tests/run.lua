@@ -649,6 +649,10 @@ else
   check(party:find("source server", 1, true) and party:find("\tTest Ayla\n", 1, true) and party:find("\tTest Cora\n", 1, true)
     and not party:find("Test Dain", 1, true), "3 test players come back from the server half in the party list")
   check(party:find("\np\t1\t", 1, true) ~= nil, "you are still in the list, marked as you")
+  local ayla = party:match("\n(p\t0\t[^\n]*\tTest Ayla)\n")
+  local _, tabs = (ayla or ""):gsub("\t", "")
+  local ax, az = (ayla or ""):match("^p\t0\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t(%-?%d+)\t(%-?%d+)\t")
+  check(tabs == 9 and tonumber(ax) and tonumber(ax) >= 0 and tonumber(az) >= 0, "each player's line has a place (x and z) before the name")
   local names = {}
   for _, p in ipairs(tp.list(SW, PLAYER)) do names[#names + 1] = p.x and p.name end
   check(#names == 3, "the test players have places around you (for the minimap)")
