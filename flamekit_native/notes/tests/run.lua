@@ -119,6 +119,8 @@ local function enc(v)
 end
 
 local logged = {}  -- emf.log lines
+local last_ask  -- the last request for test players sent to the server half
+local ptest_up = {}  -- requests for test players, from the player's game to the server half
 local party_down = {}  -- party lists the server half sent to the player's game
 emf = {
   id = "flamekit", dir = TMP,
@@ -165,7 +167,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" then assert(def.to == "players") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
+      if name == "map" or name == "party" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -175,6 +177,7 @@ emf = {
       assert(JOINED and side == "client", "emf.net.send is for a joined game here")
       assert(#data <= 16384)
       if name == "exp" then exp_up[#exp_up + 1] = data; return true end
+      if name == "party_test" then ptest_up[#ptest_up + 1] = data; last_ask = data; return true end
       to_server[#to_server + 1] = data
       return true
     end,
@@ -238,7 +241,10 @@ local function step(n)
     local ups = exp_up
     exp_up = {}
     for _, data in ipairs(ups) do channels.exp.on_server(SW, { player = PLAYER, account = ACCOUNT, admin = ADMIN }, data) end
-    if JOINED then server.tick(SW); require("features.experimental").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
+    local asks = ptest_up
+    ptest_up = {}
+    for _, data in ipairs(asks) do channels.party_test.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
+    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
     side = "client"
     msgs = to_client
     to_client = {}
@@ -610,4 +616,56 @@ local party = pf and pf:read("a") or ""
 if pf then pf:close() end
 check(party:find("^source %a+\n") ~= nil and party:find("\nend\n$") ~= nil, "ui_party.dat is written, complete")
 check(party:find("\np\t1\t", 1, true) ~= nil, "you are in the party list, marked as you")
+-- test players (core/test_players.lua): asked for in the Party tab, sent back by the server half like real players
+local function party_text()
+  for _, data in ipairs(party_down) do channels.party.on_player(nil, { player = 0 }, data) end
+  party_down = {}
+  local f = io.open(TMP .. "\\ui_party.dat", "r")
+  local t = f and f:read("a") or ""
+  if f then f:close() end
+  return t
+end
+ui_action("view", "party")
+step(12)
+tabs_text = read_tabs()
+local pgen = tabs_text:match("view\tparty\t(%d+)")
+check(pgen ~= nil, "the Party tab's rows are written")
+local three
+for line in tabs_text:gmatch("[^\n]+") do
+  local f = {}
+  for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
+  if f[1] == "r" and f[2] == "b" and f[9] == "3" then three = f[8] end
+end
+check(three ~= nil, "the Party tab has a button for 3 test players")
+ui_action("tab", "party/" .. pgen .. "/" .. three)
+step(70)
+local tp = require("core.test_players")
+if JOINED then
+  check(last_ask == "3", "the request for 3 test players is sent to the server half")
+  print("note this mock's dedicated server only sees player ids up to 64 (the player is 100): the list itself is checked in host mode")
+else
+  check(tp.count(PLAYER) == 3, "3 test players are set for you")
+  party = party_text()
+  check(party:find("source server", 1, true) and party:find("\tTest Ayla\n", 1, true) and party:find("\tTest Cora\n", 1, true)
+    and not party:find("Test Dain", 1, true), "3 test players come back from the server half in the party list")
+  check(party:find("\np\t1\t", 1, true) ~= nil, "you are still in the list, marked as you")
+  local names = {}
+  for _, p in ipairs(tp.list(SW, PLAYER)) do names[#names + 1] = p.x and p.name end
+  check(#names == 3, "the test players have places around you (for the minimap)")
+end
+ui_action("view", "-")
+step(12)
+ui_action("view", "party")
+step(12)
+tabs_text = read_tabs()
+pgen = tabs_text:match("view\tparty\t(%d+)")
+local off
+for line in tabs_text:gmatch("[^\n]+") do
+  local f = {}
+  for field in (line .. "\t"):gmatch("([^\t]*)\t") do f[#f + 1] = field end
+  if f[1] == "r" and f[2] == "b" and f[9] == "Off" then off = f[8] end
+end
+ui_action("tab", "party/" .. pgen .. "/" .. off)
+step(70)
+check(not party_text():find("Test ", 1, true) and tp.count(PLAYER) == 0 and (not JOINED or last_ask == "0"), "Off: the test players are gone")
 print("ALL PASSED (" .. MODE .. ")")

@@ -11,8 +11,13 @@
 
 local F = { id = "party", title = "Party" }
 
+local test_players = require("core.test_players")
+
 local kit
 local CHANNEL = "party"
+local ASK = "party_test"   -- a player's game -> the server half: "<how many test players>" (core/test_players.lua)
+local test_wanted = 0      -- in this game: the test players asked for
+local test_sent_at = -1000 -- the client step it was last sent
 local steps = 0
 local last_heard = -1000  -- the client step of the last list from the server half
 local client_steps = 0
@@ -61,6 +66,7 @@ function F.tick(world)
   steps = steps + 1
   if steps % 30 ~= 0 then return end
   local here = {}
+  local present = {}
   local ids = {}
   for id = 1, 64 do ids[#ids + 1] = id end  -- players' bodies have the lowest entity ids
   local me = emf.local_player()
@@ -73,15 +79,20 @@ function F.tick(world)
         local oka, v = pcall(emf.attribute, world, id, name)
         return oka and v or nil
       end
+      present[id] = true
       here[#here + 1] = { id = id, name = player_name(world, id), hp = okh and hp or nil, hp_max = okh and hp_max or nil,
         mana = attr("mana"), mana_max = attr("max_mana"), level = attr("level") }
     end
   end
+  test_players.keep_only(present)
   for _, to in ipairs(here) do
     local lines = {}
     for _, p in ipairs(here) do
       lines[#lines + 1] = table.concat({ "p", p.id == to.id and "1" or "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max),
         num(p.level), clean(p.name) }, "\t")
+    end
+    for _, p in ipairs(test_players.list(world, to.id)) do  -- this player's own test players, sent like real ones
+      lines[#lines + 1] = table.concat({ "p", "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max), num(p.level), clean(p.name) }, "\t")
     end
     local text = table.concat(lines, "\n")
     if to.id == me then
@@ -94,8 +105,55 @@ end
 
 -- A step of your own screen's world: without lists from a server half (a server without FlameKit), what this game
 -- knows itself.
+local function hosting(world)
+  return kit.is_host() or world:is_server()
+end
+
+-- Asks the server half for `n` test players (0: none). In your own game (you host) it is set directly.
+local function ask_test(world, n)
+  test_wanted = n
+  test_sent_at = client_steps
+  if hosting(world) then
+    local me = emf.local_player()
+    if me and me ~= 0 then test_players.set(me, n) end
+    return
+  end
+  local ok = pcall(emf.net.send, ASK, tostring(n))
+  kit.debug("info", "party: asked the server for %d test player(s)%s", n, ok and "" or " (could not be sent)")
+end
+
+local function server_has_it()
+  local ok, version = pcall(emf.net.peer, nil, 0, ASK)
+  return ok and (version or 0) ~= 0
+end
+
+function F.panel(world)
+  local host = hosting(world)
+  local can = host or server_has_it()
+  local rows = {
+    { heading = "Test players" },
+    { text = "Made-up players for testing the party window and the minimap alone. The server sends them to you the "
+      .. "same way as real players (only you see them). They walk around you; some are far away, at the minimap's edge." },
+  }
+  if not can then
+    rows[#rows + 1] = { dim = true, text = "This server does not run FlameKit (or not this version): test players need it." }
+    return rows
+  end
+  for _, n in ipairs({ 0, 1, 3, 6 }) do
+    rows[#rows + 1] = { button = "test:" .. n, text = n == 0 and "Off" or tostring(n), selected = test_wanted == n, same_line = n ~= 0,
+      tooltip = n == 0 and "No test players" or ("Ask for " .. n .. " test player" .. (n == 1 and "" or "s")) }
+  end
+  return rows
+end
+
+function F.click(world, key)
+  local n = tonumber(key:match("^test:(%d+)$") or "")
+  if n then ask_test(world, n) end
+end
+
 function F.client_tick(world)
   client_steps = client_steps + 1
+  if test_wanted > 0 and client_steps - test_sent_at >= 600 and not hosting(world) then ask_test(world, test_wanted) end  -- the server may have restarted
   if client_steps % 30 ~= 15 or client_steps - last_heard < 240 then return end
   local me = emf.local_player()
   if not me or me == 0 then return end
@@ -111,6 +169,15 @@ function F.setup(k)
     on_player = kit.guard(F, function(world, from, data) receive(data) end, "the party list from the server"),
   })
   if not ok then kit.debug("warn", "party: the channel flamekit/party was refused: only your own health is shown") end
+  local ok2 = emf.net.channel(ASK, {
+    version = 1, to = "server", max = 16, per_10s = 20,
+    on_server = kit.guard(F, function(world, from, data)
+      if type(from) ~= "table" or not from.player or from.player == 0 then return end
+      local n = test_players.set(from.player, data)
+      kit.debug("info", "party: player %s asked for %d test player(s)", tostring(from.player), n)
+    end, "a request for test players"),
+  })
+  if not ok2 then kit.debug("warn", "party: the channel flamekit/party_test was refused: no test players") end
 end
 
 return F

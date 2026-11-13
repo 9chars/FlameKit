@@ -79,6 +79,7 @@ end
 -- (a Lua mod and a native mod have no other way to talk; the file is tiny).
 
 local CHANNEL = "map"
+local test_players = require("core.test_players")
 local steps = 0
 local seq = 0
 
@@ -116,6 +117,9 @@ function F.tick(world)
     local lines = {}
     for _, p in ipairs(here) do
       if p.id ~= to.id then lines[#lines + 1] = p.line end
+    end
+    for _, p in ipairs(test_players.list(world, to.id)) do  -- this player's test players (core/test_players.lua)
+      if p.x then lines[#lines + 1] = string.format("%.1f %.1f %s", p.x, p.z, p.name) end
     end
     local text = table.concat(lines, "\n")
     if to.id == me then

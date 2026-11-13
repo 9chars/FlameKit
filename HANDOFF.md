@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.21.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.22.
 
 ## What FlameKit is
 
@@ -65,7 +65,8 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.21. Client: 0.15.21 through the GitHub updater (needs a game restart).
+- Local server: 0.15.22. Client: 0.15.22 through the GitHub updater (needs a game restart).
+- 0.15.22 (owner: test multiplayer alone): test players, Lua only (the DLL is the 0.15.21 build). `core/test_players.lua` makes up 1-6 players per asking player (walk around them at 25 m to 2 km, health/mana waves, Test Dain at 0 health 4 s of every 20 s). The Party tab (party.lua panel: Off/1/3/6) sends the count on channel `party_test` (to = server); the hosting half adds them to that player's party list (party.lua) and far-players list (minimap.lua) only, so the real network path is used. Not saved; the player's game re-asks every 600 steps. Tested by the owner: 0.15.21 Right Alt pointer, input blocked while held, Alt+F4, party data from the server (health, mana, level).
 - 0.15.21 (owner: pinned windows, party window): `PinnedLayer` in flamekit_native.cpp is the base for windows that stay on screen while playing: title bar with – (collapse) and × (hide), drag by the title bar, resize from the lower right corner, layout in `emf\mods\flamekit\ui_layout.txt` (the DLL is its one writer). They take the mouse only in pointer mode (`g_pointer_mode`: F6 window open, or **Right Alt held** while the game's process is in front, `g_pointer_hold`); while Right Alt is held the backdrop takes the keyboard, so the overlay is the front window and the game gets no mouse moves; Alt's menu keys are swallowed, Alt+F4 is passed to the game. Not yet tested whether the game still turns the camera with raw input while the overlay is in front. `PartyLayer` reads `ui_party.dat` (features/party.lua: the hosting side reads name, emf.health, emf.attribute mana/max_mana/level every 30 steps and sends each player the list on channel `party`; a server without FlameKit: `source local`, only you with health, plus an orange note). `player_style(name)` gives each player a symbol and colour, used by the party window and the minimap. F6 window has a DLL-own **Windows** tab (show/hide, reset place, Right Alt help, Ctrl+Shift+F12 and the log folder). HUD: `notice <text>` line in ui_hud.dat, drawn orange under the label (kit.lua writes it when the server does not run FlameKit). TO DO (owner, later): a controller binding for pointer mode; a setting for the pointer key (Right Alt default, Caps Lock as an option).
 - Tests: run.lua writes files named `<tmp>\ui_*.txt` (backslash paths on Linux land next to the tmp folder, not in it): delete `<tmp>\*` between runs, or a stale ui_actions.txt makes the tab test fail.
 - 0.15.20 (owner: the cache waits were too slow): the updater reads the newest commit from `github.com/9chars/FlameKit.git/info/refs` (git's own address, not cached) and downloads from `raw.githubusercontent.com/9chars/FlameKit/<commit>/...` (immutable); falls back to main if the commit cannot be read. Test channel checks every 60 s, players every 10 min. "Check for updates" button in the window (`web_update::g_check_now`). Same download/verify/hold path as production.
