@@ -30,6 +30,11 @@ It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Fea
 13. **The DLL never reads the game for the UI.** The Lua part (fields looked up by name at runtime, so it survives game updates) owns all game data and all changes; the DLL only draws and takes clicks. Stable and reliable over clever; no hacky code.
 14. **When something needs to be run on the owner's PC** (the build watcher, a program, a restart of the local server), do not hand it to the owner as a chore: ask for permission to run it yourself (computer use or the shell), and on a yes, do it.
 15. **Name things explicitly.** In every message to the owner, name exactly what is meant: the file, the program, the tool, the window, the setting, the version. No "it", "this", "that" or "things" where the owner would have to guess; write the name instead (e.g. "the tool that copies files onto your PC", not "it").
+16. **The same report after every change** (owner, 0.15.22), always in this form:
+    - **Recap:** one or two sentences: what was done and why.
+    - **What changed:** the version and a short list of what is different in the game.
+    - **Restart needed:** exactly which of these: the game client, the local dedicated server, both, or none (and why, in a few words).
+    - Then ask: "Shall I restart <the game client / the local server / both> now?" On a yes, do the whole restart yourself with computer use and the shell (rule 14): close the game client, stop the local dedicated server (Ctrl+C in its window, so it saves), start the server again, wait until its world is loaded (`emf\emf_core.log` in the server folder: "world loaded"), start the game client, and check in FlameKit's log that the new version runs. Never restart anything without that yes.
 
 ## Where everything is
 
