@@ -52,7 +52,7 @@ local TIPS = {
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Careful: your hits "
-    .. "can also hurt your own summons, pets and villagers while it is on. Off again when you leave the server. Everyone "
+    .. "may also hurt your own summons and pets while it is on (villagers cannot be hurt: tried in game). Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
