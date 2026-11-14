@@ -1,3 +1,6 @@
+0.15.104 Nov 14, 2026
+- New default places for FlameKit's windows (used until you move a window, and by "Reset place" in the Windows tab): Messages top left, Party on the left under it, Notices top centre, the PvP Leaderboard at the right edge and the Experimental window just left of it. The right-hand windows line up with the right edge at any screen size. The minimap stays in the lower right corner and the FlameKit Menu in the middle.
+
 0.15.103 Nov 14, 2026
 - Main screen: the line in the lower right reads just "FlameKit v0.15.103".
 - In a world: the label reads "FlameKit v0.15.103 is Connected" when the server runs FlameKit, or "is Not Connected" when it does not (instead of "by Ninechars"; the separate orange "This server does not run FlameKit" line is gone).

@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.103.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.104.
 
 ## What FlameKit is
 
@@ -124,6 +124,12 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## Default window places (0.15.104)
+PinnedLayer: def_x_pm / def_y_pm (per mille), or def_center, or def_right_px (px from the right edge). Messages 6,20‰ top
+left; Party 6,240‰; Notices centred, 90‰; Leaderboard 12 px from the right, 190‰; Experimental 324 px from the right
+(left of the Leaderboard's 300 px), 190‰. Based on the owner's own arrangement at 1920x1080. Saved places
+(ui_layout.txt) win; "Reset place" goes back to these.
 
 ## Labels and About (0.15.103)
 Main screen line: "FlameKit vX". In-world label (kit.lua hud_tick): "FlameKit vX is Connected|Not Connected" from

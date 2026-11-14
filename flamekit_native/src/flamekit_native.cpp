@@ -2597,6 +2597,10 @@ struct PinnedLayer : Layer {
     std::wstring title;
     int default_w = 300, min_w = 220, max_w = 640;
     int def_x_pm = 12, def_y_pm = 333;  // the first place: per mille of the game window's width and height
+    // (0.15.104, owner: the default places were all over the place) instead of def_x_pm: centred across the screen, or
+    // this many pixels from the right edge (the window's right side), so the right-hand windows line up at any resolution
+    bool def_center = false;
+    int def_right_px = -1;
     static constexpr int kGrip = 14;
     int kHead = 28;          // the title bar's height (0 with headless)
     bool headless = false;   // no title bar (the Notices window): dragged anywhere in pointer mode, sized at its corner
@@ -2703,7 +2707,8 @@ struct PinnedLayer : Layer {
             dirty = false;
             draw_all();
         }
-        int x = e.x >= 0 ? e.x : f.gw * def_x_pm / 1000, y = e.y >= 0 ? e.y : f.gh * def_y_pm / 1000;
+        int x = e.x >= 0 ? e.x : def_center ? (f.gw - canvas.w) / 2 : def_right_px >= 0 ? f.gw - def_right_px - canvas.w : f.gw * def_x_pm / 1000;
+        int y = e.y >= 0 ? e.y : f.gh * def_y_pm / 1000;
         x = std::clamp(x, 0, std::max(0, f.gw - canvas.w));
         y = std::clamp(y, 0, std::max(0, f.gh - canvas.h));
         place(x, y);
@@ -2833,7 +2838,7 @@ struct PartyLayer : PinnedLayer {
         return b;
     }
 
-    PartyLayer() : PinnedLayer("party", L"Party", 300) { hide_in_menus = true; }
+    PartyLayer() : PinnedLayer("party", L"Party", 300) { hide_in_menus = true; def_x_pm = 6; def_y_pm = 240; }  // left, under Messages
     uint32_t hotkey() const override { return settings().party_vk; }
     // its key (party_window_key, 0.15.81) shows and hides it, like the Experimental window's
     bool party_key(const Frame& f) {
@@ -3206,7 +3211,7 @@ struct MessagesLayer : PinnedLayer {
     uint64_t stamp = 0, next_read = 0;
     static constexpr int kLine = 18, kShowMs = 12000, kNew = 5, kAll = 10;
 
-    MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_y_pm = 60; }
+    MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_x_pm = 6; def_y_pm = 20; }  // top left
 
     bool active(const Frame& f) override { return f.in_world; }
 
@@ -3327,7 +3332,7 @@ struct BoardLayer : PinnedLayer {
     uint64_t stamp = 0, next_read = 0, next_ask = 0;
     static constexpr int kLine = 22;
 
-    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_x_pm = 780; def_y_pm = 420; }
+    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_right_px = 12; def_y_pm = 190; }  // right edge
     uint32_t hotkey() const override { return settings().board_vk; }
 
     bool read_file() {
@@ -3466,8 +3471,8 @@ struct NoticeLayer : PinnedLayer {
         headless = true;
         kHead = 0;
         hide_in_menus = true;
-        def_x_pm = 330;
-        def_y_pm = 70;
+        def_center = true;  // top centre
+        def_y_pm = 90;
     }
 
     bool active(const Frame& f) override { return f.in_world && !notes.empty() && !(hide_in_menus && f.in_menu); }
@@ -4864,7 +4869,8 @@ struct ExperimentalLayer : PinnedLayer {
     static constexpr int kLine = 26, kListMax = 12, kBtnH = 28;
 
     uint32_t hotkey() const override { return settings().exp_vk; }
-    ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 380) { def_x_pm = 700; def_y_pm = 120; hide_in_menus = true; max_w = 760; }
+    // right side, left of the PvP Leaderboard's place (12 px + its 300 + 12 px from the right edge)
+    ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 380) { def_right_px = 324; def_y_pm = 190; hide_in_menus = true; max_w = 760; }
 
     static std::wstring unescape(const std::string& s) {
         std::wstring w = widen(s);
