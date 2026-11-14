@@ -1,3 +1,9 @@
+0.15.79 Nov 14, 2026
+- Minimap: a marker's name on hover is smaller and sits right above the marker (below it near the top), never cut off at the edge.
+- The PvP dummy is level 100, so it takes a long beating (it never hurts anyone).
+- FlameKit's window: its key (F4) now closes it when it is open, without the window flickering open again.
+- New setting (Settings tab): "Press the pointer key once instead of holding it". On: one press of Right Alt (or the key you chose) shows the mouse pointer for FlameKit's windows and the minimap, the next press or Esc puts it away.
+
 0.15.78 Nov 14, 2026
 - Test monsters: the highest level is 100 (was 105); the quick levels are 1, 25, 50, 75, 100.
 

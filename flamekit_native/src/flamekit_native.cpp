@@ -62,6 +62,7 @@ struct Settings {
     uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
     uint32_t exp_vk = VK_F6;      // shows and hides the Experimental window (setting exp_window_key, 0.15.74)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
+    bool pointer_toggle = false;  // pointer_toggle (0.15.79): one press shows the pointer, the next (or Esc) puts it away
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
     int zoom = 2;            // index into kRanges
     bool markers = true;     // altars and the map markers you have found
@@ -121,6 +122,7 @@ void read_settings() {
     s.exp_vk = ekey.empty() ? 0 : emf::keys::parse_key(std::wstring(ekey.begin(), ekey.end()));
     const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
     s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
+    s.pointer_toggle = emf::setting_bool(kKit, "pointer_toggle", false);
     s.markers = true;  // its own switch is gone: the marker filters (map_hide) decide
     s.water = true;  // its own switch is gone: the marker filters (map_hide) decide
     s.players = emf::setting_bool(kKit, "map_players", true);
@@ -2430,18 +2432,28 @@ struct MinimapLayer : Layer {
         const Style& st = kStyles[k->kind];
         const std::wstring name = widen(k->name.empty() ? std::string(st.label) : k->name);
         if (name.empty()) return;
-        const int tw = text.width(name), th = letter_px(settings(), dial_w) + 10;
-        int x0 = hover_x + 14, y0 = hover_y - th - 4;
-        if (x0 + tw + 12 > canvas.w) x0 = hover_x - tw - 26;
-        x0 = std::clamp(x0, 0, std::max(0, canvas.w - tw - 12));
-        y0 = std::clamp(y0, 0, std::max(0, canvas.h - th));
-        for (int y = y0; y < y0 + th && y < canvas.h; ++y)
-            for (int x = x0; x < x0 + tw + 12 && x < canvas.w; ++x) {
-                const bool edge = y == y0 || y == y0 + th - 1 || x == x0 || x == x0 + tw + 11;
+        // (0.15.79, owner: too big, too far from the pointer, cut off at the edge) the size of the labels under the
+        // markers, right above the marker itself (below it at the dial's top), always inside the picture
+        static TextPainter tip;
+        const Settings s = settings();
+        const int px = std::max(11, letter_px(s, dial_w) * 7 / 10);
+        if (!tip.ready(nullptr, px)) return;
+        const int n = dial_w;
+        const float mid = static_cast<float>(n) * 0.5f, R = mid - 2.0f, rim = std::max(3.0f, static_cast<float>(n) * 0.022f);
+        const float mpp = last_range / (R - rim);
+        const int mx = pad + static_cast<int>(mid + (k->x - last_x) / mpp), my = static_cast<int>(mid - (k->z - last_z) / mpp);
+        const int tw = tip.width(name), bw = tw + 8, bh = px + 6;
+        int x0 = std::clamp(mx - bw / 2, 0, std::max(0, canvas.w - bw));
+        int y0 = my - 12 - bh;
+        if (y0 < 0) y0 = my + 12;
+        y0 = std::clamp(y0, 0, std::max(0, canvas.h - bh));
+        for (int y = y0; y < y0 + bh && y < canvas.h; ++y)
+            for (int x = x0; x < x0 + bw && x < canvas.w; ++x) {
+                const bool edge = y == y0 || y == y0 + bh - 1 || x == x0 || x == x0 + bw - 1;
                 if (edge) canvas.blend(x, y, 214, 176, 92, 1.0f);
                 else canvas.blend(x, y, 20, 22, 28, 0.92f);
             }
-        text.draw(canvas, x0 + 6, y0 + 4, name, 240, 232, 210);
+        tip.draw(canvas, x0 + 4, y0 + 2, name, 240, 232, 210);
     }
 
     // The marker nearest the click within 14 pixels: its place goes to the Lua part as the waypoint ("wp x z", metres),
@@ -3494,6 +3506,8 @@ struct WindowLayer : Layer {
     std::string version;  // FlameKit's version, for the title bar (mod.json)
 
     bool open = false, close_asked = false, dirty = true, drop_open = false;
+    bool key_toggle_pending = false;
+    uint64_t last_toggle = 0;  // when the window key last opened or closed the window (GetTickCount64)
     // the tabs
     std::vector<Tab> tabs;
     std::string current = "changes";      // the tab shown: What's New the first time in a game, after that the last one
@@ -4343,14 +4357,27 @@ struct WindowLayer : Layer {
                 FK_LOG(fklog::kInfo, "window: opened by the Lua part on tab %s", current.c_str());
             }
         }
-        if (g_ui_request.exchange(false)) {
-            if (!open && f.game_front) {
+        // (0.15.79, owner) the window key toggles: open, the key closes it. The key is seen twice when the window has the
+        // keyboard (its own key message and the game thread's key check), so a second press within 400 ms is the same one.
+        bool want_toggle = g_ui_request.exchange(false);
+        if (key_toggle_pending) {
+            key_toggle_pending = false;
+            want_toggle = true;
+        }
+        if (want_toggle) {
+            if (f.now - last_toggle < 400) {
+                // the same press, seen a second time
+            } else if (open) {
+                last_toggle = f.now;
+                close_asked = true;
+            } else if (f.game_front) {
+                last_toggle = f.now;
                 open = true;
                 if (version.empty()) version = version_in(g_flamekit_dir + L"mod.json");
                 list_stamp = tabs_stamp = 0;  // read at once
                 dirty = true;
                 FK_LOG(fklog::kInfo, "window: opened (its key), tab %s", current.c_str());
-            } else if (!open) {
+            } else {
                 FK_LOG(fklog::kInfo, "window: its key ignored: the game's window is not the front window");
             }
         }
@@ -4413,8 +4440,12 @@ struct WindowLayer : Layer {
     bool wants_keys() const override { return open; }
     void key(WPARAM vk) override {
         const uint32_t wk = settings().window_vk;
-        if (vk == VK_ESCAPE || (wk && vk == wk)) {
+        if (vk == VK_ESCAPE) {
             close_asked = true;
+            return;
+        }
+        if (wk && vk == wk) {  // the window key: the same toggle as the game thread's key check (deduplicated in update)
+            key_toggle_pending = true;
             return;
         }
         // any other key: to the Lua part (a setting's Change takes it as the setting's key; else the shown tab's feature)
@@ -5573,8 +5604,32 @@ void ui_thread_body() {
 
         // The pointer key (setting pointer_key: Right Alt, Right Ctrl or Caps Lock) held while the game's process is in
         // front: the pointer is out for the pinned windows
-        const int pointer_vk = settings().pointer_vk;
-        const bool hold = f.ours_front && f.in_world && (GetAsyncKeyState(pointer_vk) & 0x8000) != 0;
+        const Settings ps = settings();
+        const int pointer_vk = ps.pointer_vk;
+        const bool key_now = f.ours_front && f.in_world && (GetAsyncKeyState(pointer_vk) & 0x8000) != 0;
+        // (0.15.79, owner) pointer_toggle: a press switches the pointer on, the next press or Esc switches it off; it also
+        // goes off when the world ends or another program takes the front. Without it: out while the key is held.
+        bool hold = key_now;
+        {
+            static bool key_was = false, esc_was = false, toggled = false;
+            if (ps.pointer_toggle) {
+                if (key_now && !key_was) {
+                    toggled = !toggled;
+                    FK_LOG(fklog::kInfo, "pointer: switched %s with its key", toggled ? "on" : "off");
+                }
+                const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+                if (esc && !esc_was && toggled) {
+                    toggled = false;
+                    FK_LOG(fklog::kInfo, "pointer: switched off with Esc");
+                }
+                esc_was = esc;
+                if (!f.in_world || !f.ours_front) toggled = false;
+                hold = toggled;
+            } else {
+                toggled = false;
+            }
+            key_was = key_now;
+        }
         if (hold != g_pointer_hold) {
             g_pointer_hold = hold;
             FK_LOG(fklog::kInfo, "pointer: the pointer key (vk %02x) %s", pointer_vk, hold ? "held: the pinned windows take the mouse" : "let go");

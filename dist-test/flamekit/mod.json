@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.78",
+  "version": "0.15.79",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -43,6 +43,15 @@
           "label": "Caps Lock"
         }
       ]
+    },
+    {
+      "key": "pointer_toggle",
+      "type": "bool",
+      "default": false,
+      "label": "Press the pointer key once instead of holding it",
+      "help": "On: one press of the pointer key shows the mouse pointer for FlameKit's windows and the minimap, the next press (or Esc) puts it away. Off: the pointer is out only while the key is held.",
+      "live": true,
+      "group": "FlameKit"
     },
     {
       "key": "notify",

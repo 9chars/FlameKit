@@ -349,6 +349,7 @@ end
 local function spawn_body(world, account, player, kind, level, what)
   drop_bodies_of(world, account, true)
   if kind ~= "dummy" and kind ~= "duel" then return nil end
+  if kind == "dummy" then level = MAX_LEVEL end  -- (0.15.79, owner) it never hurts anyone: lots of health to beat on
   local x, y, z = where(world, player)
   if not x then return "Your position is not known." end
   local fx, fz = 0, 1
@@ -1172,7 +1173,7 @@ function F.window_rows(world)
     selected = on, tooltip = TIPS.pvp }
   rows[#rows + 1] = { heading = "Test monsters" }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "PvP dummy", selected = v.body == "dummy",
-    tooltip = "A player-like body (faction Player). With PvP on it swings at you but does no damage: hit it to see whether your weapons hurt a player." }
+    tooltip = "A player-like body (faction Player) at level 100, so it takes a long beating. With PvP on it swings at you but does no damage: hit it to see whether your weapons hurt a player." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test body." }
   -- (0.15.73, owner: the group buttons and pages were too confusing) One drop-down with every monster under its group's
