@@ -1,3 +1,9 @@
+0.15.97 Nov 14, 2026
+- Experimental window, Test monsters: the blocks of text above the dummy's and the duelist's drop-downs are gone; that explanation is now in their tooltips (hold the pointer key and point at them). The Experimental window shows tooltips now.
+- The dummy's tooltips say you must have PvP on to hit it.
+- The first dummy choice is now "Dummy: Player-like", and it spawns a random human-looking body (a Scavenger fighter or the game's fake-player ranger) instead of the Vukah one.
+- A drop-down's text no longer runs out of its box: it is cut short with "...".
+
 0.15.96 Nov 14, 2026
 - Experimental window, PvP section: a "Show PvP Leaderboard [F5]" button ("Hide ..." while it is shown), so the leaderboard is easy to find.
 

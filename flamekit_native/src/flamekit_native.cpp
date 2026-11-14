@@ -4815,7 +4815,7 @@ struct ExperimentalLayer : PinnedLayer {
         bool same = false, selected = false, disabled = false, dim = false, has_colour = false;
         uint8_t r = 0, g = 0, b = 0;
         int number = 0;
-        std::wstring text;
+        std::wstring text, tip;  // tip: its tooltip (0.15.97: shown while the pointer is over it)
         std::vector<Opt> list;
     };
     struct Placed {
@@ -4909,6 +4909,7 @@ struct ExperimentalLayer : PinnedLayer {
                 r.has_colour = colour(f[6], r.r, r.g, r.b);
                 r.number = std::atoi(f[7].c_str());
                 r.text = unescape(f[8]);
+                r.tip = unescape(f[9]);
                 if (r.kind == 'd') {
                     for (size_t k = 10; k < f.size(); ++k) {
                         const std::string& e = f[k];
@@ -5077,7 +5078,15 @@ struct ExperimentalLayer : PinnedLayer {
                 box(b.right - 1, b.top, b.right, b.bottom, 120, 120, 132, 1.0f);
                 float cr = 240, cg = 240, cb = 240;
                 if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
-                text.draw(canvas, b.left + 8, b.top + 4, r.text, cr, cg, cb);
+                {  // (0.15.97) cut to the box, before the arrow: it ran out of the box in the owner's game
+                    std::wstring t = r.text;
+                    const int room = b.right - 28 - (b.left + 8);
+                    while (t.size() > 2 && text.width(t) > room) {
+                        t.resize(t.size() - 2);
+                        t.push_back(L'\u2026');
+                    }
+                    text.draw(canvas, b.left + 8, b.top + 4, t, cr, cg, cb);
+                }
                 const int ax = b.right - 20, ay = b.top + 11;
                 for (int k = 0; k < 6; ++k) {
                     const int ry = open_now ? ay + 5 - k : ay + k;
@@ -5128,6 +5137,47 @@ struct ExperimentalLayer : PinnedLayer {
                 const int track = shown * kLine, th = std::max(14, track * shown / n);
                 const int ty = b.top + (track - th) * list_scroll / std::max(1, n - shown);
                 box(b.right - 5, ty, b.right - 2, ty + th, 140, 140, 155, 1.0f);
+            }
+        }
+        // (0.15.97, owner: the explanations moved from text rows into tooltips) the tooltip of what the pointer is over:
+        // under it, or above it when it does not fit below; as wide as the window
+        if (list_open < 0 && g_pointer_mode && hover_x >= 0) {
+            for (const Placed& p : placed) {
+                const Row& r = rows[p.row];
+                if (r.tip.empty() || !(r.kind == 'b' || r.kind == 'd' || r.kind == 'l') || !in(p.box, hover_x, hover_y)) continue;
+                std::vector<std::wstring> tl;
+                const int tw = width - 16 - 16;
+                std::wstring cur;
+                size_t at = 0;
+                while (at <= r.tip.size()) {
+                    size_t sp = r.tip.find(L' ', at);
+                    if (sp == std::wstring::npos) sp = r.tip.size();
+                    const std::wstring word = r.tip.substr(at, sp - at);
+                    const std::wstring tryl = cur.empty() ? word : cur + L" " + word;
+                    if (!cur.empty() && little.width(tryl) > tw) {
+                        tl.push_back(cur);
+                        cur = word;
+                    } else {
+                        cur = tryl;
+                    }
+                    at = sp + 1;
+                }
+                if (!cur.empty()) tl.push_back(cur);
+                const int lh = 17, h = static_cast<int>(tl.size()) * lh + 10;
+                int y0 = static_cast<int>(p.box.bottom) + top + 4;
+                if (y0 + h > canvas.h - 4) y0 = std::max(kHead + 2, static_cast<int>(p.box.top) + top - h - 4);
+                const int x0 = 8, x1 = width - 8;
+                box(x0, y0, x1, y0 + h, 20, 22, 28, 0.97f);
+                box(x0, y0, x1, y0 + 1, 150, 150, 165, 1.0f);
+                box(x0, y0 + h - 1, x1, y0 + h, 150, 150, 165, 1.0f);
+                box(x0, y0, x0 + 1, y0 + h, 150, 150, 165, 1.0f);
+                box(x1 - 1, y0, x1, y0 + h, 150, 150, 165, 1.0f);
+                int ly = y0 + 5;
+                for (const std::wstring& l : tl) {
+                    little.draw(canvas, x0 + 8, ly, l, 230, 230, 235);
+                    ly += lh;
+                }
+                break;
             }
         }
     }

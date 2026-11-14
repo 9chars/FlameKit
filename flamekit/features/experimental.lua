@@ -267,7 +267,18 @@ end
 -- (0.15.81, owner) The dummy can be any monster too: it gets faction 7 (Player), whose hits do no damage (EMF
 -- re_companions.md: a player-faction enemy body hits for 0), so it never hurts anyone. The first choice is the
 -- player-like body of before.
-local DUMMY_PLAIN = { "Dummy", "Player-like dummy", DUMMY_GUID, false }
+local DUMMY_PLAIN = { "Dummy", "Player-like", DUMMY_GUID, false }
+-- (0.15.97, owner: the FakePlayer_Vukah_Melee body does not look like a player) "Player-like" spawns one of these at
+-- random: the game's other fake-player body and the human Scavenger fighters (template names from the game's data).
+local PLAYER_LIKE = {
+  "4227fee0-b8e6-4518-9dc6-358472b3957b",  -- FakePlayer_Scavenger_Ranger
+  "53bf33ac-f81a-4874-9f0c-7c23daf4e24e", "bfeb722b-c6b8-4fdd-9141-dfb363ab7ff0", "1ae0f2bf-1201-42ae-aa69-ab9bd516c029",
+  "bd8548d8-4c7d-4133-8db8-3f24dc377340", "7782b953-ba12-4254-9eea-042a1c9c65cf", "016c2e66-30a1-494b-9682-35564756f011",
+  "342d4470-68f0-4f9c-8454-6875ff72f261", "eb35d1ff-3c0c-47b7-8aec-bc7826525362", "60b09960-d2c7-43ea-875c-2eb4547bed50",  -- Enemy_Scavenger_Melee01-09
+  "40bd6a6a-d549-4e9b-b421-741f3b0777d5", "73941b4c-5d7a-4525-85fc-0da71a4fc74e", "78060b4c-8395-4d3b-a814-f350092affb2",
+  "19023f07-becf-48c6-88dd-8c2060ed9a6c", "68e89aee-9560-4246-8bd8-3fc9a6a5fbe0", "04e5439f-2fd5-4626-bbf0-deb8f1a39e1f",
+  "b5f02f01-513e-4543-a6f1-d82c64d3194b",  -- Enemy_Scavenger_ColdHeights_Melee01-07
+}
 local function dummy_of(guid)
   if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
   return MONSTER_BY_GUID[guid]
@@ -369,7 +380,9 @@ local function spawn_body(world, account, player, kind, level, what)
     if len > 0.01 then fx, fz = ax / len, az / len end
   end)
   local d = kind == "duel" and duelist(what) or dummy_of(what)
-  local ok, id = pcall(emf.spawn, world, d[3], x + fx * 3, y, z + fz * 3)
+  local guid = d[3]
+  if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
+  local ok, id = pcall(emf.spawn, world, guid, x + fx * 3, y, z + fz * 3)
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
@@ -1226,21 +1239,21 @@ function F.window_rows(world)
   end
   -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level 100
   local dpick = dummy_of(dummy_what)
-  rows[#rows + 1] = { dim = true, text = "Dummy: never hurts anyone, level 100. Beat on it as long as you like." }
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil,
-    tooltip = "Click to choose what the dummy looks like: the player-like body or any monster. It never hurts anyone." }
+    tooltip = "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it. "
+      .. "Click to choose what it looks like: Player-like (a random human-looking body) or any monster." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy",
-    tooltip = "Spawns " .. dpick[2] .. " at level 100 3 m in front of you. With PvP on it swings at you but does no damage: hit it to see "
-      .. "whether your weapons hurt a player. It replaces your test monster." }
+    tooltip = "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
+      .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test monster." }
   rows[#rows + 1] = { separator = true }
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
-  rows[#rows + 1] = { dim = true, text = "Duelist: fights everyone with full damage, PvP on or off; never animals, pets or buildings." }
   rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3]), text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
-    tooltip = "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
+    tooltip = "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings. "
+      .. "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
   rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = duel_level <= 1, tooltip = "One level lower" }

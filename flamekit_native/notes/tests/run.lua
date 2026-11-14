@@ -769,7 +769,7 @@ step(40)
 do
   local ddum
   for _, r in ipairs(exp_rows()) do if r.options and not ddum then ddum = r end end
-  check(ddum and ddum.text == "Dummy: Player-like dummy" and ddum.options[1].heading and ddum.options[1].text == "Dummy",
+  check(ddum and ddum.text == "Dummy: Player-like" and ddum.options[1].heading and ddum.options[1].text == "Dummy",
     "the dummy has its own drop-down, the player-like body first")
   local boar
   for _, o in ipairs(ddum.options) do if o.text == "Boar" then boar = o end end
@@ -781,6 +781,24 @@ do
   step(40)
   check(spawned[3] and spawned[3].guid == boar.key:match("dbg:dwhat:(.+)$") and comps.Faction[953].faction == 7,
     "the dummy is the picked monster, with faction 7 (its hits do no damage)")
+  click(find_row("Remove").button)
+  step(40)
+  -- (0.15.97) "Player-like" spawns a random human-looking body, never the Vukah fake player
+  click("W:" .. ddum.options[2].key)
+  step(12)
+  local before = #spawned
+  comps.Faction[954] = { faction = 6 }
+  comps.NetworkHealth[954] = { health = 100 }
+  click(find_row("^Spawn dummy$").button)
+  step(40)
+  local g = spawned[before + 1] and spawned[before + 1].guid
+  check(g and g ~= "9543cfb0-b4d7-408e-905c-ccb79a15136d" and (g == "4227fee0-b8e6-4518-9dc6-358472b3957b" or require("core.monsters")[1] ~= nil),
+    "Player-like spawns a human-looking body: " .. tostring(g))
+  local dd2
+  for _, r in ipairs(exp_rows()) do if r.options and not dd2 then dd2 = r end end
+  check(dd2.tooltip:find("Switch PvP on to hit it", 1, true) ~= nil, "the dummy's tooltip says PvP must be on to hit it")
+  check(find_row("Spawn dummy").tooltip:find("must have PvP on", 1, true) ~= nil, "so does Spawn dummy's")
+  for _, r in ipairs(exp_rows()) do check(not (r.dim and (r.text or ""):find("never hurts")), "no block of text above the dummy's drop-down") end
   click(find_row("Remove").button)
   step(40)
 end

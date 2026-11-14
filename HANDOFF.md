@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.96.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.97.
 
 ## What FlameKit is
 
@@ -124,6 +124,12 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## Experimental window tooltips (0.15.97)
+ExperimentalLayer reads each row's tooltip (ui_exp.dat field 10) and draws it under (or above) the hovered button,
+drop-down or label in pointer mode. Explanations go into tooltips, not text rows (owner). Drop-down labels are cut to
+the box. Dummy "Player-like" (DUMMY_GUID key) spawns a random PLAYER_LIKE template (FakePlayer_Scavenger_Ranger and the
+human Scavenger melee fighters) instead of FakePlayer_Vukah_Melee.
 
 ## PvP Leaderboard (0.15.95)
 features/leaderboard.lua: server side uses emf.on_player_died (p.killer = last hitter within 10 s; counted only when
