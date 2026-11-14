@@ -110,7 +110,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 ## To do (owner's list)
 
-1. **#2 Clean PC / `dist` test** (owner: next session): install FlameKit from nothing the way a player would, and the first `dist` (players') channel. Not before the owner says so (rule 8).
+1. **#2 Release update test** (owner: tomorrow): test the main release path to players, the `dist` channel. Start from the old FlameKit release players have now, then update the server and the players' clients to a new release version, and check that each side ends up on it. Also install FlameKit from nothing the way a new player would. Not before the owner says so (rule 8).
 2. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
 
 ## Things learned the hard way
