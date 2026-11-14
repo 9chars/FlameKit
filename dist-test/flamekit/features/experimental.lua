@@ -264,7 +264,7 @@ end
 local function duelist(guid)
   return MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[DUEL_GUID] or { "Vukah", "Melee", DUEL_GUID, false }
 end
-local MAX_LEVEL = 105  -- the game's own top: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
+local MAX_LEVEL = 100  -- owner (0.15.78): a round top. The game's own is 105: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
 local DUEL_FACTION = 1                                      -- HitAll
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
@@ -1190,13 +1190,13 @@ function F.window_rows(world)
   end
   rows[#rows + 1] = { options = options, text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
     tooltip = "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
-  local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, 105: the game's top, about 62700)."
+  local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
   rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = duel_level <= 1, tooltip = "One level lower" }
   rows[#rows + 1] = { label = true, text = tostring(duel_level), same_line = true, color = duel_level > 50 and "#ff8060" or nil,
     tooltip = lvl_tip }
   rows[#rows + 1] = { button = "dbg:lvl:1", text = ">", same_line = true, disabled = duel_level >= MAX_LEVEL, tooltip = "One level higher" }
-  for _, q in ipairs({ 1, 25, 50, 75, 105 }) do
+  for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q, tooltip = lvl_tip }
   end
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel",
@@ -1313,7 +1313,7 @@ function F.setup(k)
         emf.reply("duelist: removed")
         return
       end
-      -- the game sets any level above 105 back to 105
+      -- at most MAX_LEVEL (the game itself would set anything above 105 back to 105)
       if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
       local why = spawn_body(world, tostring(account), player, "duel", level, args[3])
       emf.reply("duelist: " .. (why or "spawned"))

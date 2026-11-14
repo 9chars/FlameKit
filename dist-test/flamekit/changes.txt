@@ -1,3 +1,6 @@
+0.15.78 Nov 14, 2026
+- Test monsters: the highest level is 100 (was 105); the quick levels are 1, 25, 50, 75, 100.
+
 0.15.77 Nov 14, 2026
 - Minimap: hold the pointer key (Right Alt) and point at a map marker: its name shows in a small box beside it (the name you gave it, else the game's name for that kind of marker).
 
