@@ -3150,6 +3150,9 @@ struct WindowLayer : Layer {
     int kW = kDefW, kH = kDefH;
     int kTop = 82;  // where a tab's content starts: under the title bar and the tab rows
     int kCols = 10, kBagRows = 5, kJunkRows = 4, kBagHead = 0, kBagTop = 0, kJunkHead = 0, kJunkTop = 0;
+    std::wstring warning;            // the Auto Junk List's warning (ui_list.dat "W"), drawn in red over the bag; empty: none
+    std::vector<std::wstring> warning_lines;
+    int warning_y = 0;
     int kViewTop = 0, kViewBottom = 0;  // a tab of rows: the part of the window it scrolls in
     std::vector<RECT> tab_r;           // where each tab is in the tab rows
     RECT close_r{};
@@ -3209,6 +3212,7 @@ struct WindowLayer : Layer {
         if (!fp) return false;
         std::vector<Entry> b, j;
         std::vector<Opt> o;
+        std::wstring warn;
         bool a = false, del = false, complete = false;
         char line[1024];
         while (fgets(line, sizeof line, fp)) {
@@ -3250,6 +3254,8 @@ struct WindowLayer : Layer {
                 e.key = key;
                 e.name = widen(line + 1 + used);
                 (line[0] == 'B' ? b : j).push_back(std::move(e));
+            } else if (line[0] == 'W' && line[1] == '\t') {  // a warning over the bag, in red (since 0.15.49)
+                warn = widen(line + 2);
             } else if (line[0] == 'P' && sscanf_s(line + 1, " %399s %d %n", key, static_cast<unsigned>(sizeof key), &on, &used) == 2 && used > 0) {
                 const std::string rest = line + 1 + used;  // "<label><tab><tooltip>"
                 const size_t tab = rest.find('\t');
@@ -3264,6 +3270,7 @@ struct WindowLayer : Layer {
         bag = std::move(b);
         junk = std::move(j);
         opts = std::move(o);
+        warning = std::move(warn);
         auto_on = a;
         delete_junk = del;
         FK_LOG(fklog::kDebug, "window: ui_list.dat read: %d in the bag, %d on the junk list, auto %d, %s", static_cast<int>(bag.size()),
@@ -3696,6 +3703,8 @@ struct WindowLayer : Layer {
             if (!opts[i].tip.empty()) hits.back().tip = &opts[i].tip;
             ox += w + 8;
         }
+        for (size_t i = 0; i < warning_lines.size(); ++i)  // the warning: red, over the bag
+            text.draw(canvas, kPad, warning_y + static_cast<int>(i) * 22, warning_lines[i], 255, 90, 80);
         section(L"In your bag", 255, 210, 122, bag, bag_page, kBagRows, kBagHead, kBagTop, kBagItem, kBagPrev, kBagNext);
         section(L"Your junk list", 255, 74, 61, junk, junk_page, kJunkRows, kJunkHead, kJunkTop, kJunkItem, kJunkPrev, kJunkNext);
         if (drop_open) {  // the drop-down's options, over what is below
@@ -3726,7 +3735,9 @@ struct WindowLayer : Layer {
         }
         kTop = ty + 30 + 14;
         kCols = std::max(1, (kW - 2 * kPad + kGap) / (kIcon + kGap));
-        const int grid_h = kH - kTop - 52 - 30 - kPad - 30 - kPad;
+        warning_lines = warning.empty() ? std::vector<std::wstring>() : wrap(warning, kW - 2 * kPad);
+        const int warn_h = warning_lines.empty() ? 0 : static_cast<int>(warning_lines.size()) * 22 + 8;
+        const int grid_h = kH - kTop - 52 - 30 - kPad - 30 - kPad - warn_h;
         const int grid_rows = std::max(2, (grid_h + 2 * kGap) / (kIcon + kGap));
         kBagRows = std::max(1, (grid_rows * 5 + 4) / 9);
         kJunkRows = std::max(1, grid_rows - kBagRows);
@@ -3737,7 +3748,8 @@ struct WindowLayer : Layer {
                     text.width(L"Auto: OFF") + 28 + 8;
             opts_y = kPad + need + right <= kW - kPad ? kTop + 10 : kTop + 48;
         }
-        kBagHead = kTop + 52 + (opts_y > kTop + 10 ? 38 : 0);
+        warning_y = kTop + 52 + (opts_y > kTop + 10 ? 38 : 0);
+        kBagHead = warning_y + warn_h;
         kBagTop = kBagHead + 30;
         kJunkHead = kBagTop + kBagRows * kIcon + (kBagRows - 1) * kGap + kPad;
         kJunkTop = kJunkHead + 30;

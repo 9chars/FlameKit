@@ -365,6 +365,7 @@ local function junk_view()
   for line in t:gmatch("[^\n]+") do
     local auto, action = line:match("^O (%d) (%a+)$")
     if auto then v.auto, v.action = auto == "1", action end
+    v.warning = v.warning or line:match("^W\t(.*)$")
     local fl = {}
     for field in (line .. "\t"):gmatch("([^\t]*)\t") do fl[#fl + 1] = field end
     if fl[1] == "B" or fl[1] == "J" then
@@ -493,14 +494,15 @@ local function yells()
   return n
 end
 check(yells() == 1, "auto loot on and junk dropped: a red message came")
+check((junk_view().warning or ""):find("Auto%-Collect Scattered Loot") ~= nil, "and the window's Auto Junk List view shows the warning over the bag")
 check((hud.autoloot or "") == "", "no extra line is left on the screen")
 clock = clock + 8
 step(2)
 check(yells() == 1, "the message is not repeated within a minute")
 ui_action("action", "delete")
-check(junk_view().action == "delete", "junk set to delete")
+check(junk_view().action == "delete" and junk_view().warning == nil, "junk set to delete: the warning goes")
 ui_action("action", "drop")
-check(junk_view().action == "drop", "and back to drop")
+check(junk_view().action == "drop" and junk_view().warning ~= nil, "back to drop: the warning is back")
 step(SYNC)
 -- each drop into auto loot brings the banner back
 clock = clock + 60
@@ -520,7 +522,7 @@ before = yells()
 comps.Inventory[201].slots[1] = stack(0x11, 5)
 pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
-check(yells() == before, "auto loot switched off in the game: no more warnings")
+check(yells() == before and junk_view().warning == nil, "auto loot switched off in the game: no more warnings, the line goes")
 comps.Inventory[201].slots[1] = stack()
 
 -- the chat command runs on the server half and the player's own game follows

@@ -1,3 +1,6 @@
+0.15.50 Nov 13, 2026
+- Auto Junk List: the warning is back in FlameKit's window. While junk is set to Drop and the game's "Auto-Collect Scattered Loot" is on, a red line over your bag says so (it was lost with the old panel in 0.15.49's cleanup). The red message in Messages when junk is dropped stays as it was.
+
 0.15.49 Nov 13, 2026
 - Party window: every player's buffs and debuffs, with the game's own icons: a badge per buff (green buff, red debuff, amber food, blue rested, brown terrain) and the time left under it. Debuffs come first. Hold the pointer key and point at a badge for its name and the exact time left. Everyone in the game sees everyone's buffs. Test players have some too.
 - Auto Junk List: Dump Junk in FlameKit's window now works in a world you host yourself (single player or hosting); before, it only worked on a server.

@@ -11,6 +11,8 @@
 --                                                                           an item you carry that is not junk (but can be)
 --                     J<tab>... the same                                    an entry of the junk list (id 0: unknown)
 --                     P <click key> <0|1 lit> <label><tab><tooltip>         one of the feature's settings, as a button
+--                     W <tab><text>                                          a warning over the bag, in red (0.15.49: Auto-Collect
+--                                                                            Scattered Loot is on while junk is dropped)
 --                                                                           (features/settings.lua: "b:lf_keep_hotbar")
 --                   (B and J are item tiles: core/items.lua items.tip; the DLL draws every item tile and its tooltip the same
 --                   way: the name in its rarity's colour, item level, rarity, type, carried, command name)
@@ -72,6 +74,8 @@ local function write_list(world)
     return table.concat({ kind, string.format("%x", e.item or 0), tostring(e.count or 0), e.debug_name, tostring(t.rarity), t.level,
       one_line(t.type), one_line(e.name) }, "\t")
   end
+  local warning = junk_list.ui_warning()  -- the Auto-Collect Scattered Loot conflict: a red line over the bag
+  if warning then lines[#lines + 1] = "W\t" .. one_line(warning) end
   for _, e in ipairs(in_bag) do lines[#lines + 1] = tile("B", e) end
   for _, e in ipairs(junk) do lines[#lines + 1] = tile("J", e) end
   lines[#lines + 1] = "end"

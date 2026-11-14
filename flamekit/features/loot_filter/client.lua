@@ -29,6 +29,9 @@ local for_host = {}        -- in a world this game hosts: requests made on the c
 -- Messages window (kit.note), at most once a minute.
 local AUTO_LOOT_BANNER = { "FlameKit Junk List: dropped junk is coming back into your bag (drop failed).",
                            "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings." }
+-- The warning line in FlameKit's window (the Auto Junk List's view), shown as long as the problem is there.
+local AUTO_LOOT_WARNING = "\"Auto-Collect Scattered Loot\" is on in the game's settings: dropped junk comes straight back "
+  .. "into your bag. Turn it off, or set Drop / Delete to Delete."
 
 -- True while junk is to be dropped and the game's auto loot would take it straight back.
 local function auto_loot_problem()
@@ -305,6 +308,11 @@ function C.ui_lists(world)
   end)
   local opts = options()
   return in_bag, shown, { auto = opts.auto, action = opts.action }
+end
+
+-- The warning FlameKit's window shows over the bag (red), or nil: junk is dropped while the game's auto loot is on.
+function C.ui_warning()
+  return auto_loot_problem() and AUTO_LOOT_WARNING or nil
 end
 
 -- A click in FlameKit's own window: put the item on the junk list (on = true) or take it off.
