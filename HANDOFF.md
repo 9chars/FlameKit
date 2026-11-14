@@ -116,7 +116,8 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 ## To do (owner's list)
 
 1. **#2 Release update test** (owner: tomorrow): test the main release path to players, the `dist` channel. Start from the old FlameKit release players have now, then update the server and the players' clients to a new release version, and check that each side ends up on it. Also install FlameKit from nothing the way a new player would. Not before the owner says so (rule 8). Players now have 0.14.2 (`release\FlameKit-0.14.2`), which has no updater (its DLL is `flamekit_map.dll`): the owner updates them by hand tomorrow, after that the updater keeps them current. The new install must remove the old `flamekit_map` folder (else two overlays and two minimaps). A 0.14.2 player on a new server keeps the junk list, experimental and far players (same channels lf/exp/map at version 1, same messages, same saved list format) and gets nothing on the new channels; FlameKit has no `side: both`, so EMF's mod check never kicks over the version.
-2. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
+2. **Boss challenge / arena mode** (owner, 2026-11-14): turn the duelist into a game mode: a boss challenge (pick a level and a place, a duelist appears for you or the party to beat) or an arena with waves of duelists, each wave stronger than the last. Measured: level 50 duelist = 6692 health, a fair fight for a level 50 player; level 75 = 20760 health, beat the owner (needed Invincible Mode). Starts from `flamekit.duelist <player> [level]` and `set_level` in experimental.lua (Level.dataStorage + DynamicEnemyScaling.nextUpdateTime = 0). Tomorrow.
+3. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
 
 ## Things learned the hard way
 
