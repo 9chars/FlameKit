@@ -1,3 +1,6 @@
+0.15.48 Nov 13, 2026
+- Party window and minimap: the server now knows who is playing from EMF's own join and leave reports, instead of guessing the first 64 player numbers. A player is never missed, however many have come and gone.
+
 0.15.47 Nov 13, 2026
 - Updates: after a failed or refused update, the message at the bottom left goes away once a later check finds everything in order.
 

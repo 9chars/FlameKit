@@ -68,6 +68,7 @@ local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
 local teleports = {}
 left_fns = {}
+joined_fns = {}  -- EMF reports the players already there (the test player) after the world data
 SESSION_TOKEN = "run-1"
 held_key = nil
 local channels, exp_up, exp_down, hit_rules, next_rule, ADMIN, casts = {}, {}, {}, {}, 0, false, {}
@@ -146,7 +147,7 @@ emf = {
   on_world_data = function() end,
   on_player_left = function(fn) left_fns[#left_fns + 1] = fn; return true end,
   session_token = function() return SESSION_TOKEN end,
-  on_player_joined = function() return true end,
+  on_player_joined = function(fn) joined_fns[#joined_fns + 1] = fn; return true end,
   command = function(name, help, fn, opts) commands[name] = fn end,
   sender = function() return sender end,
   local_player = function() return (JOINED and side == "server") and 0 or PLAYER end,
@@ -239,6 +240,8 @@ do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","aut
   .. '{"key":"lf_keep_hotbar","type":"bool","default":true,"label":"Never touch the action bar","group":"Auto Junk List"},'
   .. '{"key":"map_clock","type":"bool","default":true,"label":"Show the clock under the minimap","group":"Minimap"}]}'); m:close() end
 dofile(MOD .. "/main.lua")
+local function join_all() for _, fn in ipairs(joined_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, host = not JOINED }) end end
+join_all()
 local server = require("features.loot_filter.server")
 
 local UI = JOINED and CW or SW  -- the world keys and the window run in
@@ -608,6 +611,10 @@ side = "server"
 for _, fn in ipairs(left_fns) do fn(SW, { player = PLAYER, account = ACCOUNT }) end
 side = "client"
 check(rule_count() == 0, "the player leaves: their rule goes")
+local pl = require("core.players")
+check(#pl.ids(SW) == 0, "the player left: core/players.lua no longer lists them")
+join_all()  -- and comes back
+check(#pl.ids(SW) == 1 and pl.ids(SW)[1] == PLAYER, "EMF reports the player joined: core/players.lua lists their entity id")
 local vt = io.open(TMP .. "\\experimental.json"); local visit = vt:read("a"); vt:close()
 check(visit:find('"fall":true', 1, true) ~= nil, "but the option stays saved")
 step(JOINED and 320 or 40)
@@ -712,7 +719,7 @@ step(70)
 local tp = require("core.test_players")
 if JOINED then
   check(last_ask == "3", "the request for 3 test players is sent to the server half")
-  print("note this mock's dedicated server only sees player ids up to 64 (the player is 100): the list itself is checked in host mode")
+  print("note: the list itself is checked in host mode")
 else
   check(tp.count(PLAYER) == 3, "3 test players are set for you")
   party = party_text()

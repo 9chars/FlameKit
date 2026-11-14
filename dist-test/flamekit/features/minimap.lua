@@ -80,6 +80,7 @@ end
 
 local CHANNEL = "map"
 local test_players = require("core.test_players")
+local players = require("core.players")
 local steps = 0
 local seq = 0
 
@@ -98,7 +99,7 @@ function F.tick(world)
   steps = steps + 1
   if steps % 30 ~= 0 then return end
   local here = {}
-  for id = 1, 64 do  -- players' bodies have the lowest entity ids
+  for _, id in ipairs(players.ids(world)) do  -- core/players.lua: from EMF's join and leave events
     local ok, account = pcall(world.account, world, id)
     if ok and account then
       local x, _, z = world:position(id)
@@ -132,6 +133,7 @@ end
 
 function F.setup(k)
   kit = k
+  players.setup(k)
   local ok = emf.net.channel(CHANNEL, {
     version = 1, to = "players", max = 8192, per_10s = 60,
     on_player = kit.guard(F, function(world, from, data) receive(data) end, "the players' places from the server"),

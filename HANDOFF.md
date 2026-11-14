@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.47.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.48.
 
 ## What FlameKit is
 
@@ -76,7 +76,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 ## State right now
 
-- **Versions:** local server 0.15.47 (Lua). Client: runs 0.15.46; 0.15.47 is downloaded and waits for the next game start. Production server (G-Portal): 0.14.x, not touched. `dist` (players) does not exist yet.
+- **Versions:** local server 0.15.48 (Lua). Client: runs 0.15.46; 0.15.48 is downloaded and waits for the next game start. Production server (G-Portal): 0.14.x, not touched. `dist` (players) does not exist yet.
 - Every version's detail is in `flamekit/changes.txt` and the git log. Below: how things are built, so new work fits.
 
 ## Design (how FlameKit is built)
@@ -94,7 +94,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - Tooltips: every button whose use is not obvious gets one; a paragraph starting with `WindowLayer::kRedLine` (`L'\x01'`) is red. UI text stays short; tooltips may explain.
 - Messages window always shown in a world: last 5, 10 in pointer mode.
 
-**Features (Lua):** settings live only in their own feature's tab; the Settings tab (`features/settings.lua`, from mod.json) shows only the FlameKit groups and each feature's `enabled_setting`. Debug things go in Experimental → Debug (log level buttons, test players `dbg:test:N`). Party: the hosting side reads each player every 30 steps and sends the list on channel `party`; DOWN at 0 health; clicking a player in pointer mode follows them on the minimap. Test players: `core/test_players.lua`, via channel `party_test`. Server version: `features/server_version.lua`, channel `ver` (client asks at step 120, then every 3600; `kit.server_note`). Server save: `features/server_save.lua` (for the restart helper). The Auto Junk List never junks trophies, runes, Legendary Runes, eternal arrows/spells (unless `lf_show_all`).
+**Features (Lua):** settings live only in their own feature's tab; the Settings tab (`features/settings.lua`, from mod.json) shows only the FlameKit groups and each feature's `enabled_setting`. Debug things go in Experimental → Debug (log level buttons, test players `dbg:test:N`). Party: the hosting side reads each player every 30 steps and sends the list on channel `party`; DOWN at 0 health; clicking a player in pointer mode follows them on the minimap. Test players: `core/test_players.lua`, via channel `party_test`. Server version: `features/server_version.lua`, channel `ver` (client asks at step 120, then every 3600; `kit.server_note`). Server save: `features/server_save.lua` (for the restart helper). Who is in the server world: `core/players.lua` (0.15.48), kept from `emf.on_player_joined` / `emf.on_player_left` (EMF Lua 1.20; the installed one is 1.24). Measured on the owner's server: after a FlameKit reload EMF reports every player already there again (`joined: entity id 1` in the same moment), so the list has no gap; the owner's player was id 1, no player id in 65-1023. EMF's docs: player entity ids are 1..0x3FF and a leaving player's id goes to the next who joins. Never scan entity ids for players again; the 1-64 scan stays only as the fallback for an EMF without the events. The Auto Junk List never junks trophies, runes, Legendary Runes, eternal arrows/spells (unless `lf_show_all`).
 
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
@@ -103,9 +103,8 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 ## To do (owner's list)
 
 1. **#2 Clean PC / `dist` test** (owner: next session): install FlameKit from nothing the way a player would, and the first `dist` (players') channel. Not before the owner says so (rule 8).
-2. **#6 EMF player list:** EMF has no list of connected players, so the server halves of `party.lua` and `minimap.lua` look at entity ids 1–64 every round (wasteful; misses a player above 64). Ask EMF for `world:players()` (add to `flamekit_native/notes/EMF_REQUESTS.md`), then drop the scan.
-3. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
-4. **#8 What the Messages window is for:** decide what goes there (now: `kit.note` lines). Later.
+2. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
+3. **#8 What the Messages window is for:** decide what goes there (now: `kit.note` lines). Later.
 
 ## Things learned the hard way
 

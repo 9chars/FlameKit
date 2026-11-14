@@ -13,6 +13,7 @@
 local F = { id = "party", title = "Party" }
 
 local test_players = require("core.test_players")
+local players = require("core.players")
 
 local kit
 local CHANNEL = "party"
@@ -68,11 +69,8 @@ function F.tick(world)
   if steps % 30 ~= 0 then return end
   local here = {}
   local present = {}
-  local ids = {}
-  for id = 1, 64 do ids[#ids + 1] = id end  -- players' bodies have the lowest entity ids
-  local me = emf.local_player()
-  if me and me > 64 then ids[#ids + 1] = me end  -- and the host's own player, wherever it is
-  for _, id in ipairs(ids) do
+  local me = emf.local_player()  -- the host's own player gets the list right here (receive)
+  for _, id in ipairs(players.ids(world)) do  -- core/players.lua: from EMF's join and leave events
     local ok, account = pcall(world.account, world, id)
     if ok and account then
       local okh, hp, hp_max = pcall(emf.health, world, id)
@@ -183,6 +181,7 @@ function F.setup(k)
     end, "a request for test players"),
   })
   if not ok2 then kit.debug("warn", "party: the channel flamekit/party_test was refused: no test players") end
+  players.setup(kit)
 end
 
 return F
