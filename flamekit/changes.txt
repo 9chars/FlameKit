@@ -1,3 +1,6 @@
+0.15.46 Nov 13, 2026
+- Test release: the DLL is rebuilt with no feature change, to check that a second update in one game session replaces the first one that is still waiting.
+
 0.15.45 Nov 13, 2026
 - Updates are signed: FlameKit only installs an update that carries the signature of FlameKit's release key, which never leaves the developer's PC. A change to the update files on GitHub alone can no longer reach your game.
 - On a server with an older FlameKit than yours, an orange line under the FlameKit label says so (and that some features are off).
