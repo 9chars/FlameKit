@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.89.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.90.
 
 ## What FlameKit is
 
@@ -129,6 +129,10 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 Outside a world HudLayer shows one line in the lower RIGHT corner: "FlameKit v<running Lua version> Loaded" (owner: the
 lower left holds the game's copyright lines on the main screen). Nothing if ui_hud.dat's label is empty (show_label
 off). Status, notice, updater and debug lines and a stale "build 1" count only in a world.
+0.15.90: on a translucent dark box. Seen 0.15.88/89: after Alt+Tab back to the MAIN SCREEN the overlay stays "not topmost;
+below the game's window" and SetWindowPos(HWND_TOPMOST) does not take (never seen in a world). 0.15.90 logs a refused
+SetWindowPos with its error, and the watchdog then hides and re-shows the overlay with SWP_SHOWWINDOW into the topmost
+band; check the log ("watchdog: hidden and shown again") to see whether that helps. Next idea if not: owner = game window.
 
 ## Update dialog (0.15.83)
 UpdateDialog (flamekit_native.cpp, above BackdropLayer) reads update_status.txt each second (first after 5 s, once the

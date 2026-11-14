@@ -5316,7 +5316,7 @@ struct HudLayer : Layer {
     std::wstring label, status, notice, update_line;
     uint32_t status_rgb = 0xffb060, update_rgb = 0xffb060;
     uint64_t next_read = 0;
-    bool in_world = false, hud_file = false;  // hud_file: ui_hud.dat was there (its label line says whether the label is on)
+    bool in_world = false, hud_file = false, drawn_in_world = false;  // hud_file: ui_hud.dat was there (its label line says whether the label is on)
     std::wstring version;                     // the Lua part's version, for the label before a world (0.15.88)
 
     void read_files(uint64_t now) {
@@ -5396,17 +5396,23 @@ struct HudLayer : Layer {
             FK_LOG(fklog::kDebug, "lower left lines: %s", vis ? "shown" : "hidden");
         }
         if (!visible) return;
-        if (want != shown) {
+        if (want != shown || drawn_in_world != in_world) {
             shown = want;
+            drawn_in_world = in_world;
             if (!font) {
                 font = true;
                 text.ready(g_screen, 18);
             }
+            // (0.15.90, owner) the main screen's line on a translucent dark box, so it stands out
+            const int pad = in_world ? 4 : 12, top = in_world ? 2 : 6;
             int w = 8;
-            for (const Line& l : shown) w = std::max(w, text.width(l.text) + 8);
-            resize(w, static_cast<int>(shown.size()) * 24 + 4);
+            for (const Line& l : shown) w = std::max(w, text.width(l.text) + 2 * pad);
+            resize(w, static_cast<int>(shown.size()) * 24 + 2 * top);
             std::fill(pixels.begin(), pixels.end(), 0u);
-            for (size_t i = 0; i < shown.size(); ++i) text.draw(canvas, 4, 2 + static_cast<int>(i) * 24, shown[i].text, shown[i].r, shown[i].g, shown[i].b);
+            if (!in_world)
+                for (int y = 0; y < canvas.h; ++y)
+                    for (int x = 0; x < canvas.w; ++x) canvas.blend(x, y, 10, 11, 14, 0.62f);
+            for (size_t i = 0; i < shown.size(); ++i) text.draw(canvas, pad, top + static_cast<int>(i) * 24, shown[i].text, shown[i].r, shown[i].g, shown[i].b);
             changed = true;
             FK_LOG(fklog::kDebug, "lower left lines: %d line(s), first '%ls'", static_cast<int>(shown.size()), shown.empty() ? L"" : shown[0].text.c_str());
         }
@@ -5585,7 +5591,10 @@ struct WindowPresenter {
     void order(HWND game, bool ours_front, const char* why) {
         if (!shown || !game) return;
         if (ours_front) {
-            SetWindowPos(win, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            if (!SetWindowPos(win, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)) {
+                static int said = 0;
+                if (said++ < 20) FK_LOG(fklog::kWarn, "overlay: SetWindowPos topmost refused (error %lu, %s)", GetLastError(), why);
+            }
         } else {
             SetWindowPos(win, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             HWND above = GetWindow(game, GW_HWNDPREV);  // the window just above the game's: go under it
@@ -5751,7 +5760,18 @@ struct Watchdog {
             g_presenter.show(true);
         }
         g_presenter.order(f.game, true, "watchdog repair");
-        const std::string again = problem(g_presenter.win, f.game, f.origin, f.gw, f.gh);
+        std::string again = problem(g_presenter.win, f.game, f.origin, f.gw, f.gh);
+        if (!again.empty()) {
+            // (0.15.90) seen on the game's main screen after Alt+Tab: the plain repair does not take. Hide the overlay and
+            // show it again straight into the topmost band.
+            ShowWindow(g_presenter.win, SW_HIDE);
+            const BOOL ok = SetWindowPos(g_presenter.win, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            const DWORD err = ok ? 0 : GetLastError();
+            g_presenter.topmost = true;
+            again = problem(g_presenter.win, f.game, f.origin, f.gw, f.gh);
+            FK_LOG(fklog::kWarn, "watchdog: hidden and shown again on top: %s (SetWindowPos %s, error %lu)", again.empty() ? "repaired" : again.c_str(),
+                   ok ? "ok" : "refused", err);
+        }
         if (again.empty()) {
             ++repaired;
             FK_LOG(fklog::kWarn, "watchdog: repaired");

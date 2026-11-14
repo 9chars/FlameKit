@@ -1,3 +1,7 @@
+0.15.90 Nov 14, 2026
+- Main screen: the "FlameKit ... Loaded" line sits on a translucent dark box so it stands out.
+- After Alt+Tab back to the main screen, FlameKit's overlay could stay behind the game. When the usual repair does not take, the overlay is now hidden and shown again on top, and the log says why Windows refused.
+
 0.15.89 Nov 14, 2026
 - Main screen: instead of the lower left lines (they covered the game's copyright lines), one line in the lower right corner: "FlameKit v0.15.89 Loaded". In a world the lower left lines are as before.
 
