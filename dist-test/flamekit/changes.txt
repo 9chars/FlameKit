@@ -1,3 +1,6 @@
+0.15.94 Nov 14, 2026
+- After Alt+Tab back to the main screen the "Loaded" line (all of FlameKit's overlay) stayed hidden behind the game. FlameKit's overlay now belongs to the game's window, which Windows always keeps it in front of.
+
 0.15.93 Nov 14, 2026
 - Main screen line: its dark box 2 pixels tighter again, still 1 pixel from the right and bottom edges.
 

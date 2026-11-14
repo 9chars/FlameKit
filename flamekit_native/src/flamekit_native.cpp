@@ -5590,8 +5590,20 @@ struct WindowPresenter {
     }
 
     // In front of the game: topmost while the game's process has the front window, else right above the game's window.
+    HWND owner = nullptr;  // the game's window, as the overlay's owner (0.15.94)
     void order(HWND game, bool ours_front, const char* why) {
         if (!shown || !game) return;
+        if (owner != game) {
+            // (0.15.94) The game's window owns the overlay: Windows always keeps an owned window in front of its owner. On
+            // the game's main screen, after Alt+Tab, SetWindowPos(HWND_TOPMOST) succeeded but the overlay stayed below the
+            // game's window and not topmost (0.15.88 to 0.15.93, 29 of 29 checks a minute failed); in a world it never did.
+            SetLastError(0);
+            SetWindowLongPtrW(win, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(game));
+            const DWORD err = GetLastError();
+            owner = game;
+            FK_LOG(err ? fklog::kWarn : fklog::kInfo, "overlay: owned by the game's window %p%s", static_cast<void*>(game),
+                   err ? " FAILED" : "");
+        }
         if (ours_front) {
             if (!SetWindowPos(win, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)) {
                 static int said = 0;
@@ -5724,8 +5736,8 @@ struct Watchdog {
     std::string problem(HWND win, HWND game, const POINT& origin, int gw, int gh) {
         std::string p;
         if (!IsWindowVisible(win)) p += "not shown; ";
-        if (!(GetWindowLongPtrW(win, GWL_EXSTYLE) & WS_EX_TOPMOST)) p += "not topmost; ";
-        if (!above_game(win, game)) p += "below the game's window; ";
+        // (0.15.94) only being below the game's window counts: the overlay is owned by it, topmost or not
+        if (!above_game(win, game)) p += (GetWindowLongPtrW(win, GWL_EXSTYLE) & WS_EX_TOPMOST) ? "below the game's window; " : "below the game's window (not topmost); ";
         RECT r{};
         GetWindowRect(win, &r);
         if (r.left != origin.x || r.top != origin.y || r.right - r.left != gw || r.bottom - r.top != gh) {

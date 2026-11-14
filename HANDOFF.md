@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.93.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.94.
 
 ## What FlameKit is
 
@@ -132,7 +132,8 @@ off). Status, notice, updater and debug lines and a stale "build 1" count only i
 0.15.90: on a translucent dark box. Seen 0.15.88/89: after Alt+Tab back to the MAIN SCREEN the overlay stays "not topmost;
 below the game's window" and SetWindowPos(HWND_TOPMOST) does not take (never seen in a world). 0.15.90 logs a refused
 SetWindowPos with its error, and the watchdog then hides and re-shows the overlay with SWP_SHOWWINDOW into the topmost
-band; check the log ("watchdog: hidden and shown again") to see whether that helps. Next idea if not: owner = game window.
+band; check the log ("watchdog: hidden and shown again") to see whether that helps. Result: SetWindowPos returned ok, still not topmost and below the game. 0.15.94: the overlay's owner is the game window
+(GWLP_HWNDPARENT, in WindowPresenter::order); the watchdog only counts "below the game's window" as a failure now.
 
 ## Update dialog (0.15.83)
 UpdateDialog (flamekit_native.cpp, above BackdropLayer) reads update_status.txt each second (first after 5 s, once the
