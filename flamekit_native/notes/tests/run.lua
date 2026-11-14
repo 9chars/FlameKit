@@ -29,7 +29,7 @@ local function reset_world()
     SlotSelection = { [PLAYER] = { actionbarEntityIds = { 202, 0 } } },
     PlayerInput = { [PLAYER] = { fromClientSettings = { flags = 0x1000 } } },
     -- the building cursor (zero outside build mode): kit.lua's build mode
-    ClientPlayerInput = { [PLAYER] = { data = { cursorInput = { primaryTransform = { position = { x = 0, y = 0, z = 0 } } } } } },
+    ClientPlayerInput = { [PLAYER] = { data = { mask = 0, cursorInput = { primaryTransform = { position = { x = 0, y = 0, z = 0 } } } } } },
     ItemState = { [900] = { itemRarityUi = 2, itemLevelUi = 12, baseDamageUi = 34, itemState = 0 },
                   [901] = { itemRarityUi = 4, itemLevelUi = 30, baseDamageUi = 0, itemState = 0 } },
     WeaponGemSlot = { [900] = { weaponGem = { id = 0x44 } } },
@@ -426,21 +426,22 @@ settings.show_label = false
 step(1)
 check(hud.label == "", "the label can be switched off")
 settings.show_label = true
--- build mode (0.15.62): only measured: the building cursor's fields are logged when they change, nothing is hidden
-local probes = 0
-for _, l in ipairs(logged) do if l:find("build probe:", 1, true) then probes = probes + 1 end end
-comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryFlags = 0
-comps.ClientPlayerInput[PLAYER].data.cursorInput.secondaryFlags = 0
-comps.ClientPlayerInput[PLAYER].data.cursorInput.hoveredVoxelMaterialId = 0
-comps.ClientPlayerInput[PLAYER].data.cursorInput.isCursorAttachedToProp = false
+-- build mode: ClientPlayerInput.data.mask's two low bits (the building cursors) are set while the building tool is out
+check(hud.build == false, "not building: no build line")
+comps.ClientPlayerInput[PLAYER].data.mask = 3
+step(2)
+check(hud.build == true, "the building tool is out (mask 3): ui_hud.dat says build 1, all of FlameKit hides")
+settings.ui_hide_build = false
+step(2)
+check(hud.build == false, "with the setting off, nothing is hidden")
+settings.ui_hide_build = true
 comps.ClientPlayerInput[PLAYER].data.mask = 0
-comps.ClientPlayerInput[PLAYER].inputMode = 0
+comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryTransform.position.x = 12345  -- stays after build mode (measured)
 step(2)
-comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryFlags = 3
+check(hud.build == false, "the tool is put away (mask 0, the cursor where it was): the line goes, FlameKit comes back")
+comps.ClientPlayerInput[PLAYER].data.mask = 256
 step(2)
-local after = 0
-for _, l in ipairs(logged) do if l:find("build probe:", 1, true) then after = after + 1 end end
-check(after > probes and hud.build == false, "the building cursor's fields are logged when they change; nothing is hidden yet")
+check(hud.build == false, "mask 256 (seen while playing normally) is not build mode")
 settings.notify = false
 local newest_before = hud.newest
 comps.Inventory[201].slots[1] = stack(0x11, 4)

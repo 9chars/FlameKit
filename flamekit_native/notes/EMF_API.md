@@ -50,6 +50,7 @@ player's language), `on_player`, `net_*`, `hook_*`, `find_pattern`.
 - **Connected is not in the world** (measured 2026-11-13): EMF's message link to a joining player is up (log "hello ...
   welcome sent") about 15 s before EMF reports them joined; in between their messages arrive with `from.player == 0`
   (only the account is known). FlameKit's loot_filter server keeps such a list and takes it at `on_player_joined`.
+- **Build mode** (measured 2026-11-14): in a player's own game, `ClientPlayerInput.data.mask` (the local player's, client world) has its two low bits set (3) exactly while the building tool is out (0 or 256 otherwise). `cursorInput.primaryTransform` is zero only until the first build mode; after that it keeps its last value.
 - **A player's game settings** (e.g. "Auto-Collect Scattered Loot", `ClientPlayerSettings.flags` bit 12) are only in
   `PlayerInput.fromClientSettings`, and `PlayerInput` is `server_only` (docs/components.txt). The client world's
   `ClientPlayerInput` has no settings, so a player's own game cannot read them through EMF 0.6.6: ask the server.

@@ -1,3 +1,6 @@
+0.15.64 Nov 14, 2026
+- Build mode works: while the building tool is out, all of FlameKit on your screen is hidden, and it comes back as soon as you put the tool away (F4, tab Windows, "Hide all of FlameKit" switches it). FlameKit now reads the game's own sign of an active building cursor, measured in game.
+
 0.15.63 Nov 14, 2026
 - FlameKit's window opens with F4 by default again, the key players know from the older versions (it was F6). A key you set yourself stays; change it in the Settings tab.
 - The message after an update names the key your FlameKit window opens with.
