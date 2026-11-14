@@ -119,6 +119,13 @@ function F.capturing()
   return capturing
 end
 
+-- A setting's help text from mod.json ("" without one): for a button's tooltip.
+function F.help(key)
+  if not list then load_list() end
+  local s = find(key)
+  return s and type(s.help) == "string" and s.help or ""
+end
+
 -- A short text for a setting's value (the Auto Junk List's own view shows its options as buttons).
 function F.value_text(key)
   if not list then load_list() end

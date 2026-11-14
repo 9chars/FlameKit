@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.37",
+  "version": "0.15.38",
   "description": "One toolkit, many features (F6 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -110,7 +110,7 @@
       "key": "lf_dump_key",
       "type": "keybind",
       "default": "",
-      "label": "Key: dump junk now",
+      "label": "Dump Key",
       "help": "No key by default, so nothing is deleted by a stray key press.",
       "live": true,
       "group": "Auto Junk List",
@@ -123,9 +123,9 @@
       "key": "lf_keep_hotbar",
       "type": "bool",
       "default": true,
-      "label": "Never touch the action bar",
+      "label": "Exclude Action Bar",
       "live": true,
-      "help": "Weapons, armour, rings, tools and summoning items are never junked, wherever they are.",
+      "help": "On: items on your action bar are never junked, even if they are on your junk list. Weapons, armour, rings, tools and summoning items are never junked wherever they are (unless Show All Bag Items is on).",
       "group": "Auto Junk List",
       "enabledWhen": {
         "setting": "lf_enabled",
@@ -136,7 +136,7 @@
       "key": "lf_show_all",
       "type": "bool",
       "default": false,
-      "label": "Show all bag items",
+      "label": "Show All Bag Items",
       "help": "Off (the default): weapons, armour, shields, rings, amulets, tools, summoning items, blueprints, trophies, runes and pieces of gear with their own level and perks are never junk, so they are not offered in the bag list, and one already on your junk list is left alone. On: every item in your bag is offered and can be junked, including valuable high level gear. Junked items are dropped or deleted like any other junk, so be careful with Delete.",
       "live": true,
       "group": "Auto Junk List"

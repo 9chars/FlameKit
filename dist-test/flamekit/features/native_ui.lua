@@ -10,7 +10,7 @@
 --                     B<tab><item id hex><tab><count><tab><debug name><tab><rarity 0-4|-1><tab><item level><tab><type><tab><name>
 --                                                                           an item you carry that is not junk (but can be)
 --                     J<tab>... the same                                    an entry of the junk list (id 0: unknown)
---                     P <click key> <0|1 lit> <label>                       one of the feature's settings, as a button
+--                     P <click key> <0|1 lit> <label><tab><tooltip>         one of the feature's settings, as a button
 --                                                                           (features/settings.lua: "b:lf_keep_hotbar")
 --                   (B and J are item tiles: core/items.lua items.tip; the DLL draws every item tile and its tooltip the same
 --                   way: the name in its rarity's colour, item level, rarity, type, carried, command name)
@@ -60,12 +60,12 @@ local function write_list(world)
   local lines = { string.format("O %d %s", opts.auto and 1 or 0, opts.action) }
   -- the Auto Junk List's other settings, as buttons on its view (the Settings tab does not show them)
   local settings = require("features.settings")
-  lines[#lines + 1] = string.format("P b:lf_keep_hotbar %d Never touch the action bar: %s", kit.setting("lf_keep_hotbar", true) and 1 or 0,
-    settings.value_text("lf_keep_hotbar"))
-  lines[#lines + 1] = string.format("P k:lf_dump_key:c %d Dump key: %s", settings.capturing() == "lf_dump_key" and 1 or 0,
-    settings.value_text("lf_dump_key"))
-  lines[#lines + 1] = string.format("P b:lf_show_all %d Show all bag items: %s", kit.setting("lf_show_all", false) and 1 or 0,
-    settings.value_text("lf_show_all"))
+  local function opt(click, lit, label, key)  -- a button, and its tooltip: the setting's help from mod.json
+    lines[#lines + 1] = string.format("P %s %d %s\t%s", click, lit and 1 or 0, label, one_line(settings.help(key)))
+  end
+  opt("b:lf_keep_hotbar", kit.setting("lf_keep_hotbar", true), "Exclude Action Bar: " .. settings.value_text("lf_keep_hotbar"), "lf_keep_hotbar")
+  opt("k:lf_dump_key:c", settings.capturing() == "lf_dump_key", "Dump Key: " .. settings.value_text("lf_dump_key"), "lf_dump_key")
+  opt("b:lf_show_all", kit.setting("lf_show_all", false), "Show All Bag Items: " .. settings.value_text("lf_show_all"), "lf_show_all")
   local items = kit.items
   local function tile(kind, e)
     local t = items.tip(e.item, e.debug_name)

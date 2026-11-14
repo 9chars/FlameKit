@@ -3086,7 +3086,7 @@ struct WindowLayer : Layer {
     struct Opt {  // the Auto Junk List's own settings, as buttons on its view ("P" lines of ui_list.dat)
         std::string key;  // what a click sends back: "opt <key>"
         bool lit = false;
-        std::wstring label;
+        std::wstring label, tip;  // the tooltip: the setting's help from mod.json
     };
     struct Row {
         char kind = 't';  // h heading, t text, b button, s separator
@@ -3221,7 +3221,9 @@ struct WindowLayer : Layer {
                 e.name = widen(line + 1 + used);
                 (line[0] == 'B' ? b : j).push_back(std::move(e));
             } else if (line[0] == 'P' && sscanf_s(line + 1, " %399s %d %n", key, static_cast<unsigned>(sizeof key), &on, &used) == 2 && used > 0) {
-                o.push_back({key, on != 0, widen(line + 1 + used)});  // one of the feature's settings, as a button
+                const std::string rest = line + 1 + used;  // "<label><tab><tooltip>"
+                const size_t tab = rest.find('\t');
+                o.push_back({key, on != 0, widen(rest.substr(0, tab)), tab == std::string::npos ? std::wstring() : widen(rest.substr(tab + 1))});
             }
         }
         fclose(fp);
@@ -3646,6 +3648,7 @@ struct WindowLayer : Layer {
         for (size_t i = 0; i < opts.size(); ++i) {
             const int w = text.width(opts[i].label) + 22;
             button(ox, opts_y, w, opts[i].label, opts[i].lit, kOpt, i);
+            if (!opts[i].tip.empty()) hits.back().tip = &opts[i].tip;
             ox += w + 8;
         }
         section(L"In your bag", 255, 210, 122, bag, bag_page, kBagRows, kBagHead, kBagTop, kBagItem, kBagPrev, kBagNext);
