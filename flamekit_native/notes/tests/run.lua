@@ -461,7 +461,7 @@ check(count(202, 0x11) == 5, "the action bar is untouched")
 check(count(201, 0x22) == 50, "other items are untouched")
 check(hud.status == "Junk discarded: Twigs x37", "a status line says what was discarded: " .. tostring(hud.status))
 check(hud.status_colour == "#ff4a3d", "the status line is red")
-check(hud.label == "FlameKit v9.9.9 by Tester", "the label shows name, version and author: " .. tostring(hud.label))
+check(hud.label == "FlameKit v9.9.9 is Connected", "the label shows name, version and that the server runs FlameKit: " .. tostring(hud.label))
 step(500)
 check(hud.messages >= 1, "the message stays in the Messages window's list")
 settings.show_label = false

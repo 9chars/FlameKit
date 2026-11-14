@@ -1,3 +1,8 @@
+0.15.103 Nov 14, 2026
+- Main screen: the line in the lower right reads just "FlameKit v0.15.103".
+- In a world: the label reads "FlameKit v0.15.103 is Connected" when the server runs FlameKit, or "is Not Connected" when it does not (instead of "by Ninechars"; the separate orange "This server does not run FlameKit" line is gone).
+- What's New tab: an About button (left of Check for updates) opens a window with FlameKit's README from GitHub, scrollable (mouse wheel, arrow keys, Page Up/Down), with an OK button. Esc closes it too.
+
 0.15.102 Nov 14, 2026
 - Windows tab: "FlameKit window" is now called "FlameKit Menu".
 

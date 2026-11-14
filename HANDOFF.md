@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.102.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.103.
 
 ## What FlameKit is
 
@@ -124,6 +124,13 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## Labels and About (0.15.103)
+Main screen line: "FlameKit vX". In-world label (kit.lua hud_tick): "FlameKit vX is Connected|Not Connected" from
+kit.connected(); the not-connected orange notice is gone (the older-server notice stays). About: WindowLayer kAbout
+(What's New tab) sets g_about_request; AboutDialog fetches /9chars/FlameKit/main/README.md from raw.githubusercontent.com
+on a thread (web_update::fetch) each time it opens and shows it cleaned (headings gold, ** and ` dropped, bullets, table
+rows as cells) in a scroll box; OK / Esc / Enter close; it takes pointer and keys like the update dialog.
 
 ## Minimap (0.15.101)
 map_corner and map_margin settings removed (owner: never asked for them): corner fixed lower right, margin 24, map_x/map_y

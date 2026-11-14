@@ -173,9 +173,9 @@ function kit.connected(world)
 end
 
 -- Each step of your own screen's world: the lines in the lower left corner, drawn by FlameKit's DLL (not by EMF): the
--- "FlameKit v1.2.3 by Name" label and the notice, written into emf\mods\flamekit\ui_hud.dat when they change:
+-- "FlameKit v1.2.3 is Connected" label (or "is Not Connected": the server does not run FlameKit) and the notice, written into emf\mods\flamekit\ui_hud.dat when they change:
 --   label <text>              ("" when the player switched the label off)
---   notice <text>             (orange, under the label: this server does not run FlameKit, or an older one)
+--   notice <text>             (orange, under the label: the server runs an older FlameKit)
 --   build 1                   (0.15.59: the player is in build mode and ui_hide_build is on: the DLL hides all of
 --                              FlameKit's UI but FlameKit's window, these lines too since 0.15.61)
 --   end                       (a file without it is half written: the DLL reads it again later)
@@ -205,14 +205,13 @@ local function hud_tick(world)
   write_messages()
   write_notices()
   local label = ""
+  local connected = kit.connected(world)
   if kit.setting("show_label", true) then
-    label = string.format("%s v%s", kit.name, kit.version)
-    if kit.author ~= "" then label = label .. " by " .. kit.author end
+    -- (0.15.103, owner) whether this game is connected to a server with FlameKit, instead of "by <author>"
+    label = string.format("%s v%s is %s", kit.name, kit.version, connected and "Connected" or "Not Connected")
   end
   local lines = { "label " .. label }
-  if not kit.connected(world) then
-    lines[#lines + 1] = "notice This server does not run FlameKit: some features are off"
-  elseif kit.server_note then  -- the server runs an older FlameKit (features/server_version.lua)
+  if connected and kit.server_note then  -- the server runs an older FlameKit (features/server_version.lua)
     local note = kit.server_note(world)
     if note then lines[#lines + 1] = "notice " .. note end
   end
