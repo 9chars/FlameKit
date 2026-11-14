@@ -62,7 +62,7 @@ All keys can be changed in the FlameKit Menu (Settings tab).
 
 ## Installing
 
-FlameKit needs EMF (the Enshrouded Modding Framework) 0.6.6 with its Lua host. EMF is not part of this repository; install it first.
+FlameKit needs EMF (the Enshrouded Modding Framework) 0.6.6 with its Lua host. EMF is not part of this repository; install it first, from https://github.com/matenm/emf-enshrouded/releases
 
 In your game, put the folders `flamekit` and `flamekit_native` into `Enshrouded\emf\mods\`. On a dedicated server, put only `flamekit` into the server's `emf\mods\`. Both need the same FlameKit version for every feature to work; your game updates itself, the server is updated by its owner.
 
