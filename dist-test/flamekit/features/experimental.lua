@@ -523,8 +523,9 @@ local function handle(world, account, entity, msg)
           if not okn or type(name) ~= "string" or name == "" then okn, name = pcall(world.character_name, world, entity) end
           if not okn or type(name) ~= "string" or name == "" then name = "a player" end
           local line = string.format("%s for %s %s.", s[4], name, msg.on == true and "ENABLED" or "DISABLED")
-          local sent, why = pcall(emf.broadcast, line, { system = true })
-          if not sent or why == false then emf.log("experimental: the chat line was not sent (" .. tostring(why) .. ")") end
+          -- (0.15.76, owner) to the Messages window of everyone with FlameKit (features/chat.lua), no longer the game's chat
+          local sent, why = pcall(require("features.chat").announce, world, line)
+          if not sent then emf.log("experimental: the announcement was not sent (" .. tostring(why) .. ")") end
         end
         save_all()
       end

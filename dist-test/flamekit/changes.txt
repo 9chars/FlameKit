@@ -1,3 +1,7 @@
+0.15.76 Nov 14, 2026
+- Chat: every line a player types is also copied into the Messages window (the game's chat lines fade away; the game still shows them in its chat too). Needs FlameKit on the server.
+- FlameKit's own announcements (for example "PvP for Ninechars ENABLED.") now go to the Messages window of everyone with FlameKit instead of the game's chat. The Notices window is unchanged.
+
 0.15.75 Nov 14, 2026
 - Minimap: hold the pointer key (Right Alt) and click a map marker on the minimap to set your waypoint there (the game's own waypoint: its map and compass show it, and Map Waypoint takes you there). Click the waypoint's marker again to clear it; clicking another marker moves the waypoint there. Dragging the minimap still moves it.
 - Minimap: a Shape setting (Minimap tab and settings): Circle or Square.

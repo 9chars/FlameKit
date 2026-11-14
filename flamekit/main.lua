@@ -18,5 +18,6 @@ kit.start({
   "features.native_ui",
   "features.server_save",
   "features.server_version",  -- the notice when the server's FlameKit is older
+  "features.chat",            -- chat copied into the Messages window, FlameKit's announcements there
   -- "features.my_next_feature",
 })

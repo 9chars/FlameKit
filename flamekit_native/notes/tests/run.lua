@@ -75,7 +75,7 @@ left_fns = {}
 joined_fns = {}  -- EMF reports the players already there (the test player) after the world data
 SESSION_TOKEN = "run-1"
 held_key = nil
-spawned, destroyed, emitted = {}, {}, {}
+spawned, destroyed, emitted, chat_fn, broadcasts = {}, {}, {}, nil, 0
 local channels, exp_up, exp_down, hit_rules, next_rule, ADMIN, casts = {}, {}, {}, {}, 0, false, {}
 local window, gives, next_pickup = nil, {}, 5000
 local emf_hud = {}  -- what the mod asked EMF to show (nothing since 0.15.14: FlameKit draws its own lines)
@@ -195,7 +195,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
+      if name == "map" or name == "party" or name == "chat" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -215,6 +215,7 @@ emf = {
       assert(player == PLAYER and w:is_server())
       if name == "exp" then exp_down[#exp_down + 1] = data; return true end
       if name == "party" then party_down[#party_down + 1] = data; return true end
+      if name == "chat" then channels.chat.on_player(CW, {}, data); return true end
       to_client[#to_client + 1] = data
       return true
     end,
@@ -223,6 +224,7 @@ emf = {
   key_down = function(k) return held_key == k end,
   hit_rule = function(r) next_rule = next_rule + 1; hit_rules[next_rule] = r; return next_rule end,
   hit_rule_remove = function(id) local had = hit_rules[id] ~= nil; hit_rules[id] = nil; return had end,
+  on_chat = function(fn) chat_fn = fn; return true end,
   broadcast = function(t, opts) assert(type(t) == "string" and (opts == nil or type(opts) == "table"), "emf.broadcast takes (text [, opts])"); casts[#casts + 1] = t; return true end,
   take = function(w, entity, item, count, fn, opts)
     assert(w:is_server(), "emf.take needs the server world")
@@ -379,6 +381,14 @@ local function find_row(pattern, key)
   end
 end
 local function check(cond, what) if not cond then error("FAILED: " .. what, 2) end print("ok   " .. what) end
+do  -- (0.15.76) FlameKit's announcements go to the Messages window (features/chat.lua), no longer the game's chat:
+  -- `casts` now collects them there, and emf.broadcast must not be used any more
+  local chat = require("features.chat")
+  local real = chat.announce
+  chat.announce = function(w, t) casts[#casts + 1] = t; return real(w, t) end
+  local real_broadcast = emf.broadcast
+  emf.broadcast = function(...) broadcasts = broadcasts + 1; return real_broadcast(...) end
+end
 local SYNC = JOINED and 40 or 3  -- steps until a change has reached the server half
 
 step(3)
@@ -816,6 +826,20 @@ check(gsaved:find('"fly":false', 1, true) ~= nil, "and that it is off is kept")
 click(find_row("Enhanced Glider Mode").button)
 step(70)
 check(#casts == 2 and casts[2] == "No Shroud Damage for a player DISABLED.", "and when they switch it off; nobody is told about the glider option")
+check(broadcasts == 0, "FlameKit's announcements are never chat lines")
+do  -- the announcement and a player's chat line both reach the Messages window
+  local mf = io.open(TMP .. "\\ui_messages.dat")
+  local mt = mf and mf:read("a") or ""
+  if mf then mf:close() end
+  check(mt:find("No Shroud Damage for a player DISABLED.", 1, true) ~= nil, "an announcement is in the Messages window")
+  check(type(chat_fn) == "function", "FlameKit reads the players' chat (emf.on_chat)")
+  chat_fn(SW, ACCOUNT, PLAYER, "hello there")
+  step(SYNC + 5)
+  mf = io.open(TMP .. "\\ui_messages.dat")
+  mt = mf and mf:read("a") or ""
+  if mf then mf:close() end
+  check(mt:find(": hello there", 1, true) ~= nil, "a player's chat line is copied into the Messages window")
+end
 check(comps.Velocity[PLAYER].velocity.y == 12 and comps.Velocity[PLAYER].velocity.z >= 10 and comps.Velocity[PLAYER].velocity.x == 0, "switch on, gliding, S held: the player climbs and keeps flying forward")
 comps.Velocity[PLAYER].velocity.y = -4.5
 comps.DynamicLocomotion[PLAYER].state = 0
