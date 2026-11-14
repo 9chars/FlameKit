@@ -3098,6 +3098,7 @@ struct WindowLayer : Layer {
         int count = 0, rarity = -1;
         std::wstring level, type, command;
     };
+    static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
     enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem };
     struct Hit {
         RECT r;
@@ -3641,8 +3642,9 @@ struct WindowLayer : Layer {
                                               L"Weapons, armour, rings, tools, summoning items and trophies are left alone unless Show All Bag Items "
                                               L"is on; the action bar too while Exclude Action Bar is on.";
         static const std::wstring kDropTip = L"What happens to junk. Drop: it lands on the ground at your feet, and you can pick it up again. "
-                                              L"Delete: it is destroyed for good.\nWith Drop, turn off the game's \"Auto-Collect Scattered Loot\" "
-                                              L"or the junk comes straight back into your bag.";
+                                              L"Delete: it is destroyed for good.\n"
+                                              L"\x01With Drop, turn off the game's \"Auto-Collect Scattered Loot\" setting or the junk comes straight "
+                                              L"back into your bag.";
         static const std::wstring kDropOnlyTip = L"Junk lands on the ground at your feet; you can pick it up again.";
         static const std::wstring kDeleteTip = L"Junk is destroyed for good. It cannot be brought back.";
         const std::wstring drop_label = std::wstring(delete_junk ? L"Delete" : L"Drop") + L" ▾";
@@ -3791,7 +3793,21 @@ struct WindowLayer : Layer {
             std::wstring tip;
             if (h.tip) tip = *h.tip;
             if (tip.empty()) continue;
-            const std::vector<std::wstring> lines = wrap(tip, 420);
+            // a paragraph (between line breaks) that starts with kRedLine is a warning: drawn in red, the mark left out
+            std::vector<std::wstring> lines;
+            std::vector<bool> warn;
+            for (size_t at = 0; at <= tip.size();) {
+                size_t nl = tip.find(L'\n', at);
+                if (nl == std::wstring::npos) nl = tip.size();
+                std::wstring para = tip.substr(at, nl - at);
+                const bool red = !para.empty() && para[0] == kRedLine;
+                if (red) para.erase(0, 1);
+                for (std::wstring& l : wrap(para, 420)) {
+                    lines.push_back(std::move(l));
+                    warn.push_back(red);
+                }
+                at = nl + 1;
+            }
             int tw = 0;
             for (const std::wstring& l : lines) tw = std::max(tw, text.width(l));
             tw += 16;
@@ -3800,8 +3816,9 @@ struct WindowLayer : Layer {
             box(tx2, ty, tx2 + tw, ty + th, 30, 30, 36, 1.0f);
             frame_box(tx2, ty, tx2 + tw, ty + th, 1, 120, 120, 130);
             int ly = ty + 4;
-            for (const std::wstring& l : lines) {
-                text.draw(canvas, tx2 + 8, ly, l, 240, 240, 240);
+            for (size_t i = 0; i < lines.size(); ++i) {
+                if (warn[i]) text.draw(canvas, tx2 + 8, ly, lines[i], 255, 90, 80);
+                else text.draw(canvas, tx2 + 8, ly, lines[i], 240, 240, 240);
                 ly += 22;
             }
             break;
