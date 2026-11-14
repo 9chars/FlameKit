@@ -43,7 +43,7 @@ local banner_at = 0
 
 local function banner()
   if os.time() < banner_at then return end
-  kit.note(table.concat(AUTO_LOOT_BANNER, " "), "#ff5a50", true)
+  kit.note(table.concat(AUTO_LOOT_BANNER, " "), "#ff5a50", true, "autoloot")
   banner_at = os.time() + 60
 end
 
@@ -176,6 +176,7 @@ function C.receive(world, msg)
     if msg.action == "drop" and auto_loot_problem() then banner() end  -- each time junk is dropped into auto loot (once a minute at most)
   elseif msg.op == "autoloot" then
     auto_loot = msg.on == true
+    if not auto_loot then kit.unnote("autoloot") end  -- turned off in the game: its warnings leave the Messages window
     refresh_warning()
   elseif msg.op == "info" and type(msg.text) == "string" then
     kit.note(msg.text, nil, true)

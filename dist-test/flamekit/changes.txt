@@ -1,3 +1,6 @@
+0.15.53 Nov 13, 2026
+- Auto Junk List: when you turn "Auto-Collect Scattered Loot" off in the game, its red warnings leave the Messages window by themselves (within a second or so).
+
 0.15.52 Nov 13, 2026
 - Party window: the buffs and debuffs moved onto the name line, behind each player's name, as small badges (debuffs first), so a player takes no more room than before. When more are active than fit, the last badge says "+3" and lists the rest when you point at it. The time left is in the tooltip; a buff with less than 10 s left is drawn fainter.
 

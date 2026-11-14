@@ -92,14 +92,25 @@ local MOST_MESSAGES = 20
 -- `always` (warnings the player has to see). Also written to the log. emf\mods\flamekit\ui_messages.dat:
 --   m <number> <rrggbb> <text>     (the last 20, oldest first)
 --   end                            (a file without it is half written: the DLL reads it again later)
-function kit.note(text, colour, always)
+function kit.note(text, colour, always, tag)
   emf.log(tostring(text))
   if not always and not kit.setting("notify", true) then return end
   message_n = message_n + 1
   messages[#messages + 1] = { n = message_n, colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060",
-    text = (tostring(text):gsub("[%c]", " ")) }
+    text = (tostring(text):gsub("[%c]", " ")), tag = tag }
   if #messages > MOST_MESSAGES then table.remove(messages, 1) end
   messages_dirty = true
+end
+
+-- Takes every message noted with `tag` out of the Messages window (what it warned about is over).
+function kit.unnote(tag)
+  if tag == nil then return end
+  for i = #messages, 1, -1 do
+    if messages[i].tag == tag then
+      table.remove(messages, i)
+      messages_dirty = true
+    end
+  end
 end
 
 local function write_messages()

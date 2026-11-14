@@ -523,6 +523,7 @@ comps.Inventory[201].slots[1] = stack(0x11, 5)
 pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
 check(yells() == before and junk_view().warning == nil, "auto loot switched off in the game: no more warnings, the line goes")
+check(yells() == 0, "and its earlier warnings are gone from the Messages window")
 comps.Inventory[201].slots[1] = stack()
 
 -- the chat command runs on the server half and the player's own game follows
