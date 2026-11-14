@@ -29,7 +29,7 @@ local for_host = {}        -- in a world this game hosts: requests made on the c
 -- junk comes straight back: a red notice stays on screen (kit.notice, FlameKit's Notices window; 0.15.54, owner: in
 -- Messages it got lost) and a red line shows over the bag in FlameKit's window (C.ui_warning), until it is solved.
 local AUTO_LOOT_WARNING = "\"Auto-Collect Scattered Loot\" is on in the game's settings: dropped junk comes straight back "
-  .. "into your bag. Turn it off, or set Drop / Delete to Delete."
+  .. "into your bag. Turn it off or set auto junk to delete instead of drop."
 
 -- True while junk is to be dropped and the game's auto loot would take it straight back.
 local function auto_loot_problem()

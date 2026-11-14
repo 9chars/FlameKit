@@ -2608,6 +2608,8 @@ struct PartyLayer : PinnedLayer {
         RECT r;                          // in content coordinates (from the content's top, as content_hover gets them)
     };
     std::vector<Spot> spots;             // the badges as last drawn
+    TextPainter timer;                   // the time inside a badge: 11 px, normal weight (0.15.55, owner: smaller, less bold)
+    bool timer_ready = false;
 
     int member_height(const Member& m, int) const { return kRow + (m.buffs.empty() ? 0 : kBuffExtra); }
     // the time left, for the tooltip: "12:05 left"
@@ -2807,16 +2809,19 @@ struct PartyLayer : PinnedLayer {
             const std::wstring letter = b.name.empty() ? std::wstring(L"?") : b.name.substr(0, 1);
             text.draw(canvas, x + (kBadge - text.width(letter)) / 2, y + 4, letter, 245, 245, 245);
         }
-        if (b.left >= 0) {  // the time left, over the icon's lower part: light text on a dark outline
+        if (b.left >= 0) {  // the time left, over the icon's lower part: small light text on a soft dark strip
+            if (!timer_ready) {
+                timer_ready = true;
+                timer.weight = FW_NORMAL;
+                timer.ready(g_screen, 11);
+            }
             wchar_t t[16];
             if (b.left < 60) swprintf_s(t, L"%d", b.left);
             else if (b.left < 3600) swprintf_s(t, L"%dm", (b.left + 30) / 60);
             else swprintf_s(t, L"%dh", (b.left + 1800) / 3600);
-            const int tx = x + (kBadge - little.width(t)) / 2, ty = y + kBadge - little.font_px - 3;
-            for (int dy = -1; dy <= 1; ++dy)
-                for (int dx = -1; dx <= 1; ++dx)
-                    if (dx || dy) little.draw(canvas, tx + dx, ty + dy, t, 0, 0, 0);
-            little.draw(canvas, tx, ty, t, 255, 255, 255);
+            const int tw = timer.width(t), tx = x + (kBadge - tw) / 2, ty = y + kBadge - timer.font_px - 4;
+            box(tx - 2, ty + 1, tx + tw + 2, ty + timer.font_px + 3, 0, 0, 0, 0.55f);
+            timer.draw(canvas, tx, ty, t, 255, 255, 255);
         }
     }
     void more_badge(int x, int y, int n, bool over) {
