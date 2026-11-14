@@ -1,3 +1,6 @@
+0.15.98 Nov 14, 2026
+- Settings: "Press the pointer key once instead of holding it" moved to the Windows group.
+
 0.15.97 Nov 14, 2026
 - Experimental window, Test monsters: the blocks of text above the dummy's and the duelist's drop-downs are gone; that explanation is now in their tooltips (hold the pointer key and point at them). The Experimental window shows tooltips now.
 - The dummy's tooltips say you must have PvP on to hit it.
