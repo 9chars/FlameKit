@@ -100,7 +100,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - **Updates and new settings** (0.15.61): EMF reads FlameKit's `mod.json` (its settings) before FlameKit Native loads and puts a held Lua part in place, so a setting a new version adds did not exist until the second start (it read as off). After installing, the DLL touches `flamekit\mod.json` 8 s later (`install_pending` returns true); EMF's watcher then reads the settings again and reloads the Lua part. Log: `update: flamekit\mod.json touched`.
 - Item tiles are a standard element: Lua `kit.items.tip(id, debug_name)`; a panel row `{ item = <id>, count, text, tooltip, button, selected }`; DLL `ItemTip` + `draw_item_tip()`. Use them for any item UI.
 - Tooltips: every button whose use is not obvious gets one; a paragraph starting with `WindowLayer::kRedLine` (`L'\x01'`) is red. UI text stays short; tooltips may explain.
-- Messages window always shown in a world: last 5, 10 in pointer mode.
+- Messages window always shown in a world: last 5, 10 in pointer mode. It is for every message FlameKit sends the player (`kit.note`), except persistent notices, which go to the notices window (`kit.notice`) (owner, 0.15.64).
 
 **Features (Lua):** settings live only in their own feature's tab; the Settings tab (`features/settings.lua`, from mod.json) shows only the FlameKit groups and each feature's `enabled_setting`. Debug things go in Experimental → Debug (log level buttons, test players `dbg:test:N`). Party: the hosting side reads each player every 30 steps and sends the list on channel `party`; DOWN at 0 health; clicking a player in pointer mode follows them on the minimap. Test players: `core/test_players.lua`, via channel `party_test`. Server version: `features/server_version.lua`, channel `ver` (client asks at step 120, then every 3600; `kit.server_note`). Server save: `features/server_save.lua` (for the restart helper). Who is in the server world: `core/players.lua` (0.15.48), kept from `emf.on_player_joined` / `emf.on_player_left` (EMF Lua 1.20; the installed one is 1.24). Measured on the owner's server: after a FlameKit reload EMF reports every player already there again (`joined: entity id 1` in the same moment), so the list has no gap; the owner's player was id 1, no player id in 65-1023. EMF's docs: player entity ids are 1..0x3FF and a leaving player's id goes to the next who joins. Never scan entity ids for players again; the 1-64 scan stays only as the fallback for an EMF without the events. The Auto Junk List never junks trophies, runes, Legendary Runes, eternal arrows/spells (unless `lf_show_all`).
 
@@ -112,7 +112,6 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 1. **#2 Clean PC / `dist` test** (owner: next session): install FlameKit from nothing the way a player would, and the first `dist` (players') channel. Not before the owner says so (rule 8).
 2. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
-3. **#8 What the Messages window is for:** decide what goes there (now: `kit.note` lines). Later.
 
 ## Things learned the hard way
 
