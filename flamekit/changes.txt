@@ -1,3 +1,6 @@
+0.15.100 Nov 14, 2026
+- "Check for updates" while an update is already downloaded brings up the update window again, with its Restart Game button.
+
 0.15.99 Nov 14, 2026
 - Experimental window: shorter tooltips (PvP's, the dummy's and the duelist's drop-downs); the leaderboard button is just "Leaderboard", lit while the leaderboard is shown.
 

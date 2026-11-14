@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.99.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.100.
 
 ## What FlameKit is
 
@@ -160,6 +160,9 @@ WMI (Win32_Process.Create) start it again in "wait" mode as a process that is NO
 Steam counted it as the game and refused the restart), then posts WM_CLOSE to the game window (as the restart helper and
 Alt+F4 do). The waiter waits up to 120 s for the game's process, then until no enshrouded.exe is left, 5 s, then starts
 steam://rungameid/1203620. Log: flamekit\restart_game.log.
+
+0.15.100: the Check for updates button (WindowLayer kCheckUpdates) sets g_update_ask_until = now + 20 s; a ready status
+within that time shows the dialog again even for an announced version.
 
 ## Restart button (owner, 2026-11-14)
 

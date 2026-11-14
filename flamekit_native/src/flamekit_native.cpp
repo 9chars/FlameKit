@@ -485,6 +485,9 @@ std::atomic<bool> g_ui_request{false};  // F4 (window_key) was pressed: FlameKit
 std::atomic<bool> g_exp_toggle{false};  // the Experimental window's key was pressed (ui_thread shows or hides it)
 std::atomic<bool> g_party_toggle{false};  // the Party window's key (0.15.81)
 std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
+// (0.15.100, owner) "Check for updates" clicked: until then (GetTickCount64), an update that is ready shows the update
+// dialog again, even when it was shown for that version already
+std::atomic<uint64_t> g_update_ask_until{0};
 
 // A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
 std::wstring key_label(uint32_t vk) {
@@ -4725,6 +4728,7 @@ struct WindowLayer : Layer {
                 break;
             case kCheckUpdates:
                 web_update::g_check_now = true;
+                g_update_ask_until = GetTickCount64() + 20000;
                 FK_LOG(fklog::kInfo, "window: Check for updates");
                 break;
             case kRowButton:
@@ -5252,7 +5256,8 @@ struct UpdateDialog : Layer {
     }
 
     void read_status(uint64_t now) {
-        next_read = now + 1000;
+        const bool asked = now < g_update_ask_until.load();  // the Check for updates button: show it again
+        next_read = now + (asked ? 250 : 1000);
         FILE* fp = _wfsopen((g_flamekit_dir + L"update_status.txt").c_str(), L"rb", _SH_DENYNO);
         if (!fp) return;
         char line[256] = "";
@@ -5263,12 +5268,13 @@ struct UpdateDialog : Layer {
         if (!v) return;
         std::string ver;
         for (v += 2; *v && *v != ' ' && *v != ':' && *v != '\r' && *v != '\n'; ++v) ver += *v;
-        if (ver.empty() || ver == announced) return;
+        if (ver.empty() || (ver == announced && !asked)) return;
+        if (asked) g_update_ask_until = 0;
         announced = ver;
         version = widen(ver);
         open = true;
         dirty = true;
-        FK_LOG(fklog::kInfo, "update dialog: shown for v%s", ver.c_str());
+        FK_LOG(fklog::kInfo, "update dialog: shown for v%s%s", ver.c_str(), asked ? " (Check for updates)" : "");
     }
 
     void draw() {
