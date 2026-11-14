@@ -1614,6 +1614,32 @@ struct TextPainter {
             }
     }
 
+    // Draws only the outline of `text` (0.15.56, the timer in a buff badge): the letters' ink grown by 1 px in every
+    // direction, minus the ink itself, in colour r g b. The inside of each letter is not drawn, so what is under it
+    // (the badge's icon) shows through.
+    void draw_hollow(Canvas& c, int x, int y, const std::wstring& text, float r, float g, float b) {
+        const int wide = std::min(width(text), kW - 2), tall = std::min(kH, font_px + font_px / 2 + 2);
+        for (int row = 0; row < tall; ++row) std::fill(bits + row * kW, bits + row * kW + wide + 2, 0u);
+        TextOutW(dc, 0, 0, text.c_str(), static_cast<int>(text.size()));
+        GdiFlush();
+        const int gw = wide + 2, gh = tall + 2;  // with a pixel of room on every side for the outline
+        std::vector<float> ink(static_cast<size_t>(gw) * gh, 0.0f);
+        for (int row = 0; row < tall; ++row)
+            for (int col = 0; col < wide; ++col)
+                ink[static_cast<size_t>(row + 1) * gw + col + 1] = static_cast<float>((bits[row * kW + col] >> 8) & 0xFF) / 255.0f;
+        for (int gy = 0; gy < gh; ++gy)
+            for (int gx = 0; gx < gw; ++gx) {
+                float grown = 0.0f;
+                for (int dy = -1; dy <= 1; ++dy)
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        const int ny = gy + dy, nx = gx + dx;
+                        if (nx >= 0 && ny >= 0 && nx < gw && ny < gh) grown = std::max(grown, ink[static_cast<size_t>(ny) * gw + nx]);
+                    }
+                const float ring = grown - ink[static_cast<size_t>(gy) * gw + gx];
+                if (ring > 0.02f) c.blend(x + gx - 1, y + gy - 1, r, g, b, ring);
+            }
+    }
+
     void draw(Canvas& c, int x, int y, const std::wstring& text, float r, float g, float b, float alpha = 1.0f) {
         const int wide = std::min(width(text), kW - 2), tall = std::min(kH, font_px + font_px / 2 + 2);
         for (int row = 0; row < tall; ++row) std::fill(bits + row * kW, bits + row * kW + wide + 2, 0u);
@@ -2608,7 +2634,7 @@ struct PartyLayer : PinnedLayer {
         RECT r;                          // in content coordinates (from the content's top, as content_hover gets them)
     };
     std::vector<Spot> spots;             // the badges as last drawn
-    TextPainter timer;                   // the time inside a badge: 11 px, normal weight (0.15.55, owner: smaller, less bold)
+    TextPainter timer;                   // the time inside a badge: 13 px, only its outline drawn (0.15.56, owner: the icon shows through)
     bool timer_ready = false;
 
     int member_height(const Member& m, int) const { return kRow + (m.buffs.empty() ? 0 : kBuffExtra); }
@@ -2809,19 +2835,17 @@ struct PartyLayer : PinnedLayer {
             const std::wstring letter = b.name.empty() ? std::wstring(L"?") : b.name.substr(0, 1);
             text.draw(canvas, x + (kBadge - text.width(letter)) / 2, y + 4, letter, 245, 245, 245);
         }
-        if (b.left >= 0) {  // the time left, over the icon's lower part: small light text on a soft dark strip
+        if (b.left >= 0) {  // the time left, over the icon's lower part: hollow digits, a black outline, the icon inside
             if (!timer_ready) {
                 timer_ready = true;
-                timer.weight = FW_NORMAL;
-                timer.ready(g_screen, 11);
+                timer.ready(g_screen, 13);  // semibold, as the 0.15.54 timer
             }
             wchar_t t[16];
             if (b.left < 60) swprintf_s(t, L"%d", b.left);
             else if (b.left < 3600) swprintf_s(t, L"%dm", (b.left + 30) / 60);
             else swprintf_s(t, L"%dh", (b.left + 1800) / 3600);
-            const int tw = timer.width(t), tx = x + (kBadge - tw) / 2, ty = y + kBadge - timer.font_px - 4;
-            box(tx - 2, ty + 1, tx + tw + 2, ty + timer.font_px + 3, 0, 0, 0, 0.55f);
-            timer.draw(canvas, tx, ty, t, 255, 255, 255);
+            const int tw = timer.width(t), tx = x + (kBadge - tw) / 2, ty = y + kBadge - timer.font_px - 3;
+            timer.draw_hollow(canvas, tx, ty, t, 0, 0, 0);
         }
     }
     void more_badge(int x, int y, int n, bool over) {

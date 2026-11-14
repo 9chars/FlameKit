@@ -1,3 +1,6 @@
+0.15.56 Nov 13, 2026
+- Party window: the time inside a buff badge is drawn hollow: only a thin black outline around each digit, so the icon shows through the number (13 px, the size before 0.15.55).
+
 0.15.55 Nov 13, 2026
 - Party window: the time inside a buff badge is smaller and lighter (11 px, normal weight, on a soft dark strip instead of a heavy black outline).
 - Auto Junk List: the Auto-Collect warning now ends "Turn it off or set auto junk to delete instead of drop." (in the notice and over the bag in FlameKit's window).
