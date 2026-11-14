@@ -96,7 +96,7 @@ end
 local function tab_features()  -- the features with a tab, switched on
   local list = {}
   for _, f in ipairs(kit.features) do
-    if f.panel and kit.enabled(f) then list[#list + 1] = f end
+    if (f.panel or f.own_view) and kit.enabled(f) then list[#list + 1] = f end
   end
   return list
 end

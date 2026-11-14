@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.48.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.49.
 
 ## What FlameKit is
 
@@ -37,6 +37,8 @@ It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Fea
     - Then ask: "Shall I restart <the game client / the local server / both> now?" On a yes, do the whole restart yourself with the **restart helper** (never computer use: the owner does not want his mouse and keyboard taken over): write the one word `client`, `server` or `both` into `<work folder>\restart_helper\restart.request` (copy from a fresh folder each time), wait for `restart.done` (`ok ...` / `failed ...`) and read `restart.log`, then check in FlameKit's log that the new version runs. The helper (`tools/restart_helper/` in this repository; `restart_paths.txt` with the server folder is on the PC only) runs in its own window, `restart_watch.cmd`, which the owner starts: the client is closed like Alt+F4 and started through Steam (app 1203620), a server restart always closes the client first (no player connected), then writes a number into the server's `emf\mods\flamekit\save_now.request`; `features/server_save.lua` on the server calls `emf.request_save()` and answers in `save_now.done`; once a save file newer than the request exists the helper ends the server process (Ctrl+C from another program did not work: tried twice on 2026-11-13, the server ignored it), starts it again minimized, waits for "world loaded" in `emf\emf_core.log`, then starts the client. No new save within 90 s: nothing is stopped. The client is never ended by force. The helper restarts itself when `restart_helper.ps1` changes (exit code 10, `restart_watch.cmd` loops). Joining the server stays a click for the owner. Before asking for a server restart, check whether EMF already reloaded the Lua files on the running server (it does on file change). Never restart anything without that yes.
 17. **A chime when waiting for the owner** (owner: ADHD, multitasking): at the end of every turn that waits for the owner's answer or test, copy a file `chime.request` (any content) into `<work folder>\restart_helper\`; the restart helper plays a chime on the PC and deletes the file. Always, every such turn: the owner asked for it.
 18. **Be specific and clear** (owner, 0.15.36). The owner wants to understand how FlameKit works inside and points out flawed designs: never hold technical details back or talk down. Technical terms are fine; vague ones are not. When describing a change, say concretely what it does: which file, which function, which data goes where, what the owner will see in the game, and a concrete example when an idea is new (e.g. the actual row a feature would write). A sentence the owner cannot picture is a failure: rewrite it until it names the real thing.
+19. **Know EMF before building around it** (owner, 0.15.48: "it's critical you understand everything that is available to us"). Before building a workaround, guessing game data, or writing "EMF cannot do X", look it up in `flamekit_native/notes/EMF_API.md` and EMF's own docs (`docs/modding/lua.md`, `llms.txt`, `reference.md` in the EMF zip on the owner's PC), and name the line that says so. Also search FlameKit's own code for the call first: the 1-64 player scan (0.15.21-0.15.47) was written while `experimental.lua` already used EMF's player events.
+20. **No account ids in logs** (0.15.49). A player's account (`world:account`, `p.account`: likely their Steam id) never goes into a log line; use the entity id. Logs get shared with bug reports.
 
 ## Where everything is
 
@@ -51,7 +53,7 @@ Folder names on the owner's PC are not in this repository (it is public). `<work
 - **Production server:** G-Portal, last given 0.14.1/0.14.2 by the owner. Upload only when asked.
 - **Logs:** `emf\emf_core.log` in the client and in the server folder.
 
-Runtime files that are never deployed, diffed or overwritten: `junk_list.json`, `seen_version.json`, `far_players.dat`, `experimental.json` (server), `item_details.dat`, `icon_requests.txt`, `icons\`, `update_status.txt`, `update_channel.txt`, `ui_list.dat`, `ui_tabs.dat`, `ui_actions.txt`, `ui_hud.dat`, `ui_messages.dat`, `ui_party.dat`, `ui_open.dat`, `ui_layout.txt`, `save_now.request`/`save_now.done` (server), `debug.txt`, `logs\`.
+Runtime files that are never deployed, diffed or overwritten: `junk_list.json`, `seen_version.json`, `far_players.dat`, `experimental.json` (server), `item_details.dat`, `update_status.txt`, `update_channel.txt`, `ui_list.dat`, `ui_tabs.dat`, `ui_actions.txt`, `ui_hud.dat`, `ui_messages.dat`, `ui_party.dat`, `ui_open.dat`, `ui_layout.txt`, `save_now.request`/`save_now.done` (server), `debug.txt`, `logs\`.
 
 ## How to build and publish a version
 
@@ -76,7 +78,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 ## State right now
 
-- **Versions:** local server 0.15.48 (Lua). Client: runs 0.15.46; 0.15.48 is downloaded and waits for the next game start. Production server (G-Portal): 0.14.x, not touched. `dist` (players) does not exist yet.
+- **Versions:** local server 0.15.49 (Lua). Client: 0.15.49 through the updater (needs a game restart). Leftovers on the client from before 0.15.49, no longer written or read: `emf\mods\flamekit\icons\` (item PNGs) and `icon_requests.txt`; delete with the owner's permission. Production server (G-Portal): 0.14.x, not touched. `dist` (players) does not exist yet.
 - Every version's detail is in `flamekit/changes.txt` and the git log. Below: how things are built, so new work fits.
 
 ## Design (how FlameKit is built)
@@ -90,6 +92,9 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - `WindowLayer` (F6, `window_key`): title bar, frame, move, resize (min 560×440); tabs wrap; sizes are members set by `lay_out()`. Tab order from `main.lua`, What's New first; it opens by itself on What's New after an update (or every game with `open_on_start`). Auto Junk List has its own icon view (pages); every other tab is rows from `ui_tabs.dat` with a scroll bar. Another program in front does not close it (`lost_front`).
 - `PinnedLayer` (party, messages): stay on screen while playing, collapse/hide, move, resize (height = maximum, content scrolls), `content_click`, `hide_in_menus` (party: on; messages: off). They take the mouse only in pointer mode.
 - Pointer mode (`g_pointer_mode`): F6 window open, or the pointer key held (`pointer_key`: Right Alt default, Right Ctrl, Caps Lock; `g_pointer_hold`). The pointer returns to where it was last time. The game's own pointer is copied from Windows (`look_for_game_cursor`: only a colour pointer with its hot spot in the top left quarter; the real one is 64×64, hot spot 3,3). `Frame::in_menu`: the game shows its own pointer outside pointer mode.
+- Party window buffs (0.15.49): the server half reads `emf.buffs` per player (types the game hides left out) and sends `b <type hex>:<slot>:<seconds>,...` after each `p` line; each player's game adds the names (`emf.buff_type`, its own language) and writes one `b <type hex> <slot> <seconds> <name>` line per buff into `ui_party.dat`. `PartyLayer` draws a badge per buff (slot colour, the game's icon from `game_files().buff_icon`, time under it; debuffs first) and a tooltip on hover (pointer mode, `PinnedLayer::content_hover`). Buff icons: `item_icons.hpp` (buff registry layout there). `game_files()` is the one shared reader of the game's data files (UI thread).
+- FlameKit's own raw memory reads (`peek`: map markers, names, quest marks; and the item-definition offsets) run only on game build 1287369 (`kLayoutsBuild`, `g_layouts_ok` from `emf::game_build()`); another build logs `FlameKit's own memory reads are OFF`.
+- Tests: the Auto Junk List is tested through what FlameKit's window really uses (`junk_view()` in run.lua reads `ui_list.dat`, clicks go through `ui_actions.txt`); the old EMF-panel tests are gone. Other tabs are still driven through their `panel` rows (`toggle_panel`).
 - Item tiles are a standard element: Lua `kit.items.tip(id, debug_name)`; a panel row `{ item = <id>, count, text, tooltip, button, selected }`; DLL `ItemTip` + `draw_item_tip()`. Use them for any item UI.
 - Tooltips: every button whose use is not obvious gets one; a paragraph starting with `WindowLayer::kRedLine` (`L'\x01'`) is red. UI text stays short; tooltips may explain.
 - Messages window always shown in a world: last 5, 10 in pointer mode.

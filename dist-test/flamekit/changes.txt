@@ -1,3 +1,11 @@
+0.15.49 Nov 13, 2026
+- Party window: every player's buffs and debuffs, with the game's own icons: a badge per buff (green buff, red debuff, amber food, blue rested, brown terrain) and the time left under it. Debuffs come first. Hold the pointer key and point at a badge for its name and the exact time left. Everyone in the game sees everyone's buffs. Test players have some too.
+- Auto Junk List: Dump Junk in FlameKit's window now works in a world you host yourself (single player or hosting); before, it only worked on a server.
+- Privacy: the server's log no longer names players by their account number (it could be shared with a bug report); it uses their number in the game instead.
+- After a game update FlameKit no longer reads the places in the game's memory it found on the current game version (map markers, names, quest marks, item details) until a FlameKit version knows the new one: nothing wrong is read.
+- FlameKit Native says in its mod.json that it is only needed in a player's game, not on a server (EMF.exe shows that to server owners).
+- Cleanup: the old Auto Junk List panel (from the EMF window) and its icon files are gone; FlameKit's window does all of it.
+
 0.15.48 Nov 13, 2026
 - Party window and minimap: the server now knows who is playing from EMF's own join and leave reports, instead of guessing the first 64 player numbers. A player is never missed, however many have come and gone.
 

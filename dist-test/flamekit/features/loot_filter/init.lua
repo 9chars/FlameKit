@@ -3,7 +3,7 @@
 -- Two halves, in one mod that is installed on both sides:
 --   server.lua  runs where the world is hosted (your own game, or a dedicated server). Only that side may change an
 --               inventory, so it does the removing, for each player by their own list.
---   client.lua  runs in your own game: your list (a file), the panel, the keys. It tells the server half what you want.
+--   client.lua  runs in your own game: your list (a file), what FlameKit's window shows, the keys. It tells the server half what you want.
 -- In a world you host both halves are in the same game and call each other directly. On a server you joined they
 -- talk over EMF's mod messages on the channel "flamekit/lf".
 
@@ -41,7 +41,7 @@ end
 F.client_tick = client.client_tick
 F.connected = client.connected
 F.setting_changed = client.setting_changed
-F.panel = client.panel
-F.click = client.click
+-- its tab in FlameKit's window is drawn by the DLL from ui_list.dat (features/native_ui.lua), not from panel rows
+F.own_view = true
 
 return F

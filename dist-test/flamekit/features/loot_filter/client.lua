@@ -1,7 +1,8 @@
 -- features/loot_filter/client.lua: the half in your own game.
 --
--- It keeps your junk list (junk_list.json in the mod's folder, the same for every world and server), draws the Loot
--- Filter tab of the panel, and tells the server half what you want: your list and options ("sync") and "dump".
+-- It keeps your junk list (junk_list.json in the mod's folder, the same for every world and server), gives FlameKit's
+-- window (features/native_ui.lua) what to show, and tells the server half what you want: your list and options
+-- ("sync") and "dump".
 -- In a world you host the server half is in this same game and is called directly; on a server you joined the
 -- messages go over EMF's mod messages (the channel flamekit/lf), which needs FlameKit on that server too.
 
@@ -10,8 +11,7 @@ local C = {}
 local kit, items, bag, server
 
 local FILE = "junk_list"
-local MAX_ROWS = 100       -- rows per list in the panel
-local JUNK_RED = "#ff4a3d" -- junk in the panel: the list's heading and entries, and bag items that are on it
+local JUNK_RED = "#ff4a3d" -- the colour of junk messages
 local RESEND_STEPS = 3600  -- your list is sent again about once a minute (a message can be lost)
 
 local junk = {}            -- debug name -> true: the list as it is saved
@@ -20,15 +20,15 @@ local resolved = false
 local dirty = true         -- the server half has not got the list and options as they are now
 local last_peer = nil      -- the joined server's channel version as last seen (0: it has no FlameKit)
 local since_sync = 0
-local drawn_junk = {}      -- the junk rows of the panel as last drawn: index -> debug name
 local auto_loot = nil      -- the game's auto loot setting as the server reports it (nil: not known yet)
 local warning_shown = false
+local for_host = {}        -- in a world this game hosts: requests made on the client world (FlameKit's window), handed to
+                           -- the server half on the server world's next step (C.server_tick)
 
 -- The game calls its auto loot setting "Auto-Collect Scattered Loot". The banner: one red message in FlameKit's
--- Messages window (kit.note), at most once a minute; the tab has room for one sentence.
+-- Messages window (kit.note), at most once a minute.
 local AUTO_LOOT_BANNER = { "FlameKit Junk List: dropped junk is coming back into your bag (drop failed).",
                            "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings." }
-local AUTO_LOOT_WARNING = "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings: dropped junk comes back into your bag."
 
 -- True while junk is to be dropped and the game's auto loot would take it straight back.
 local function auto_loot_problem()
@@ -139,7 +139,10 @@ local function request(world, msg)
     if not ok or not account then return false end
     return server.handle(world, { player = player, account = account }, msg) == true
   end
-  if kit.is_host() then return false end  -- the server world of this game takes it on its own step
+  if kit.is_host() then  -- clicked on the client world (FlameKit's window): the server world's next step takes it
+    if #for_host < 16 then for_host[#for_host + 1] = msg end
+    return true
+  end
   local text = emf.json.encode(msg)
   if not text or #text > 16000 then
     emf.log("an Auto Junk List message was too long to send (" .. tostring(text and #text) .. " bytes)")
@@ -209,6 +212,9 @@ function C.server_tick(world)
   if emf.local_player() == 0 then return end  -- a dedicated server: nobody plays in this game
   since_sync = since_sync + 1
   if dirty then sync(world) end
+  local waiting = for_host
+  for_host = {}
+  for _, msg in ipairs(waiting) do request(world, msg) end
 end
 
 -- A step of your own screen's world. On a joined server: say hello with your list once the server has greeted this
@@ -242,25 +248,9 @@ end
 
 -- Lays chips out left to right: line(text) says whether the next chip still fits on the running line. EMF gives no
 -- text widths, so a chip's width is estimated from its length, on the safe side (in text heights).
-local GRID = 10  -- slots in a row of the bag grid (a slot is three text lines wide)
-
-local function flow()
-  local room = kit.hub.WIDTH - 3
-  local used = 0
-  return function(text)
-    local need = #text * 0.56 + 1.6
-    if used > 0 and used + need <= room then
-      used = used + need
-      return true
-    end
-    used = need
-    return false
-  end
-end
-
 -- What in the bag can be put on the junk list, one entry per item ({item, count, name, debug_name}), sorted by name;
 -- how many stacks of junk are in it now; how many stacks are never junk (not listed); and false when the bag cannot
--- be read. The panel's tab and FlameKit's own window (C.ui_lists) both show this.
+-- be read. FlameKit's window shows this (C.ui_lists).
 local function bag_list(world)
   resolve()
   local by_item, list, junk_stacks, kept = {}, {}, 0, 0
@@ -286,141 +276,6 @@ local function bag_list(world)
   end)
   return list, junk_stacks, kept, readable
 end
-
--- The Auto Junk List tab: the buttons, what is in your bag (click = junk or keep), and the whole list.
-function C.panel(world)
-  local rows = {}
-  local where = link(world)
-  local list, junk_stacks, kept, readable = bag_list(world)
-
-  if not where then
-    rows[#rows + 1] = { color = "#ffb060",
-      text = "This server does not run FlameKit (or has not greeted your game yet): nothing can be removed here. "
-        .. "You can still edit your list." }
-  elseif where == "server" then
-    rows[#rows + 1] = { text = "Connected to this server's FlameKit.", dim = true }
-  end
-  local drop = emf.setting("lf_action") ~= "delete"
-  if auto_loot_problem() then rows[#rows + 1] = { text = AUTO_LOOT_WARNING, color = JUNK_RED } end
-  rows[#rows + 1] = { button = "dump", text = "Dump junk now" .. (readable and (" (" .. junk_stacks .. ")") or ""),
-    disabled = not where or (readable and junk_stacks == 0),
-    tooltip = "Removes every stack of a junk item from your backpack now. Never weapons, armour, rings, tools or "
-      .. "summoning items, and not the action bar (a setting)." }
-  rows[#rows + 1] = { button = "auto", same_line = true, selected = emf.setting("lf_auto") == true,
-    text = "On loot: " .. (emf.setting("lf_auto") and "ON" or "OFF"),
-    tooltip = "ON: junk is removed as soon as you loot it. OFF: only when you press Dump junk now." }
-  rows[#rows + 1] = { button = "action", same_line = true, text = drop and "Junk is dropped" or "Junk is deleted",
-    tooltip = "Click to switch between dropping junk at your feet and deleting it for good. "
-      .. "For dropping, turn off \"Auto-Collect Scattered Loot\" in the game settings: otherwise the game picks dropped junk back up." }
-
-  -- Two blocks of "chips" (one button per item, as many on a line as fit): what is in the bag, then the junk list.
-  -- A chip's colour is the item's quality (gear) or kind; a bag chip that is on the junk list is lit.
-  rows[#rows + 1] = { separator = true }
-  rows[#rows + 1] = { heading = "IN YOUR BAG (" .. #list .. ")", color = "#ffd27a" }
-  if not readable then
-    rows[#rows + 1] = { text = "Your bag cannot be read here. Add items with the chat command: /flamekit.junk add <item>",
-      dim = true }
-  elseif #list == 0 then
-    rows[#rows + 1] = { text = "Your bag is empty.", dim = true }
-  else
-    rows[#rows + 1] = { text = "Click an item to put it on your junk list (lit = junk). Click it again to keep it.", dim = true }
-  end
-  if kept > 0 then
-    rows[#rows + 1] = { text = "Not listed, because they are never junked: weapons, armour, rings, tools and summoning items.",
-      dim = true }
-  end
-  local line = flow()
-  for i, e in ipairs(list) do
-    if i > MAX_ROWS then
-      rows[#rows + 1] = { text = "... and " .. (#list - MAX_ROWS) .. " more", dim = true }
-      break
-    end
-    local is_junk = e.debug_name ~= nil and junk[e.debug_name] == true
-    local label = e.name  -- the name only: how many are carried is in the tooltip
-    local tip = items.details(e.item, e.debug_name, e.count)
-    table.insert(tip, 1, e.name)
-    tip[#tip + 1] = is_junk and "ON YOUR JUNK LIST. Click to keep it." or "Click to put it on your junk list."
-    if items.data(e.item) then
-      -- a grid like the game's bag: the item's icon on its rarity's colour (its name until the picture is made)
-      local icon = items.icon(e.item)
-      rows[#rows + 1] = {
-        slot = string.format("t:%x", e.item),
-        text = icon and "" or label,
-        icon = icon,
-        same_line = (i - 1) % GRID ~= 0,
-        selected = is_junk,
-        color = items.color(e.debug_name, e.item),
-        disabled = e.debug_name == nil,
-        tooltip = table.concat(tip, "\n"):sub(1, 500),
-      }
-    else
-      rows[#rows + 1] = {
-        button = string.format("t:%x", e.item),
-        text = label,
-        same_line = line(label),
-        selected = is_junk,
-        color = items.color(e.debug_name, e.item),
-        disabled = e.debug_name == nil,
-        tooltip = table.concat(tip, "\n"):sub(1, 500),
-      }
-    end
-  end
-
-  local names = sorted_names()
-  local shown = {}
-  for i, name in ipairs(names) do shown[i] = { name = name, text = items.name(name) } end
-  table.sort(shown, function(a, b)
-    if a.text ~= b.text then return a.text < b.text end
-    return a.name < b.name
-  end)
-  rows[#rows + 1] = { separator = true }
-  rows[#rows + 1] = { heading = "YOUR JUNK LIST (" .. #names .. ")", color = JUNK_RED }
-  if #names == 0 then
-    rows[#rows + 1] = { text = "Nothing yet.", dim = true }
-  else
-    rows[#rows + 1] = { text = "Click an item to take it off the list.", dim = true }
-  end
-  drawn_junk = {}
-  line = flow()
-  for i, e in ipairs(shown) do
-    if i > MAX_ROWS then
-      rows[#rows + 1] = { text = "... and " .. (#shown - MAX_ROWS) .. " more (junk_list.json has them all)", dim = true }
-      break
-    end
-    drawn_junk[i] = e.name
-    local tip = items.details(items.id(e.name), e.name, nil)
-    table.insert(tip, 1, e.text)
-    tip[#tip + 1] = "Click to keep it (take it off your junk list)."
-    rows[#rows + 1] = { button = "r:" .. i, text = e.text, same_line = line(e.text), color = items.color(e.name, items.id(e.name)),
-      tooltip = table.concat(tip, "\n"):sub(1, 500) }
-  end
-  return rows
-end
-
-function C.click(world, key)
-  if key == "dump" then
-    dump(world)
-  elseif key == "auto" then
-    emf.set_setting("lf_auto", not emf.setting("lf_auto"))
-    dirty = true
-  elseif key == "action" then
-    emf.set_setting("lf_action", emf.setting("lf_action") == "delete" and "drop" or "delete")
-    dirty = true
-  else
-    local hex = key:match("^t:(%x+)$")
-    local index = key:match("^r:(%d+)$")
-    if hex then
-      local name = items.debug_name(tonumber(hex, 16))
-      if name then set_junk(name, not junk[name]) end
-    elseif index then
-      local name = drawn_junk[tonumber(index)]
-      if name then set_junk(name, false) end
-    end
-  end
-  refresh_warning()
-  if dirty then sync(world) end  -- at once where it can (a world you host); else on the next step
-end
-
 
 -- ---- FlameKit's own window (features/native_ui.lua) ----
 
@@ -452,8 +307,7 @@ function C.ui_lists(world)
   return in_bag, shown, { auto = opts.auto, action = opts.action }
 end
 
--- A click in FlameKit's own window: put the item on the junk list (on = true) or take it off. The same as a click in
--- the panel's tab.
+-- A click in FlameKit's own window: put the item on the junk list (on = true) or take it off.
 function C.ui_set(world, debug_name, on)
   if type(debug_name) ~= "string" or debug_name == "" then return end
   set_junk(debug_name, on)
@@ -461,12 +315,12 @@ function C.ui_set(world, debug_name, on)
   if dirty then sync(world) end
 end
 
--- Dump Junk in FlameKit's own window: the same as the panel's button.
+-- Dump Junk in FlameKit's own window.
 function C.ui_dump(world)
   dump(world)
 end
 
--- Auto (on/off) and Drop/Delete in FlameKit's own window: the same settings the panel's buttons change.
+-- Auto (on/off) and Drop/Delete in FlameKit's own window.
 function C.ui_option(world, key, value)
   if key == "auto" then
     emf.set_setting("lf_auto", value == "1")

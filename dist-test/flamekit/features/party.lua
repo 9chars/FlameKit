@@ -6,7 +6,12 @@
 --   source server|local
 --   p <you 0|1> <health> <max health> <mana> <max mana> <level> <x> <z> <name>   (fields separated by tabs; -1: not
 --     known; x east and z north in metres: the DLL shows the region and how far away and where from you)
+--   b <buff type id hex> <slot 0-4> <seconds left, -1: none> <name>   (since 0.15.49: that player's buffs and debuffs,
+--     after their p line; slot 0 food, 1 buff, 2 debuff, 3 rested, 4 terrain; the DLL draws the game's own icon)
 --   end
+-- Buffs travel from the server half as one line per player, "b <type hex>:<slot>:<seconds>,...", and each player's
+-- game adds the names in its own language (emf.buff_type; a dedicated server has no names). Types the game hides are
+-- left out, as the game's own HUD does.
 -- On a server without FlameKit the game writes what it knows itself ("source local"): only you, with your health.
 -- ui_party.dat is a runtime file: never deployed or diffed.
 
@@ -24,6 +29,49 @@ local steps = 0
 local last_heard = -1000  -- the client step of the last list from the server half
 local client_steps = 0
 local written = nil
+
+local SLOT = { food = 0, buff = 1, debuff = 2, rested = 3, terrain = 4 }
+local hidden_type = {}  -- buff type id -> true when the game does not show it (read once per type)
+local buff_name = {}    -- buff type id -> its name in this game's language
+
+-- Where the world is hosted: a player's buffs as "<type hex>:<slot>:<seconds left>,...", or "" (none, or no EMF buffs).
+local function buffs_of(world, id)
+  local ok, list = pcall(emf.buffs, world, id)
+  if not ok or type(list) ~= "table" then return "" end
+  local out = {}
+  for _, b in ipairs(list) do
+    if type(b) == "table" and type(b.type) == "number" and not b.cleansed then
+      local hide = hidden_type[b.type]
+      if hide == nil then
+        local okt, t = pcall(emf.buff_type, world, b.type)
+        hide = okt and type(t) == "table" and t.hidden == true
+        hidden_type[b.type] = hide
+      end
+      if not hide then
+        local left = tonumber(b.seconds_left)
+        out[#out + 1] = string.format("%x:%d:%d", b.type, SLOT[b.slot] or 1, left and math.max(0, math.floor(left + 0.5)) or -1)
+      end
+    end
+    if #out >= 24 then break end
+  end
+  return table.concat(out, ",")
+end
+
+-- In a player's game: "b <list>" from the server half -> one "b" line per buff, with its name in this game's language.
+local function buff_lines(world, list)
+  local out = {}
+  for hex, slot, left in (list or ""):gmatch("(%x+):(%d):(%-?%d+)") do
+    local id = tonumber(hex, 16)
+    local name = buff_name[id]
+    if name == nil then
+      local ok, t = pcall(emf.buff_type, world, id)
+      name = ok and type(t) == "table" and type(t.name) == "string" and t.name ~= "" and t.name or false
+      buff_name[id] = name
+    end
+    out[#out + 1] = table.concat({ "b", hex, slot, left, name and (name:gsub("[%c]", " ")) or "" }, "\t")
+  end
+  return out
+end
 
 local function num(v)
   v = tonumber(v)
@@ -49,10 +97,20 @@ local function write(text)
 end
 
 -- In a player's game: the list as the server half sent it ("you" marked per player).
-local function receive(text)
+local function receive(world, text)
   if type(text) ~= "string" or #text > 8000 then return end
   last_heard = client_steps
-  write("source server\n" .. text .. (text ~= "" and "\n" or "") .. "end\n")
+  local lines = {}
+  for line in text:gmatch("[^\n]+") do
+    local list = line:match("^b\t(.*)$")
+    if list then
+      for _, l in ipairs(buff_lines(world, list)) do lines[#lines + 1] = l end
+    else
+      lines[#lines + 1] = line
+    end
+  end
+  lines[#lines + 1] = "end"
+  write("source server\n" .. table.concat(lines, "\n") .. "\n")
 end
 
 local function player_name(world, id)
@@ -81,7 +139,8 @@ function F.tick(world)
       present[id] = true
       local okp, x, _, z = pcall(world.position, world, id)
       here[#here + 1] = { id = id, name = player_name(world, id), hp = okh and hp or nil, hp_max = okh and hp_max or nil,
-        mana = attr("mana"), mana_max = attr("max_mana"), level = attr("level"), x = okp and x or nil, z = okp and z or nil }
+        mana = attr("mana"), mana_max = attr("max_mana"), level = attr("level"), x = okp and x or nil, z = okp and z or nil,
+        buffs = buffs_of(world, id) }
     end
   end
   test_players.keep_only(present)
@@ -90,14 +149,16 @@ function F.tick(world)
     for _, p in ipairs(here) do
       lines[#lines + 1] = table.concat({ "p", p.id == to.id and "1" or "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max),
         num(p.level), num(p.x), num(p.z), clean(p.name) }, "\t")
+      if p.buffs ~= "" then lines[#lines + 1] = "b\t" .. p.buffs end  -- everyone sees everyone's buffs
     end
     for _, p in ipairs(test_players.list(world, to.id)) do  -- this player's own test players, sent like real ones
       lines[#lines + 1] = table.concat({ "p", "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max), num(p.level), num(p.x), num(p.z),
         clean(p.name) }, "\t")
+      if p.buffs and p.buffs ~= "" then lines[#lines + 1] = "b\t" .. p.buffs end
     end
     local text = table.concat(lines, "\n")
     if to.id == me then
-      receive(text)  -- the host's own game is right here
+      receive(world, text)  -- the host's own game is right here
     else
       pcall(emf.net.send_to, world, to.id, CHANNEL, text)
     end
@@ -162,14 +223,15 @@ function F.client_tick(world)
   local okp, x, _, z = pcall(world.position, world, me)
   local line = table.concat({ "p", "1", num(ok and hp or nil), num(ok and hp_max or nil), "-1", "-1", "-1", num(okp and x or nil),
     num(okp and z or nil), clean(player_name(world, me)) }, "\t")
-  write("source local\n" .. line .. "\nend\n")
+  local mine = buff_lines(world, buffs_of(world, me))  -- buffs are replicated: your own are known here too
+  write("source local\n" .. line .. "\n" .. (#mine > 0 and (table.concat(mine, "\n") .. "\n") or "") .. "end\n")
 end
 
 function F.setup(k)
   kit = k
   local ok = emf.net.channel(CHANNEL, {
     version = 1, to = "players", max = 8192, per_10s = 60,
-    on_player = kit.guard(F, function(world, from, data) receive(data) end, "the party list from the server"),
+    on_player = kit.guard(F, function(world, from, data) receive(world, data) end, "the party list from the server"),
   })
   if not ok then kit.debug("warn", "party: the channel flamekit/party was refused: only your own health is shown") end
   local ok2 = emf.net.channel(ASK, {

@@ -390,7 +390,15 @@ void read_clock(emf::World w, float& hours, bool& is_day, float& minutes_left) {
 // Both live in objects of the client world whose layout EMF's docs do not cover; they were worked out from the running
 // game (build 1287369, 2026-11-11). Every read goes through ReadProcessMemory, which fails instead of crashing when
 // the memory is not there, and every value is checked; when a check fails the minimap simply shows none of them.
+//
+// These places were found on game build 1287369 only (kLayoutsBuild). On any other build (a game update) every raw read
+// is off (g_layouts_ok, set at the start from EMF's game_build), so nothing is read from places that may have moved:
+// the minimap then shows no own markers, names or quest marks, and the item details are not written, until a
+// FlameKit version that knows the new build. EMF's own component reads (World::get) check sizes themselves.
+constexpr uint32_t kLayoutsBuild = 1287369;
+std::atomic<bool> g_layouts_ok{false};
 bool peek(uint64_t at, void* into, size_t bytes) {
+    if (!g_layouts_ok.load()) return false;
     SIZE_T got = 0;
     return at > 0x10000 && ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<LPCVOID>(at), into, bytes, &got) && got == bytes;
 }
@@ -449,124 +457,15 @@ std::vector<uint32_t> quest_marks(emf::World w) {
     return out;
 }
 
-// ---- item icons for FlameKit's panel ----
-// The panel (Lua) lists the items it wants a picture of in emf\mods\flamekit\icon_requests.txt (an item id in hex per
-// line). A thread here reads each one's icon from the game's data files (item_icons.hpp), lays it over the colour of
-// the item's rarity, as the game's bag does, and saves it as emf\mods\flamekit\icons\<id>.png, where the panel finds
-// it. A picture is made once and kept until the game's data files change (icons\stamp.txt).
+// ---- item icons ----
+// The game's item details (GUID and rarity) for the icons FlameKit's window draws (WindowLayer::picture, item_icons.hpp).
 struct ItemMeta {
     uint8_t guid[16];
     uint8_t rarity;
 };
 std::mutex g_item_meta_lock;
 std::unordered_map<uint32_t, ItemMeta> g_item_meta;  // filled once, when the item details are written
-std::atomic<bool> g_icon_thread{false};
 std::atomic<bool> g_ui_request{false};  // F6 was pressed: FlameKit's own UI (ui_thread)
-
-void item_icon_thread() {
-    constexpr int kSide = 64;
-    static const uint8_t kRarity[5][3] = {{138, 134, 126}, {95, 211, 95}, {79, 163, 255}, {181, 107, 255}, {255, 180, 60}};
-    wchar_t exe[MAX_PATH];
-    const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
-    std::wstring game(exe, n);
-    const size_t slash = game.find_last_of(L"\\/");
-    game = slash == std::wstring::npos ? std::wstring() : game.substr(0, slash + 1);
-    const std::wstring kit = game + L"emf\\mods\\flamekit\\", dir = kit + L"icons\\";
-    CreateDirectoryW(dir.c_str(), nullptr);
-
-    // the game's data files changed (an update): the pictures made from the old ones go
-    WIN32_FILE_ATTRIBUTE_DATA info{};
-    char stamp[64] = "";
-    if (GetFileAttributesExW((game + L"enshrouded.kfc").c_str(), GetFileExInfoStandard, &info))
-        snprintf(stamp, sizeof stamp, "%lu %lu %lu", info.nFileSizeLow, info.ftLastWriteTime.dwHighDateTime, info.ftLastWriteTime.dwLowDateTime);
-    char had[64] = "";
-    if (FILE* f = _wfsopen((dir + L"stamp.txt").c_str(), L"rb", _SH_DENYNO)) {
-        const size_t got = fread(had, 1, sizeof had - 1, f);
-        had[got] = 0;
-        fclose(f);
-    }
-    if (std::strcmp(stamp, had) != 0) {
-        WIN32_FIND_DATAW found;
-        const HANDLE h = FindFirstFileW((dir + L"*.png").c_str(), &found);
-        if (h != INVALID_HANDLE_VALUE) {
-            do DeleteFileW((dir + found.cFileName).c_str());
-            while (FindNextFileW(h, &found));
-            FindClose(h);
-        }
-        if (FILE* f = _wfsopen((dir + L"stamp.txt").c_str(), L"wb", _SH_DENYNO)) {
-            fwrite(stamp, 1, std::strlen(stamp), f);
-            fclose(f);
-        }
-    }
-
-    static std::wstring game_dir;
-    game_dir = game;
-    ItemIcons icons;
-    icons.open = [](const char* name, void*) {
-        std::wstring wide(name, name + std::strlen(name));
-        return _wfsopen((game_dir + wide).c_str(), L"rb", _SH_DENYNO);
-    };
-    std::unordered_set<uint32_t> done;
-    uint64_t seen = 0;
-    int made = 0, failed = 0;
-    for (;;) {
-        Sleep(400);
-        WIN32_FILE_ATTRIBUTE_DATA req{};
-        if (!GetFileAttributesExW((kit + L"icon_requests.txt").c_str(), GetFileExInfoStandard, &req)) continue;
-        const uint64_t now = (static_cast<uint64_t>(req.ftLastWriteTime.dwHighDateTime) << 32 | req.ftLastWriteTime.dwLowDateTime) ^ req.nFileSizeLow;
-        if (now == seen) continue;
-        seen = now;
-        std::string text;
-        if (FILE* f = _wfsopen((kit + L"icon_requests.txt").c_str(), L"rb", _SH_DENYNO)) {
-            char buf[16384];
-            const size_t got = fread(buf, 1, sizeof buf, f);
-            fclose(f);
-            text.assign(buf, got);
-        }
-        for (size_t at = 0; at < text.size();) {
-            size_t end = text.find('\n', at);
-            if (end == std::string::npos) end = text.size();
-            char* stop = nullptr;
-            const uint32_t id = static_cast<uint32_t>(std::strtoul(text.substr(at, end - at).c_str(), &stop, 16));
-            at = end + 1;
-            if (id == 0 || !done.insert(id).second) continue;
-            wchar_t name[32];
-            swprintf(name, 32, L"%08x.png", id);
-            if (GetFileAttributesW((dir + name).c_str()) != INVALID_FILE_ATTRIBUTES) continue;  // made on an earlier day
-            ItemMeta meta;
-            {
-                std::lock_guard<std::mutex> l(g_item_meta_lock);
-                const auto it = g_item_meta.find(id);
-                if (it == g_item_meta.end()) continue;
-                meta = it->second;
-            }
-            std::vector<uint8_t> icon;
-            if (!icons.icon(meta.guid, kSide, icon)) {
-                if (++failed == 1) FK_LOG(fklog::kInfo, "item icons: no picture for item %08x (%s)", id, icons.note.empty() ? "not as expected" : icons.note.c_str());
-                continue;
-            }
-            // over the rarity's colour, lighter at the top
-            const uint8_t* c = kRarity[meta.rarity < 5 ? meta.rarity : 0];
-            for (int y = 0; y < kSide; ++y) {
-                const float shade = 0.62f - 0.34f * static_cast<float>(y) / (kSide - 1);
-                for (int x = 0; x < kSide; ++x) {
-                    uint8_t* p = &icon[(static_cast<size_t>(y) * kSide + x) * 4];
-                    const float a = p[3] / 255.0f;
-                    for (int k = 0; k < 3; ++k) p[k] = static_cast<uint8_t>(p[k] * a + c[k] * shade * (1.0f - a) + 0.5f);
-                    p[3] = 255;
-                }
-            }
-            const std::vector<uint8_t> file = ItemIcons::png(icon, kSide, kSide);
-            const std::wstring tmp = dir + name + L".tmp";
-            if (FILE* f = _wfsopen(tmp.c_str(), L"wb", _SH_DENYNO)) {
-                fwrite(file.data(), 1, file.size(), f);
-                fclose(f);
-                if (MoveFileExW(tmp.c_str(), (dir + name).c_str(), MOVEFILE_REPLACE_EXISTING) && ++made == 1)
-                    FK_LOG(fklog::kInfo, "item icons: the first picture is made (item %08x)", id);
-            }
-        }
-    }
-}
 
 void on_world_tick(emf::World w) {
     if (!w.is_client()) return;
@@ -590,6 +489,10 @@ void on_world_tick(emf::World w) {
     // another size nothing is written and the panel shows what it knows itself.
     {
         static bool written = false;
+        if (!written && !g_layouts_ok.load()) {  // the item definitions' offsets are from build kLayoutsBuild: nothing written
+            written = true;
+            FK_LOG(fklog::kWarn, "item details: not written: this game build is not %u, where their layout was found", kLayoutsBuild);
+        }
         if (!written) {
             written = true;
             wchar_t exe[MAX_PATH];
@@ -624,7 +527,6 @@ void on_world_tick(emf::World w) {
                     fclose(f);
                 }
                 FK_LOG(fklog::kInfo, "item details: %d items written for the panel (%d left out)", count, odd);
-                if (!g_icon_thread.exchange(true)) std::thread(item_icon_thread).detach();
             } else {
                 _wremove(path.c_str());
                 FK_LOG(fklog::kWarn, "item details: the game's item definitions are not as expected (%d read, %d odd): none written", count, odd);
@@ -2465,6 +2367,20 @@ struct Layout {
 };
 Layout g_layout;
 
+// The game's data files (item_icons.hpp): item icons for FlameKit's window, buff icons for the party window. One copy
+// of the 9 MB index, used on FlameKit's UI thread only.
+ItemIcons& game_files() {
+    static ItemIcons files = [] {
+        ItemIcons f;
+        f.open = [](const char* file, void*) {
+            std::wstring wide(file, file + std::strlen(file));
+            return _wfsopen((g_game_dir + wide).c_str(), L"rb", _SH_DENYNO);
+        };
+        return f;
+    }();
+    return files;
+}
+
 struct PinnedLayer;
 std::vector<PinnedLayer*> g_pinned;  // every pinned window, for the Windows tab
 
@@ -2492,6 +2408,7 @@ struct PinnedLayer : Layer {
     virtual void draw_content(int top, int width) = 0;          // into canvas, below the title bar
     virtual bool refresh(const Frame& f) { return false; }      // read new data; true when the content changed
     virtual void content_click(int x, int y) {}                 // a click on the content (y from the content's top)
+    virtual bool content_hover(int x, int y) { return false; }  // the pointer over the content (-1, -1: gone); true: draw again
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -2593,6 +2510,7 @@ struct PinnedLayer : Layer {
     bool wants_mouse() const override { return visible && g_pointer_mode; }
     void mouse_left() override {
         mouse_x = mouse_y = -1;
+        content_hover(-1, -1);
         dirty = true;
     }
     void mouse(UINT msg, int x, int y) override {
@@ -2613,6 +2531,7 @@ struct PinnedLayer : Layer {
                 mouse_x = x;
                 mouse_y = y;
                 if (hover_change) dirty = true;
+                if (content_hover(x, y >= kHead ? y - (kHead + 4) + scroll : -1)) dirty = true;
             }
             return;
         }
@@ -2649,17 +2568,53 @@ struct PinnedLayer : Layer {
 // From the Lua part (features/party.lua) in emf\mods\flamekit\ui_party.dat. Each player has a symbol and a colour from
 // their name (player_style), the same as on the minimap. You first, then the others by name.
 struct PartyLayer : PinnedLayer {
+    // A buff or debuff (since 0.15.49): the game's type id, its slot (0 food, 1 buff, 2 debuff, 3 rested, 4 terrain),
+    // the seconds left (-1: no time limit) and its name in the player's language (may be empty).
+    struct Buff {
+        uint32_t type = 0;
+        int slot = 1, left = -1;
+        std::wstring name;
+    };
     struct Member {
         bool you = false;
         int hp = -1, hp_max = -1, mana = -1, mana_max = -1, level = -1;
         float x = -1, z = -1;  // where (metres, x east, z north); -1: not known
         std::string name;
         std::wstring where;    // the location line, made when the list is read
+        std::vector<Buff> buffs;
     };
     std::vector<Member> members;
     bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
     uint64_t stamp = 0, next_read = 0;
     static constexpr int kRow = 76;
+    // the buff row under a player's bars: a badge per buff (the game's icon on its slot's colour), its time under it
+    static constexpr int kBadge = 26, kBadgeGap = 4, kBuffLine = 40, kBuffIcon = 20;
+    int last_width = 300;
+    int hover_member = -1, hover_buff = -1;  // the badge under the pointer (-1: none)
+    std::unordered_map<uint32_t, std::vector<uint8_t>> buff_pics;  // buff type -> its icon (empty: none to be had)
+
+    int per_line(int width) const { return std::max(1, (width - 20 + kBadgeGap) / (kBadge + kBadgeGap)); }
+    int member_height(const Member& m, int width) const {
+        if (m.buffs.empty()) return kRow;
+        const int n = static_cast<int>(m.buffs.size()), k = per_line(width);
+        return kRow + (n + k - 1) / k * kBuffLine;
+    }
+    // "45s", "12m", "2h" (and the long form for the tooltip: "12:05 left")
+    static std::wstring short_time(int s) {
+        if (s < 0) return L"";
+        wchar_t b[16];
+        if (s < 60) swprintf_s(b, L"%ds", s);
+        else if (s < 3600) swprintf_s(b, L"%dm", (s + 30) / 60);
+        else swprintf_s(b, L"%dh", (s + 1800) / 3600);
+        return b;
+    }
+    static std::wstring long_time(int s) {
+        if (s < 0) return L"no time limit";
+        wchar_t b[32];
+        if (s < 3600) swprintf_s(b, L"%d:%02d left", s / 60, s % 60);
+        else swprintf_s(b, L"%d:%02d:%02d left", s / 3600, s / 60 % 60, s % 60);
+        return b;
+    }
 
     PartyLayer() : PinnedLayer("party", L"Party", 300) { hide_in_menus = true; }
 
@@ -2735,6 +2690,18 @@ struct PartyLayer : PinnedLayer {
                 from_server = std::strcmp(line + 7, "server") == 0;
                 continue;
             }
+            if (line[0] == 'b' && line[1] == '\t') {  // a buff of the player above (since 0.15.49)
+                Buff bf;
+                unsigned type = 0;
+                int used = 0;
+                if (!list.empty() && list.back().buffs.size() < 24 &&
+                    sscanf_s(line + 2, "%x\t%d\t%d\t%n", &type, &bf.slot, &bf.left, &used) == 3 && used > 0) {
+                    bf.type = type;
+                    bf.name = widen(line + 2 + used);
+                    list.back().buffs.push_back(std::move(bf));
+                }
+                continue;
+            }
             if (line[0] != 'p' || line[1] != '\t') continue;
             Member m;
             int you = 0, used = 0;
@@ -2753,6 +2720,11 @@ struct PartyLayer : PinnedLayer {
         fclose(fp);
         if (!complete) return false;
         stamp = st;
+        for (Member& m : list)  // debuffs first (what a party needs to see), then terrain, buffs, food, rested
+            std::stable_sort(m.buffs.begin(), m.buffs.end(), [](const Buff& a, const Buff& b) {
+                static const int kOrder[5] = {3, 2, 0, 4, 1};  // by slot: food, buff, debuff, rested, terrain
+                return kOrder[std::clamp(a.slot, 0, 4)] < kOrder[std::clamp(b.slot, 0, 4)];
+            });
         std::sort(list.begin(), list.end(), [](const Member& a, const Member& b) {
             if (a.you != b.you) return a.you;
             return _stricmp(a.name.c_str(), b.name.c_str()) < 0;
@@ -2767,7 +2739,9 @@ struct PartyLayer : PinnedLayer {
     }
 
     int content_height(int width) override {
-        int h = static_cast<int>(std::max<size_t>(members.size(), 1)) * kRow;
+        last_width = width;
+        int h = members.empty() ? kRow : 0;
+        for (const Member& m : members) h += member_height(m, width);
         if (!server) h += 36;           // the note about the server
         if (g_pointer_mode) h += 22;    // how to follow a player
         return h;
@@ -2776,12 +2750,69 @@ struct PartyLayer : PinnedLayer {
     // A click on a player (pointer out): follow that player on the minimap (a gold ring, the name even at the edge);
     // a click on the followed player stops it.
     void content_click(int x, int y) override {
-        const int row = y / kRow;
-        if (y < 0 || row >= static_cast<int>(members.size())) return;
+        if (y < 0) return;
+        int top = 0, row = -1;
+        for (size_t i = 0; i < members.size() && row < 0; ++i) {
+            const int h = member_height(members[i], last_width);
+            if (y < top + h) row = static_cast<int>(i);
+            top += h;
+        }
+        if (row < 0) return;
         const std::string& name = members[static_cast<size_t>(row)].name;
         g_tracked = g_tracked == name ? std::string() : name;
         dirty = true;
         FK_LOG(fklog::kInfo, "party: %s", g_tracked.empty() ? "no player followed on the minimap" : ("following " + g_tracked + " on the minimap").c_str());
+    }
+
+    // The badge under the pointer: which player and which of their buffs.
+    bool content_hover(int x, int y) override {
+        int hm = -1, hb = -1, top = 0;
+        if (x >= 0 && y >= 0)
+            for (size_t i = 0; i < members.size(); ++i) {
+                const int h = member_height(members[i], last_width);
+                if (y >= top + kRow && y < top + h) {
+                    const int line = (y - top - kRow) / kBuffLine, in_y = (y - top - kRow) % kBuffLine;
+                    const int col = (x - 10) / (kBadge + kBadgeGap), in_x = (x - 10) % (kBadge + kBadgeGap);
+                    const int k = line * per_line(last_width) + col;
+                    if (x >= 10 && in_x < kBadge && in_y < kBadge && col < per_line(last_width) && k < static_cast<int>(members[i].buffs.size())) {
+                        hm = static_cast<int>(i);
+                        hb = k;
+                    }
+                }
+                top += h;
+            }
+        if (hm == hover_member && hb == hover_buff) return false;
+        hover_member = hm;
+        hover_buff = hb;
+        return true;
+    }
+
+    // A buff's badge: a rounded square in its slot's colour (green buff, red debuff, amber food, blue rested, brown
+    // terrain) with the game's icon on it (a letter where the game has none), its time under it.
+    void badge(int x, int y, const Buff& b, bool over) {
+        static const float kSlot[5][3] = {{170, 120, 40}, {40, 125, 85}, {165, 45, 45}, {55, 95, 160}, {130, 80, 40}};
+        const float* c = kSlot[std::clamp(b.slot, 0, 4)];
+        const float lift = over ? 1.25f : 1.0f;
+        box(x + 1, y, x + kBadge - 1, y + kBadge, c[0] * 0.45f, c[1] * 0.45f, c[2] * 0.45f, 0.95f);  // the rim
+        box(x, y + 1, x + kBadge, y + kBadge - 1, c[0] * 0.45f, c[1] * 0.45f, c[2] * 0.45f, 0.95f);
+        box(x + 2, y + 2, x + kBadge - 2, y + kBadge - 2, std::min(255.0f, c[0] * lift), std::min(255.0f, c[1] * lift), std::min(255.0f, c[2] * lift), 0.95f);
+        auto have = buff_pics.find(b.type);
+        if (have == buff_pics.end()) {
+            std::vector<uint8_t> pic;
+            if (!game_files().buff_icon(b.type, kBuffIcon, pic)) pic.clear();
+            have = buff_pics.emplace(b.type, std::move(pic)).first;
+            if (buff_pics.size() == 1)
+                FK_LOG(fklog::kInfo, "party: buff icons from the game's files: %d buff types, %d with an icon%s%s", game_files().buff_types,
+                       static_cast<int>(game_files().buff_icon_guid.size()), game_files().note.empty() ? "" : "; ", game_files().note.c_str());
+        }
+        if (!have->second.empty()) {
+            canvas.picture(have->second.data(), kBuffIcon, x + kBadge * 0.5f, y + kBadge * 0.5f, 1.0f);
+        } else {
+            const std::wstring letter = b.name.empty() ? std::wstring(L"?") : b.name.substr(0, 1);
+            text.draw(canvas, x + (kBadge - text.width(letter)) / 2, y + 3, letter, 245, 245, 245);
+        }
+        const std::wstring t = short_time(b.left);
+        if (!t.empty()) little.draw(canvas, x + (kBadge - little.width(t)) / 2, y + kBadge, t, 200, 205, 215);
     }
 
     // A bar in the game's style: a dark frame, the fill with a lighter top, a notch every 100 points, a bright end, and
@@ -2809,22 +2840,27 @@ struct PartyLayer : PinnedLayer {
 
     void draw_content(int top, int width) override {
         int y = top;
+        last_width = width;
+        int tip_x = -1, tip_y = -1;
+        const Buff* tip = nullptr;
         if (members.empty()) {
             text.draw(canvas, 10, y + 4, L"...", 150, 150, 160);
             y += kRow;
         }
-        for (const Member& m : members) {
+        for (size_t mi = 0; mi < members.size(); ++mi) {
+            const Member& m = members[mi];
+            const int mh = member_height(m, width);
             const PlayerStyle st = player_style(m.name);
             const bool tracked = !g_tracked.empty() && m.name == g_tracked;
             const bool down = m.hp == 0 && m.hp_max > 0;
             if (tracked) {  // followed on the minimap: a gold frame
                 // the mana bar ends at y + 71: the bottom line one pixel under it (y + 73), as the top line is above the name
                 box(3, y - 2, width - 3, y - 1, 255, 214, 90, 1.0f);
-                box(3, y + kRow - 3, width - 3, y + kRow - 2, 255, 214, 90, 1.0f);
-                box(3, y - 2, 4, y + kRow - 2, 255, 214, 90, 1.0f);
-                box(width - 4, y - 2, width - 3, y + kRow - 2, 255, 214, 90, 1.0f);
+                box(3, y + mh - 3, width - 3, y + mh - 2, 255, 214, 90, 1.0f);
+                box(3, y - 2, 4, y + mh - 2, 255, 214, 90, 1.0f);
+                box(width - 4, y - 2, width - 3, y + mh - 2, 255, 214, 90, 1.0f);
             }
-            if (down) box(4, y - 1, width - 4, y + kRow - 3, 120, 20, 20, 0.45f);  // health 0: a red glow
+            if (down) box(4, y - 1, width - 4, y + mh - 3, 120, 20, 20, 0.45f);  // health 0: a red glow
             draw_player_mark(canvas, 16.0f, static_cast<float>(y + 11), 13.0f, st);
             const std::wstring nm = widen(m.name) + (m.you ? L" (you)" : L"");
             text.draw(canvas, 30, y + 2, nm, st.r, st.g, st.b);
@@ -2839,7 +2875,33 @@ struct PartyLayer : PinnedLayer {
             if (!m.where.empty()) little.draw(canvas, 30, y + 23, m.where, 170, 175, 185);  // where they are
             bar(10, y + 42, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
             bar(10, y + 60, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
-            y += kRow;
+            const int k = per_line(width);
+            for (size_t bi = 0; bi < m.buffs.size(); ++bi) {  // the buff row(s)
+                const int bx = 10 + static_cast<int>(bi % k) * (kBadge + kBadgeGap), by = y + kRow + static_cast<int>(bi / k) * kBuffLine;
+                const bool over = static_cast<int>(mi) == hover_member && static_cast<int>(bi) == hover_buff;
+                badge(bx, by, m.buffs[bi], over);
+                if (over) {
+                    tip = &m.buffs[bi];
+                    tip_x = bx;
+                    tip_y = by;
+                }
+            }
+            y += mh;
+        }
+        if (tip) {  // the tooltip of the badge under the pointer: its name, kind and time left
+            static const wchar_t* kKind[5] = {L"Food", L"Buff", L"Debuff", L"Rested", L"Terrain"};
+            const std::wstring head = tip->name.empty() ? std::wstring(kKind[std::clamp(tip->slot, 0, 4)]) : tip->name;
+            const std::wstring sub = std::wstring(kKind[std::clamp(tip->slot, 0, 4)]) + L" \u00B7 " + long_time(tip->left);
+            const int w = std::max(text.width(head), little.width(sub)) + 16, h = 44;
+            const int x = std::clamp(tip_x, 4, std::max(4, width - w - 4));
+            const int ty = tip_y + kBadge + 16 + h <= canvas.h ? tip_y + kBadge + 14 : tip_y - h - 2;
+            box(x, ty, x + w, ty + h, 22, 24, 30, 0.97f);
+            box(x, ty, x + w, ty + 1, 120, 128, 145, 1.0f);
+            const float* c = nullptr;
+            static const float kTint[5][3] = {{235, 190, 110}, {120, 220, 160}, {255, 120, 110}, {140, 180, 245}, {215, 160, 110}};
+            c = kTint[std::clamp(tip->slot, 0, 4)];
+            text.draw(canvas, x + 8, ty + 4, head, c[0], c[1], c[2]);
+            little.draw(canvas, x + 8, ty + 25, sub, 190, 195, 205);
         }
         if (!server) {
             little.draw(canvas, 10, y + 2, L"Mana, level and other players need", 255, 176, 96);
@@ -3124,14 +3186,9 @@ struct WindowLayer : Layer {
     uint64_t last_action = 0, list_stamp = 0, tabs_stamp = 0;
     TextPainter text;
     bool fonts = false;
-    ItemIcons icons;
     std::unordered_map<uint32_t, std::vector<uint8_t>> pictures;  // an empty one: no picture to be had
 
     WindowLayer() {
-        icons.open = [](const char* file, void*) {
-            std::wstring wide(file, file + std::strlen(file));
-            return _wfsopen((g_game_dir + wide).c_str(), L"rb", _SH_DENYNO);
-        };
         // the clicks already in ui_actions.txt (from an earlier game): new numbers start above them
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_actions.txt").c_str(), L"rb", _SH_DENYNO)) {
             char line[512];
@@ -3346,7 +3403,7 @@ struct WindowLayer : Layer {
         }
         static const uint8_t kRarity[5][3] = {{138, 134, 126}, {95, 211, 95}, {79, 163, 255}, {181, 107, 255}, {255, 180, 60}};
         std::vector<uint8_t> pic;
-        if (icons.icon(meta.guid, kIcon, pic)) {
+        if (game_files().icon(meta.guid, kIcon, pic)) {
             const uint8_t* c = kRarity[meta.rarity < 5 ? meta.rarity : 0];
             for (int py = 0; py < kIcon; ++py) {
                 const float shade = 0.62f - 0.34f * static_cast<float>(py) / (kIcon - 1);
@@ -4907,6 +4964,12 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
         EMF_LOG(kMod, "needs EMF API v13 or newer");
         FK_LOG(fklog::kError, "start: needs EMF API v13 or newer: FlameKit Native does not run");
         return false;
+    }
+    {  // FlameKit's own memory reads only on the game build they were found on (peek)
+        const auto build = emf::game_build();
+        g_layouts_ok = build && build->number == kLayoutsBuild;
+        FK_LOG(g_layouts_ok ? fklog::kInfo : fklog::kWarn, "start: game build %u%s: FlameKit's own memory reads are %s", build ? build->number : 0u,
+               build && build->known ? "" : " (not known to EMF)", g_layouts_ok ? "on" : "OFF (they were found on build 1287369)");
     }
     read_settings();
     emf::on_setting_changed(kKit, [](emf::World, const std::string&) { read_settings(); });

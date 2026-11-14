@@ -99,7 +99,7 @@ end
 local function save(st)
   local text = emf.json.encode({ items = S.names(st), opts = st.opts })
   local ok, saved = pcall(emf.save_player_data, st.account, text)
-  if not ok or not saved then emf.log("the junk list of " .. tostring(st.account) .. " was not saved with the world") end
+  if not ok or not saved then emf.log("the junk list of player " .. tostring(st.entity) .. " was not saved with the world") end  -- never the account in a log
 end
 
 local function account_of(world, entity)
@@ -307,7 +307,7 @@ function S.tick(world)
         local on = (flags >> AUTO_LOOT_BIT) & 1 == 1
         if on ~= st.auto_loot then
           st.auto_loot = on
-          emf.log("auto loot of " .. tostring(st.account) .. ": " .. (on and "on" or "off"))
+          emf.log("auto loot of player " .. tostring(st.entity) .. ": " .. (on and "on" or "off"))
           tell_auto_loot(world, st)
         end
       end

@@ -9,7 +9,8 @@
 --
 -- Each test player walks around you in a circle at its own distance (some near, some far beyond what your game sees
 -- itself, so they show at the minimap's edge), with health and mana that go up and down; Test Dain is down (0 health)
--- for 4 s every 20 s.
+-- for 4 s every 20 s. They carry buffs and debuffs of the game's own types (since 0.15.49), with timers that run down
+-- and start again, so the party window's buff row can be tested too.
 
 local T = {}
 
@@ -17,6 +18,16 @@ T.MAX = 6
 local NAMES = { "Test Ayla", "Test Bram", "Test Cora", "Test Dain", "Test Esme", "Test Finn" }
 local DIST = { 25, 70, 160, 400, 900, 2000 }  -- metres from you
 local LEVEL = { 12, 25, 33, 41, 50, 8 }
+
+-- the game's buff types (ids as EMF gives them; game build 1287369): type, slot (0 food, 1 buff, 2 debuff, 3 rested), time
+local BUFFS = {
+  { 0xAC13C6C3, 2, 900 },  -- Wet
+  { 0xFF24634F, 1, 1800 }, -- Elixir Buff
+  { 0xCDBE9C80, 3, 600 },  -- Rested
+  { 0x369C3618, 2, 30 },   -- Poisoned
+  { 0x44B408C6, 2, 120 },  -- Cold
+  { 0xFA042AF9, 1, 300 },  -- a Flame prayer
+}
 
 local wanted = {}  -- player entity id -> how many test players
 
@@ -37,7 +48,8 @@ function T.keep_only(present)
   end
 end
 
--- The test players for player `id`, now: { name, x, z (nil: your place is not known), hp, hp_max, mana, mana_max, level }.
+-- The test players for player `id`, now: { name, x, z (nil: your place is not known), hp, hp_max, mana, mana_max, level,
+-- buffs ("<type hex>:<slot>:<seconds left>,...", as features/party.lua sends them) }.
 function T.list(world, id)
   local n = wanted[id]
   if not n then return {} end
@@ -59,6 +71,12 @@ function T.list(world, id)
     p.hp = math.floor(p.hp_max * (0.25 + 0.75 * wave) + 0.5)
     p.mana = math.floor(p.mana_max * (0.5 + 0.5 * math.cos(t * 0.5 + i)) + 0.5)
     if i == 4 and t % 20 < 4 then p.hp = 0 end
+    local list = {}
+    for k = 1, (i % 4) + 1 do  -- 2, 3, 4, 1, 2, 3 different buffs
+      local b = BUFFS[((i + k - 1) % #BUFFS) + 1]
+      list[#list + 1] = string.format("%x:%d:%d", b[1], b[2], b[3] - (t + i * 37) % b[3])
+    end
+    p.buffs = table.concat(list, ",")
     out[#out + 1] = p
   end
   return out

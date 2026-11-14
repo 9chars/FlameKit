@@ -44,8 +44,7 @@ function items.find(text)
   return nil
 end
 
--- Colours as the game uses them for an item's quality (0 Common .. 4 Legendary).
-items.RARITY = { [0] = "#d9d4c7", [1] = "#5fd35f", [2] = "#4fa3ff", [3] = "#b56bff", [4] = "#ffb43c" }
+-- The game's names for an item's quality (0 Common .. 4 Legendary).
 items.RARITY_NAME = { [0] = "Common", [1] = "Uncommon", [2] = "Rare", [3] = "Epic", [4] = "Legendary" }
 
 -- An item's kind, read from its debug name ("Material_T1_Twigs" -> material): the word to show and its colour.
@@ -143,82 +142,6 @@ function items.data(id)
   return details and id and details[id] or nil
 end
 
--- An item's icon for a window's slot: the picture the minimap's DLL makes from the game's own files, on the colour of
--- the item's rarity (icons\<id>.png in this folder). The first time an item is asked for, its id goes into
--- icon_requests.txt, which the DLL reads; until the picture is there (or where there is no DLL) this gives nil and
--- the slot shows the item's name. EMF holds at most 128 pictures in a game session: past MOST_ICONS items the rest
--- stay names.
-local MOST_ICONS = 120
-local icons, icon_count = {}, 0   -- item id -> the picture's handle, or false (none this session)
-local asked, asked_list = {}, {}
-local icons_since, icon_refused, icon_limit_said = os.time(), false, false
-
-function items.icon(id)
-  if not id or not items.data(id) then return nil end  -- without the game's item details there is no DLL to ask
-  local have = icons[id]
-  if have ~= nil then return have or nil end
-  local name = string.format("icons\\%08x.png", id)
-  local f = io.open(emf.dir .. "\\" .. name, "rb")
-  if f then
-    f:close()
-    if icon_count >= MOST_ICONS then
-      icons[id] = false
-      if not icon_limit_said then
-        icon_limit_said = true
-        emf.log(string.format("item icons: the limit of %d is reached, %d minutes after the mod loaded: further items show their name",
-          MOST_ICONS, (os.time() - icons_since) // 60))
-      end
-      return nil
-    end
-    local ok, handle = pcall(emf.image, (name:gsub("\\", "/")))
-    icons[id] = ok and handle and handle ~= 0 and handle or false
-    -- for the record (EMF holds at most 128 pictures a game session): how many icons a session comes to, and when
-    local minutes = (os.time() - icons_since) // 60
-    if icons[id] then
-      icon_count = icon_count + 1
-      if icon_count % 25 == 0 then
-        emf.log(string.format("item icons: %d in use, %d minutes after the mod loaded", icon_count, minutes))
-      end
-    elseif not icon_refused then
-      icon_refused = true
-      emf.log(string.format("item icons: EMF refused a picture after %d icons, %d minutes after the mod loaded (its limit?)", icon_count, minutes))
-    end
-    return icons[id] or nil
-  end
-  if not asked[id] then
-    asked[id] = true
-    asked_list[#asked_list + 1] = string.format("%08x", id)
-    local out = io.open(emf.dir .. "\\icon_requests.txt", "w")
-    if out then
-      out:write(table.concat(asked_list, "\n"), "\n")
-      out:close()
-    end
-  end
-  return nil
-end
-
--- The lines of an item's tooltip: item level, rarity, type, then `count` (how many are carried, optional) and the
--- debug name.
-function items.details(id, debug_name, count)
-  local lines = {}
-  local d = items.data(id)
-  if d then
-    if d.level_max > 0 then
-      lines[#lines + 1] = "Item level: " .. (d.level_min == d.level_max and d.level_max or (d.level_min .. "-" .. d.level_max))
-    end
-    if items.RARITY_NAME[d.rarity] then lines[#lines + 1] = "Rarity: " .. items.RARITY_NAME[d.rarity] end
-    local kind = CATEGORY[d.category]
-    if kind and d.category == 8 and AMMUNITION[d.sub] then kind = kind .. ", " .. AMMUNITION[d.sub] end
-    if kind then lines[#lines + 1] = "Type: " .. kind end
-  else
-    local tier = items.tier(debug_name)
-    lines[#lines + 1] = "Type: " .. (items.kind(debug_name)) .. (tier and (", tier " .. tier) or "")
-  end
-  if count then lines[#lines + 1] = "Quantity: " .. count end
-  if debug_name then lines[#lines + 1] = "Name for commands: " .. debug_name end
-  return lines
-end
-
 -- An item's details for FlameKit's item tiles (the DLL draws the tile and its tooltip the same way everywhere):
 --   { rarity = 0..4 (Common .. Legendary) or -1, level = "12" / "12-14" / "", type = "Material" / "", command = debug name }
 -- Where the game's item details are not there (item_details.dat), the kind and tier from the debug name.
@@ -236,15 +159,6 @@ function items.tip(id, debug_name)
     t.type = tostring(items.kind(debug_name)) .. (tier and (", tier " .. tier) or "")
   end
   return t
-end
-
--- The colour for an item in a list: its rarity as the game colours it (Common .. Legendary); where the game's item
--- details are not there, its kind's colour, else nil.
-function items.color(debug_name, id)
-  local d = items.data(id)
-  if d and items.RARITY[d.rarity] then return items.RARITY[d.rarity] end
-  local _, colour = items.kind(debug_name)
-  return colour
 end
 
 -- The name to show for an item (an id or a debug name).

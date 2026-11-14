@@ -148,6 +148,16 @@ emf = {
   on_player_left = function(fn) left_fns[#left_fns + 1] = fn; return true end,
   session_token = function() return SESSION_TOKEN end,
   on_player_joined = function(fn) joined_fns[#joined_fns + 1] = fn; return true end,
+  -- buffs (Lua 1.24): the player is Wet (812.4 s left) and has a buff without a timer and one the game hides
+  buffs = function(w, id)
+    if id ~= PLAYER then return {} end
+    return { { type = 0xAC13C6C3, slot = "debuff", seconds_left = 812.4 }, { type = 0x1234, slot = "buff" },
+             { type = 0x9999, slot = "buff", seconds_left = 5 }, { type = 0x5555, slot = "food", seconds_left = 9, cleansed = true } }
+  end,
+  buff_type = function(w, id)
+    local names = { [0xAC13C6C3] = "Wet", [0x1234] = "Blessing", [0x9999] = "Secret", [0x5555] = "Stew" }
+    return names[id] and { id = id, name = names[id], hidden = id == 0x9999 } or nil
+  end,
   command = function(name, help, fn, opts) commands[name] = fn end,
   sender = function() return sender end,
   local_player = function() return (JOINED and side == "server") and 0 or PLAYER end,
@@ -238,6 +248,7 @@ do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","aut
   .. '{"key":"map_size","type":"slider","min":120,"max":480,"step":20,"default":300,"label":"Size","group":"Minimap"},'
   .. '{"key":"map_hide","type":"text","default":"-","label":"Hidden kinds","group":"Minimap"},'
   .. '{"key":"lf_keep_hotbar","type":"bool","default":true,"label":"Never touch the action bar","group":"Auto Junk List"},'
+  .. '{"key":"lf_show_all","type":"bool","default":false,"label":"Show all bag items","group":"Auto Junk List"},'
   .. '{"key":"map_clock","type":"bool","default":true,"label":"Show the clock under the minimap","group":"Minimap"}]}'); m:close() end
 dofile(MOD .. "/main.lua")
 local function join_all() for _, fn in ipairs(joined_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, host = not JOINED }) end end
@@ -282,7 +293,8 @@ local function count(inv_id, item)
   for _, s in ipairs(comps.Inventory[inv_id].slots) do if s.id == item then n = n + s.data.count end end
   return n
 end
--- The panel as the tests use it: the features' tabs (panel / click), as FlameKit's window shows them. (EMF's panel,
+-- The panel as the tests use it: the features' tabs (panel / click), as FlameKit's window shows them (the Auto Junk
+-- List has its own view instead: ui_list.dat, tested through junk_view). (EMF's panel,
 -- core/hub.lua, was removed in 0.15.26; these tests keep its "tab:<n>" and "f<n>:<key>" keys.)
 local panel_tab = 1
 local function panel_list()
@@ -335,25 +347,50 @@ local SYNC = JOINED and 40 or 3  -- steps until a change has reached the server 
 
 step(3)
 
--- the panel: open it, mark Twigs as junk by clicking its bag row
-toggle_panel()
-check(window ~= nil, "panel opens")
-if JOINED then check(find_row("Connected to this server") ~= nil, "the panel says the server has Flamekit") end
-local twigs = find_row("Twigs")
-check(twigs and twigs.button == "f1:t:11" and not twigs.selected, "bag chip for Twigs, not junk yet")
-check(twigs.color == "#cdbf9f", "a material has the materials' colour")
-check(find_row("^Sword", ":t:") == nil and find_row("^Torch", ":t:") == nil and find_row("Farmer", ":t:") == nil,
+-- FlameKit's window, the Auto Junk List's own view: what it shows comes from ui_list.dat (features/native_ui.lua), its
+-- clicks go back through ui_actions.txt ("<n> junk|keep <debug name>", "dump -", "auto 1|0", "action drop|delete")
+local action_n = 9000000000000
+local action_lines = {}
+local function ui_action(what, arg)
+  action_n = action_n + 1
+  action_lines[#action_lines + 1] = action_n .. " " .. what .. " " .. arg
+  local f = io.open(TMP .. "\\ui_actions.txt", "w"); f:write(table.concat(action_lines, "\n") .. "\n"); f:close()
+end
+local function junk_view()
+  step(11)  -- native_ui reads the clicks every 3 steps and writes the view every 10
+  local f = io.open(TMP .. "\\ui_list.dat", "r")
+  local t = f and f:read("a") or ""
+  if f then f:close() end
+  local v = { bag = {}, junk = {}, text = t }
+  for line in t:gmatch("[^\n]+") do
+    local auto, action = line:match("^O (%d) (%a+)$")
+    if auto then v.auto, v.action = auto == "1", action end
+    local fl = {}
+    for field in (line .. "\t"):gmatch("([^\t]*)\t") do fl[#fl + 1] = field end
+    if fl[1] == "B" or fl[1] == "J" then
+      table.insert(fl[1] == "B" and v.bag or v.junk, { id = tonumber(fl[2], 16), count = tonumber(fl[3]), debug = fl[4],
+        rarity = tonumber(fl[5]), level = fl[6], type = fl[7], name = fl[8] })
+    end
+  end
+  return v
+end
+local function tile(list, pattern)
+  for _, e in ipairs(list) do if e.name:find(pattern) then return e end end
+end
+
+-- mark Twigs as junk by clicking its tile in the bag
+local v = junk_view()
+check(v.text:find("\nend\n$") ~= nil, "ui_list.dat is written, complete")
+local twigs = tile(v.bag, "^Twigs")
+check(twigs and twigs.debug == "Material_T1_Twigs" and tile(v.junk, "^Twigs") == nil, "a bag tile for Twigs, not junk yet")
+check(twigs.type == "Material, tier 1" and twigs.count == 42, "a material's tile: its type, and how many you carry (" .. tostring(twigs.count) .. ")")
+check(tile(v.bag, "^Sword") == nil and tile(v.bag, "^Torch") == nil and tile(v.bag, "Farmer") == nil,
   "weapons, tools and summoning items are not offered")
-check(find_row("Ceiling", ":t:") == nil, "a building blueprint is not offered")
-check(find_row("^String", ":t:") ~= nil, "a material whose name merely contains 'ring' is offered")
-check(find_row("never junked") ~= nil, "the panel says what is left out")
-check(twigs.tooltip:find("Material, tier 1", 1, true) and twigs.tooltip:find("Quantity: 42", 1, true), "a material's tooltip: " .. twigs.tooltip:gsub("\n", " | "))
-check(window.def.title == "FlameKit v9.9.9 by Tester", "the window is titled with the kit's name, version and author: " .. tostring(window.def.title))
-check(find_row("Dump junk now %(0%)").disabled, "dump button disabled without junk")
-click(twigs.button)
-check(find_row("^Twigs", ":t:").selected, "the Twigs chip is lit after the click")
-check(find_row("^Twigs", ":r:") ~= nil, "and Twigs is in the junk block")
-check(find_row("Dump junk now %(2%)") ~= nil, "dump counts the 2 backpack stacks (not the action bar)")
+check(tile(v.bag, "Ceiling") == nil, "a building blueprint is not offered")
+check(tile(v.bag, "^String") ~= nil, "a material whose name merely contains 'ring' is offered")
+ui_action("junk", "Material_T1_Twigs")
+v = junk_view()
+check(tile(v.junk, "^Twigs") ~= nil and tile(v.bag, "^Twigs") == nil, "after the click Twigs is on the junk list, not among the bag's tiles")
 step(SYNC)
 check(count(201, 0x11) == 37, "marking does not remove anything by itself")
 local f = io.open(TMP .. "\\junk_list.json"); local saved = f:read("a"); f:close()
@@ -398,43 +435,42 @@ channel.on_server(SW, { player = PLAYER, account = ACCOUNT }, emf.json.encode({ 
   items = { "Material_T1_Twigs", "Weapon_T1_Sword", "Tool_T1_Torch", "NPC_Crafter_Farmer01" }, opts = { auto = false, action = "delete" } }))
 side = "client"
 check(pdata[ACCOUNT]:find("Twigs") ~= nil, "the server keeps the list (kept kinds stay on it, but are never removed: below)")
-settings.lf_auto = false
-click("f1:auto"); click("f1:auto")
-check(settings.lf_auto == false, "the auto button switches the setting")
+ui_action("auto", "0")
+check(junk_view().auto == false and settings.lf_auto == false, "the Auto button switches the setting, and the view shows it")
 step(SYNC)
 pickup({ itemId = 0x11, itemCount = 3, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
 check(count(201, 0x11) == 37, "with auto off a pickup removes nothing")
-step(30)
-check(find_row("Dump junk now %(2%)") ~= nil, "the open panel refreshed by itself")
-click("f1:dump")
+check(tile(junk_view().junk, "^Twigs") ~= nil, "the view follows the bag by itself")
+ui_action("dump", "-")
 step(10)
 check(count(201, 0x11) == 0, "dump removes the junk in the backpack")
 check(count(201, 0x33) == 1 and count(201, 0x55) == 1 and count(201, 0x66) == 1, "sword, torch and summoning item are still there")
 check(count(203, 0x33) == 1, "worn equipment is never touched")
 -- Show all bag items (lf_show_all): the sword is offered, can be put on the list, and goes on a dump
-check(find_row("^Sword", ":t:") == nil, "the sword is not offered while Show all bag items is off")
-settings.lf_show_all = true
-require("features.loot_filter.client").setting_changed("lf_show_all")
-check(find_row("^Sword", ":t:") ~= nil, "with Show all bag items on, the sword is offered")
-click(find_row("^Sword", ":t:").button)
+check(tile(junk_view().bag, "^Sword") == nil, "the sword is not offered while Show all bag items is off")
+ui_action("opt", "b:lf_show_all")
+step(6)
+check(settings.lf_show_all == true, "Show All Bag Items is switched on from the view: " .. tostring(settings.lf_show_all))
+check(tile(junk_view().bag, "^Sword") ~= nil, "with Show all bag items on, the sword is offered")
+ui_action("junk", "Weapon_T1_Sword")
 step(SYNC + 40)
-click("f1:dump")
+ui_action("dump", "-")
 step(10)
 check(count(201, 0x33) == 0, "and a dump removes it")
 check(count(203, 0x33) == 1, "worn equipment is still never touched")
-settings.lf_show_all = false
-require("features.loot_filter.client").setting_changed("lf_show_all")
+ui_action("opt", "b:lf_show_all")
 step(SYNC + 40)
-click("f1:dump")
+check(settings.lf_show_all == false, "and off again")
+ui_action("dump", "-")
 step(5)
 check(hud.status == "No junk in your bag.", "a dump with nothing to do says so: " .. tostring(hud.status))
 
 -- drop mode: handed to emf.give at once; a drop the game's auto loot takes straight back gets one warning
 reset_world()
 settings.lf_auto = true
-click("f1:action")
-check(settings.lf_action == "drop", "the action button switches to drop")
+ui_action("action", "drop")
+check(junk_view().action == "drop" and settings.lf_action == "drop", "the Drop/Delete choice switches to drop")
 step(SYNC)
 pickup({ itemId = 0x11, itemCount = 3, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
@@ -448,7 +484,6 @@ step(10)
 check(count(201, 0x11) == 30 and #gives == n_gives, "a drop that came back stays in the bag (no loop)")
 -- the game's auto loot is on (the mock's flags have bit 12): the player is warned while junk is dropped
 step(70)
-check(find_row("Auto%-Collect Scattered Loot") ~= nil, "auto loot on and junk dropped: the panel warns in red")
 local function yells()
   local n = 0
   local f = io.open(TMP .. "\\ui_messages.dat", "r")
@@ -457,15 +492,15 @@ local function yells()
   f:close()
   return n
 end
-check(yells() == 1, "and a red message came")
+check(yells() == 1, "auto loot on and junk dropped: a red message came")
 check((hud.autoloot or "") == "", "no extra line is left on the screen")
 clock = clock + 8
 step(2)
 check(yells() == 1, "the message is not repeated within a minute")
-click("f1:action")
-check(find_row("Auto%-Collect Scattered Loot") == nil, "junk set to delete: the warning goes")
-click("f1:action")
-check(find_row("Auto%-Collect Scattered Loot") ~= nil, "back to drop: the warning is back")
+ui_action("action", "delete")
+check(junk_view().action == "delete", "junk set to delete")
+ui_action("action", "drop")
+check(junk_view().action == "drop", "and back to drop")
 step(SYNC)
 -- each drop into auto loot brings the banner back
 clock = clock + 60
@@ -480,7 +515,12 @@ step(10)
 check(yells() == before + 1, "but not twice within a minute")
 comps.PlayerInput[PLAYER].fromClientSettings.flags = 0x0853
 step(70)
-check(find_row("Auto%-Collect Scattered Loot") == nil, "auto loot switched off in the game: the warning goes")
+clock = clock + 60
+before = yells()
+comps.Inventory[201].slots[1] = stack(0x11, 5)
+pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
+step(10)
+check(yells() == before, "auto loot switched off in the game: no more warnings")
 comps.Inventory[201].slots[1] = stack()
 
 -- the chat command runs on the server half and the player's own game follows
@@ -497,22 +537,22 @@ check(replies[#replies]:find("cannot be junk"), "junk add refuses a weapon: " ..
 cmd({ "add", "nonsense" })
 check(replies[#replies]:find("no item named"), "junk add refuses an unknown item")
 step(31)
-local keep = find_row("^Stone", ":r:")
-check(keep ~= nil, "the panel's junk block shows Stone, added by the command")
+check(tile(junk_view().junk, "^Stone") ~= nil, "the view's junk list shows Stone, added by the command")
 f = io.open(TMP .. "\\junk_list.json"); saved = f:read("a"); f:close()
 check(saved:find("Material_T1_Stone", 1, true) ~= nil, "and junk_list.json has it")
-click(keep.button)
-check(find_row("^Stone", ":r:") == nil, "clicking a junk chip takes it off the list")
+ui_action("keep", "Material_T1_Stone")
+check(tile(junk_view().junk, "^Stone") == nil, "clicking a junk tile takes it off the list")
 step(SYNC)
 check(not pdata[ACCOUNT]:find("Material_T1_Stone", 1, true), "and off the server half's list")
 cmd({ "list" })
 cmd({ "clear" })
 cmd({ "clear", "yes" })
 step(31)
-check(find_row("Nothing yet") ~= nil, "junk clear yes empties the list")
+check(#junk_view().junk == 0, "junk clear yes empties the list")
 
+toggle_panel()  -- the other features' tabs (panel rows), as the tests drive them
 -- the Minimap tab's marker filters
-click("tab:2")
+click("tab:1")
 step(2)
 click(find_row("Ancient Spires", "f:sp").button)
 step(2)
@@ -526,7 +566,7 @@ check(settings.map_hide == "-" and find_row("Ancient Spires", "f:sp").selected, 
 
 -- the Experimental tab: the host's (or the server's) switches
 local function rule_count() local n = 0; for _ in pairs(hit_rules) do n = n + 1 end; return n end
-click("tab:3")
+click("tab:2")
 step(JOINED and 310 or 2)
 local sw = find_row("Shroud Damage", "sw:shroud")
 check(sw ~= nil and not sw.selected and rule_count() == 0, "the Experimental tab lists the shroud switch, off, and no rule is set")
@@ -652,13 +692,6 @@ local function read_tabs()
   if f then f:close() end
   return t
 end
-local action_n = 9000000000000
-local action_lines = {}
-local function ui_action(what, arg)
-  action_n = action_n + 1
-  action_lines[#action_lines + 1] = action_n .. " " .. what .. " " .. arg
-  local f = io.open(TMP .. "\\ui_actions.txt", "w"); f:write(table.concat(action_lines, "\n") .. "\n"); f:close()
-end
 step(12)
 check(read_tabs():find("tab\tminimap\tMinimap", 1, true) ~= nil, "ui_tabs.dat lists the Minimap tab")
 check(read_tabs():find("\nview\t", 1, true) == nil, "no rows while the window shows no generic tab")
@@ -693,6 +726,9 @@ local party = pf and pf:read("a") or ""
 if pf then pf:close() end
 check(party:find("^source %a+\n") ~= nil and party:find("\nend\n$") ~= nil, "ui_party.dat is written, complete")
 check(party:find("\np\t1\t", 1, true) ~= nil, "you are in the party list, marked as you")
+check(party:find("\tPlayer\nb\tac13c6c3\t2\t812\tWet\nb\t1234\t1\t-1\tBlessing\n", 1, true) ~= nil,
+  "your buffs follow your line: type, slot, seconds left (-1: none), name in your language")
+check(not party:find("Secret", 1, true) and not party:find("Stew", 1, true), "buffs the game hides, and one being removed, are left out")
 -- test players (core/test_players.lua): asked for in the Party tab, sent back by the server half like real players
 local function party_text()
   for _, data in ipairs(party_down) do channels.party.on_player(nil, { player = 0 }, data) end
@@ -726,6 +762,7 @@ else
   check(party:find("source server", 1, true) and party:find("\tTest Ayla\n", 1, true) and party:find("\tTest Cora\n", 1, true)
     and not party:find("Test Dain", 1, true), "3 test players come back from the server half in the party list")
   check(party:find("\np\t1\t", 1, true) ~= nil, "you are still in the list, marked as you")
+  check(party:find("\tTest Ayla\nb\t%x+\t%d\t%d+\t") ~= nil, "a test player has buffs too, with a timer")
   local ayla = party:match("\n(p\t0\t[^\n]*\tTest Ayla)\n")
   local _, tabs = (ayla or ""):gsub("\t", "")
   local ax, az = (ayla or ""):match("^p\t0\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t(%-?%d+)\t(%-?%d+)\t")
@@ -759,7 +796,7 @@ do
   check(find_row("Show the clock") == nil and find_row("Key that shows and hides the minimap") == nil, "the Settings tab has no feature's settings")
   click(find_row("^Right Ctrl$").button)
   check(settings.pointer_key == "right_ctrl", "a choice sets the option's value")
-  click("tab:2")  -- the Minimap tab has the minimap's keys
+  click("tab:1")  -- the Minimap tab has the minimap's keys
   click(find_row("^Change$", ":set:k:map_toggle_key:").button)
   check(find_row("press a key now") ~= nil, "Change waits for a key")
   require("features.settings").key(UI, "F9")

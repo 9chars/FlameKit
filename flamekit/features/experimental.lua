@@ -228,7 +228,7 @@ local function handle(world, account, entity, msg)
         end
         saved[account] = next(set) and set or nil
         refused[s[1]] = nil
-        emf.log(string.format("experimental: %s switched '%s' %s", account, s[1], msg.on == true and "on" or "off"))
+        emf.log(string.format("experimental: player %s switched '%s' %s", tostring(entity), s[1], msg.on == true and "on" or "off"))  -- never the account in a log (a log may be shared)
         if s[4] then  -- everyone on the server is told (not for the glider: it changes nothing for others)
           local okn, name = pcall(world.name, world, entity)
           if not okn or type(name) ~= "string" or name == "" then okn, name = pcall(world.character_name, world, entity) end
