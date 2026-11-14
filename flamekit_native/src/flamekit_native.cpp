@@ -5316,6 +5316,8 @@ struct HudLayer : Layer {
     std::wstring label, status, notice, update_line;
     uint32_t status_rgb = 0xffb060, update_rgb = 0xffb060;
     uint64_t next_read = 0;
+    bool in_world = false, hud_file = false;  // hud_file: ui_hud.dat was there (its label line says whether the label is on)
+    std::wstring version;                     // the Lua part's version, for the label before a world (0.15.88)
 
     void read_files(uint64_t now) {
         next_read = now + 200;  // 0.15.59: build mode should hide the windows quickly (was 500)
@@ -5343,6 +5345,8 @@ struct HudLayer : Layer {
             }
             fclose(fp);
             if (complete) {
+                hud_file = true;
+                build = build && in_world;  // a build mode left over from the last game counts only in a world
                 if (build != g_build_hide.load()) {
                     g_build_hide = build;
                     FK_LOG(fklog::kInfo, "build mode: FlameKit's windows %s", build ? "hidden" : "shown again");
@@ -5370,15 +5374,27 @@ struct HudLayer : Layer {
     }
 
     void update(const Frame& f) override {
+        in_world = f.in_world;
         if (f.now >= next_read) read_files(f.now);
         std::vector<Line> want;
-        if (!status.empty()) want.push_back({status, static_cast<uint8_t>(status_rgb >> 16), static_cast<uint8_t>(status_rgb >> 8), static_cast<uint8_t>(status_rgb)});
-        if (!label.empty()) want.push_back({label, 235, 225, 205});
-        if (!notice.empty()) want.push_back({notice, 255, 150, 50});  // orange: e.g. the server does not run FlameKit
+        if (!in_world) {
+            // (0.15.88, owner) On the game's main screen too, before any world: FlameKit is loaded with the game. The label
+            // as the player has it (ui_hud.dat from the last game: off stays off), with the version that runs now (that
+            // file may still name the one before an update); the updater's line and the debug line under it.
+            if (version.empty()) version = widen(version_in(g_flamekit_dir + L"mod.json"));
+            if (!hud_file || !label.empty()) {
+                std::wstring l = L"FlameKit v" + version;
+                const size_t by = label.find(L" by ");
+                if (by != std::wstring::npos) l += label.substr(by);
+                want.push_back({l, 235, 225, 205});
+            }
+        } else if (!status.empty()) want.push_back({status, static_cast<uint8_t>(status_rgb >> 16), static_cast<uint8_t>(status_rgb >> 8), static_cast<uint8_t>(status_rgb)});
+        if (in_world && !label.empty()) want.push_back({label, 235, 225, 205});
+        if (in_world && !notice.empty()) want.push_back({notice, 255, 150, 50});  // orange: e.g. the server does not run FlameKit
         if (!update_line.empty()) want.push_back({update_line, static_cast<uint8_t>(update_rgb >> 16), static_cast<uint8_t>(update_rgb >> 8), static_cast<uint8_t>(update_rgb)});
         const int mode = fklog::g_mode.load();
         if (mode != fklog::kNormal) want.push_back({std::wstring(L"FlameKit debug: ") + (mode == fklog::kOff ? L"off" : L"full"), 120, 200, 255});
-        const bool vis = f.in_world && !want.empty();
+        const bool vis = f.gw > 0 && f.gh > 0 && !want.empty();
         if (vis != visible) {
             visible = vis;
             changed = true;
