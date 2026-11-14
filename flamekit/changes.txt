@@ -1,3 +1,7 @@
+0.15.113 Nov 14, 2026
+- The lower left corner no longer shows FlameKit's version, the update line or the debug level while you play (more room for windows: updates have their own window, and the FlameKit Menu shows the version). Only the orange warning that the server runs an older FlameKit is still shown there.
+- "Show FlameKit mod version" is now "Show the FlameKit version on the game's main screen": it switches the line in the lower right corner of the main screen.
+
 0.15.112 Nov 14, 2026
 - The PvP Leaderboard now really starts hidden for a new player (it was shown from the start: its "first time" check came too late).
 - Windows tab: the F5, F6 and F7 keys and "Press the pointer key once instead of holding it" can be changed at the bottom of the Windows tab (they were in no tab before).

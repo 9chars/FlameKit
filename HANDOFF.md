@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.112.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.113.
 
 ## What FlameKit is
 
@@ -186,6 +186,11 @@ equal kills+deaths share a rank. Kills announced via chat.announce. Console: fla
 (PinnedLayer "board", key board_window_key F5, hidden until the key is first pressed). Not yet tested with real kills.
 0.15.96: Experimental window button "Show/Hide PvP Leaderboard [F5]" (label from ui_layout.txt's board line); a click
 writes ui_board_toggle.request, which BoardLayer deletes and toggles on (checked every 100 ms).
+
+## Corner lines (0.15.113)
+In a world the lower left corner shows only the orange older-server notice (owner: screen space; no version label,
+update line or debug line, and the unused "status" line is gone from HudLayer). show_label now only switches the main
+screen's version line.
 
 ## Main screen line (0.15.88 to 0.15.94)
 Outside a world HudLayer shows one line in the lower RIGHT corner, 1 px from the edges, on a dark box: "FlameKit v<running

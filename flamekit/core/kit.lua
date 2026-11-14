@@ -12,7 +12,7 @@
 --   click(world, key)  a click on one of its rows' buttons
 --   key(world, name) a key pressed in FlameKit's window while its tab shows (the key's name as EMF's settings write it)
 --   setting_changed(key)
---   connected(world) false while this feature cannot reach its server half on a joined server (the label says so)
+--   connected(world) false while this feature cannot reach its server half on a joined server (then no older-server notice is shown)
 -- Every call is protected: a feature that raises an error is switched off until the next reload, the others go on.
 
 local kit = { features = {}, name = "FlameKit", version = "?", author = "" }
@@ -178,10 +178,10 @@ function kit.connected(world)
   return true
 end
 
--- Each step of your own screen's world: the lines in the lower left corner, drawn by FlameKit's DLL (not by EMF): the
--- "FlameKit v1.2.3 is Connected" label (or "is Not Connected": the server does not run FlameKit) and the notice, written into emf\mods\flamekit\ui_hud.dat when they change:
---   label <text>              ("" when the player switched the label off)
---   notice <text>             (orange, under the label: the server runs an older FlameKit)
+-- Each step of your own screen's world: emf\mods\flamekit\ui_hud.dat for FlameKit's DLL (not EMF), written when it changes:
+--   label <text>              ("" when the player switched show_label off: then the DLL shows no version on the game's
+--                              main screen; in a world the DLL shows no label since 0.15.113, owner: screen space)
+--   notice <text>             (orange, in the lower left corner: the server runs an older FlameKit)
 --   build 1                   (0.15.59: the player is in build mode and ui_hide_build is on: the DLL hides all of
 --                              FlameKit's UI but FlameKit's window, these lines too since 0.15.61)
 --   end                       (a file without it is half written: the DLL reads it again later)
@@ -212,9 +212,8 @@ local function hud_tick(world)
   write_notices()
   local label = ""
   local connected = kit.connected(world)
-  if kit.setting("show_label", true) then
-    -- (0.15.103, owner) whether this game is connected to a server with FlameKit, instead of "by <author>"
-    label = string.format("%s v%s is %s", kit.name, kit.version, connected and "Connected" or "Not Connected")
+  if kit.setting("show_label", true) then  -- only whether it is on counts now (the DLL's main screen line)
+    label = string.format("%s v%s", kit.name, kit.version)
   end
   local lines = { "label " .. label }
   if connected and kit.server_note then  -- the server runs an older FlameKit (features/server_version.lua)

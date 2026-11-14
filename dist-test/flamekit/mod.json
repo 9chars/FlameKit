@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.112",
+  "version": "0.15.113",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -358,8 +358,8 @@
       "key": "show_label",
       "type": "bool",
       "default": true,
-      "label": "Show FlameKit mod version",
-      "help": "On by default. Switch it off to take the label off your screen; FlameKit keeps working.",
+      "label": "Show the FlameKit version on the game's main screen",
+      "help": "On by default: \"FlameKit vX\" in the lower right corner of the game's main screen. Switch it off to take it away; FlameKit keeps working.",
       "live": true,
       "group": "FlameKit label"
     }
