@@ -127,7 +127,7 @@ void read_settings() {
     s.where = emf::setting_bool(kKit, "map_where", true);
     s.labels = emf::setting_bool(kKit, "map_labels", true);
     s.hide_menus = emf::setting_bool(kKit, "map_hide_in_menus", true);
-    s.move = emf::setting_bool(kKit, "map_move", false);
+    s.move = false;  // set by the UI thread while the pointer is out (the setting map_move is gone since 0.15.34)
     s.pos_x = static_cast<int>(emf::setting_float(kKit, "map_x", -1.0));
     s.pos_y = static_cast<int>(emf::setting_float(kKit, "map_y", -1.0));
     std::lock_guard<std::mutex> l(g_settings_lock);
@@ -2059,16 +2059,7 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
     quad(0, -L, -W, L * 0.62f, 0, L * 0.20f, W, L * 0.62f, 240, 98, 64, 222, 82, 54);
     quad(0, L * 0.42f, -W * 0.55f, L * 0.95f, 0, L * 0.78f, W * 0.55f, L * 0.95f, 240, 98, 64, 222, 82, 54);
 
-    if (s.move) {  // being moved: a bright ring and a hint
-        c.disc(mid, mid, R + 1.0f, 110, 226, 255, 0.95f, std::max(3.0f, rim));
-        if (text.ready(nullptr, letter_px(s, n))) {
-            const std::wstring hint = L"Drag me";
-            const int tw = text.width(hint), th = text.font_px + text.font_px / 3;
-            const float x0 = mid - static_cast<float>(tw) * 0.5f, y0 = mid - R * 0.62f;
-            c.pill(x0 - 10.0f, y0, x0 + static_cast<float>(tw) + 10.0f, y0 + static_cast<float>(th) + 4.0f, 14, 17, 22, 0.8f);
-            text.draw(c, static_cast<int>(x0), static_cast<int>(y0) + 1, hint, 150, 236, 255);
-        }
-    }
+    if (s.move) c.disc(mid, mid, R + 1.0f, 110, 226, 255, 0.95f, std::max(3.0f, rim));  // the pointer is out: it can be dragged
 
     // ---- under the dial: one line with the clock and, at its end, how high the player is ----
     const bool show_clock = s.clock && ov.time_of_day >= 0;
@@ -2271,6 +2262,9 @@ std::string window_info(HWND h) {
 
 // ---- the minimap layer ----
 // Moving it with the mouse: only while the "move" setting is on.
+bool g_pointer_mode = false;  // the pointer is out: FlameKit's window is open or Right Alt is held (UI thread)
+bool g_pointer_hold = false;  // Right Alt is held while the game's process is in front (UI thread)
+
 struct MinimapLayer : Layer {
     const char* name() const override { return "minimap"; }
     TextPainter text;
@@ -2279,7 +2273,6 @@ struct MinimapLayer : Layer {
     bool loaded = false;
     uint64_t drawn_at = 0, said_at = 0;
     bool said_shown = false;
-    bool move = false;
     bool dragging = false, has_drag = false, dropped = false;
     POINT grab{}, drag_pos{};  // where in the picture it was grabbed; the picture's top left corner (client coordinates)
     int pad = 0, dial_w = 0, dial_h = 0;
@@ -2324,14 +2317,16 @@ struct MinimapLayer : Layer {
 
     void update(const Frame& f) override {
         if (!loaded) load();
-        const Settings s = settings();
-        if (move != s.move) {
-            move = s.move;
-            dragging = has_drag = dropped = false;
-            FK_LOG(fklog::kInfo, "minimap: move mode %s", move ? "on" : "off");
+        Settings s = settings();
+        // While the pointer is out (FlameKit's window open, or the pointer key held) the minimap can be dragged, like the
+        // pinned windows; let go, its place is kept (map_x, map_y). "Back to its corner" in the Minimap tab undoes it.
+        s.move = g_pointer_mode;
+        if (!g_pointer_mode && dragging) {
+            dragging = false;
+            dropped = true;
         }
         bool in_menu = false;  // the game shows its mouse pointer only in its menus (the big map, the bag, ...)
-        if (f.game_front && s.hide_menus && !s.move) {
+        if (f.game_front && s.hide_menus && !g_pointer_mode) {  // (FlameKit's own pointer is not a game menu)
             CURSORINFO ci{};
             ci.cbSize = sizeof(ci);
             // a pointer that is "showing" but has no picture is not on screen: the game hides its pointer that way too
@@ -2413,7 +2408,6 @@ struct MinimapLayer : Layer {
                 emf::run_on_world(EMF_WORLD_CLIENT, [px, py](emf::World) {
                     emf::set_setting(kKit, "map_x", std::to_string(px));
                     emf::set_setting(kKit, "map_y", std::to_string(py));
-                    emf::set_setting(kKit, "map_move", "0");
                 });
             }
         } else if (s.pos_x >= 0 && s.pos_y >= 0) {
@@ -2427,7 +2421,7 @@ struct MinimapLayer : Layer {
         }
     }
 
-    bool wants_mouse() const override { return move && visible; }
+    bool wants_mouse() const override { return g_pointer_mode && visible; }
     void mouse(UINT msg, int x, int y) override {
         if (msg == WM_LBUTTONDOWN) {
             grab = {x, y};
@@ -2451,8 +2445,6 @@ struct MinimapLayer : Layer {
 //   <window id> <x> <y> <width> <collapsed 0|1> <hidden 0|1> <height>   (x, y: its top left corner in the game window, -1:
 //   default; height: 0 as tall as the content, else at most this tall, the content then scrolls). "window" is FlameKit's
 //   own window (F6), which can be moved and resized the same way.
-bool g_pointer_mode = false;  // the pointer is out: FlameKit's window is open or Right Alt is held (UI thread)
-bool g_pointer_hold = false;  // Right Alt is held while the game's process is in front (UI thread)
 
 struct LayoutEntry {
     int x = -1, y = -1, w = 0;
@@ -4448,7 +4440,7 @@ void ui_thread_body() {
     backdrop.window = &window;
     PartyLayer party;
     MessagesLayer messages;
-    g_compositor.layers = {&minimap, &hud, &backdrop, &party, &messages, &window};  // bottom first (pinned windows over the backdrop)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;

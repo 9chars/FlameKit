@@ -1,3 +1,7 @@
+0.15.34 Nov 13, 2026
+- The minimap can be dragged with the mouse while FlameKit's window is open or while you hold the pointer key (it gets a light ring then), like the pinned windows. It stays where you let go; "Back to its corner" in the Minimap tab puts it back. The "Move the minimap" button and its setting are gone.
+- The minimap no longer hides while FlameKit's window is open or the pointer key is held.
+
 0.15.33 Nov 13, 2026
 - Auto Junk List: an item moved straight back (you changed your mind) has no gold frame any more; it is back where it was.
 

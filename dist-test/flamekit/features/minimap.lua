@@ -144,17 +144,11 @@ local ZOOM_STEPS = 7  -- the setting map_zoom: 0 closest .. 6 farthest
 
 function F.panel(world)
   local rows = {}
-  local moving = kit.setting("map_move", false) == true
   rows[#rows + 1] = { heading = "Where it sits" }
-  if moving then
-    rows[#rows + 1] = { color = "#96ecff", text = "Drag the minimap with the mouse and let go where you want it." }
-    rows[#rows + 1] = { button = "move", text = "Cancel", selected = true }
-  else
-    rows[#rows + 1] = { button = "move", text = "Move the minimap",
-      tooltip = "Lets you drag the minimap with the mouse to anywhere on the screen. It stays where you let go." }
-  end
+  rows[#rows + 1] = { dim = true, text = "Drag the minimap with the mouse to anywhere on the screen while this window is open, "
+    .. "or while you hold the pointer key (Right Alt unless changed in Settings). It stays where you let go." }
   local placed = (tonumber(kit.setting("map_x", -1)) or -1) >= 0
-  rows[#rows + 1] = { button = "reset", text = "Back to its corner", same_line = true, disabled = not placed,
+  rows[#rows + 1] = { button = "reset", text = "Back to its corner", disabled = not placed,
                       tooltip = "Puts the minimap back in its corner of the screen (the corner is below)." }
   for _, r in ipairs(require("features.settings").rows({ "map_corner", "map_margin" })) do rows[#rows + 1] = r end
   rows[#rows + 1] = { separator = true }
@@ -210,9 +204,7 @@ end
 
 function F.click(world, key)
   if key:sub(1, 4) == "set:" then return require("features.settings").click(world, key:sub(5)) end  -- a settings row
-  if key == "move" then
-    emf.set_setting("map_move", not (kit.setting("map_move", false) == true))
-  elseif key == "reset" then
+  if key == "reset" then
     emf.set_setting("map_x", -1)
     emf.set_setting("map_y", -1)
   elseif key == "zoom:in" or key == "zoom:out" then
