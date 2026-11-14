@@ -125,7 +125,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 ## Restart button (owner, 2026-11-14)
 
-When a restart is due, offer it as a button (AskUserQuestion: "Restart client" / "Not now", or server/both as fits) instead of asking the owner to type "restart".
+When a restart is due (or might help), offer it as buttons, never ask the owner to type "restart": AskUserQuestion with the options **Restart Server**, **Restart Client**, **Restart Both** and **Not now** (the owner sometimes changes the server's settings file and wants just the server restarted).
 
 ## To do (owner's list)
 
