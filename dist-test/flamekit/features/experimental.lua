@@ -1297,8 +1297,8 @@ function F.window_rows(world)
   local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
-    color = dpick[4] and "#ffb060" or nil,
-    tooltip = "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it." }
+    color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
+    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
       .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
@@ -1308,15 +1308,16 @@ function F.window_rows(world)
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
   rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3]), text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
-    tooltip = "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings." }
+    disabled = in_pvp or nil, tooltip = in_pvp and no_spawn or "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
-  rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = duel_level <= 1, tooltip = "One level lower" }
+  rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = in_pvp or duel_level <= 1, tooltip = "One level lower" }
   rows[#rows + 1] = { label = true, text = tostring(duel_level), same_line = true, color = duel_level > 50 and "#ff8060" or nil,
     tooltip = lvl_tip }
-  rows[#rows + 1] = { button = "dbg:lvl:1", text = ">", same_line = true, disabled = duel_level >= MAX_LEVEL, tooltip = "One level higher" }
+  rows[#rows + 1] = { button = "dbg:lvl:1", text = ">", same_line = true, disabled = in_pvp or duel_level >= MAX_LEVEL, tooltip = "One level higher" }
   for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
-    rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q, tooltip = lvl_tip }
+    rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q,
+      disabled = in_pvp or nil, tooltip = lvl_tip }
   end
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "

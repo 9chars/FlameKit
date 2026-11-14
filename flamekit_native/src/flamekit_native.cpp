@@ -5227,14 +5227,18 @@ struct ExperimentalLayer : PinnedLayer {
                 if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
                 text.draw(canvas, b.left, b.top + 4, r.text, cr, cg, cb);
             } else if (r.kind == 'd') {
-                const bool open_now = list_open == static_cast<int>(p.row), over = g_pointer_mode && in(p.box, hover_x, hover_y);
+                // (0.15.120) a disabled drop-down (the test monsters in PvP): greyed out, never opens
+                if (r.disabled && list_open == static_cast<int>(p.row)) list_open = -1;
+                const bool open_now = list_open == static_cast<int>(p.row),
+                           over = g_pointer_mode && !r.disabled && in(p.box, hover_x, hover_y);
                 box(b.left, b.top, b.right, b.bottom, over || open_now ? 66.0f : 44.0f, over || open_now ? 66.0f : 44.0f, over || open_now ? 76.0f : 52.0f, 1.0f);
                 box(b.left, b.top, b.right, b.top + 1, 120, 120, 132, 1.0f);
                 box(b.left, b.bottom - 1, b.right, b.bottom, 120, 120, 132, 1.0f);
                 box(b.left, b.top, b.left + 1, b.bottom, 120, 120, 132, 1.0f);
                 box(b.right - 1, b.top, b.right, b.bottom, 120, 120, 132, 1.0f);
                 float cr = 240, cg = 240, cb = 240;
-                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                if (r.disabled) cr = cg = cb = 120;
+                else if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
                 {  // (0.15.97) cut to the box, before the arrow: it ran out of the box in the owner's game
                     std::wstring t = r.text;
                     const int room = b.right - 28 - (b.left + 8);
@@ -5249,7 +5253,7 @@ struct ExperimentalLayer : PinnedLayer {
                     const int ry = open_now ? ay + 5 - k : ay + k;
                     box(ax + k, ry, ax + 12 - k, ry + 1, 220, 220, 225, 1.0f);
                 }
-                hits.push_back({p.box, 1, static_cast<int>(p.row)});
+                if (!r.disabled) hits.push_back({p.box, 1, static_cast<int>(p.row)});
             } else {
                 float cr = 220, cg = 220, cb = 225;
                 if (r.kind == 'h') cr = 255, cg = 210, cb = 122;

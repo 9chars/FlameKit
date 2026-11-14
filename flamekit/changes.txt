@@ -1,3 +1,6 @@
+0.15.120 Nov 14, 2026
+- PvP: the test monster drop-downs and the duelist's level buttons are greyed out too while your PvP is on.
+
 0.15.119 Nov 14, 2026
 - PvP: fast travel (Flame Altar, Ancient Spire, Map Waypoint) is off and greyed out while your PvP is on, so nobody can escape a fight. It comes back when you switch PvP off.
 - PvP: test monsters cannot be spawned while your PvP is on, and switching PvP on removes your duelist. The harmless dummy stays: spawn it before you switch PvP on to test your weapons.

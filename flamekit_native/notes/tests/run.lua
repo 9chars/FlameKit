@@ -858,6 +858,9 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     "PvP on: the player's duelist is removed")
   check(find_row("^Spawn duelist$").disabled and find_row("^Spawn dummy$").disabled
     and find_row("^Spawn dummy$").tooltip:find("Off while you are in PvP", 1, true), "both spawn buttons are greyed out and say why")
+  local dds = 0
+  for _, r in ipairs(exp_rows()) do if r.options then dds = dds + (r.disabled and 1 or 0) end end
+  check(dds == 2 and find_row("^>$").disabled and find_row("^50$").disabled, "the two monster drop-downs and the level buttons too (0.15.120)")
   local n = #spawned
   click(find_row("^Spawn duelist$").button)
   step(40)
