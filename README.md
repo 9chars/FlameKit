@@ -72,7 +72,7 @@ Coming from FlameKit 0.14 or older: delete the old `emf\mods\flamekit_map` folde
 
 Nothing from the game is in this repository: item icons and item details are read on your own PC from your own game files, and FlameKit never changes the game's files. FlameKit's log (`emf\mods\flamekit\logs\`) leaves out account ids, so it is safe to share with a bug report.
 
-## For the curious: how it is built
+## For the curious
 
 | Folder | What it is |
 |---|---|
@@ -83,6 +83,8 @@ Nothing from the game is in this repository: item icons and item details are rea
 | `flamekit/changes.txt` | Every change in every version. |
 
 The updater reads the newest commit of this repository, downloads the channel's file list (`update.txt`), checks its ECDSA signature against the key built into the DLL, and downloads only the files that changed. The new version is put in place at the next game start.
+
+The source, the notes and every version: https://github.com/9chars/FlameKit
 
 ## Third-party code
 
