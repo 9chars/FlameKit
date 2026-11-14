@@ -4288,7 +4288,7 @@ struct WindowLayer : Layer {
             button(kPad + 320, y, 150, L"Reset place", false, kPinReset, i);
             y += 40;
         }
-        text.draw(canvas, kPad, y + 5, L"FlameKit window", 230, 230, 235);
+        text.draw(canvas, kPad, y + 5, L"FlameKit Menu", 230, 230, 235);
         button(kPad + 320, y, 150, L"Reset place", false, kPinReset, g_pinned.size());  // its place and size
         y += 40;
         {  // (0.15.62, owner: it affects all of FlameKit's UI, so it belongs here; it was in the Minimap tab)
