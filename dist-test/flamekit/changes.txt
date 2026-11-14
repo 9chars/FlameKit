@@ -1,3 +1,6 @@
+0.15.85 Nov 14, 2026
+- The update window no longer takes the keyboard or the mouse when it appears, so a fight goes on undisturbed. Click its buttons with the pointer key (Right Alt) like the other windows; Esc closes it. Its text now reads "Restart the game to load it!".
+
 0.15.84 Nov 14, 2026
 - A test update, to show the new update window. Nothing else changed.
 

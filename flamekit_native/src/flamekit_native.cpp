@@ -5038,7 +5038,9 @@ struct ExperimentalLayer : PinnedLayer {
 // ---- the update dialog (0.15.83, owner) ----
 // When the updater has a new version ready for the next start (update_status.txt "ready|Update vX is ready: ..."), a
 // small window in the middle of the game window says so, like a Windows dialog, besides the lower left line. Once per
-// version in a game session. OK, Esc or Enter close it; Restart Game closes the game the way Alt+F4 does (WM_CLOSE: the
+// version in a game session. It never takes the keyboard or the mouse by itself (0.15.85, owner: the player may be in a
+// fight): like the pinned windows its buttons are clicked with the pointer key out. Esc closes it (seen from the key's
+// state; the game gets the Esc too). OK closes it; Restart Game closes the game the way Alt+F4 does (WM_CLOSE: the
 // owner's restart helper does the same) and a hidden PowerShell starts it again through Steam once the game's process
 // has ended (the new version is put in place at that start). If the game is still running after 120 s (the close did
 // not happen), nothing is started.
@@ -5052,8 +5054,8 @@ struct UpdateDialog : Layer {
     TextPainter text, head;
     RECT ok_r{}, restart_r{};
     int mouse_x = -1, mouse_y = -1;
-    bool restarting = false;
-    static constexpr int kW = 440, kH = 176, kHead = 32;
+    bool restarting = false, was_pointer = false, esc_was = true;
+    static constexpr int kW = 440, kH = 200, kHead = 32;
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -5096,9 +5098,13 @@ struct UpdateDialog : Layer {
         box(kW - 1, 0, kW, kH, 120, 160, 220, 1.0f);
         head.draw(canvas, 12, 6, L"FlameKit update", 235, 225, 205);
         text.draw(canvas, 20, kHead + 18, L"FlameKit v" + version + L" has been downloaded.", 90, 220, 110);
-        text.draw(canvas, 20, kHead + 44, restarting ? L"Closing the game; it starts again by itself..." : L"It is used the next time the game starts.",
+        text.draw(canvas, 20, kHead + 44, restarting ? L"Closing the game; it starts again by itself..." : L"Restart the game to load it!",
                   225, 225, 230);
-        const int bw = 130, bh = 32, by = kH - bh - 16;
+        if (!g_pointer_mode) {  // how to click it: the pointer key (Right Alt unless changed)
+            const std::wstring k = key_label(settings().pointer_vk);
+            little_hint(L"Use " + (k.empty() ? std::wstring(L"the pointer key") : k) + L" to click the buttons. Esc closes this.");
+        }
+        const int bw = 130, bh = 32, by = kH - bh - 14;
         restart_r = {kW - 16 - bw, by, kW - 16, by + bh};
         ok_r = {restart_r.left - 12 - bw, by, restart_r.left - 12, by + bh};
         auto button = [&](const RECT& r, const wchar_t* label, bool main) {
@@ -5116,7 +5122,19 @@ struct UpdateDialog : Layer {
         changed = true;
     }
 
+    void little_hint(const std::wstring& t) { text.draw(canvas, 20, kHead + 76, t, 150, 155, 170); }
+
     void update(const Frame& f) override {
+        {  // Esc closes it while the game's process is in front (a new press only)
+            const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+            if (esc && !esc_was && open && f.ours_front) close("Esc");
+            esc_was = esc;
+        }
+        if (was_pointer != g_pointer_mode) {
+            was_pointer = g_pointer_mode;
+            dirty = true;
+            if (!g_pointer_mode) mouse_x = mouse_y = -1;
+        }
         if (!next_read) next_read = f.now + 5000;  // the updater clears the last session's line at its start first
         if (f.now >= next_read && !restarting) read_status(f.now);
         const bool want = open && f.gw > 0 && f.gh > 0;
@@ -5170,12 +5188,7 @@ struct UpdateDialog : Layer {
         PostMessageW(g, WM_CLOSE, 0, 0);
     }
 
-    bool wants_mouse() const override { return open; }
-    bool wants_keys() const override { return open; }
-    void key(WPARAM vk) override {
-        if (vk == VK_ESCAPE) close("Esc");
-        else if (vk == VK_RETURN) close("Enter");
-    }
+    bool wants_mouse() const override { return open && g_pointer_mode; }
     void mouse_left() override {
         mouse_x = mouse_y = -1;
         dirty = true;
@@ -5200,9 +5213,8 @@ struct BackdropLayer : Layer {
     bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "backdrop"; }
     const Layer* window = nullptr;
-    const Layer* dialog = nullptr;  // the update dialog (0.15.83): the pointer is out while it is open
     void update(const Frame& f) override {
-        const bool want = ((window && window->visible) || (dialog && dialog->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
+        const bool want = ((window && window->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
         if (want != visible) {
             visible = want;
             changed = true;
@@ -5743,7 +5755,6 @@ void ui_thread_body() {
     ExperimentalLayer experimental;
     experimental.window = &window;
     UpdateDialog update_dialog;
-    backdrop.dialog = &update_dialog;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
     g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
@@ -5844,7 +5855,7 @@ void ui_thread_body() {
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
         // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
         {
-            const bool mode = hold || window.open || update_dialog.open;
+            const bool mode = hold || window.open;
             if (mode && !g_pointer_mode) {
                 restore_rounds = 5;
             } else if (!mode && g_pointer_mode) {

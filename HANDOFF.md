@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.84.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.85.
 
 ## What FlameKit is
 
@@ -127,10 +127,10 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 ## Update dialog (0.15.83)
 UpdateDialog (flamekit_native.cpp, above BackdropLayer) reads update_status.txt each second (first after 5 s, once the
-updater has cleared the last session's line). On "ready|Update vX ..." it opens once per version per session: OK / Enter
-/ Esc close it; Restart Game starts a hidden PowerShell that waits up to 120 s for the game's process to end, then starts
-steam://rungameid/1203620, and posts WM_CLOSE to the game window (as the restart helper and Alt+F4 do). The pointer is out
-while it is open (pointer mode, backdrop).
+updater has cleared the last session's line). On "ready|Update vX ..." it opens once per version per session. Since 0.15.85
+it never takes keys or the mouse by itself (the player may be fighting): buttons work in pointer mode only; Esc (key
+state, the game gets it too) and OK close it; Restart Game starts a hidden PowerShell that waits up to 120 s for the game's process to end, then starts
+steam://rungameid/1203620, and posts WM_CLOSE to the game window (as the restart helper and Alt+F4 do).
 
 ## Restart button (owner, 2026-11-14)
 
