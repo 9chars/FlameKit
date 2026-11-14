@@ -52,7 +52,7 @@ local TIPS = {
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Careful: your hits "
-    .. "can also hurt your own summons, pets and villagers while it is on. Off again when you leave the server. Everyone "
+    .. "may also hurt your own summons and pets while it is on (villagers cannot be hurt: tried in game). Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
@@ -1142,7 +1142,7 @@ local function panel_rows(world)
     rows[#rows + 1] = { button = "dbg:lvl:" .. step, text = (step > 0 and "+" or "") .. step, same_line = i > 1,
       disabled = (step < 0 and duel_level <= 1) or (step > 0 and duel_level >= MAX_LEVEL), tooltip = lvl_tip }
   end
-  for _, q in ipairs({ 1, 25, 50 }) do
+  for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q }
   end
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn " .. duelist(duel_what)[2] .. " (level " .. duel_level .. ")",

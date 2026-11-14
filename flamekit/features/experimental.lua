@@ -1142,7 +1142,7 @@ local function panel_rows(world)
     rows[#rows + 1] = { button = "dbg:lvl:" .. step, text = (step > 0 and "+" or "") .. step, same_line = i > 1,
       disabled = (step < 0 and duel_level <= 1) or (step > 0 and duel_level >= MAX_LEVEL), tooltip = lvl_tip }
   end
-  for _, q in ipairs({ 1, 25, 50 }) do
+  for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q }
   end
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn " .. duelist(duel_what)[2] .. " (level " .. duel_level .. ")",

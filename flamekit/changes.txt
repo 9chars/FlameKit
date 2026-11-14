@@ -1,3 +1,7 @@
+0.15.71 Nov 14, 2026
+- PvP duelist: quick level buttons 75 and 100 next to 1, 25 and 50.
+- PvP switch tooltip: villagers cannot be hurt (tried in game).
+
 0.15.70 Nov 14, 2026
 - PvP duelist (Experimental, Debug section): pick what it is (Vukah Warrior, Vukah Brawler mini-boss, Skeleton, Wolf, Boar, Sabretooth, Hound) and its level (buttons -10, -1, +1, +10, or 1, 25, 50; up to 255), then spawn it. The game sets its health and damage from the level: level 50 is about 6700 health, level 75 about 20800 and beat a level 50 player.
 - Server console: "flamekit.duelist <player> [level] [kind]" does the same.
