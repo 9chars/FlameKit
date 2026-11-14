@@ -88,13 +88,12 @@ local MOST_MESSAGES = 100  -- (0.15.105) the Messages window can be sized to sho
 
 -- A message in FlameKit's Messages window (drawn by FlameKit's DLL; it shows itself for a few seconds when a message
 -- comes, and with the last ones while the pointer key is held): what a feature just did ("Junk discarded: Twigs x3"),
--- in `colour` ("#rrggbb"; orange without). The player can switch these off (setting notify), except the ones with
--- `always` (warnings the player has to see). Also written to the log. emf\mods\flamekit\ui_messages.dat:
+-- in `colour` ("#rrggbb"; orange without). Always shown (0.15.106, owner: the setting notify that switched them off is
+-- gone; `always` is kept for the callers). Also written to the log. emf\mods\flamekit\ui_messages.dat:
 --   m <number> <rrggbb> <text>     (the last 20, oldest first)
 --   end                            (a file without it is half written: the DLL reads it again later)
 function kit.note(text, colour, always)
   emf.log(tostring(text))
-  if not always and not kit.setting("notify", true) then return end
   message_n = message_n + 1
   messages[#messages + 1] = { n = message_n, colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060",
     text = (tostring(text):gsub("[%c]", " ")) }

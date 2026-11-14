@@ -1,3 +1,9 @@
+0.15.106 Nov 14, 2026
+- Auto Junk List: the buttons are Auto, Drop/Delete, then Dump Junk last, at the end of the row where it is easiest to hit.
+- Auto Junk List: the Drop/Delete tooltip says "With Drop mode set, turn off the game's Auto-Collect Scattered Loot setting...".
+- Experimental tab, Debug: an "Open log folder" button opens FlameKit's log folder in Explorer.
+- Settings: "Show FlameKit's messages (the Messages window)" is gone; the Messages window always shows FlameKit's messages.
+
 0.15.105 Nov 14, 2026
 - Messages window: size it at its lower right corner (pointer key held) in both directions, wider and taller. Once you have given it a height it keeps that height and shows all kept messages (now the last 100, chat included), scrolled to the newest; the mouse wheel scrolls back, and at the bottom again it follows new messages. "Reset place" in the Windows tab puts it back to its small size.
 

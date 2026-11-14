@@ -66,7 +66,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
@@ -484,14 +484,12 @@ check(hud.build == false, "the tool is put away (mask 0, the cursor where it was
 comps.ClientPlayerInput[PLAYER].data.mask = 256
 step(2)
 check(hud.build == false, "mask 256 (seen while playing normally) is not build mode")
-settings.notify = false
 local newest_before = hud.newest
 comps.Inventory[201].slots[1] = stack(0x11, 4)
 pickup({ itemId = 0x11, itemCount = 4, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
-check(count(201, 0x11) == 0 and hud.newest == newest_before, "with messages off the junk still goes, silently")
+check(count(201, 0x11) == 0 and hud.newest > newest_before, "junk goes, and the Messages window always says so (0.15.106: no setting to switch it off)")
 check(next(emf_hud) == nil, "nothing is drawn by EMF: no emf.hud line")
-settings.notify = true
 
 -- gear, tools and summoning items are never junk, whatever a list or a command says
 reset_world()

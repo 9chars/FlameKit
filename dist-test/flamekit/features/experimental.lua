@@ -1142,6 +1142,7 @@ local function debug_rows(world, rows)
     rows[#rows + 1] = { button = "dbg:log:" .. l[1], text = l[2], selected = level == l[1], same_line = i > 1, tooltip = l[3] }
   end
   rows[#rows + 1] = { dim = true, text = "The logs are in emf\\mods\\flamekit\\logs in the game's folder (the last 10 games)." }
+  rows[#rows + 1] = { button = "dbg:openlogs", text = "Open log folder", tooltip = "Opens FlameKit's log folder in Explorer." }  -- (0.15.106)
   return rows
 end
 
@@ -1312,6 +1313,14 @@ function F.click(world, key)
       if account then note = handle(world, account, player, msg).note end
     else
       ask(msg)
+    end
+    return
+  end
+  if key == "dbg:openlogs" then  -- FlameKit's DLL opens Explorer on the logs when this file appears (HudLayer)
+    local f = io.open(emf.dir .. "\\ui_open_logs.request", "w")
+    if f then
+      f:write("1")
+      f:close()
     end
     return
   end

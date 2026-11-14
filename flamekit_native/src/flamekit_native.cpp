@@ -37,6 +37,8 @@
 #include "fk_log.hpp"
 #include "item_icons.hpp"
 #include "web_update.hpp"
+#include <shellapi.h>  // ShellExecuteW: the Debug section's "Open log folder" (0.15.106)
+#pragma comment(lib, "shell32.lib")
 
 #ifndef MOD_ID
 #define MOD_ID "flamekit_native"
@@ -4347,20 +4349,22 @@ struct WindowLayer : Layer {
                                               L"is on; the action bar too while Exclude Action Bar is on.";
         static const std::wstring kDropTip = L"What happens to junk. Drop: it lands on the ground at your feet, and you can pick it up again. "
                                               L"Delete: it is destroyed for good.\n"
-                                              L"\x01With Drop, turn off the game's \"Auto-Collect Scattered Loot\" setting or the junk comes straight "
+                                              L"\x01With Drop mode set, turn off the game's \"Auto-Collect Scattered Loot\" setting or the junk comes straight "
                                               L"back into your bag.";
         static const std::wstring kDropOnlyTip = L"Junk lands on the ground at your feet; you can pick it up again.";
         static const std::wstring kDeleteTip = L"Junk is destroyed for good. It cannot be brought back.";
         const std::wstring drop_label = std::wstring(delete_junk ? L"Delete" : L"Drop") + L" ▾";
         const int drop_w = std::max(text.width(L"Delete ▾"), text.width(L"Drop ▾")) + 28;
-        const int drop_x = kW - kPad - drop_w, by = kTop + 10;
-        button(drop_x, by, drop_w, drop_label, false, kDrop);
-        hits.back().tip = &kDropTip;
-        const int dump_w = text.width(L"Dump Junk") + 28, dump_x = drop_x - 8 - dump_w;
+        // (0.15.106, owner) Auto, Drop/Delete, then Dump Junk last, at the row's end where it is easiest to hit
+        const int by = kTop + 10;
+        const int dump_w = text.width(L"Dump Junk") + 28, dump_x = kW - kPad - dump_w;
         button(dump_x, by, dump_w, L"Dump Junk", false, kDump);
         hits.back().tip = &kDumpTip;
+        const int drop_x = dump_x - 8 - drop_w;
+        button(drop_x, by, drop_w, drop_label, false, kDrop);
+        hits.back().tip = &kDropTip;
         const int auto_w = text.width(L"Auto: OFF") + 28;
-        button(dump_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
+        button(drop_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
         hits.back().tip = &kAutoTip;
         int ox = kPad;  // the feature's other settings
         for (size_t i = 0; i < opts.size(); ++i) {
@@ -5813,6 +5817,16 @@ struct HudLayer : Layer {
 
     void read_files(uint64_t now) {
         next_read = now + 200;  // 0.15.59: build mode should hide the windows quickly (was 500)
+        {  // (0.15.106) the Debug section's "Open log folder" button (features/experimental.lua): Explorer on the logs
+            const std::wstring req = g_flamekit_dir + L"ui_open_logs.request";
+            if (GetFileAttributesW(req.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                DeleteFileW(req.c_str());
+                const std::wstring dir = g_flamekit_dir + L"logs";
+                const HINSTANCE r = ShellExecuteW(nullptr, L"open", dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+                FK_LOG(reinterpret_cast<INT_PTR>(r) > 32 ? fklog::kInfo : fklog::kWarn, "log folder: opened in Explorer (%lld)",
+                       static_cast<long long>(reinterpret_cast<INT_PTR>(r)));
+            }
+        }
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_hud.dat").c_str(), L"rb", _SH_DENYNO)) {
             std::wstring new_label, new_status, new_notice;
             uint32_t rgb = 0xffb060;
