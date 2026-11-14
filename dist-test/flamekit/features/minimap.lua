@@ -144,11 +144,9 @@ local ZOOM_STEPS = 7  -- the setting map_zoom: 0 closest .. 6 farthest
 
 function F.panel(world)
   local rows = {}
-  rows[#rows + 1] = { heading = "Where it sits" }
-  rows[#rows + 1] = { dim = true, text = "Drag the minimap with the mouse to anywhere on the screen while this window is open, "
-    .. "or while you hold the pointer key (Right Alt unless changed in Settings). It stays where you let go." }
+  rows[#rows + 1] = { heading = "Location" }
   local placed = (tonumber(kit.setting("map_x", -1)) or -1) >= 0
-  rows[#rows + 1] = { button = "reset", text = "Back to its corner", disabled = not placed,
+  rows[#rows + 1] = { button = "reset", text = "Reset Default Position", disabled = not placed,
                       tooltip = "Puts the minimap back in its corner of the screen (the corner is below)." }
   for _, r in ipairs(require("features.settings").rows({ "map_corner", "map_margin" })) do rows[#rows + 1] = r end
   rows[#rows + 1] = { separator = true }
