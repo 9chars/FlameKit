@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.94.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.95.
 
 ## What FlameKit is
 
@@ -124,6 +124,14 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## PvP Leaderboard (0.15.95)
+features/leaderboard.lua: server side uses emf.on_player_died (p.killer = last hitter within 10 s; counted only when
+world:account(killer) is a player and not the victim). leaderboard.json (store, by account; never log accounts) keeps
+kills/deaths/name. Board sent on channel flamekit/board (to players) on change, join and every 30 s; the client writes
+ui_board.dat ("source server|none", "r rank kills deaths you name", "end"). Ranking: kills desc, deaths asc, name;
+equal kills+deaths share a rank. Kills announced via chat.announce. Console: flamekit.board_reset. DLL: BoardLayer
+(PinnedLayer "board", key board_window_key F5, hidden until the key is first pressed). Not yet tested with real kills.
 
 ## Main screen line (0.15.88, 0.15.89)
 Outside a world HudLayer shows one line in the lower RIGHT corner: "FlameKit v<running Lua version> Loaded" (owner: the

@@ -1,3 +1,6 @@
+0.15.95 Nov 14, 2026
+- New: PvP Leaderboard, a window that ranks players by how many other players they killed (fewer deaths first when kills are equal) and shows how often each one was killed by another player. F5 shows and hides it (Settings, Windows group); it starts hidden. Your own row is lit and names are in each player's colour. Only kills between players count; deaths to monsters, falls and the like do not. The server keeps the counts across restarts, and each kill is announced in the Messages window. The server needs this version too. Server console: flamekit.board_reset clears the board.
+
 0.15.94 Nov 14, 2026
 - After Alt+Tab back to the main screen the "Loaded" line (all of FlameKit's overlay) stayed hidden behind the game. FlameKit's overlay now belongs to the game's window, which Windows always keeps it in front of.
 

@@ -72,6 +72,7 @@ local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
 local teleports = {}
 left_fns = {}
+died_fns = {}  -- the leaderboard's emf.on_player_died
 joined_fns = {}  -- EMF reports the players already there (the test player) after the world data
 SESSION_TOKEN = "run-1"
 held_key = nil
@@ -154,6 +155,7 @@ emf = {
   on_player_left = function(fn) left_fns[#left_fns + 1] = fn; return true end,
   session_token = function() return SESSION_TOKEN end,
   on_player_joined = function(fn) joined_fns[#joined_fns + 1] = fn; return true end,
+  on_player_died = function(fn) died_fns[#died_fns + 1] = fn; return true end,
   -- buffs (Lua 1.24): the player is Wet (812.4 s left) and has a buff without a timer and one the game hides
   buffs = function(w, id)
     if id ~= PLAYER then return {} end
@@ -195,7 +197,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" or name == "chat" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
+      if name == "map" or name == "party" or name == "chat" or name == "board" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -216,6 +218,7 @@ emf = {
       if name == "exp" then exp_down[#exp_down + 1] = data; return true end
       if name == "party" then party_down[#party_down + 1] = data; return true end
       if name == "chat" then channels.chat.on_player(CW, {}, data); return true end
+      if name == "board" then channels.board.on_player(CW, {}, data); return true end
       to_client[#to_client + 1] = data
       return true
     end,
@@ -288,7 +291,7 @@ local function step(n)
     local asks = ptest_up
     ptest_up = {}
     for _, data in ipairs(asks) do channels.party_test.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
-    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
+    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW); require("features.leaderboard").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
     side = "client"
     msgs = to_client
     to_client = {}
@@ -1108,5 +1111,41 @@ do
   local done_text = d and d:read("a") or ""
   if d then d:close() end
   check(done_text == "1234", "a save request from the restart helper is answered with its number")
+end
+-- the PvP Leaderboard (features/leaderboard.lua, 0.15.95)
+do
+  local function board_text()
+    local f = io.open(TMP .. "\\ui_board.dat", "r")
+    local t = f and f:read("a") or ""
+    if f then f:close() end
+    return t
+  end
+  join_all()  -- the test player left earlier: back in the world
+  check(#died_fns == 1, "the leaderboard asks EMF for player deaths")
+  local KILLER = 101
+  local old_account = SW.account
+  SW.account = function(w, id) if id == KILLER then return "0x00000000000000bb" end return old_account(w, id) end
+  SW.name = function(w, id) return id == KILLER and "Rival" or id == PLAYER and "Ninechars" or nil end
+  for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = KILLER }) end
+  step(3)
+  local t = board_text()
+  check(t:find("source server\nr\t1\t1\t0\t0\tRival\nr\t2\t0\t1\t1\tNinechars\nend\n", 1, true) ~= nil,
+    "a kill by another player: the killer first with 1 kill, you second with 1 death, your row marked: " .. t:gsub("\n", "|"))
+  for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 950 }) end
+  for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 0 }) end
+  step(3)
+  check(board_text() == t, "a death to a monster or to nothing is not on the PvP board")
+  for _, fn in ipairs(died_fns) do fn(SW, { player = KILLER, account = "0x00000000000000bb", name = "Rival", killer = PLAYER }) end
+  for _, fn in ipairs(died_fns) do fn(SW, { player = KILLER, account = "0x00000000000000bb", name = "Rival", killer = PLAYER }) end
+  step(3)
+  t = board_text()
+  check(t:find("r\t1\t2\t1\t1\tNinechars\nr\t2\t1\t2\t0\tRival\n", 1, true) ~= nil, "more kills rank first: " .. t:gsub("\n", "|"))
+  local jf = io.open(TMP .. "\\leaderboard.json", "r")
+  check(jf ~= nil, "the board is kept in leaderboard.json")
+  if jf then jf:close() end
+  commands.board_reset(SW, {})
+  step(3)
+  check(board_text() == "source server\nend\n", "flamekit.board_reset clears it")
+  SW.account, SW.name = old_account, nil
 end
 print("ALL PASSED (" .. MODE .. ")")

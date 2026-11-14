@@ -62,6 +62,7 @@ struct Settings {
     uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
     uint32_t exp_vk = VK_F6;      // shows and hides the Experimental window (setting exp_window_key, 0.15.74)
     uint32_t party_vk = VK_F7;    // shows and hides the Party window (setting party_window_key, 0.15.81)
+    uint32_t board_vk = VK_F5;    // shows and hides the PvP Leaderboard (setting board_window_key, 0.15.95)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     bool pointer_toggle = false;  // pointer_toggle (0.15.79): one press shows the pointer, the next (or Esc) puts it away
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
@@ -123,6 +124,8 @@ void read_settings() {
     s.exp_vk = ekey.empty() ? 0 : emf::keys::parse_key(std::wstring(ekey.begin(), ekey.end()));
     const std::string pwkey = emf::setting_text(kKit, "party_window_key", "F7");
     s.party_vk = pwkey.empty() ? 0 : emf::keys::parse_key(std::wstring(pwkey.begin(), pwkey.end()));
+    const std::string bkey = emf::setting_text(kKit, "board_window_key", "F5");
+    s.board_vk = bkey.empty() ? 0 : emf::keys::parse_key(std::wstring(bkey.begin(), bkey.end()));
     const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
     s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
     s.pointer_toggle = emf::setting_bool(kKit, "pointer_toggle", false);
@@ -481,6 +484,7 @@ std::unordered_map<uint32_t, ItemMeta> g_item_meta;  // filled once, when the it
 std::atomic<bool> g_ui_request{false};  // F4 (window_key) was pressed: FlameKit's own UI (ui_thread)
 std::atomic<bool> g_exp_toggle{false};  // the Experimental window's key was pressed (ui_thread shows or hides it)
 std::atomic<bool> g_party_toggle{false};  // the Party window's key (0.15.81)
+std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
 
 // A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
 std::wstring key_label(uint32_t vk) {
@@ -506,6 +510,8 @@ void on_world_tick(emf::World w) {
     if (s.exp_vk && exp_key.pressed(emf::keys::down(s.exp_vk))) g_exp_toggle = true;
     static emf::keys::Edge party_key;
     if (s.party_vk && party_key.pressed(emf::keys::down(s.party_vk))) g_party_toggle = true;
+    static emf::keys::Edge board_key;
+    if (s.board_vk && board_key.pressed(emf::keys::down(s.board_vk))) g_board_toggle = true;
     const auto* t = w.get<gen::CurrentTransform>(emf::local_player());
     if (!t) return;
     // Item details for FlameKit's panel (a Lua mod cannot read the game's item definitions): once per game start,
@@ -3286,6 +3292,131 @@ struct MessagesLayer : PinnedLayer {
     }
 };
 
+// ---- the PvP Leaderboard (0.15.95, owner) ----
+// A pinned window: the players ranked by their kills of other players, with how often each one died to another player.
+// From features/leaderboard.lua in emf\mods\flamekit\ui_board.dat: "source server|none", "r <rank> <kills> <deaths>
+// <you 0|1> <name>" (tab separated, best first), "end". Its key (setting board_window_key, F5) shows and hides it;
+// hidden until that key is pressed the first time (it has no line in ui_layout.txt yet). Names in each player's colour
+// (the Party window's and the minimap's), your own row lit.
+struct BoardLayer : PinnedLayer {
+    struct Row {
+        int rank = 0, kills = 0, deaths = 0;
+        bool you = false;
+        std::wstring name;
+        PlayerStyle style{};
+    };
+    std::vector<Row> rows;
+    bool from_server = false, known = false, first = true;
+    uint64_t stamp = 0, next_read = 0;
+    static constexpr int kLine = 22;
+
+    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_x_pm = 780; def_y_pm = 420; }
+    uint32_t hotkey() const override { return settings().board_vk; }
+
+    bool read_file() {
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        const std::wstring file = g_flamekit_dir + L"ui_board.dat";
+        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
+                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
+                                : 2;
+        if (st == stamp) return false;
+        FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
+        if (!fp) return false;
+        std::vector<Row> got;
+        bool complete = false, server = false;
+        char line[512];
+        while (fgets(line, sizeof line, fp)) {
+            line[std::strcspn(line, "\r\n")] = 0;
+            if (std::strcmp(line, "end") == 0) {
+                complete = true;
+                break;
+            }
+            if (std::strcmp(line, "source server") == 0) server = true;
+            Row r;
+            int you = 0, used = 0;
+            if (sscanf_s(line, "r\t%d\t%d\t%d\t%d\t%n", &r.rank, &r.kills, &r.deaths, &you, &used) == 4 && used > 0) {
+                r.you = you != 0;
+                r.name = widen(line + used);
+                r.style = player_style(line + used);
+                got.push_back(std::move(r));
+            }
+        }
+        fclose(fp);
+        if (!complete) return false;
+        stamp = st;
+        rows = std::move(got);
+        from_server = server;
+        known = true;
+        FK_LOG(fklog::kDebug, "leaderboard: ui_board.dat read: %d row(s)%s", static_cast<int>(rows.size()), server ? "" : " (no board from the server)");
+        return true;
+    }
+
+    bool refresh(const Frame& f) override {
+        bool again = false;
+        if (first) {  // hidden until its key is pressed the first time
+            first = false;
+            if (!g_layout.loaded) g_layout.load();
+            if (!g_layout.entries.count(id)) {
+                lay().hidden = true;
+                g_layout.save();
+                FK_LOG(fklog::kInfo, "leaderboard: hidden until its key is pressed (first time)");
+            }
+        }
+        if (g_board_toggle.exchange(false) && f.in_world) {
+            LayoutEntry& e = lay();
+            e.hidden = !e.hidden;
+            g_layout.save();
+            FK_LOG(fklog::kInfo, "leaderboard: %s (its key)", e.hidden ? "hidden" : "shown");
+            again = true;
+        }
+        if (f.now >= next_read) {
+            next_read = f.now + 500;
+            if (read_file()) again = true;
+        }
+        return again;
+    }
+
+    int content_height(int width) override {
+        return rows.empty() ? kLine + 6 : static_cast<int>(rows.size() + 1) * kLine + 6;
+    }
+
+    void draw_content(int top, int width) override {
+        if (rows.empty()) {
+            const wchar_t* t = !known ? L"Waiting for the server..." : !from_server ? L"This server does not run FlameKit's PvP Leaderboard"
+                                                                                      : L"No PvP kills yet";
+            little.draw(canvas, 10, top + 3, t, 140, 145, 155);
+            return;
+        }
+        const int col_deaths = width - 12, col_kills = width - 72;  // right edges of the number columns
+        auto right = [&](int edge, int y, const std::wstring& t, float r, float g, float b) { little.draw(canvas, edge - little.width(t), y, t, r, g, b); };
+        int y = top + 2;
+        little.draw(canvas, 10, y, L"#", 150, 155, 170);
+        little.draw(canvas, 40, y, L"Player", 150, 155, 170);
+        right(col_kills, y, L"Kills", 150, 155, 170);
+        right(col_deaths, y, L"Deaths", 150, 155, 170);
+        box(8, y + kLine - 4, width - 8, y + kLine - 3, 90, 96, 110, 0.9f);
+        y += kLine;
+        for (const Row& r : rows) {
+            if (r.you) box(4, y - 2, width - 4, y + kLine - 4, 70, 90, 130, 0.45f);
+            const bool top3 = r.rank <= 3;
+            const float rr = r.rank == 1 ? 255 : r.rank == 2 ? 215 : r.rank == 3 ? 220 : 200;
+            const float rg = r.rank == 1 ? 210 : r.rank == 2 ? 220 : r.rank == 3 ? 150 : 200;
+            const float rb = r.rank == 1 ? 80 : r.rank == 2 ? 230 : r.rank == 3 ? 90 : 205;
+            little.draw(canvas, 10, y, std::to_wstring(r.rank), top3 ? rr : 200.0f, top3 ? rg : 200.0f, top3 ? rb : 205.0f);
+            std::wstring name = r.name;
+            const int room = col_kills - 48 - 40;
+            while (name.size() > 3 && little.width(name) > room) {
+                name.resize(name.size() - 2);
+                name.back() = L'…';
+            }
+            little.draw(canvas, 40, y, name, r.style.r, r.style.g, r.style.b);
+            right(col_kills, y, std::to_wstring(r.kills), 235, 225, 205);
+            right(col_deaths, y, std::to_wstring(r.deaths), 235, 225, 205);
+            y += kLine;
+        }
+    }
+};
+
 std::string version_in(const std::wstring& mod_json);  // (the monitor's, further down)
 
 // ---- the Notices window (since 0.15.54): warnings that stay on screen until FlameKit takes them back ----
@@ -5829,10 +5960,11 @@ void ui_thread_body() {
     NoticeLayer notices;
     ExperimentalLayer experimental;
     experimental.window = &window;
+    BoardLayer board;
     UpdateDialog update_dialog;
     backdrop.dialog = &update_dialog;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;

@@ -19,5 +19,6 @@ kit.start({
   "features.server_save",
   "features.server_version",  -- the notice when the server's FlameKit is older
   "features.chat",            -- chat copied into the Messages window, FlameKit's announcements there
+  "features.leaderboard",     -- the PvP Leaderboard (kills and deaths between players)
   -- "features.my_next_feature",
 })
