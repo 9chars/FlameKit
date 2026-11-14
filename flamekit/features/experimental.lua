@@ -51,8 +51,7 @@ local TIPS = {
   immortal = "Nothing can hurt or kill you: enemies, lava, the shroud, falling. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
-    .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Careful: your hits "
-    .. "may also hurt your own summons and pets while it is on (villagers cannot be hurt: tried in game). Off again when you leave the server. Everyone "
+    .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
@@ -1216,8 +1215,8 @@ function F.window_rows(world)
     selected = on, tooltip = TIPS.pvp }
   -- (0.15.96, owner) the PvP Leaderboard's window (DLL), so players find it
   local board_key = tostring(kit.setting("board_window_key", "F5") or "")
-  rows[#rows + 1] = { button = "board", text = (board_shown() and "Hide" or "Show") .. " PvP Leaderboard" .. (board_key ~= "" and (" [" .. board_key .. "]") or ""),
-    tooltip = "The PvP Leaderboard ranks players by their kills of other players and shows how often each one was killed by another player." }
+  rows[#rows + 1] = { button = "board", text = "Leaderboard", selected = board_shown(),
+    tooltip = "Shows or hides the PvP Leaderboard" .. (board_key ~= "" and (" (" .. board_key .. ")") or "") .. ". It ranks players by their kills of other players and shows how often each one was killed by another player." }
   rows[#rows + 1] = { heading = "Test monsters" }
   -- every monster under its group's heading, bosses in orange (0.15.73); `first` is put on top under its own heading
   local function monster_options(prefix, chosen, first)
@@ -1241,8 +1240,7 @@ function F.window_rows(world)
   local dpick = dummy_of(dummy_what)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil,
-    tooltip = "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it. "
-      .. "Click to choose what it looks like: Player-like (a random human-looking body) or any monster." }
+    tooltip = "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy",
     tooltip = "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
       .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
@@ -1252,8 +1250,7 @@ function F.window_rows(world)
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
   rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3]), text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
-    tooltip = "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings. "
-      .. "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
+    tooltip = "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
   rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = duel_level <= 1, tooltip = "One level lower" }

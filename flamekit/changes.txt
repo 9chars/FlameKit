@@ -1,3 +1,6 @@
+0.15.99 Nov 14, 2026
+- Experimental window: shorter tooltips (PvP's, the dummy's and the duelist's drop-downs); the leaderboard button is just "Leaderboard", lit while the leaderboard is shown.
+
 0.15.98 Nov 14, 2026
 - Settings: "Press the pointer key once instead of holding it" moved to the Windows group.
 

@@ -1170,10 +1170,10 @@ do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
   os.remove(TMP .. "\\ui_layout.txt")
   local function board_row() for _, r in ipairs(exp_rows()) do if r.button == "W:board" then return r end end end
   local br = board_row()
-  check(br ~= nil and br.text == "Show PvP Leaderboard [F5]", "the Experimental window has a Show PvP Leaderboard button: " .. tostring(br and br.text))
+  check(br ~= nil and br.text == "Leaderboard" and not br.selected, "the Experimental window has a Leaderboard button: " .. tostring(br and br.text))
   local lf = io.open(TMP .. "\\ui_layout.txt", "w"); lf:write("party 1 2 300 0 0 0\nboard 10 10 300 0 0 0\n"); lf:close()
   br = board_row()
-  check(br.text == "Hide PvP Leaderboard [F5]", "it says Hide while the window is shown (ui_layout.txt)")
+  check(br.text == "Leaderboard" and br.selected, "lit while the window is shown (ui_layout.txt)")
   os.remove(TMP .. "\\ui_board_toggle.request")
   click(br.button)
   local rf = io.open(TMP .. "\\ui_board_toggle.request", "r")
