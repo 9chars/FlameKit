@@ -5404,7 +5404,7 @@ struct HudLayer : Layer {
                 text.ready(g_screen, 18);
             }
             // (0.15.90, owner) the main screen's line on a translucent dark box, so it stands out
-            const int pad = in_world ? 4 : 12, top = in_world ? 2 : 6;
+            const int pad = in_world ? 4 : 10, top = in_world ? 2 : 4;  // (0.15.92) the box 2 px tighter
             int w = 8;
             for (const Line& l : shown) w = std::max(w, text.width(l.text) + 2 * pad);
             resize(w, static_cast<int>(shown.size()) * 24 + 2 * top);
@@ -5418,7 +5418,7 @@ struct HudLayer : Layer {
         }
         // (0.15.91, owner) 5 pixels from the corner's edges (it was 1.2% and 2% in, over some of the game's own UI); the
         // text's own top and side padding is inside the picture
-        place(in_world ? 5 - 4 : f.gw - 5 - canvas.w, f.gh - 5 - canvas.h + (in_world ? 2 : 0));
+        place(in_world ? 5 - 4 : f.gw - 1 - canvas.w, in_world ? f.gh - 5 - canvas.h + 2 : f.gh - 1 - canvas.h);  // main screen's box: 1 px in (0.15.92)
     }
 };
 
