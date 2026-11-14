@@ -1,3 +1,6 @@
+0.15.40 Nov 13, 2026
+- Auto Junk List: the key button says Set Dump Key and comes last in its row.
+
 0.15.39 Nov 13, 2026
 - The updater keeps looking for updates while one waits for the game restart: a newer version takes the waiting one's place, so one restart always brings the newest version (client).
 - The party window hides while one of the game's menus is open (bag, map, skills, ...), like the minimap.

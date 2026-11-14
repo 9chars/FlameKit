@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.39.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.40.
 
 ## What FlameKit is
 
@@ -72,7 +72,7 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.39. Client: 0.15.39 through the GitHub updater (needs a game restart).
+- Local server: 0.15.40. Client: 0.15.40 through the GitHub updater (needs a game restart).
 - 0.15.34 (owner: move the minimap with the mouse, no special option): MinimapLayer takes the mouse in pointer mode (`g_pointer_mode`) and is drawn over the backdrop (layer order: hud, backdrop, minimap, party, messages, window); a drag saves map_x/map_y as before; the light ring shows while the pointer is out; the "hide in menus" check is skipped in pointer mode (FlameKit's own pointer). Setting `map_move` and the Move button are gone.
 - 0.15.38 (owner): option button labels "Exclude Action Bar: ON", "Dump Key: ...", "Show All Bag Items: ..." (mod.json labels too); P lines carry a tooltip after a tab (`settings.help(key)`, the setting's help), shown by the DLL on hover.
 - 0.15.37 (owner): `items.is_keeper` also keeps trophies (debug name contains "trophy", e.g. `_Material_TX_Trophy_Wolf_Heavy_head`). New setting `lf_show_all` (button on the Auto Junk List's view, P line): on, nothing is kept (bag list shows gear and keepers; client `removable` and server `removable` allow them; the server learns it through `opts.show_all` in the sync message). Lists no longer drop kept kinds when loaded (client `load_list`, server `clean_names`): a kept item on the list is only skipped at removal while show_all is off, so switching show_all off loses nothing. Tooltip: no Carried line (the count is on the tile).

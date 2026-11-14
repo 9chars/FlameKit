@@ -64,8 +64,8 @@ local function write_list(world)
     lines[#lines + 1] = string.format("P %s %d %s\t%s", click, lit and 1 or 0, label, one_line(settings.help(key)))
   end
   opt("b:lf_keep_hotbar", kit.setting("lf_keep_hotbar", true), "Exclude Action Bar: " .. settings.value_text("lf_keep_hotbar"), "lf_keep_hotbar")
-  opt("k:lf_dump_key:c", settings.capturing() == "lf_dump_key", "Dump Key: " .. settings.value_text("lf_dump_key"), "lf_dump_key")
   opt("b:lf_show_all", kit.setting("lf_show_all", false), "Show All Bag Items: " .. settings.value_text("lf_show_all"), "lf_show_all")
+  opt("k:lf_dump_key:c", settings.capturing() == "lf_dump_key", "Set Dump Key: " .. settings.value_text("lf_dump_key"), "lf_dump_key")
   local items = kit.items
   local function tile(kind, e)
     local t = items.tip(e.item, e.debug_name)
