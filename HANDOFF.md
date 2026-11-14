@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.66.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.67.
 
 ## What FlameKit is
 
@@ -101,6 +101,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - Item tiles are a standard element: Lua `kit.items.tip(id, debug_name)`; a panel row `{ item = <id>, count, text, tooltip, button, selected }`; DLL `ItemTip` + `draw_item_tip()`. Use them for any item UI.
 - Tooltips: every button whose use is not obvious gets one; a paragraph starting with `WindowLayer::kRedLine` (`L'\x01'`) is red. UI text stays short; tooltips may explain.
 - PvP (0.15.65, Experimental switch `pvp`, session only, never saved): the server gives a player with PvP on `Faction` 1 (HitAll, enemy of everything: EMF `engine_parts/combat.md` 1.2), written again every step; off: back to 7. While anyone has PvP on, each player without it gets two hit rules (`from players, to them, cancel` and `from them, to players, cancel`) and one rule scales player-on-player hits to 25%. A player without PvP found with faction 1 is put back to 7 within 60 steps (leftover from a crash or reload: the faction is saved with the world). Untested with two players; the risk: some attacks may skip players for other reasons, and a HitAll player can hurt their own summons, pets and villagers. Rule budget: 2 per non-PvP player while PvP is in use (EMF allows 64).
+- PvP and monsters (0.15.67): measured with the duelist: a faction-1 player is noticed but never attacked by enemy AI (the target picker `enemy_combat_targets` takes player-side targets only); with PvP off it attacked at once. A PvP player's hit on the faction-7 dummy did kill it (PvP hits land). Fix: `pvp_aggro` every 120 steps sends `AddThreatTargetEvent {attackerId = monster, targetId = PvP player, threatValue = 100}` to each enemy-AI entity (DynamicEnemy01BehaviorState, faction not 7/8/11, alive) within 20 m; `emf.emits` in experimental's setup, so the server needs a restart for it (not a reload).
 - PvP test bodies (0.15.66, Experimental Debug, op `body` on channel exp): dummy `FakePlayer_Vukah_Melee` (faction 7, 0 damage) and duelist `Enemy_Vukah_Melee` with faction 1 (rewritten every 30 steps), one per player, 3 m in front. Owner: the duelist may hurt everything but pets and animals, never buildings: rule `from duelist, to objects, cancel` plus, every 180 steps, a rule per animal/pet within 40 m (Wildlife/Animal/IsTame, faction 5/6/12, or 11 without NpcState), at most 40. Villagers are fair game (owner). Not saved; gone on Remove, death, reload or the owner leaving. Unknown: whether a spawned Vukah despawns after a while (EMF saw a hostile vanish within a minute).
 - Messages window always shown in a world: last 5, 10 in pointer mode. It is for every message FlameKit sends the player (`kit.note`), except persistent notices, which go to the notices window (`kit.notice`) (owner, 0.15.64).
 

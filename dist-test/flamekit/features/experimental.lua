@@ -648,6 +648,47 @@ local function pvp_off_everywhere(world, why)
   emf.log("experimental: PvP is off for everyone: " .. why)
 end
 
+-- Monsters ignore a player of faction 1: the game's target picker (enemy_combat_targets) takes only player-side targets
+-- (seen in game, 0.15.66: the HitAll duelist noticed a PvP player but never attacked; with PvP off it attacked at
+-- once). So PvP would make a player safe from monsters. Fix: every 2 s each monster within AGGRO_R of a PvP player is
+-- told, with the game's own AddThreatTargetEvent, that this player threatens it (EMF re_companion_orders.md: it makes
+-- an enemy-AI body attack a target it would otherwise ignore). A monster here: an entity with the enemy AI
+-- (DynamicEnemy01BehaviorState), alive, of a faction that is not player side (7, 8, 11: players, companions, summons).
+local AGGRO_R, AGGRO_STEPS, AGGRO_THREAT = 20, 120, 100
+local aggro_broken = false
+
+local function pvp_aggro(world, players)
+  if aggro_broken or #players == 0 then return end
+  local sent = 0
+  local ok, err = pcall(function()
+    for _, e in ipairs(world:entities()) do
+      if has(world, "DynamicEnemy01BehaviorState", e) then
+        local _, n = faction(world, e)
+        if n and n ~= 7 and n ~= 8 and n ~= 11 then
+          local hp = world:get("NetworkHealth", e)
+          local x, _, z = world:position(e)
+          if x and (hp == nil or hp.health > 0) then
+            for _, pl in ipairs(players) do
+              local px, _, pz = world:position(pl)
+              if px and (px - x) ^ 2 + (pz - z) ^ 2 < AGGRO_R * AGGRO_R then
+                local done = emf.emit("server", "AddThreatTargetEvent", { attackerId = e, targetId = pl, threatValue = AGGRO_THREAT })
+                if done == false then error("the game refused AddThreatTargetEvent") end
+                sent = sent + 1
+              end
+            end
+          end
+        end
+      end
+    end
+  end)
+  if not ok then
+    aggro_broken = true
+    emf.log("experimental: PvP: monsters cannot be pointed at PvP players on this game version (" .. tostring(err) .. "): they ignore them")
+  elseif sent > 0 then
+    kit.debug("debug", "PvP: %d monster(s) told about PvP players near them", sent)
+  end
+end
+
 local function pvp(world)
   pvp_steps = pvp_steps + 1
   local any = false
@@ -694,7 +735,12 @@ local function pvp(world)
       pvp_scale_rule = nil
     end
   end)
-  if not ok then pvp_off_everywhere(world, tostring(err)) end
+  if not ok then pvp_off_everywhere(world, tostring(err)) return end
+  if any and pvp_steps % AGGRO_STEPS == 0 then
+    local players = {}
+    for _, p in pairs(online) do if p.pvp then players[#players + 1] = p.entity end end
+    pvp_aggro(world, players)
+  end
 end
 
 function F.tick(world)
@@ -980,6 +1026,9 @@ end
 
 function F.setup(k)
   kit = k
+  -- the game event that points monsters at PvP players (see pvp_aggro); EMF wants it named in the mod's first run
+  local okx, said = pcall(emf.emits, { "AddThreatTargetEvent" }, "server")
+  if not okx or said == false then emf.log("experimental: AddThreatTargetEvent cannot be sent (" .. tostring(said) .. "): monsters may ignore PvP players") end
   -- a player who joins has their rules from the first second, not from their game's first hello
   -- a player who leaves: their rules go at once (their switches stay saved for the next visit)
   pcall(emf.on_player_left, kit.guard(F, function(world, p)

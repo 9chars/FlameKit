@@ -74,7 +74,7 @@ left_fns = {}
 joined_fns = {}  -- EMF reports the players already there (the test player) after the world data
 SESSION_TOKEN = "run-1"
 held_key = nil
-spawned, destroyed = {}, {}
+spawned, destroyed, emitted = {}, {}, {}
 local channels, exp_up, exp_down, hit_rules, next_rule, ADMIN, casts = {}, {}, {}, {}, 0, false, {}
 local window, gives, next_pickup = nil, {}, 5000
 local emf_hud = {}  -- what the mod asked EMF to show (nothing since 0.15.14: FlameKit draws its own lines)
@@ -169,6 +169,8 @@ emf = {
   session = function() return 1 end,
   spawn = function(w, guid, x, y, z) spawned[#spawned + 1] = { guid = guid, x = x, y = y, z = z }; return 950 + #spawned end,
   destroy = function(w, id) destroyed[#destroyed + 1] = id; return true end,
+  emits = function(names, kind) assert(type(names) == "table", "emf.emits takes a list"); return true end,
+  emit = function(kind, name, fields) emitted[#emitted + 1] = { kind = kind, name = name, f = fields }; return true end,
   setting = function(k) assert(settings[k] ~= nil, "unknown setting " .. k); return settings[k] end,
   set_setting = function(k, v) assert(settings[k] ~= nil); settings[k] = v end,
   item = function(n) return ITEMS[n] end,
@@ -637,6 +639,18 @@ check(casts[#casts] == "PvP for a player ENABLED.", "everyone is told: " .. tost
 comps.Faction[PLAYER].faction = 7  -- the game sets it back (a death, say)
 step(2)
 check(comps.Faction[PLAYER].faction == 1, "a faction the game set back is written again")
+-- monsters ignore faction 1 players by themselves: each monster near a PvP player is told it is threatened by them
+comps.DynamicEnemy01BehaviorState = { [901] = {} }
+comps.NetworkHealth = comps.NetworkHealth or {}
+comps.Faction[901] = { faction = 3 }  -- a Vukah
+local pos0 = SW.position
+SW.position = function(self, id) if id == 901 then return 5, 0, 5 end return pos0(self, id) end
+step(125)
+local th = emitted[#emitted] or { f = {} }
+check(th.kind == "server" and th.name == "AddThreatTargetEvent" and th.f.attackerId == 901 and th.f.targetId == PLAYER,
+  "a monster near a PvP player is pointed at them (AddThreatTargetEvent)")
+SW.position = pos0
+comps.DynamicEnemy01BehaviorState, comps.Faction[901] = {}, nil
 ef = io.open(TMP .. "\\experimental.json"); etext = ef:read("a"); ef:close()
 check(not etext:find("pvp", 1, true), "PvP is never saved: it is off again next time")
 click(find_row("PvP", "sw:pvp").button)

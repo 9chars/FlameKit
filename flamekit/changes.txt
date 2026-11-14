@@ -1,3 +1,6 @@
+0.15.67 Nov 14, 2026
+- PvP: monsters ignored a player with PvP on (the game's monsters only pick players as targets, and a PvP player no longer counts as one). Now every monster within 20 m of a PvP player is pointed at them every 2 seconds with the game's own threat event, so PvP never makes you safe from monsters.
+
 0.15.66 Nov 14, 2026
 - PvP test bodies, to try PvP alone (Experimental, Debug section): "Spawn PvP dummy" puts a player-like body 3 m in front of you. With PvP on it swings at you but does no damage; hit it to see whether your weapons hurt a player. "Spawn PvP duelist" puts a Vukah fighter there that attacks everyone with full damage, PvP on or off. It never hurts animals, pets or buildings; villagers are fair game. "Remove" takes your body away. One at a time; it is gone after a reload or when you leave.
 
