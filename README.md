@@ -1,6 +1,6 @@
 # FlameKit
 
-A mod suite for Enshrouded by Ninechars. FlameKit adds a minimap, a party window, an auto junk list, PvP with a leaderboard, and a set of handy extras, all in one mod with one version number. It keeps itself up to date.
+A mod suite for Enshrouded by Ninechars. FlameKit adds a minimap, a party window, an auto junk list, PvP with a leaderboard, and a set of handy extras, all in one mod with one version number. It is built on top of the Enshrouded Modding Framework (EMF), available from its GitHub repository: https://github.com/matenm/emf-enshrouded/releases. It keeps itself up to date.
 
 FlameKit runs in your game and, for the features that change the world (PvP, fast travel, the experimental options), on the server too. On a server without FlameKit you still get the minimap, the junk list and the windows; the lower left corner then says "Not Connected".
 
