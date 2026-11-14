@@ -2601,6 +2601,7 @@ struct PinnedLayer : Layer {
     // this many pixels from the right edge (the window's right side), so the right-hand windows line up at any resolution
     bool def_center = false;
     int def_right_px = -1;
+    bool fixed_height = false;  // (0.15.105) a height the player gave it is kept even when the content is shorter
     static constexpr int kGrip = 14;
     int kHead = 28;          // the title bar's height (0 with headless)
     bool headless = false;   // no title bar (the Notices window): dragged anywhere in pointer mode, sized at its corner
@@ -2639,7 +2640,9 @@ struct PinnedLayer : Layer {
         LayoutEntry& e = lay();
         const int w = std::clamp(e.w > 0 ? e.w : default_w, min_w, max_w);
         const int natural = kHead + (e.collapsed ? 0 : content_height(w) + 8);
-        const int h = e.collapsed ? kHead : e.h > 0 ? std::min(natural, std::max(e.h, kHead + 40)) : natural;  // e.h: at most this tall
+        const int h = e.collapsed ? kHead
+                      : e.h > 0 ? (fixed_height ? std::max(e.h, kHead + 40) : std::min(natural, std::max(e.h, kHead + 40)))  // e.h: at most this tall
+                                : natural;
         max_scroll = std::max(0, natural - h);
         scroll = std::clamp(scroll, 0, max_scroll);
         resize(w, h);
@@ -3211,7 +3214,15 @@ struct MessagesLayer : PinnedLayer {
     uint64_t stamp = 0, next_read = 0;
     static constexpr int kLine = 18, kShowMs = 12000, kNew = 5, kAll = 10;
 
-    MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_x_pm = 6; def_y_pm = 20; }  // top left
+    // (0.15.105, owner: it holds the chat now) sized freely in both directions at its lower right corner: once the
+    // player gave it a height it keeps that height and shows every kept message, scrolled to the newest (the mouse wheel
+    // scrolls back; at the bottom again it follows the newest)
+    MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_x_pm = 6; def_y_pm = 20; fixed_height = true; max_w = 1400; }  // top left
+    bool stick = true;  // follows the newest message
+    void wheel(int delta, int x, int y) override {
+        PinnedLayer::wheel(delta, x, y);
+        stick = scroll >= max_scroll;
+    }
 
     bool active(const Frame& f) override { return f.in_world; }
 
@@ -3268,11 +3279,18 @@ struct MessagesLayer : PinnedLayer {
             next_read = f.now + 250;
             read_file(f.now);
         }
-        std::vector<size_t> want;  // the last 5, or 10 while the pointer is out
-        const size_t n = g_pointer_mode ? kAll : kNew;
+        std::vector<size_t> want;  // the last 5, or 10 while the pointer is out; all when the player sized it
+        const size_t n = lay().h > 0 ? all.size() : g_pointer_mode ? kAll : kNew;
         for (size_t i = all.size() > n ? all.size() - n : 0; i < all.size(); ++i) want.push_back(i);
-        if (want == shown) return false;
+        if (want == shown) {
+            if (stick && lay().h > 0 && scroll < max_scroll) {  // sized just now: to the newest
+                scroll = max_scroll;
+                return true;
+            }
+            return false;
+        }
         shown = std::move(want);
+        if (stick) scroll = 1 << 28;  // to the newest (draw_all keeps it in range)
         return true;
     }
 

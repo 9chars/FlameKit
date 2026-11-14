@@ -1,3 +1,6 @@
+0.15.105 Nov 14, 2026
+- Messages window: size it at its lower right corner (pointer key held) in both directions, wider and taller. Once you have given it a height it keeps that height and shows all kept messages (now the last 100, chat included), scrolled to the newest; the mouse wheel scrolls back, and at the bottom again it follows new messages. "Reset place" in the Windows tab puts it back to its small size.
+
 0.15.104 Nov 14, 2026
 - New default places for FlameKit's windows (used until you move a window, and by "Reset place" in the Windows tab): Messages top left, Party on the left under it, Notices top centre, the PvP Leaderboard at the right edge and the Experimental window just left of it. The right-hand windows line up with the right edge at any screen size. The minimap stays in the lower right corner and the FlameKit Menu in the middle.
 

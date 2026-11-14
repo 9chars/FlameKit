@@ -84,7 +84,7 @@ local messages = {}       -- the last messages, oldest first: {n, colour, text}
 local message_n = 0       -- the number of the newest message (they only grow; a new number shows the Messages window)
 local messages_dirty = false
 local hud_written = nil   -- ui_hud.dat as last written
-local MOST_MESSAGES = 20
+local MOST_MESSAGES = 100  -- (0.15.105) the Messages window can be sized to show many, chat included
 
 -- A message in FlameKit's Messages window (drawn by FlameKit's DLL; it shows itself for a few seconds when a message
 -- comes, and with the last ones while the pointer key is held): what a feature just did ("Junk discarded: Twigs x3"),
