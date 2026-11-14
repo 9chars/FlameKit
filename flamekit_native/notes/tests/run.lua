@@ -28,6 +28,8 @@ local function reset_world()
     InventorySetup = { [PLAYER] = { linksEntities = { 201, 202, 203, 0 }, linksCategories = { 4, 4, 2, 0 } } },
     SlotSelection = { [PLAYER] = { actionbarEntityIds = { 202, 0 } } },
     PlayerInput = { [PLAYER] = { fromClientSettings = { flags = 0x1000 } } },
+    -- the building cursor (zero outside build mode): kit.lua's build mode
+    ClientPlayerInput = { [PLAYER] = { data = { cursorInput = { primaryTransform = { position = { x = 0, y = 0, z = 0 } } } } } },
     ItemState = { [900] = { itemRarityUi = 2, itemLevelUi = 12, baseDamageUi = 34, itemState = 0 },
                   [901] = { itemRarityUi = 4, itemLevelUi = 30, baseDamageUi = 0, itemState = 0 } },
     WeaponGemSlot = { [900] = { weaponGem = { id = 0x44 } } },
@@ -62,7 +64,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { lf_show_all = false, open_on_start = false, window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
@@ -77,12 +79,13 @@ local emf_hud = {}  -- what the mod asked EMF to show (nothing since 0.15.14: Fl
 -- The lower-left lines as the DLL would draw them: ui_hud.dat in the mod's folder (kit.lua writes it).
 -- status: the newest message in FlameKit's Messages window (ui_messages.dat, kit.note), messages: how many there are
 local hud = setmetatable({}, { __index = function(_, key)
-  local t = { label = nil, status = "", status_colour = nil, messages = 0, newest = 0 }
+  local t = { label = nil, status = "", status_colour = nil, messages = 0, newest = 0, build = false }
   local f = io.open(TMP .. "\\ui_hud.dat", "r")
   if f then
     for line in f:lines() do
       local label = line:match("^label (.*)$")
       if label then t.label = label end
+      if line == "build 1" then t.build = true end
     end
     f:close()
   end
@@ -423,6 +426,18 @@ settings.show_label = false
 step(1)
 check(hud.label == "", "the label can be switched off")
 settings.show_label = true
+-- build mode: the building cursor moves away from zero; FlameKit's windows hide (ui_hud.dat "build 1"), if the setting is on
+check(hud.build == false, "not building: no build line")
+comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryTransform.position.x = 12345
+step(2)
+check(hud.build == true, "building (the cursor is placed): ui_hud.dat says build 1")
+settings.ui_hide_build = false
+step(2)
+check(hud.build == false, "with the setting off, nothing is hidden")
+settings.ui_hide_build = true
+comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryTransform.position.x = 0
+step(2)
+check(hud.build == false, "out of build mode: the line goes")
 settings.notify = false
 local newest_before = hud.newest
 comps.Inventory[201].slots[1] = stack(0x11, 4)

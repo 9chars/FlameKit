@@ -20,6 +20,7 @@ local SWITCHES = {
   { "map_big_text", "Minimaps larger than Large magnify (off: they show more of the world)", false,
     "Off: a minimap bigger than Large shows more of the world, with icons and text as big as on Large. On: it shows the same piece of the world, with everything bigger." },
   { "map_hide_in_menus", "Hide it while the big map, the bag or any menu is open", nil, "Hides the minimap while one of the game's menus is open, so it is not in the way." },
+  { "ui_hide_build", "Hide FlameKit's windows in build mode", nil, "While you build, the minimap, the party window, Messages and Notices are hidden so they are not in the way. The FlameKit label and its lines in the lower left corner stay, and FlameKit's window (F6) still opens." },
 }
 
 -- The marker filters: the short name the native part knows the kind by (kFilter in flamekit_native.cpp) and what the

@@ -2113,9 +2113,17 @@ struct Frame {  // what a layer gets to know about this moment
     bool in_menu = false;    // one of the game's menus is open (bag, map, skills, ...): the game shows its own pointer
 };
 
+// Build mode (0.15.59, owner: declutter the screen while building): the Lua part writes "build 1" into ui_hud.dat while
+// the player builds and ui_hide_build is on (HudLayer reads it). Every layer is then hidden unless it says otherwise
+// (Layer::stays_in_build): only the lower left lines and FlameKit's window (opened on purpose) stay. New windows hide
+// in build mode without doing anything.
+std::atomic<bool> g_build_hide{false};
+
 struct Layer {
     virtual ~Layer() = default;
     virtual const char* name() const = 0;
+    virtual bool stays_in_build() const { return false; }  // true: shown in build mode too (see g_build_hide)
+    bool shown() const { return visible && !(g_build_hide.load() && !stays_in_build()); }  // what is on screen now
     // Brings the layer up to date: visible, rect (where, in the game window's client coordinates; its size is the
     // canvas's) and the picture. Sets changed when the picture changed.
     virtual void update(const Frame& f) = 0;
@@ -3295,6 +3303,7 @@ std::string read_text(const std::wstring& path, size_t max);
 // act functions change. F6 (while the game is in front) opens the window and it takes the keyboard and mouse; F6 or
 // Esc closes it, and so does another window taking the front (Alt+Tab). Long tabs show in pages, never scroll.
 struct WindowLayer : Layer {
+    bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "FlameKit window"; }
     struct Entry {
         uint32_t id = 0;    // item id; 0: the game does not know the item (a grey square)
@@ -4320,6 +4329,7 @@ struct WindowLayer : Layer {
 // window. While FlameKit's window is open, this layer covers the game window with pixels that are as good as clear
 // (alpha 1 of 255) so the pointer stays visible everywhere; a click outside FlameKit's window does nothing.
 struct BackdropLayer : Layer {
+    bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "backdrop"; }
     const Layer* window = nullptr;
     void update(const Frame& f) override {
@@ -4383,6 +4393,7 @@ void look_for_game_cursor() {
 // update line from update_status.txt, which this DLL's own updater writes (green: ready for a restart); the debug level line only while the level
 // is not normal.
 struct HudLayer : Layer {
+    bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "lower left lines"; }
     struct Line {
         std::wstring text;
@@ -4397,11 +4408,11 @@ struct HudLayer : Layer {
     uint64_t next_read = 0;
 
     void read_files(uint64_t now) {
-        next_read = now + 500;
+        next_read = now + 200;  // 0.15.59: build mode should hide the windows quickly (was 500)
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_hud.dat").c_str(), L"rb", _SH_DENYNO)) {
             std::wstring new_label, new_status, new_notice;
             uint32_t rgb = 0xffb060;
-            bool complete = false;
+            bool complete = false, build = false;
             char line[512];
             while (fgets(line, sizeof line, fp)) {
                 line[std::strcspn(line, "\r\n")] = 0;
@@ -4409,7 +4420,9 @@ struct HudLayer : Layer {
                     complete = true;
                     break;
                 }
-                if (std::strncmp(line, "label ", 6) == 0) {
+                if (std::strcmp(line, "build 1") == 0) {
+                    build = true;
+                } else if (std::strncmp(line, "label ", 6) == 0) {
                     new_label = widen(line + 6);
                 } else if (std::strncmp(line, "notice ", 7) == 0) {
                     new_notice = widen(line + 7);
@@ -4420,6 +4433,10 @@ struct HudLayer : Layer {
             }
             fclose(fp);
             if (complete) {
+                if (build != g_build_hide.load()) {
+                    g_build_hide = build;
+                    FK_LOG(fklog::kInfo, "build mode: FlameKit's windows %s", build ? "hidden" : "shown again");
+                }
                 label = new_label;
                 status = new_status;
                 notice = new_notice;
@@ -4499,20 +4516,20 @@ struct Compositor {
         for (size_t i = 0; i < layers.size(); ++i) {
             Layer* l = layers[i];
             const bool moved = !EqualRect(&l->rect, &was_rect[i]);
-            if (l->changed || moved || l->visible != was_visible[i]) {
+            if (l->changed || moved || l->shown() != was_visible[i]) {
                 if (was_visible[i]) unite(dirty, was_rect[i]);
-                if (l->visible) unite(dirty, l->rect);
+                if (l->shown()) unite(dirty, l->rect);
             }
             l->changed = false;
             was_rect[i] = l->rect;
-            was_visible[i] = l->visible;
+            was_visible[i] = l->shown();
         }
         const RECT screen{0, 0, w, h};
         IntersectRect(&dirty, &dirty, &screen);
         if (IsRectEmpty(&dirty)) return dirty;
         for (int y = dirty.top; y < dirty.bottom; ++y) std::fill(surface + static_cast<size_t>(y) * w + dirty.left, surface + static_cast<size_t>(y) * w + dirty.right, 0u);
         for (Layer* l : layers) {
-            if (!l->visible || !l->canvas.px) continue;
+            if (!l->shown() || !l->canvas.px) continue;
             RECT part;
             if (!IntersectRect(&part, &l->rect, &dirty)) continue;
             for (int y = part.top; y < part.bottom; ++y) {
@@ -4535,23 +4552,23 @@ struct Compositor {
 
     bool any_visible() const {
         for (const Layer* l : layers)
-            if (l->visible) return true;
+            if (l->shown()) return true;
         return false;
     }
     Layer* keys_layer() const {
         for (auto it = layers.rbegin(); it != layers.rend(); ++it)
-            if ((*it)->visible && (*it)->wants_keys()) return *it;
+            if ((*it)->shown() && (*it)->wants_keys()) return *it;
         return nullptr;
     }
     bool any_mouse() const {
         for (const Layer* l : layers)
-            if (l->visible && l->wants_mouse()) return true;
+            if (l->shown() && l->wants_mouse()) return true;
         return false;
     }
     Layer* mouse_layer(int x, int y) const {  // the top layer that takes the mouse there
         const POINT p{x, y};
         for (auto it = layers.rbegin(); it != layers.rend(); ++it)
-            if ((*it)->visible && (*it)->wants_mouse() && PtInRect(&(*it)->rect, p)) return *it;
+            if ((*it)->shown() && (*it)->wants_mouse() && PtInRect(&(*it)->rect, p)) return *it;
         return nullptr;
     }
 };

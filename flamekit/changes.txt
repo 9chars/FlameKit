@@ -1,3 +1,6 @@
+0.15.59 Nov 13, 2026
+- New setting in the Minimap tab, on by default: "Hide FlameKit's windows in build mode". While you build, the minimap, the party window, Messages and Notices are hidden so they are not in the way; the FlameKit label and its lines in the lower left corner stay, and FlameKit's window (F6) still opens. Windows added later hide the same way.
+
 0.15.58 Nov 13, 2026
 - Auto Junk List: on joining a server, your list and the Auto-Collect notice are there the moment you are in the world. The server received your list up to 15 s before that (connected, but not in the world yet) and threw it away; it now keeps it and takes it as soon as you join, and reads your Auto-Collect setting right then instead of at its next check.
 - Auto Junk List: 0.15.57's reading of the Auto-Collect setting in your own game is gone again: the game keeps that setting on the server only, so there was nothing to read.

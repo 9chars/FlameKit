@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.58",
+  "version": "0.15.59",
   "description": "One toolkit, many features (F6 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -262,6 +262,15 @@
       "default": true,
       "label": "Hide the minimap while the big map, the bag or any menu is open",
       "help": "The big map, the bag and every other screen that shows the mouse pointer.",
+      "live": true,
+      "group": "Minimap"
+    },
+    {
+      "key": "ui_hide_build",
+      "type": "bool",
+      "default": true,
+      "label": "Hide FlameKit's windows in build mode",
+      "help": "While you build, the minimap, the party window, Messages and Notices are hidden so they are not in the way. The FlameKit label and its lines in the lower left corner stay, and FlameKit's window (F6) still opens.",
       "live": true,
       "group": "Minimap"
     },

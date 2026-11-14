@@ -176,8 +176,32 @@ end
 -- "FlameKit v1.2.3 by Name" label and the notice, written into emf\mods\flamekit\ui_hud.dat when they change:
 --   label <text>              ("" when the player switched the label off)
 --   notice <text>             (orange, under the label: this server does not run FlameKit, or an older one)
+--   build 1                   (0.15.59: the player is in build mode and ui_hide_build is on: the DLL hides every
+--                              window that does not opt out, all but these lines and FlameKit's window)
 --   end                       (a file without it is half written: the DLL reads it again later)
 -- The updater's line under the label comes from the DLL itself. ui_hud.dat is a runtime file: never deployed.
+-- Build mode (0.15.59): the game's building cursor, ClientPlayerInput.data.cursorInput.primaryTransform of your own
+-- player in your game's world, is all zero outside build mode (EMF docs, engine_parts/re_villager_jobs.md, for the
+-- server's copy of the same input). Any non-zero position: building.
+local build_was = nil
+local function in_build_mode(world)
+  local me = emf.local_player()
+  if not me or me == 0 then return false end
+  local ok, on = pcall(function()
+    local input = world:get("ClientPlayerInput", me)
+    if not input then return false end
+    local p = input.data.cursorInput.primaryTransform.position
+    return p.x ~= 0 or p.y ~= 0 or p.z ~= 0
+  end)
+  on = ok and on == true
+  if on ~= build_was then
+    if not ok and build_was == nil then kit.debug("info", "build mode: cannot be read here (%s)", tostring(on)) end
+    build_was = on
+    kit.debug("info", "build mode: %s", on and "on" or "off")
+  end
+  return on
+end
+
 local function hud_tick(world)
   write_messages()
   write_notices()
@@ -193,6 +217,7 @@ local function hud_tick(world)
     local note = kit.server_note(world)
     if note then lines[#lines + 1] = "notice " .. note end
   end
+  if kit.setting("ui_hide_build", true) and in_build_mode(world) then lines[#lines + 1] = "build 1" end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"
   if text == hud_written then return end
