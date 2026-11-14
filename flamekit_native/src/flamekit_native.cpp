@@ -5404,7 +5404,7 @@ struct HudLayer : Layer {
                 text.ready(g_screen, 18);
             }
             // (0.15.90, owner) the main screen's line on a translucent dark box, so it stands out
-            const int pad = in_world ? 4 : 10, top = in_world ? 2 : 4;  // (0.15.92) the box 2 px tighter
+            const int pad = in_world ? 4 : 8, top = in_world ? 2 : 2;  // (0.15.92, 0.15.93) the box 4 px tighter in all
             int w = 8;
             for (const Line& l : shown) w = std::max(w, text.width(l.text) + 2 * pad);
             resize(w, static_cast<int>(shown.size()) * 24 + 2 * top);

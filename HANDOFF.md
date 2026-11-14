@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.92.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.93.
 
 ## What FlameKit is
 

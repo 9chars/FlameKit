@@ -1,8 +1,8 @@
-0.15.92
+0.15.93
 2020 a354e5f1 flamekit/README.md
-34525 7619c150 flamekit/changes.txt
+34651 3168b937 flamekit/changes.txt
 1085 c36b8f36 flamekit/main.lua
-12767 4b7621f6 flamekit/mod.json
+12767 4899769d flamekit/mod.json
 4360 9fe38834 flamekit/core/bag.lua
 8501 7015348a flamekit/core/items.lua
 13853 81a8dfeb flamekit/core/kit.lua
@@ -23,5 +23,5 @@
 13878 0fb7bd33 flamekit/features/loot_filter/client.lua
 2187 55496808 flamekit/features/loot_filter/init.lua
 17063 82cfd943 flamekit/features/loot_filter/server.lua
-836096 6deaffc6 flamekit_native/flamekit_native.dll
-400 c7bc0d6f flamekit_native/mod.json
+836096 c0067bbd flamekit_native/flamekit_native.dll
+400 7ad1a8ee flamekit_native/mod.json

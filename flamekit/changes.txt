@@ -1,3 +1,6 @@
+0.15.93 Nov 14, 2026
+- Main screen line: its dark box 2 pixels tighter again, still 1 pixel from the right and bottom edges.
+
 0.15.92 Nov 14, 2026
 - Main screen line: its dark box is 2 pixels tighter around the text and sits 1 pixel from the right and bottom edges.
 
