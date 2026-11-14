@@ -1,3 +1,6 @@
+0.15.72 Nov 14, 2026
+- PvP duelist: pick any of 189 monsters, read from the game's own data, in groups (Vukah, Scavengers, Shroud, Undead, Beasts, Drak, Ancients), 12 to a page; bosses are shown in orange. Untried ones may stand still.
+
 0.15.71 Nov 14, 2026
 - PvP duelist: quick level buttons 75 and 100 next to 1, 25 and 50.
 - PvP switch tooltip: villagers cannot be hurt (tried in game).

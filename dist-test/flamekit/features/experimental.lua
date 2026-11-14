@@ -248,21 +248,21 @@ end
 -- player clicks Remove or leaves, when it dies, or when the world reloads.
 local DUMMY_GUID = "9543cfb0-b4d7-408e-905c-ccb79a15136d"  -- FakePlayer_Vukah_Melee
 local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
--- What a duelist can be (0.15.70, owner: pick it from a list). Game templates that EMF's own mods spawn and that fight
--- when spawned away from their camp: raids/champion (Vukah, the brawler mini-boss), necromancer (skeleton),
--- beastmaster (the four beasts). Key, the name on the button, the template GUID.
-local DUELISTS = {
-  { "vukah", "Vukah Warrior", DUEL_GUID },
-  { "brawler", "Vukah Brawler (mini-boss)", "9c8e2008-7259-4114-b6fc-615f0f181c04" },
-  { "skeleton", "Skeleton", "b3e66f3b-7b13-4fa0-a68c-d2a41d8c84d9" },
-  { "wolf", "Wolf", "478381c5-585f-4264-b373-dbb1ea596eca" },
-  { "boar", "Boar", "255fd8d9-4447-445d-8ffc-4d9dc0afdd16" },
-  { "sabretooth", "Sabretooth", "50b96064-3ffc-47a2-8c7d-1d592a3c459c" },
-  { "hound", "Hound", "87575915-bc75-4611-ab71-0cd4e79535b1" },
-}
-local function duelist(key)
-  for _, d in ipairs(DUELISTS) do if d[1] == key then return d end end
-  return DUELISTS[1]
+-- What a duelist can be (0.15.72, owner: any monster from a list): every creature in core/monsters.lua, read from
+-- the game's own data (189 of them, in groups). The client sends the template GUID; the server spawns only GUIDs on that
+-- list. Before 0.15.72 there were seven, taken from EMF's own mods (all seven fought, 2026-11-14).
+local MONSTERS = require("core.monsters")
+local MONSTER_BY_GUID, MONSTER_GROUPS = {}, {}
+for _, m in ipairs(MONSTERS) do
+  MONSTER_BY_GUID[m[3]] = m
+  if not MONSTER_GROUPS[#MONSTER_GROUPS] or MONSTER_GROUPS[#MONSTER_GROUPS] ~= m[1] then
+    local known = false
+    for _, g in ipairs(MONSTER_GROUPS) do if g == m[1] then known = true end end
+    if not known then MONSTER_GROUPS[#MONSTER_GROUPS + 1] = m[1] end
+  end
+end
+local function duelist(guid)
+  return MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[DUEL_GUID] or { "Vukah", "Melee", DUEL_GUID, false }
 end
 local MAX_LEVEL = 255
 local DUEL_FACTION = 1                                      -- HitAll
@@ -360,6 +360,7 @@ local function spawn_body(world, account, player, kind, level, what)
   end)
   local d = duelist(what)
   local ok, id = pcall(emf.spawn, world, kind == "duel" and d[3] or DUMMY_GUID, x + fx * 3, y, z + fz * 3)
+  d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = kind == "duel" and d[2] or nil }
   bodies[id] = b
@@ -954,7 +955,8 @@ local ASK_STEPS = 300   -- say hello every 5 seconds: the server keeps your rule
 local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
-local duel_what, duel_level = "vukah", 1  -- the Debug section's duelist choice, this session (0.15.70)
+local duel_what, duel_level = DUEL_GUID, 1  -- the Debug section's duelist choice, this session (0.15.70)
+local duel_group, duel_page, PAGE = "Vukah", 1, 12
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
 -- The game's number for a map marker type: FNV-1a over the type's GUID, as the game keeps it in memory or as written.
@@ -1130,9 +1132,23 @@ local function panel_rows(world)
     tooltip = "Removes your test body." }
   rows[#rows + 1] = { text = "Duelist: it attacks everyone with full damage, PvP on or off. It never hurts animals, pets or "
     .. "buildings; villagers are fair game. Spawn it away from your base." }
-  for i, d in ipairs(DUELISTS) do
-    rows[#rows + 1] = { button = "dbg:what:" .. d[1], text = d[2], selected = duel_what == d[1], same_line = i > 1,
-      tooltip = "The duelist is a " .. d[2] .. "." }
+  for i, g in ipairs(MONSTER_GROUPS) do
+    rows[#rows + 1] = { button = "dbg:grp:" .. g, text = g, selected = duel_group == g, same_line = i > 1 }
+  end
+  local list = {}
+  for _, m in ipairs(MONSTERS) do if m[1] == duel_group then list[#list + 1] = m end end
+  local pages = math.max(1, math.ceil(#list / PAGE))
+  duel_page = math.max(1, math.min(pages, duel_page))
+  for i = (duel_page - 1) * PAGE + 1, math.min(#list, duel_page * PAGE) do
+    local m = list[i]
+    rows[#rows + 1] = { button = "dbg:what:" .. m[3], text = m[2], selected = duel_what == m[3],
+      same_line = (i - 1) % 3 ~= 0, color = m[4] and "#ffb060" or nil,
+      tooltip = m[4] and "A boss: it has its own health bar." or nil }
+  end
+  if pages > 1 then
+    rows[#rows + 1] = { button = "dbg:page:-1", text = "< Previous", disabled = duel_page <= 1 }
+    rows[#rows + 1] = { text = "page " .. duel_page .. " of " .. pages, same_line = true, dim = true }
+    rows[#rows + 1] = { button = "dbg:page:1", text = "Next >", same_line = true, disabled = duel_page >= pages }
   end
   local lvl_tip = duel_level > 50 and "Above the game's level 50 it gets very strong: a level 75 one beat a level 50 player."
     or "Its level: the game sets its health and damage from it (level 50: about 6700 health)."
@@ -1145,7 +1161,8 @@ local function panel_rows(world)
   for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q }
   end
-  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn " .. duelist(duel_what)[2] .. " (level " .. duel_level .. ")",
+  local pick = duelist(duel_what)
+  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn " .. pick[1] .. ": " .. pick[2] .. " (level " .. duel_level .. ")",
     selected = v.body == "duel", tooltip = "Replaces your test body." }
   return rows
 end
@@ -1156,8 +1173,12 @@ end
 
 function F.click(world, key)
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
-  local what = key:match("^dbg:what:(%a+)$")
-  if what then duel_what = duelist(what)[1] return end
+  local what = key:match("^dbg:what:([%x%-]+)$")
+  if what then duel_what = duelist(what)[3] return end
+  local grp = key:match("^dbg:grp:(%a+)$")
+  if grp then duel_group, duel_page = grp, 1 return end
+  local turn = key:match("^dbg:page:(%-?%d)$")
+  if turn then duel_page = duel_page + tonumber(turn) return end
   local step = key:match("^dbg:lvl:(%-?%d+)$")
   if step then duel_level = math.max(1, math.min(MAX_LEVEL, duel_level + tonumber(step))) return end
   local set = key:match("^dbg:lvlset:(%d+)$")
@@ -1225,7 +1246,7 @@ function F.setup(k)
   -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;
   -- "flamekit.pvptest off" takes all of it back. The duelist's AI lines in the log tell whether it fights.
   local test = nil  -- { account, player, rule }
-  pcall(emf.command, "duelist", "<player entity> [level 1-255] [vukah|brawler|skeleton|wolf|boar|sabretooth|hound]: a duelist 3 m in front of that player (PvP on or off, it fights)",
+  pcall(emf.command, "duelist", "<player entity> [level 1-255] [template GUID from core/monsters.lua]: a duelist 3 m in front of that player (PvP on or off, it fights)",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
       local player, level = tonumber(args[1]), tonumber(args[2])
