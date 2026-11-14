@@ -1171,6 +1171,17 @@ end
 -- FlameKit's Experimental window (0.15.74, owner): a pinned window that stays on screen while playing. Fast Travel at
 -- the top, then PvP, then the test bodies (the dummy and the duelist). Drawn by the DLL from ui_exp.dat
 -- (features/native_ui.lua); its clicks come back to F.click like the tab's.
+-- Is the PvP Leaderboard's window shown? The DLL keeps it in ui_layout.txt: "board <x> <y> <w> <collapsed> <hidden> ...";
+-- no line yet: hidden (it starts hidden).
+local function board_shown()
+  local f = io.open(emf.dir .. "\\ui_layout.txt", "r")
+  if not f then return false end
+  local text = f:read("a") or ""
+  f:close()
+  local hidden = text:match("\nboard %-?%d+ %-?%d+ %-?%d+ %d+ (%d+)") or text:match("^board %-?%d+ %-?%d+ %-?%d+ %d+ (%d+)")
+  return hidden == "0"
+end
+
 function F.window_rows(world)
   local v = my_view(world)
   if not v then
@@ -1190,6 +1201,10 @@ function F.window_rows(world)
   local on = v.pvp == true
   rows[#rows + 1] = { button = "sw:pvp", text = (on and "On    " or "Off   ") .. "PvP (free-for-all)" .. (v.pvp_dead and " (not working)" or ""),
     selected = on, tooltip = TIPS.pvp }
+  -- (0.15.96, owner) the PvP Leaderboard's window (DLL), so players find it
+  local board_key = tostring(kit.setting("board_window_key", "F5") or "")
+  rows[#rows + 1] = { button = "board", text = (board_shown() and "Hide" or "Show") .. " PvP Leaderboard" .. (board_key ~= "" and (" [" .. board_key .. "]") or ""),
+    tooltip = "The PvP Leaderboard ranks players by their kills of other players and shows how often each one was killed by another player." }
   rows[#rows + 1] = { heading = "Test monsters" }
   -- every monster under its group's heading, bosses in orange (0.15.73); `first` is put on top under its own heading
   local function monster_options(prefix, chosen, first)
@@ -1299,6 +1314,14 @@ function F.click(world, key)
     end
     kit.debug("warn", "log: debug level %s (Experimental tab, Debug)", level)
     kit.debug_level(true)
+    return
+  end
+  if key == "board" then  -- the DLL shows or hides the PvP Leaderboard (BoardLayer) when this file appears
+    local f = io.open(emf.dir .. "\\ui_board_toggle.request", "w")
+    if f then
+      f:write("1")
+      f:close()
+    end
     return
   end
   if key == "home" then

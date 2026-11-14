@@ -3307,7 +3307,7 @@ struct BoardLayer : PinnedLayer {
     };
     std::vector<Row> rows;
     bool from_server = false, known = false, first = true;
-    uint64_t stamp = 0, next_read = 0;
+    uint64_t stamp = 0, next_read = 0, next_ask = 0;
     static constexpr int kLine = 22;
 
     BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_x_pm = 780; def_y_pm = 420; }
@@ -3362,11 +3362,20 @@ struct BoardLayer : PinnedLayer {
                 FK_LOG(fklog::kInfo, "leaderboard: hidden until its key is pressed (first time)");
             }
         }
-        if (g_board_toggle.exchange(false) && f.in_world) {
+        bool asked = false;  // (0.15.96) the Experimental window's "Show PvP Leaderboard" button (features/experimental.lua)
+        if (f.now >= next_ask) {
+            next_ask = f.now + 100;
+            const std::wstring req = g_flamekit_dir + L"ui_board_toggle.request";
+            if (GetFileAttributesW(req.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                DeleteFileW(req.c_str());
+                asked = true;
+            }
+        }
+        if ((g_board_toggle.exchange(false) || asked) && f.in_world) {
             LayoutEntry& e = lay();
             e.hidden = !e.hidden;
             g_layout.save();
-            FK_LOG(fklog::kInfo, "leaderboard: %s (its key)", e.hidden ? "hidden" : "shown");
+            FK_LOG(fklog::kInfo, "leaderboard: %s (%s)", e.hidden ? "hidden" : "shown", asked ? "the Experimental window's button" : "its key");
             again = true;
         }
         if (f.now >= next_read) {

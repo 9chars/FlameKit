@@ -1148,4 +1148,19 @@ do
   check(board_text() == "source server\nend\n", "flamekit.board_reset clears it")
   SW.account, SW.name = old_account, nil
 end
+do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
+  os.remove(TMP .. "\\ui_layout.txt")
+  local function board_row() for _, r in ipairs(exp_rows()) do if r.button == "W:board" then return r end end end
+  local br = board_row()
+  check(br ~= nil and br.text == "Show PvP Leaderboard [F5]", "the Experimental window has a Show PvP Leaderboard button: " .. tostring(br and br.text))
+  local lf = io.open(TMP .. "\\ui_layout.txt", "w"); lf:write("party 1 2 300 0 0 0\nboard 10 10 300 0 0 0\n"); lf:close()
+  br = board_row()
+  check(br.text == "Hide PvP Leaderboard [F5]", "it says Hide while the window is shown (ui_layout.txt)")
+  os.remove(TMP .. "\\ui_board_toggle.request")
+  click(br.button)
+  local rf = io.open(TMP .. "\\ui_board_toggle.request", "r")
+  check(rf ~= nil, "a click asks the DLL to show or hide it (ui_board_toggle.request)")
+  if rf then rf:close() end
+  os.remove(TMP .. "\\ui_layout.txt")
+end
 print("ALL PASSED (" .. MODE .. ")")

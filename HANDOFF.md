@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.95.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.96.
 
 ## What FlameKit is
 
@@ -132,6 +132,8 @@ kills/deaths/name. Board sent on channel flamekit/board (to players) on change, 
 ui_board.dat ("source server|none", "r rank kills deaths you name", "end"). Ranking: kills desc, deaths asc, name;
 equal kills+deaths share a rank. Kills announced via chat.announce. Console: flamekit.board_reset. DLL: BoardLayer
 (PinnedLayer "board", key board_window_key F5, hidden until the key is first pressed). Not yet tested with real kills.
+0.15.96: Experimental window button "Show/Hide PvP Leaderboard [F5]" (label from ui_layout.txt's board line); a click
+writes ui_board_toggle.request, which BoardLayer deletes and toggles on (checked every 100 ms).
 
 ## Main screen line (0.15.88, 0.15.89)
 Outside a world HudLayer shows one line in the lower RIGHT corner: "FlameKit v<running Lua version> Loaded" (owner: the
