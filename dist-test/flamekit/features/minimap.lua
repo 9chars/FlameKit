@@ -104,9 +104,9 @@ function F.tick(world)
     if ok and account then
       local x, _, z = world:position(id)
       if x then
-        local okn, name = pcall(world.name, world, id)
+        local okn, name = pcall(world.character_name, world, id)  -- the character name first (0.15.108)
         if not okn or type(name) ~= "string" or name == "" then
-          okn, name = pcall(world.character_name, world, id)
+          okn, name = pcall(world.name, world, id)
         end
         if not okn or type(name) ~= "string" or name == "" then name = "Player" end
         here[#here + 1] = { id = id, line = string.format("%.1f %.1f %s", x, z, (name:gsub("[%c]", " "))) }

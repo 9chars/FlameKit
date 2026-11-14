@@ -842,8 +842,10 @@ void on_world_tick(emf::World w) {
                 const auto* ct = rt ? nullptr : w.get<gen::CurrentTransform>(id);
                 if (!rt && !ct) continue;
                 const auto& p = rt ? rt->transform.position : ct->transform.position;
-                const auto name = emf::player_name(w, id);
-                players.push_back({static_cast<float>(meters(p.x)), static_cast<float>(meters(p.z)), name ? *name : std::string()});
+                // (0.15.108, owner) no name here: emf::player_name is the connection (account) name, and the character
+                // name can only be read where the world is hosted. FarPlayers gives each one the character name from
+                // the server's list (features/minimap.lua), the nearest within 30 m.
+                players.push_back({static_cast<float>(meters(p.x)), static_cast<float>(meters(p.z)), std::string()});
             }
         }
         if (s.players) g_far_players.add_to(players, now);

@@ -1164,6 +1164,17 @@ do
   check(board_text() == "source server\nend\n", "flamekit.board_reset clears it")
   SW.account, SW.name = old_account, nil
 end
+do  -- (0.15.108) chat lines carry the character name, not the account's connection name
+  SW.name = function(w, id) return id == PLAYER and "AccountName" or nil end
+  SW.character_name = function(w, id) return id == PLAYER and "HeroChar" or nil end
+  chat_fn(SW, ACCOUNT, PLAYER, "name check")
+  step(SYNC + 5)
+  local mf = io.open(TMP .. "\\ui_messages.dat")
+  local mt = mf and mf:read("a") or ""
+  if mf then mf:close() end
+  check(mt:find("HeroChar: name check", 1, true) ~= nil and not mt:find("AccountName: name check", 1, true), "a chat line shows the character name")
+  SW.name, SW.character_name = nil, nil
+end
 do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
   os.remove(TMP .. "\\ui_layout.txt")
   local function board_row() for _, r in ipairs(exp_rows()) do if r.button == "W:board" then return r end end end

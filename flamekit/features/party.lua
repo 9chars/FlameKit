@@ -114,7 +114,9 @@ local function receive(world, text)
 end
 
 local function player_name(world, id)
-  for _, how in ipairs({ "name", "character_name" }) do  -- the order the minimap uses: the same name, the same colour
+  -- (0.15.108, owner) the character name first (the Social tab's), the connection (account) name only while it is not
+  -- known yet; the same order everywhere (minimap, chat, leaderboard): the same name, the same colour
+  for _, how in ipairs({ "character_name", "name" }) do
     local ok, name = pcall(world[how], world, id)
     if ok and type(name) == "string" and name ~= "" then return name end
   end

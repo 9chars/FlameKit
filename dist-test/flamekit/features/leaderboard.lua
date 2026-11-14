@@ -45,7 +45,7 @@ local function clean(text)
 end
 
 local function name_of(world, entity)
-  for _, how in ipairs({ "name", "character_name" }) do  -- the order the party window uses (the same colour)
+  for _, how in ipairs({ "character_name", "name" }) do  -- the character name first, as in the party window (0.15.108)
     local ok, name = pcall(world[how], world, entity)
     if ok and type(name) == "string" and name ~= "" then return clean(name) end
   end

@@ -53,8 +53,8 @@ local function to_all(world, msg)
 end
 
 local function name_of(world, entity)
-  local ok, name = pcall(world.name, world, entity)
-  if not ok or type(name) ~= "string" or name == "" then ok, name = pcall(world.character_name, world, entity) end
+  local ok, name = pcall(world.character_name, world, entity)  -- the character name first (0.15.108)
+  if not ok or type(name) ~= "string" or name == "" then ok, name = pcall(world.name, world, entity) end
   if not ok or type(name) ~= "string" or name == "" then name = "A player" end
   return (name:gsub("[%c]", " "))
 end

@@ -1,3 +1,6 @@
+0.15.108 Nov 14, 2026
+- Players are shown by their character name (the one in the game's Social tab), not their account name: in the Party window, on the minimap, in chat lines in the Messages window, in announcements and on the PvP Leaderboard. Right after someone joins, their account name may show for a few seconds until the game knows the character name. Player colours follow the character name, so they may differ from before. The server needs this version too.
+
 0.15.107 Nov 14, 2026
 - The Messages window hides while the bag or any of the game's menus is open, like the other windows.
 - Clicking another program while a game menu is open no longer brings FlameKit's windows up over the menu: FlameKit keeps the last menu state while the game is in the background.
