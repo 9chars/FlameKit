@@ -2182,6 +2182,7 @@ struct Frame {  // what a layer gets to know about this moment
     bool game_front = false; // the game's own window is the foreground window
     bool ours_front = false; // a window of the game's process is the foreground window (the game, or FlameKit's overlay)
     bool in_world = false;   // a world runs (the player's position came within the last 1.5 s)
+    bool in_menu = false;    // one of the game's menus is open (bag, map, skills, ...): the game shows its own pointer
 };
 
 struct Layer {
@@ -2511,7 +2512,8 @@ struct PinnedLayer : Layer {
     const char* name() const override { return id.c_str(); }
     LayoutEntry& lay() { return g_layout.get(id); }
 
-    virtual bool active(const Frame& f) { return f.in_world; }  // shown at all now (besides hidden)
+    bool hide_in_menus = false;  // hidden while one of the game's menus is open (Frame::in_menu), like the minimap
+    virtual bool active(const Frame& f) { return f.in_world && !(hide_in_menus && f.in_menu); }  // shown at all now (besides hidden)
     virtual int content_height(int width) = 0;                  // the content's height at this width
     virtual void draw_content(int top, int width) = 0;          // into canvas, below the title bar
     virtual bool refresh(const Frame& f) { return false; }      // read new data; true when the content changed
@@ -2685,7 +2687,7 @@ struct PartyLayer : PinnedLayer {
     uint64_t stamp = 0, next_read = 0;
     static constexpr int kRow = 76;
 
-    PartyLayer() : PinnedLayer("party", L"Party", 300) {}
+    PartyLayer() : PinnedLayer("party", L"Party", 300) { hide_in_menus = true; }
 
     bool refresh(const Frame& f) override {
         if (f.now < next_read) return false;
@@ -4660,6 +4662,15 @@ void ui_thread_body() {
             } else if (!g_pointer_mode) {
                 restore_rounds = 0;
             }
+        }
+
+        // One of the game's menus is open (bag, map, skills, ...): the game's own window is in front and shows the
+        // pointer (a pointer "showing" without a picture is hidden: the game hides it that way too). FlameKit's own
+        // pointer is not a menu: then FlameKit's overlay is in front.
+        if (f.game_front && !g_pointer_mode) {
+            CURSORINFO ci{};
+            ci.cbSize = sizeof(ci);
+            f.in_menu = GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) != 0 && ci.hCursor != nullptr;
         }
 
         if (f.game_front) look_for_game_cursor();  // the game's pointer, while the game shows it in its menus

@@ -242,6 +242,34 @@ inline void install_pending(const std::wstring& mods, void (*log)(const char*)) 
     }
 }
 
+// The version held in emf\flamekit_update\ for the next start (ready.txt's first line); empty when none is held.
+inline std::string held_version(const std::wstring& mods) {
+    std::vector<uint8_t> raw;
+    if (!read_file(pending_dir(mods) + L"ready.txt", raw)) return {};
+    std::string v(raw.begin(), raw.end());
+    v = v.substr(0, v.find('\n'));
+    while (!v.empty() && (v.back() == '\r' || v.back() == ' ')) v.pop_back();
+    return v;
+}
+
+// Throws the held Lua part away (its list first, so a half-cleared hold is never installed): before a newer version
+// is held in its place.
+inline void clear_pending(const std::wstring& mods) {
+    const std::wstring hold = pending_dir(mods);
+    std::vector<uint8_t> raw;
+    if (!read_file(hold + L"ready.txt", raw)) return;
+    DeleteFileW((hold + L"ready.txt").c_str());
+    const std::string text(raw.begin(), raw.end());
+    for (size_t at = text.find('\n'); at != std::string::npos && at + 1 < text.size();) {
+        const size_t end = text.find('\n', at + 1);
+        const std::string line = text.substr(at + 1, end == std::string::npos ? std::string::npos : end - at - 1);
+        unsigned size = 0, hash = 0;
+        char path[200] = "";
+        if (sscanf(line.c_str(), "%u %x %199s", &size, &hash, path) == 3 && safe(path)) DeleteFileW(backslashes(hold + wide(path)).c_str());
+        at = end;
+    }
+}
+
 // The newest commit of main (40 hex digits), from git's reference list; empty when it could not be had.
 inline std::string newest_commit() {
     std::vector<uint8_t> raw;
@@ -297,7 +325,14 @@ struct Updater {
         std::string version = text.substr(0, eol);
         while (!version.empty() && (version.back() == '\r' || version.back() == ' ')) version.pop_back();
         const std::string have_lua = version_of(mods + L"flamekit\\mod.json"), have_map = version_of(mods + L"flamekit_native\\mod.json");
-        if (!newer(version, have_lua) && !newer(version, have_map)) {  // up to date (or ahead of it)
+        const std::string held = held_version(mods);  // a version already downloaded, waiting for the next start
+        if (!held.empty() && !newer(version, held)) {  // nothing newer than what waits
+            say("update: checked " + channel + ": v" + version + " there, v" + held + " already waits for the next game start", last_seen == version ? 1 : 0);
+            last_seen = version;
+            status("ready|Update v" + held + " is ready: restart the game");
+            return true;
+        }
+        if (held.empty() && !newer(version, have_lua) && !newer(version, have_map)) {  // up to date (or ahead of it)
             const std::string seen = version + " " + commit;
             say("update: checked " + channel + " at commit " + (commit.empty() ? std::string("main") : commit.substr(0, 7)) + ": v" + version +
                     " there, here v" + have_lua + " (Lua) and v" + have_map + " (native): up to date",
@@ -329,7 +364,8 @@ struct Updater {
             return false;
         }
 
-        // only what differs from what is here
+        // only what differs from what is here (a file already held for an older waiting version is taken from the hold
+        // when it is still the same, not downloaded again)
         std::vector<File*> want;
         uint64_t total = 0;
         for (File& f : files) {
@@ -338,6 +374,12 @@ struct Updater {
                 if (c == L'/') c = L'\\';
             std::vector<uint8_t> here;
             if (read_file(local, here) && here.size() == f.size && fnv(here) == f.hash) continue;
+            if (f.path.rfind("flamekit_native/", 0) != 0 && read_file(backslashes(pending_dir(mods) + wide(f.path)), here) && here.size() == f.size &&
+                fnv(here) == f.hash) {
+                f.data = std::move(here);  // already held, and the same
+                want.push_back(&f);
+                continue;
+            }
             want.push_back(&f);
             total += f.size;
         }
@@ -346,6 +388,7 @@ struct Updater {
         const DWORD started = GetTickCount();
         std::atomic<uint64_t> got{0};
         for (File* f : want) {
+            if (!f->data.empty()) continue;  // taken from the hold
             status("busy|Downloading update v" + version + ": " + std::to_string(total ? got.load() * 100 / total : 100) + "%");
             if (!fetch(base + wide(f->path), f->data, &got) || f->data.size() != f->size || fnv(f->data) != f->hash) {
                 say("update: download failed: " + f->path + " did not arrive as listed (" + (g_fetch_error.empty() ? std::string("wrong size or fingerprint") : g_fetch_error) + "): nothing was changed", 2);
@@ -357,6 +400,10 @@ struct Updater {
 
         // this DLL now (renamed aside, it is in use; used from the next start), the Lua part held for the next start
         const std::wstring hold = pending_dir(mods);
+        if (!held.empty()) {
+            say("update: v" + version + " replaces v" + held + ", which was waiting for the next game start");
+            clear_pending(mods);
+        }
         bool ok = true;
         std::string list = version + "\n";
         for (File* f : want) {
@@ -365,7 +412,14 @@ struct Updater {
             if (f->path.rfind("flamekit_native/", 0) == 0) {
                 make_folders(mods, local);
                 if (f->path == "flamekit_native/flamekit_native.dll") {
-                    DeleteFileW((local + L".old").c_str());
+                    // The running DLL is either flamekit_native.dll (no update yet in this game) or, after an update
+                    // in this game, flamekit_native.dll.old (in use, it cannot be deleted): then flamekit_native.dll is
+                    // only a waiting new one and is simply replaced.
+                    const bool old_runs = GetFileAttributesW((local + L".old").c_str()) != INVALID_FILE_ATTRIBUTES && !DeleteFileW((local + L".old").c_str());
+                    if (old_runs) {
+                        ok = write_file(local, f->data);
+                        continue;
+                    }
                     if (GetFileAttributesW(local.c_str()) != INVALID_FILE_ATTRIBUTES &&
                         !MoveFileExW(local.c_str(), (local + L".old").c_str(), MOVEFILE_REPLACE_EXISTING)) {
                         ok = false;
@@ -409,16 +463,14 @@ struct Updater {
         uint64_t clear_at = 0;  // when a button answer ("up to date", "could not reach") goes away again
         for (;;) {
             asked = g_check_now.exchange(false);
-            if (!waiting_for_restart) {
-                if (asked) {
-                    say("update: check asked for with the button");
-                    status("busy|Checking for updates...");
-                }
-                check();
-                if (asked && last_status.rfind("ready|", 0) != 0) clear_at = GetTickCount64() + 8000;
-            } else if (asked) {
-                say("update: the button was pressed while an update waits for the restart: nothing to check");
+            // Also while an update waits for the restart: a newer one then takes its place, so one restart always
+            // brings the newest version (before 0.15.39 the updater stopped looking once one was waiting).
+            if (asked) {
+                say("update: check asked for with the button");
+                status("busy|Checking for updates...");
             }
+            check();
+            if (asked && last_status.rfind("ready|", 0) != 0) clear_at = GetTickCount64() + 8000;
             // the next look: every minute on the test channel, every 10 minutes for players; the button cuts it short
             std::vector<uint8_t> flag;
             const bool test = read_file(mods + L"flamekit\\update_channel.txt", flag) && flag.size() >= 4 && std::memcmp(flag.data(), "test", 4) == 0;
