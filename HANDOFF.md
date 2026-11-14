@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.88.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.89.
 
 ## What FlameKit is
 
@@ -125,10 +125,10 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
 
-## Lower left lines before a world (0.15.88)
-HudLayer shows outside a world too: "FlameKit v<running Lua version>" (+ " by ..." from ui_hud.dat's label; nothing if
-that file's label is empty, i.e. show_label off), the updater line and the debug line. Status, notice and a stale
-"build 1" count only in a world.
+## Main screen line (0.15.88, 0.15.89)
+Outside a world HudLayer shows one line in the lower RIGHT corner: "FlameKit v<running Lua version> Loaded" (owner: the
+lower left holds the game's copyright lines on the main screen). Nothing if ui_hud.dat's label is empty (show_label
+off). Status, notice, updater and debug lines and a stale "build 1" count only in a world.
 
 ## Update dialog (0.15.83)
 UpdateDialog (flamekit_native.cpp, above BackdropLayer) reads update_status.txt each second (first after 5 s, once the

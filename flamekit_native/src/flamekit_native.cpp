@@ -5378,22 +5378,17 @@ struct HudLayer : Layer {
         if (f.now >= next_read) read_files(f.now);
         std::vector<Line> want;
         if (!in_world) {
-            // (0.15.88, owner) On the game's main screen too, before any world: FlameKit is loaded with the game. The label
-            // as the player has it (ui_hud.dat from the last game: off stays off), with the version that runs now (that
-            // file may still name the one before an update); the updater's line and the debug line under it.
+            // (0.15.89, owner) On the game's main screen, before any world: one line, "FlameKit vX Loaded", in the lower
+            // RIGHT corner (the lower left holds the game's copyright lines there). Off when the player switched the label
+            // off (ui_hud.dat from the last game). The version is the one running now.
             if (version.empty()) version = widen(version_in(g_flamekit_dir + L"mod.json"));
-            if (!hud_file || !label.empty()) {
-                std::wstring l = L"FlameKit v" + version;
-                const size_t by = label.find(L" by ");
-                if (by != std::wstring::npos) l += label.substr(by);
-                want.push_back({l, 235, 225, 205});
-            }
+            if (!hud_file || !label.empty()) want.push_back({L"FlameKit v" + version + L" Loaded", 235, 225, 205});
         } else if (!status.empty()) want.push_back({status, static_cast<uint8_t>(status_rgb >> 16), static_cast<uint8_t>(status_rgb >> 8), static_cast<uint8_t>(status_rgb)});
         if (in_world && !label.empty()) want.push_back({label, 235, 225, 205});
         if (in_world && !notice.empty()) want.push_back({notice, 255, 150, 50});  // orange: e.g. the server does not run FlameKit
-        if (!update_line.empty()) want.push_back({update_line, static_cast<uint8_t>(update_rgb >> 16), static_cast<uint8_t>(update_rgb >> 8), static_cast<uint8_t>(update_rgb)});
+        if (in_world && !update_line.empty()) want.push_back({update_line, static_cast<uint8_t>(update_rgb >> 16), static_cast<uint8_t>(update_rgb >> 8), static_cast<uint8_t>(update_rgb)});
         const int mode = fklog::g_mode.load();
-        if (mode != fklog::kNormal) want.push_back({std::wstring(L"FlameKit debug: ") + (mode == fklog::kOff ? L"off" : L"full"), 120, 200, 255});
+        if (in_world && mode != fklog::kNormal) want.push_back({std::wstring(L"FlameKit debug: ") + (mode == fklog::kOff ? L"off" : L"full"), 120, 200, 255});
         const bool vis = f.gw > 0 && f.gh > 0 && !want.empty();
         if (vis != visible) {
             visible = vis;
@@ -5415,7 +5410,7 @@ struct HudLayer : Layer {
             changed = true;
             FK_LOG(fklog::kDebug, "lower left lines: %d line(s), first '%ls'", static_cast<int>(shown.size()), shown.empty() ? L"" : shown[0].text.c_str());
         }
-        place(f.gw * 12 / 1000, f.gh - f.gh * 20 / 1000 - canvas.h);
+        place(in_world ? f.gw * 12 / 1000 : f.gw - f.gw * 12 / 1000 - canvas.w, f.gh - f.gh * 20 / 1000 - canvas.h);
     }
 };
 

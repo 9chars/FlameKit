@@ -1,3 +1,6 @@
+0.15.89 Nov 14, 2026
+- Main screen: instead of the lower left lines (they covered the game's copyright lines), one line in the lower right corner: "FlameKit v0.15.89 Loaded". In a world the lower left lines are as before.
+
 0.15.88 Nov 14, 2026
 - The FlameKit version line in the lower left corner now shows on the game's main screen too, before you join a world (with the update line under it). If you switched the label off, it stays off.
 
