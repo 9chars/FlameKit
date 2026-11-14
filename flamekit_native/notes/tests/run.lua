@@ -212,7 +212,7 @@ emf = {
       return true
     end,
   },
-  teleport = function(w, id, x, y, z, opts) teleports[#teleports + 1] = opts.spawn_point or 'ground'; return true end,
+  teleport = function(w, id, x, y, z, opts) teleports[#teleports + 1] = opts.spawn_point or 'ground'; last_tp = { x = x, y = y, z = z, opts = opts }; return true end,
   key_down = function(k) return held_key == k end,
   hit_rule = function(r) next_rule = next_rule + 1; hit_rules[next_rule] = r; return next_rule end,
   hit_rule_remove = function(id) local had = hit_rules[id] ~= nil; hit_rules[id] = nil; return had end,
@@ -636,6 +636,21 @@ click(find_row("Nearest Ancient Spire").button)
 step(40)
 check(#teleports == 2 and teleports[2] == 900, "a spire is known: the player lands on the travel pad beside it")
 SP[445222884] = nil
+-- the map waypoint (0.15.60): read in the player's game, sent to the server half, a move onto the ground there
+comps.PlayerWaypoint = { [PLAYER] = { enabled = false, waypointPosition = { x = 0, y = 0, z = 0 } } }
+click(find_row("Map Waypoint").button)
+step(40)
+check(find_row("Set a waypoint on your map first") ~= nil and #teleports == 2, "no waypoint set: the tab says so and nobody is moved")
+comps.PlayerWaypoint[PLAYER] = { enabled = true, waypointPosition = { x = 5000 * 2 ^ 32, y = 120 * 2 ^ 32, z = 6000 * 2 ^ 32 } }
+local rules_before = rule_count()
+click(find_row("Map Waypoint").button)
+step(40)
+check(#teleports == 3 and last_tp.x == 5000 and last_tp.y == 120 and last_tp.z == 6000 and last_tp.opts.ground == true,
+  "a waypoint is set: the player is moved there, onto the ground (the game's ground search)")
+check(rule_count() == rules_before + 1, "and fall damage is off for them for a while")
+clock = clock + 31
+step(2)
+check(rule_count() == rules_before, "30 s later the fall protection is gone again")
 comps.DynamicLocomotion = { [PLAYER] = { state = 4, flags = 0 } }
 local function slot() return { impulse = { x = 0, y = 0, z = 0 }, type = 0, startTime = 0, endTime = 0, keepAliveMask = 0 } end
 comps.Impulse = { [PLAYER] = { impulses = { slot(), slot(), slot(), slot() } } }

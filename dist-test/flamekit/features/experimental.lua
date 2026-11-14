@@ -195,6 +195,33 @@ local function go_near(world, player, msg)
   emf.log(string.format("experimental: player %s sent to %.0f %.0f %.0f (pad %s)", tostring(player), x, y, z, tostring(best)))
 end
 
+-- Fast travel to the waypoint on the player's map (0.15.60). Their own game sends the waypoint's place (PlayerWaypoint
+-- of their player, in their game's world). The game's ground search lands them on the nearest walkable spot within
+-- about 10 m (EMF reference "v20"); where there is none they stand exactly there: in the air they fall, inside the
+-- terrain the game sends them to their spawn point. So fall damage is off for that player for 30 s after the move
+-- (an EMF hit rule, removed again by F.tick). Every move is logged with the waypoint's height and where they landed.
+local fall_guard = {}  -- player entity -> { rule = hit rule id, till = os.time() when it goes }
+local function go_waypoint(world, player, msg)
+  local x, y, z = tonumber(msg.x), tonumber(msg.y), tonumber(msg.z)
+  if not (x and y and z) or x ~= x or z ~= z or x < 0 or z < 0 or x > 10240 or z > 10240 or y < -1000 or y > 5000 then
+    return "That waypoint is not on the map."
+  end
+  local _, py = where(world, player)
+  local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
+  local okr, rule = pcall(emf.hit_rule, { kinds = "fall", to = player, cancel = true })
+  if okr and rule then
+    if fall_guard[player] then pcall(emf.hit_rule_remove, fall_guard[player].rule) end
+    fall_guard[player] = { rule = rule, till = os.time() + 30 }
+  end
+  local queued = emf.teleport(world, player, x, ty, z, { ground = true }, function(moved, mx, my, mz, info)
+    emf.log(string.format("experimental: waypoint travel of player %s: %s at %.0f %.0f %.0f (waypoint height %.0f, %s)",
+      tostring(player), tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
+      info and info.raw_target and "no ground found: stood exactly there" or "on the ground"))
+  end)
+  if not queued then return "The game refused the move (see the server's emf_core.log)." end
+  emf.log(string.format("experimental: player %s sent to the waypoint %.0f %.0f %.0f (asked height %.0f)", tostring(player), x, y, z, ty))
+end
+
 -- A word from a player about their own switches. Returns the view to send back.
 local function handle(world, account, entity, msg)
   load_saved()
@@ -209,9 +236,11 @@ local function handle(world, account, entity, msg)
     online[account].lift = msg.on == true and LIFT_STEPS or 0
     return nil
   end
-  if msg.op == "home" or msg.op == "go" then
+  if msg.op == "home" or msg.op == "go" or msg.op == "wp" then
     local ok, why
-    if msg.op == "home" then ok, why = pcall(go_home, world, entity) else ok, why = pcall(go_near, world, entity, msg) end
+    if msg.op == "home" then ok, why = pcall(go_home, world, entity)
+    elseif msg.op == "wp" then ok, why = pcall(go_waypoint, world, entity, msg)
+    else ok, why = pcall(go_near, world, entity, msg) end
     local v = view(account)
     v.note = not ok and "The move failed on this game version." or why
     if not ok then emf.log("experimental: go_home failed: " .. tostring(why)) end
@@ -426,6 +455,12 @@ function F.tick(world)
     host_burst_down = down
   end
   lift(world)
+  for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
+    if os.time() >= g.till then
+      pcall(emf.hit_rule_remove, g.rule)
+      fall_guard[id] = nil
+    end
+  end
   if go_request and account then
     note = handle(world, account, player, go_request).note
     go_request = nil
@@ -442,6 +477,7 @@ local ASK_STEPS = 300   -- say hello every 5 seconds: the server keeps your rule
 local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
+local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
 -- The game's number for a map marker type: FNV-1a over the type's GUID, as the game keeps it in memory or as written.
 local function fnv(bytes)
@@ -497,6 +533,19 @@ local function ask(msg)
 end
 
 function F.client_tick(world)
+  if want_waypoint then
+    want_waypoint = false
+    local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
+    if not ok or not wp then
+      note = "Your map waypoint cannot be read on this game version."
+    elseif not wp.enabled then
+      note = "Set a waypoint on your map first."
+    else
+      local p = wp.waypointPosition
+      local x, y, z = p.x / 2 ^ 32, p.y / 2 ^ 32, p.z / 2 ^ 32  -- the game keeps places in 1/2^32 m
+      if kit.is_host() then go_request = { op = "wp", x = x, y = y, z = z } else ask({ op = "wp", x = x, y = y, z = z }) end
+    end
+  end
   if want_spire then
     want_spire = false
     local ok, x, y, z = pcall(nearest_spire, world)
@@ -591,6 +640,9 @@ local function panel_rows(world)
     tooltip = "Takes you to the nearest flame altar at once. Works where the map's fast travel does not: inside the shroud, in lava, while stuck." }
   rows[#rows + 1] = { button = "spire", text = "Nearest Ancient Spire", same_line = true,
     tooltip = "Takes you to the nearest Ancient Spire on your map, unlocked or not. Works inside the shroud too." }
+  rows[#rows + 1] = { button = "waypoint", text = "Map Waypoint", same_line = true,
+    tooltip = "Takes you straight to the waypoint you set on your map, onto the ground there. Fall damage is off for 30 seconds "
+      .. "after the move, in case there is no ground right at the waypoint." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
   return debug_rows(world, rows)
 end
@@ -625,6 +677,11 @@ function F.click(world, key)
   if key == "spire" then
     note = nil
     want_spire = true
+    return
+  end
+  if key == "waypoint" then
+    note = nil
+    want_waypoint = true
     return
   end
   if key:sub(1, 3) ~= "sw:" then return end

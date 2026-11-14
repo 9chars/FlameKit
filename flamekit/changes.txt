@@ -1,3 +1,6 @@
+0.15.60 Nov 13, 2026
+- Experimental, Fast Travel: new button "Map Waypoint": takes you straight to the waypoint you set on your map, onto the ground there (the game's own ground search, within about 10 m). Fall damage is off for 30 seconds after the move, in case there is no ground right at the waypoint. Needs FlameKit on the server.
+
 0.15.59 Nov 13, 2026
 - New setting in the Minimap tab, on by default: "Hide FlameKit's windows in build mode". While you build, the minimap, the party window, Messages and Notices are hidden so they are not in the way; the FlameKit label and its lines in the lower left corner stay, and FlameKit's window (F6) still opens. Windows added later hide the same way.
 
