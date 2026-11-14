@@ -3,7 +3,8 @@
 -- 1. Player chat, copied: the game's chat lines fade from the screen, so every line a player types also goes into the
 --    Messages window of every player with FlameKit, as "<name>: <text>". The server sees each line (emf.on_chat, read
 --    only: the game still shows it in its own chat) and sends it over the channel flamekit/chat. A player's own game
---    is told by EMF's mod messages; the host's own game gets it directly.
+--    is told by EMF's mod messages; the host's own game gets it directly. Each line has the player's colour, the same as
+--    in the Party window (0.15.82).
 -- 2. FlameKit's own announcements (for example "PvP for Ninechars ENABLED."): no longer chat lines, only the Messages
 --    window of every player with FlameKit (F.announce). Players without FlameKit do not see them.
 -- The Notices window is not touched here.
@@ -15,9 +16,21 @@ local CHANNEL = "chat"
 local CHAT_COLOUR, ANNOUNCE_COLOUR = "#c8d2ec", "#ffd27a"
 local kit
 
+-- A player's colour, the same as their symbol's in the Party window and on the minimap (0.15.82, owner): the DLL's
+-- player_style, FNV-1a over the name's bytes, colour number (hash // 6) % 8 of these eight.
+local PLAYER_COLOURS = { "ffaa3c", "ffe65a", "ff78be", "64dcff", "be8cff", "aaf064", "ff6e5a", "f0f0f0" }
+local function player_colour(name)
+  local h = 2166136261
+  for i = 1, #name do h = ((h ~ name:byte(i)) * 16777619) & 0xffffffff end
+  return "#" .. PLAYER_COLOURS[(h // 6) % 8 + 1]
+end
+F.player_colour = player_colour
+
 local function show(msg)
   if type(msg) ~= "table" or type(msg.t) ~= "string" or msg.t == "" then return end
-  kit.note(msg.t:sub(1, 400), msg.c == "a" and ANNOUNCE_COLOUR or CHAT_COLOUR, true)
+  local colour = msg.c == "a" and ANNOUNCE_COLOUR or CHAT_COLOUR
+  if msg.c ~= "a" and type(msg.n) == "string" and msg.n ~= "" then colour = player_colour(msg.n) end
+  kit.note(msg.t:sub(1, 400), colour, true)
 end
 
 -- To every player's game with FlameKit (the host's own: directly). Server world only.
@@ -62,7 +75,8 @@ function F.setup(k)
   if not ok then emf.log("the channel flamekit/chat was refused: chat is not copied to the Messages window") end
   local okc = pcall(emf.on_chat, kit.guard(F, function(world, account, entity, text)
     if type(text) ~= "string" or text == "" then return end
-    to_all(world, { t = name_of(world, entity) .. ": " .. text:gsub("[%c]", " "), c = "c" })
+    local name = name_of(world, entity)
+    to_all(world, { t = name .. ": " .. text:gsub("[%c]", " "), c = "c", n = name })
   end, "a chat line"))
   if not okc then emf.log("chat: emf.on_chat is not there: chat is not copied to the Messages window") end
 end

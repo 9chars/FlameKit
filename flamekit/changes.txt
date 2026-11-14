@@ -1,3 +1,6 @@
+0.15.82 Nov 14, 2026
+- Messages window: each player's chat lines are in that player's colour, the same as their symbol in the Party window and on the minimap.
+
 0.15.81 Nov 14, 2026
 - Window titles show the key that opens and closes them: "FlameKit v0.15.81 [F4]", "Experimental [F6]", "Party [F7]".
 - New key: F7 shows and hides the Party window (a setting in the Windows group, like the Experimental window's F6).

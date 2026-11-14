@@ -858,6 +858,9 @@ do  -- the announcement and a player's chat line both reach the Messages window
   mt = mf and mf:read("a") or ""
   if mf then mf:close() end
   check(mt:find(": hello there", 1, true) ~= nil, "a player's chat line is copied into the Messages window")
+  local col, who = mt:match("m %d+ (%x+) ([^\n]-): hello there")
+  check(col and ("#" .. col) == require("features.chat").player_colour(who),
+    "in the player's own colour (the Party window's): " .. tostring(col) .. " for " .. tostring(who))
 end
 check(comps.Velocity[PLAYER].velocity.y == 12 and comps.Velocity[PLAYER].velocity.z >= 10 and comps.Velocity[PLAYER].velocity.x == 0, "switch on, gliding, S held: the player climbs and keeps flying forward")
 comps.Velocity[PLAYER].velocity.y = -4.5
