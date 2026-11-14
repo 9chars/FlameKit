@@ -3879,20 +3879,22 @@ struct WindowLayer : Layer {
                 break;
             case kRowPrev: if (rows_page > 0) --rows_page; break;
             case kRowNext: ++rows_page; break;
+            // A moved item gets a gold frame where it went. Moved straight back (the player changed their mind), it
+            // gets none: it is back where it was.
             case kBagItem:
                 if (h.index < bag.size()) {
-                    act("junk", bag[h.index].key);
-                    moved_junk.insert(bag[h.index].key);
-                    moved_bag.erase(bag[h.index].key);
-                    show_junk = bag[h.index].key;
+                    const std::string& key = bag[h.index].key;
+                    act("junk", key);
+                    if (!moved_bag.erase(key)) moved_junk.insert(key);
+                    show_junk = key;
                 }
                 break;
             case kJunkItem:
                 if (h.index < junk.size()) {
-                    act("keep", junk[h.index].key);
-                    moved_bag.insert(junk[h.index].key);
-                    moved_junk.erase(junk[h.index].key);
-                    show_bag = junk[h.index].key;
+                    const std::string& key = junk[h.index].key;
+                    act("keep", key);
+                    if (!moved_junk.erase(key)) moved_bag.insert(key);
+                    show_bag = key;
                 }
                 break;
             case kAuto: act("auto", auto_on ? "0" : "1"); break;

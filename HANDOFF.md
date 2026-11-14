@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.32.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.33.
 
 ## What FlameKit is
 
@@ -71,7 +71,7 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.32. Client: 0.15.32 through the GitHub updater (needs a game restart).
+- Local server: 0.15.33. Client: 0.15.33 through the GitHub updater (needs a game restart).
 - TO DO (found 0.15.32): once the updater holds an update (ready), it stops checking until the game restarts, so two versions published close together need two restarts. Make it keep checking while an update is held and replace the held one with a newer one.
 - 0.15.31 (owner: What's New text cut off): `TextPainter` drew into a 640 px scratch bitmap and `width()` clamped to 640, so `wrap()` never wrapped past 640 px and lines were cut off in a wider window. Now 2048 px and `width()` returns the real width (drawing stops at the bitmap's edge).
 - 0.15.30 (owner): (1) after an update the window opens by itself on What's New: changes.lua writes the tab id into `ui_open.dat` (once per game: after an update, or every game with the new setting `open_on_start`); the DLL opens the window on that tab and deletes the file. `WindowLayer::current` starts as "changes". (2) Auto Junk List: a moved item gets a 3 px gold frame (`moved_junk` / `moved_bag`, cleared when the window closes) and its list goes to the item's page (`show_junk` / `show_bag`, after the next ui_list.dat read).
