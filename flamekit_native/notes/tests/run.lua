@@ -350,9 +350,31 @@ local function toggle_panel()
     end,
   }
 end
-local function click(key) window.fn(UI, { kind = "click", key = key }) end
+-- The Experimental window's rows (0.15.74: Fast Travel, PvP, the test bodies moved there from the F4 tab). find_row
+-- looks in the F4 window first, then there; a button of the Experimental window has the key "W:<key>".
+local function exp_rows()
+  local out = {}
+  for _, r in ipairs(require("features.experimental").window_rows(UI) or {}) do
+    local c = {}
+    for k, v in pairs(r) do c[k] = v end
+    if c.button then c.button = "W:" .. c.button end
+    out[#out + 1] = c
+  end
+  return out
+end
+local function click(key)
+  if key:sub(1, 2) == "W:" then
+    local kit = require("core.kit")
+    for _, f in ipairs(kit.features) do if f.id == "experimental" then kit.call(f, "click", UI, key:sub(3)) end end
+    return
+  end
+  window.fn(UI, { kind = "click", key = key })
+end
 local function find_row(pattern, key)
   for _, r in ipairs(window.def.rows) do
+    if (r.text or r.heading or ""):find(pattern) and (not key or (r.button or ""):find(key, 1, true)) then return r end
+  end
+  for _, r in ipairs(exp_rows()) do
     if (r.text or r.heading or ""):find(pattern) and (not key or (r.button or ""):find(key, 1, true)) then return r end
   end
 end
@@ -629,6 +651,17 @@ click(find_row("Shroud Damage", "sw:shroud").button)
 step(3)
 check(rule_count() == 0 and not find_row("Shroud Damage", "sw:shroud").selected, "switched off: the rule is gone")
 -- PvP (0.15.65): faction 1 (HitAll) while on, 7 again when off; one rule scales player-on-player hits
+do  -- the Experimental window's file (0.15.74): Fast Travel first, then PvP, then the test monsters
+  step(12)
+  local ef2 = io.open(TMP .. "\\ui_exp.dat")
+  local t = ef2 and ef2:read("a") or ""
+  if ef2 then ef2:close() end
+  local a, b, c = t:find("Fast Travel", 1, true), t:find("PvP (free-for-all)", 1, true), t:find("Test monsters", 1, true)
+  -- (hosted: the test's client world has no player accounts, so the file only says "Asking the server..." there)
+  check(t:match("^gen\t%d+\n") and t:match("end\n$") and (not JOINED or (a and b and c and a < b and b < c)),
+    "ui_exp.dat holds the Experimental window: Fast Travel, then PvP, then the test monsters")
+  check(not find_row("PvP", "sw:pvp").button:find("^f"), "PvP is no longer in the F4 tab")
+end
 local pv = find_row("PvP", "sw:pvp")
 check(pv ~= nil and not pv.selected and comps.Faction[PLAYER].faction == 7, "the PvP switch is listed, off, and the player is faction 7")
 click(pv.button)
@@ -696,7 +729,7 @@ comps.DynamicEnemyScaling = { [952] = { nextUpdateTime = { value = 99 } } }
 comps.NetworkHealth[952] = { health = 100 }
 comps.Faction[952] = { faction = 6 }
 local dd
-for _, r in ipairs(window.def.rows) do if r.options then dd = r end end
+for _, r in ipairs(exp_rows()) do if r.options then dd = r end end
 check(dd ~= nil and dd.text == "Vukah: Melee", "the duelist is picked from one drop-down: " .. tostring(dd and dd.text))
 local heads, wolf = 0, nil
 for _, o in ipairs(dd.options) do
@@ -704,14 +737,14 @@ for _, o in ipairs(dd.options) do
   if o.text == "Wolf" then wolf = o end
 end
 check(heads == 7 and #dd.options == 189 + 7 and wolf ~= nil, "with every monster under 7 group headings")
-click(find_row("^25$").button:match("^(f%d+:)") .. wolf.key)  -- the harness prefixes keys with the tab
+click("W:" .. wolf.key)
 step(12)
 click(find_row("^25$").button)
 step(12)
 click(find_row("^>$").button)
 step(12)
 dd = nil
-for _, r in ipairs(window.def.rows) do if r.options then dd = r end end
+for _, r in ipairs(exp_rows()) do if r.options then dd = r end end
 check(dd.text == "Beasts: Wolf" and find_row("^26$") ~= nil, "the drop-down shows the pick, the level line 26")
 click(find_row("^Spawn duelist$").button)
 step(40)
@@ -726,20 +759,20 @@ step(65)
 check(comps.Faction[PLAYER].faction == 7, "a player without PvP found with faction 1 gets faction 7 back within a second")
 comps.CurrentTransform = {}
 comps.PlayerSpawnPoint = { [900] = { target = 1 }, [901] = { target = 2 } }
-click(find_row("Nearest Flame Altar").button)
+click(find_row("^Flame Altar$").button)
 step(3)
 check(#teleports == 1 and teleports[1] == 901, "the rescue button sends the player to a flame altar, not to a travel point")
 local ia, ib = require("features.experimental")._marker_ids("c1e5524a-95f2-4b2f-b11d-c8fd0cd008ef")
 check(ia == 445222884 and ib == 3431657214, "a marker type's number is worked out from its GUID")
 comps.MapMarker = {}
-click(find_row("Nearest Ancient Spire").button)
+click(find_row("^Ancient Spire$").button)
 step(40)
 check(find_row("knows no Ancient Spire") ~= nil and #teleports == 1, "no spire known: the tab says so and nobody is moved")
 comps.MapMarker = { [900] = { markerType = "c1e5524a-95f2-4b2f-b11d-c8fd0cd008ef" } }
 comps.CurrentTransform = { [900] = { transform = { position = { x = 50, y = 5, z = 60 } } } }
 local SP = require("features.experimental")._spires
 SP[445222884] = true
-click(find_row("Nearest Ancient Spire").button)
+click(find_row("^Ancient Spire$").button)
 step(40)
 check(#teleports == 2 and teleports[2] == 900, "a spire is known: the player lands on the travel pad beside it")
 SP[445222884] = nil

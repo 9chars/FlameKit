@@ -58,6 +58,7 @@ struct Settings {
     int corner = 1;          // 0 top right, 1 bottom right, 2 bottom left, 3 top left
     uint32_t toggle_vk = VK_F10;
     uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
+    uint32_t exp_vk = VK_F6;      // shows and hides the Experimental window (setting exp_window_key, 0.15.74)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
     int zoom = 2;            // index into kRanges
@@ -113,6 +114,8 @@ void read_settings() {
     s.zoom = std::clamp(static_cast<int>(emf::setting_float(kKit, "map_zoom", 2.0) + 0.5), 0, kRangeCount - 1);
     const std::string wkey = emf::setting_text(kKit, "window_key", "F4");
     s.window_vk = wkey.empty() ? 0 : emf::keys::parse_key(std::wstring(wkey.begin(), wkey.end()));
+    const std::string ekey = emf::setting_text(kKit, "exp_window_key", "F6");
+    s.exp_vk = ekey.empty() ? 0 : emf::keys::parse_key(std::wstring(ekey.begin(), ekey.end()));
     const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
     s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
     s.markers = true;  // its own switch is gone: the marker filters (map_hide) decide
@@ -468,6 +471,7 @@ struct ItemMeta {
 std::mutex g_item_meta_lock;
 std::unordered_map<uint32_t, ItemMeta> g_item_meta;  // filled once, when the item details are written
 std::atomic<bool> g_ui_request{false};  // F4 (window_key) was pressed: FlameKit's own UI (ui_thread)
+std::atomic<bool> g_exp_toggle{false};  // the Experimental window's key was pressed (ui_thread shows or hides it)
 
 void on_world_tick(emf::World w) {
     if (!w.is_client()) return;
@@ -482,6 +486,8 @@ void on_world_tick(emf::World w) {
 
     static emf::keys::Edge ui_key;  // FlameKit's own UI (ui_thread)
     if (ui_key.pressed(emf::keys::down(s.window_vk))) g_ui_request = true;
+    static emf::keys::Edge exp_key;
+    if (s.exp_vk && exp_key.pressed(emf::keys::down(s.exp_vk))) g_exp_toggle = true;
     const auto* t = w.get<gen::CurrentTransform>(emf::local_player());
     if (!t) return;
     // Item details for FlameKit's panel (a Lua mod cannot read the game's item definitions): once per game start,
@@ -4469,6 +4475,383 @@ struct WindowLayer : Layer {
 // Fully clear pixels of a layered window let the mouse through to the game, which hides its pointer over its own
 // window. While FlameKit's window is open, this layer covers the game window with pixels that are as good as clear
 // (alpha 1 of 255) so the pointer stays visible everywhere; a click outside FlameKit's window does nothing.
+// ---- FlameKit's Experimental window (0.15.74, owner): Fast Travel, PvP and the test monsters while playing ----
+// A pinned window (title bar, moved, sized, hidden like the others; its key exp_window_key shows and hides it). Its rows
+// come from the Lua part (features/experimental.lua F.window_rows) in emf\mods\flamekit\ui_exp.dat: "gen <n>", then
+// "r" lines as in ui_tabs.dat (kinds h heading, t text, s separator, b button, l label, d drop-down), then "end". A click
+// goes back through FlameKit's window's ui_actions.txt as "exp <generation>/<button number>". Clicks need the pointer
+// key held, as on every pinned window. The drop-down's list opens in the window, which grows while it is open.
+struct ExperimentalLayer : PinnedLayer {
+    struct Opt {
+        int number = 0;
+        bool heading = false, selected = false, has_colour = false;
+        uint8_t r = 0, g = 0, b = 0;
+        std::wstring label;
+    };
+    struct Row {
+        char kind = 't';
+        bool same = false, selected = false, disabled = false, dim = false, has_colour = false;
+        uint8_t r = 0, g = 0, b = 0;
+        int number = 0;
+        std::wstring text;
+        std::vector<Opt> list;
+    };
+    struct Placed {
+        size_t row;
+        RECT box;                        // content coordinates
+        std::vector<std::wstring> lines;  // a text row's lines
+    };
+    struct Hit {
+        RECT r;
+        int kind;  // 0 a button (number), 1 a drop-down (row), 2 a list entry (number), 3 the list (nothing)
+        int value;
+    };
+    WindowLayer* window = nullptr;  // its act() writes the click for the Lua part
+    std::vector<Row> rows;
+    uint64_t gen = 0, stamp = 0, next_read = 0;
+    std::vector<Placed> placed;
+    std::vector<Hit> hits;
+    int laid_w = -1, content_h = 0;
+    int list_open = -1, list_scroll = 0;
+    RECT list_box{};
+    int hover_x = -1, hover_y = -1;
+    static constexpr int kLine = 26, kListMax = 12, kBtnH = 28;
+
+    ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 380) { def_x_pm = 700; def_y_pm = 120; hide_in_menus = true; max_w = 760; }
+
+    static std::wstring unescape(const std::string& s) {
+        std::wstring w = widen(s);
+        std::wstring out;
+        for (size_t i = 0; i < w.size(); ++i) {
+            if (w[i] == L'\\' && i + 1 < w.size() && w[i + 1] == L'n') {
+                out += L'\n';
+                ++i;
+            } else {
+                out += w[i];
+            }
+        }
+        return out;
+    }
+    static bool colour(const std::string& c, uint8_t& r, uint8_t& g, uint8_t& b) {
+        if (c.size() != 6) return false;
+        const unsigned long rgb = std::strtoul(c.c_str(), nullptr, 16);
+        r = static_cast<uint8_t>(rgb >> 16), g = static_cast<uint8_t>(rgb >> 8), b = static_cast<uint8_t>(rgb);
+        return true;
+    }
+
+    bool read_file() {
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        const std::wstring file = g_flamekit_dir + L"ui_exp.dat";
+        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
+                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
+                                : 2;
+        if (st == stamp) return false;
+        FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
+        if (!fp) return false;
+        std::string all;
+        char buf[8192];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof buf, fp)) > 0) all.append(buf, n);
+        fclose(fp);
+        std::vector<Row> got;
+        uint64_t g = 0;
+        bool complete = false;
+        size_t at = 0;
+        while (at < all.size()) {
+            size_t nl = all.find('\n', at);
+            if (nl == std::string::npos) nl = all.size();
+            std::string line = all.substr(at, nl - at);
+            at = nl + 1;
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line == "end") {
+                complete = true;
+                break;
+            }
+            std::vector<std::string> f;
+            for (size_t p = 0;;) {
+                const size_t tab = line.find('\t', p);
+                f.push_back(line.substr(p, tab == std::string::npos ? std::string::npos : tab - p));
+                if (tab == std::string::npos) break;
+                p = tab + 1;
+            }
+            if (f[0] == "gen" && f.size() >= 2) {
+                g = std::strtoull(f[1].c_str(), nullptr, 10);
+            } else if (f[0] == "r" && f.size() >= 10) {
+                Row r;
+                r.kind = f[1].empty() ? 't' : f[1][0];
+                r.same = f[2] == "1";
+                r.selected = f[3] == "1";
+                r.disabled = f[4] == "1";
+                r.dim = f[5] == "1";
+                r.has_colour = colour(f[6], r.r, r.g, r.b);
+                r.number = std::atoi(f[7].c_str());
+                r.text = unescape(f[8]);
+                if (r.kind == 'd') {
+                    for (size_t k = 10; k < f.size(); ++k) {
+                        const std::string& e = f[k];
+                        const size_t a = e.find('\x1f'), b = a == std::string::npos ? a : e.find('\x1f', a + 1),
+                                     c = b == std::string::npos ? b : e.find('\x1f', b + 1);
+                        if (c == std::string::npos) continue;
+                        Opt o;
+                        o.number = std::atoi(e.substr(0, a).c_str());
+                        o.heading = e[a + 1] == 'h';
+                        o.selected = e[a + 1] == 's';
+                        o.has_colour = colour(e.substr(b + 1, c - b - 1), o.r, o.g, o.b);
+                        o.label = unescape(e.substr(c + 1));
+                        r.list.push_back(std::move(o));
+                    }
+                }
+                got.push_back(std::move(r));
+            }
+        }
+        if (!complete) return false;
+        stamp = st;
+        gen = g;
+        if (list_open >= static_cast<int>(got.size()) || (list_open >= 0 && got[static_cast<size_t>(list_open)].kind != 'd')) list_open = -1;
+        rows = std::move(got);
+        laid_w = -1;
+        FK_LOG(fklog::kDebug, "experimental window: ui_exp.dat read: %d row(s), generation %llu", static_cast<int>(rows.size()),
+               static_cast<unsigned long long>(gen));
+        return true;
+    }
+
+    bool refresh(const Frame& f) override {
+        bool again = false;
+        if (g_exp_toggle.exchange(false) && f.in_world) {
+            LayoutEntry& e = lay();
+            e.hidden = !e.hidden;
+            g_layout.save();
+            FK_LOG(fklog::kInfo, "experimental window: %s (its key)", e.hidden ? "hidden" : "shown");
+            again = true;
+        }
+        if (f.now >= next_read) {
+            next_read = f.now + 200;
+            if (read_file()) again = true;
+        }
+        return again;
+    }
+
+    std::vector<std::wstring> wrap_text(const std::wstring& t, int width) {
+        std::vector<std::wstring> out;
+        std::wstring line, word;
+        auto flush_word = [&] {
+            if (word.empty()) return;
+            const std::wstring tryl = line.empty() ? word : line + L" " + word;
+            if (!line.empty() && text.width(tryl) > width) {
+                out.push_back(line);
+                line = word;
+            } else {
+                line = tryl;
+            }
+            word.clear();
+        };
+        for (wchar_t c : t) {
+            if (c == L' ') flush_word();
+            else if (c == L'\n') {
+                flush_word();
+                out.push_back(line);
+                line.clear();
+            } else word += c;
+        }
+        flush_word();
+        if (!line.empty() || out.empty()) out.push_back(line);
+        return out;
+    }
+
+    int list_width(const Row& r, int width) {
+        int widest = text.width(r.text);
+        for (const Opt& o : r.list) widest = std::max(widest, text.width(o.label) + (o.heading ? 0 : 12));
+        return std::min(width - 16, std::max(200, widest + 44));
+    }
+
+    void lay_out(int width) {
+        if (laid_w == width) return;
+        laid_w = width;
+        placed.clear();
+        const int left = 8, right = width - 8;
+        int x = left, y = 2, line_h = 0;
+        auto newline = [&] {
+            if (line_h > 0) y += line_h + 5;
+            x = left;
+            line_h = 0;
+        };
+        for (size_t i = 0; i < rows.size(); ++i) {
+            const Row& r = rows[i];
+            if (r.kind == 'b' || r.kind == 'l' || r.kind == 'd') {
+                int w = std::max(30, text.width(r.text) + 18);
+                if (r.kind == 'l') w = text.width(r.text) + 6;
+                if (r.kind == 'd') w = list_width(r, width);
+                if (!(r.same && x > left && x + w <= right)) newline();
+                placed.push_back({i, {x, y, x + w, y + kBtnH}, {}});
+                x += w + 5;
+                line_h = std::max(line_h, kBtnH);
+            } else {
+                newline();
+                if (r.kind == 's') {
+                    placed.push_back({i, {left, y + 4, right, y + 5}, {}});
+                    y += 10;
+                } else {
+                    std::vector<std::wstring> lines = wrap_text(r.text, right - left);
+                    const int lh = r.kind == 'h' ? 22 : 19;
+                    const int h = lh * static_cast<int>(lines.size()) + (r.kind == 'h' && i > 0 ? 6 : 0);
+                    placed.push_back({i, {left, y + (r.kind == 'h' && i > 0 ? 6 : 0), right, y + h}, std::move(lines)});
+                    y += h + 2;
+                }
+            }
+        }
+        newline();
+        content_h = y + 2;
+    }
+
+    // Where the open list goes: under its drop-down (content coordinates); the window grows to hold it.
+    RECT list_place() {
+        for (const Placed& p : placed)
+            if (static_cast<int>(p.row) == list_open) {
+                const int n = static_cast<int>(rows[p.row].list.size()), shown = std::max(1, std::min(n, kListMax));
+                return {p.box.left, p.box.bottom + 2, p.box.right, p.box.bottom + 2 + shown * kLine};
+            }
+        return RECT{};
+    }
+
+    int content_height(int width) override {
+        lay_out(width);
+        int h = content_h;
+        if (list_open >= 0) h = std::max(h, static_cast<int>(list_place().bottom) + 4);
+        return h;
+    }
+
+    bool in(const RECT& r, int x, int y) const { return x >= r.left && y >= r.top && x < r.right && y < r.bottom; }
+
+    void draw_content(int top, int width) override {
+        lay_out(width);
+        hits.clear();
+        auto shift = [&](RECT r) { return RECT{r.left, r.top + top, r.right, r.bottom + top}; };
+        for (const Placed& p : placed) {
+            const Row& r = rows[p.row];
+            const RECT b = shift(p.box);
+            if (r.kind == 's') {
+                box(b.left, b.top, b.right, b.bottom, 90, 90, 100, 1.0f);
+            } else if (r.kind == 'b') {
+                const bool over = g_pointer_mode && !r.disabled && in(p.box, hover_x, hover_y);
+                if (r.selected && r.has_colour) box(b.left, b.top, b.right, b.bottom, r.r * 0.45f, r.g * 0.45f, r.b * 0.45f, 1.0f);
+                else if (r.selected) box(b.left, b.top, b.right, b.bottom, 70, 140, 80, 1.0f);
+                else box(b.left, b.top, b.right, b.bottom, over ? 74.0f : 52.0f, over ? 74.0f : 52.0f, over ? 84.0f : 60.0f, 1.0f);
+                float tr = 240, tg = 240, tb = 240;
+                if (r.disabled) tr = tg = tb = 120;
+                else if (!r.selected && r.has_colour) tr = r.r, tg = r.g, tb = r.b;
+                text.draw(canvas, b.left + (b.right - b.left - text.width(r.text)) / 2, b.top + 4, r.text, tr, tg, tb);
+                if (!r.disabled) hits.push_back({p.box, 0, r.number});
+            } else if (r.kind == 'l') {
+                float cr = 220, cg = 220, cb = 225;
+                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                text.draw(canvas, b.left, b.top + 4, r.text, cr, cg, cb);
+            } else if (r.kind == 'd') {
+                const bool open_now = list_open == static_cast<int>(p.row), over = g_pointer_mode && in(p.box, hover_x, hover_y);
+                box(b.left, b.top, b.right, b.bottom, over || open_now ? 66.0f : 44.0f, over || open_now ? 66.0f : 44.0f, over || open_now ? 76.0f : 52.0f, 1.0f);
+                box(b.left, b.top, b.right, b.top + 1, 120, 120, 132, 1.0f);
+                box(b.left, b.bottom - 1, b.right, b.bottom, 120, 120, 132, 1.0f);
+                box(b.left, b.top, b.left + 1, b.bottom, 120, 120, 132, 1.0f);
+                box(b.right - 1, b.top, b.right, b.bottom, 120, 120, 132, 1.0f);
+                float cr = 240, cg = 240, cb = 240;
+                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                text.draw(canvas, b.left + 8, b.top + 4, r.text, cr, cg, cb);
+                const int ax = b.right - 20, ay = b.top + 11;
+                for (int k = 0; k < 6; ++k) {
+                    const int ry = open_now ? ay + 5 - k : ay + k;
+                    box(ax + k, ry, ax + 12 - k, ry + 1, 220, 220, 225, 1.0f);
+                }
+                hits.push_back({p.box, 1, static_cast<int>(p.row)});
+            } else {
+                float cr = 220, cg = 220, cb = 225;
+                if (r.kind == 'h') cr = 255, cg = 210, cb = 122;
+                if (r.dim) cr = cg = cb = 150;
+                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                int ly = b.top;
+                for (const std::wstring& l : p.lines) {
+                    text.draw(canvas, b.left, ly, l, cr, cg, cb);
+                    ly += r.kind == 'h' ? 22 : 19;
+                }
+            }
+        }
+        list_box = RECT{};
+        if (list_open >= 0) {  // the open list, over what is below it
+            const Row& r = rows[static_cast<size_t>(list_open)];
+            const RECT lr = list_place();
+            const int n = static_cast<int>(r.list.size()), shown = (lr.bottom - lr.top) / kLine;
+            list_scroll = std::clamp(list_scroll, 0, std::max(0, n - shown));
+            list_box = lr;
+            const RECT b = shift(lr);
+            box(b.left, b.top, b.right, b.bottom, 28, 30, 38, 1.0f);
+            box(b.left, b.top, b.right, b.top + 1, 150, 150, 165, 1.0f);
+            box(b.left, b.bottom - 1, b.right, b.bottom, 150, 150, 165, 1.0f);
+            hits.push_back({lr, 3, 0});
+            for (int i = 0; i < shown && list_scroll + i < n; ++i) {
+                const Opt& o = r.list[static_cast<size_t>(list_scroll + i)];
+                const RECT er{lr.left + 1, lr.top + i * kLine, lr.right - 1, lr.top + (i + 1) * kLine};
+                const RECT eb = shift(er);
+                if (o.heading) {
+                    text.draw(canvas, eb.left + 6, eb.top + 4, o.label, 255, 210, 122);
+                    continue;
+                }
+                const bool over = g_pointer_mode && in(er, hover_x, hover_y);
+                if (o.selected) box(eb.left, eb.top, eb.right, eb.bottom, 60, 120, 70, 1.0f);
+                else if (over) box(eb.left, eb.top, eb.right, eb.bottom, 70, 72, 84, 1.0f);
+                float cr = 235, cg = 235, cb = 240;
+                if (o.has_colour) cr = o.r, cg = o.g, cb = o.b;
+                text.draw(canvas, eb.left + 18, eb.top + 4, o.label, cr, cg, cb);
+                hits.push_back({er, 2, o.number});
+            }
+            if (n > shown) {
+                const int track = shown * kLine, th = std::max(14, track * shown / n);
+                const int ty = b.top + (track - th) * list_scroll / std::max(1, n - shown);
+                box(b.right - 5, ty, b.right - 2, ty + th, 140, 140, 155, 1.0f);
+            }
+        }
+    }
+
+    bool content_hover(int x, int y) override {
+        if (x == hover_x && y == hover_y) return false;
+        hover_x = x;
+        hover_y = y;
+        return true;
+    }
+
+    void content_click(int x, int y) override {
+        const int was = list_open;
+        list_open = -1;
+        dirty = true;
+        for (auto it = hits.rbegin(); it != hits.rend(); ++it) {  // the last drawn is on top (the list)
+            if (!in(it->r, x, y)) continue;
+            if (it->kind == 0 && it->value > 0 && window) {
+                window->act("exp", std::to_string(gen) + "/" + std::to_string(it->value));
+            } else if (it->kind == 1) {
+                if (was != it->value) {
+                    list_open = it->value;
+                    list_scroll = 0;
+                    const std::vector<Opt>& l = rows[static_cast<size_t>(it->value)].list;
+                    for (size_t k = 0; k < l.size(); ++k)
+                        if (l[k].selected) list_scroll = std::max(0, static_cast<int>(k) - 3);
+                }
+            } else if (it->kind == 2 && it->value > 0 && window) {
+                window->act("exp", std::to_string(gen) + "/" + std::to_string(it->value));
+            } else if (it->kind == 3) {
+                list_open = was;  // a heading or the bar: the list stays open
+            }
+            return;
+        }
+    }
+
+    void wheel(int delta, int x, int y) override {
+        const int cy = y - (kHead + 4) + scroll;
+        if (list_open >= 0 && in(list_box, x, cy)) {
+            list_scroll -= delta * 3 / WHEEL_DELTA;  // draw_content keeps it in range
+            dirty = true;
+            return;
+        }
+        PinnedLayer::wheel(delta, x, y);
+    }
+};
+
 struct BackdropLayer : Layer {
     bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "backdrop"; }
@@ -5012,7 +5395,9 @@ void ui_thread_body() {
     PartyLayer party;
     MessagesLayer messages;
     NoticeLayer notices;
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    ExperimentalLayer experimental;
+    experimental.window = &window;
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;

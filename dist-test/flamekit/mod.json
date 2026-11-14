@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.73",
+  "version": "0.15.74",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -264,6 +264,15 @@
       "help": "The big map, the bag and every other screen that shows the mouse pointer.",
       "live": true,
       "group": "Minimap"
+    },
+    {
+      "key": "exp_window_key",
+      "type": "keybind",
+      "default": "F6",
+      "label": "Key that shows and hides the Experimental window",
+      "help": "The Experimental window (Fast Travel, PvP, test monsters) stays on screen while you play; this key shows or hides it. Hold the pointer key to click in it.",
+      "live": true,
+      "group": "Windows"
     },
     {
       "key": "ui_hide_build",

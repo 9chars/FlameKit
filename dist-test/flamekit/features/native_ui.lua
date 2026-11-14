@@ -114,6 +114,42 @@ local function feature(id)
   end
 end
 
+-- Rows (a feature's tab or the Experimental window) as ui_tabs.dat "r" lines, and the click keys by button number.
+local function rows_lines(rows)
+  local body, map = {}, {}
+  for _, r in ipairs(rows) do
+    local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or r.options and "d" or r.label and "l"
+      or (r.button or r.slot) and "b" or "t"
+    local number = 0
+    if (kind == "b" or kind == "i") and (r.button or r.slot) then
+      map[#map + 1] = r.button or r.slot
+      number = #map
+    end
+    local colour = type(r.color) == "string" and r.color:match("^#?(%x%x%x%x%x%x)$") or "-"
+    local fields = { "r", kind, r.same_line and "1" or "0", r.selected and "1" or "0", r.disabled and "1" or "0",
+      r.dim and "1" or "0", colour, tostring(number), clean(r.heading or r.text), clean(r.tooltip) }
+    if kind == "d" then  -- a drop-down: its entries, each "<number>\31<h|o|s>\31<rrggbb|->\31<label>"
+      for _, o in ipairs(r.options) do
+        local n = 0
+        if o.key then
+          map[#map + 1] = o.key
+          n = #map
+        end
+        local c = type(o.color) == "string" and o.color:match("^#?(%x%x%x%x%x%x)$") or "-"
+        fields[#fields + 1] = table.concat({ tostring(n), o.heading and "h" or o.selected and "s" or "o", c,
+          (clean(o.text):gsub("\31", " ")) }, "\31")
+      end
+    elseif kind == "i" then  -- an item tile: its details for the tooltip (core/items.lua items.tip)
+      local debug_name = kit.items.debug_name(r.item)
+      local t = kit.items.tip(r.item, debug_name)
+      for _, v in ipairs({ string.format("%x", r.item), tostring(r.count or 0), tostring(t.rarity), t.level, clean(t.type),
+                           clean(debug_name or "") }) do fields[#fields + 1] = v end
+    end
+    body[#body + 1] = table.concat(fields, "\t")
+  end
+  return table.concat(body, "\n"), map
+end
+
 local function write_tabs(world)
   local lines = {}
   for _, f in ipairs(tab_features()) do lines[#lines + 1] = "tab\t" .. f.id .. "\t" .. clean(f.title) end
@@ -121,38 +157,7 @@ local function write_tabs(world)
   if f and view_id ~= "loot_filter" then  -- the Auto Junk List has its own view in the DLL (ui_list.dat)
     local rows = kit.call(f, "panel", world)
     if type(rows) == "table" then
-      local body, map = {}, {}
-      for _, r in ipairs(rows) do
-        local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or r.options and "d" or r.label and "l"
-          or (r.button or r.slot) and "b" or "t"
-        local number = 0
-        if (kind == "b" or kind == "i") and (r.button or r.slot) then
-          map[#map + 1] = r.button or r.slot
-          number = #map
-        end
-        local colour = type(r.color) == "string" and r.color:match("^#?(%x%x%x%x%x%x)$") or "-"
-        local fields = { "r", kind, r.same_line and "1" or "0", r.selected and "1" or "0", r.disabled and "1" or "0",
-          r.dim and "1" or "0", colour, tostring(number), clean(r.heading or r.text), clean(r.tooltip) }
-        if kind == "d" then  -- a drop-down: its entries, each "<number>\31<h|o|s>\31<rrggbb|->\31<label>"
-          for _, o in ipairs(r.options) do
-            local n = 0
-            if o.key then
-              map[#map + 1] = o.key
-              n = #map
-            end
-            local c = type(o.color) == "string" and o.color:match("^#?(%x%x%x%x%x%x)$") or "-"
-            fields[#fields + 1] = table.concat({ tostring(n), o.heading and "h" or o.selected and "s" or "o", c,
-              (clean(o.text):gsub("\31", " ")) }, "\31")
-          end
-        elseif kind == "i" then  -- an item tile: its details for the tooltip (core/items.lua items.tip)
-          local debug_name = kit.items.debug_name(r.item)
-          local t = kit.items.tip(r.item, debug_name)
-          for _, v in ipairs({ string.format("%x", r.item), tostring(r.count or 0), tostring(t.rarity), t.level, clean(t.type),
-                               clean(debug_name or "") }) do fields[#fields + 1] = v end
-        end
-        body[#body + 1] = table.concat(fields, "\t")
-      end
-      local text = table.concat(body, "\n")
+      local text, map = rows_lines(rows)
       if text ~= last_rows then
         last_rows = text
         generation = generation + 1
@@ -175,6 +180,31 @@ local function write_tabs(world)
   out:write(text)
   out:close()
   last_tabs = text
+end
+
+-- FlameKit's Experimental window (0.15.74): the rows of features/experimental.lua F.window_rows in ui_exp.dat, a line
+-- "gen <generation>", the "r" lines (as in ui_tabs.dat), then "end". Written when they change (looked at every 10
+-- steps, and at once after a click); a click comes back as "exp <generation>/<button number>".
+local exp_gen, exp_keys, last_exp, exp_now = 0, {}, nil, true
+local function write_exp(world)
+  local f = feature("experimental")
+  local rows = f and kit.enabled(f) and f.window_rows and kit.call(f, "window_rows", world)
+  if type(rows) ~= "table" then rows = {} end
+  local text, map = rows_lines(rows)
+  if text == last_exp then return end
+  last_exp = text
+  exp_gen = exp_gen + 1
+  exp_keys[exp_gen] = map
+  exp_keys[exp_gen - 3] = nil
+  local out = io.open(emf.dir .. "\\ui_exp.dat", "w")
+  if not out then
+    kit.debug("warn", "native ui: ui_exp.dat could not be written")
+    last_exp = nil
+    return
+  end
+  out:write("gen\t" .. exp_gen .. "\n" .. text .. (text ~= "" and "\n" or "") .. "end\n")
+  out:close()
+  kit.debug("debug", "native ui: ui_exp.dat: %d row(s), generation %d", #rows, exp_gen)
 end
 
 local function act(world, what, arg)
@@ -200,6 +230,19 @@ local function act(world, what, arg)
       kit.debug("info", "native ui: a click on %s was dropped (the tab changed before it arrived)", tostring(arg))
     end
     last_rows = nil
+    tabs_now = true
+    exp_now = true
+  elseif what == "exp" then  -- a click in the Experimental window
+    local gen, number = tostring(arg):match("^(%d+)/(%d+)$")
+    local map = gen and exp_keys[tonumber(gen)]
+    local key = map and map[tonumber(number)]
+    local f = feature("experimental")
+    if f and key then
+      kit.call(f, "click", world, key)
+    else
+      kit.debug("info", "native ui: a click in the Experimental window on %s was dropped (it changed before it arrived)", tostring(arg))
+    end
+    exp_now = true
     tabs_now = true
   elseif what == "key" then  -- a key pressed in the window: the setting waiting for a key (any tab's Change) takes it
     local settings = feature("settings")
@@ -245,6 +288,10 @@ function F.client_tick(world)
   if steps % 10 == 5 or tabs_now then
     tabs_now = false
     write_tabs(world)
+  end
+  if steps % 10 == 7 or exp_now then
+    exp_now = false
+    write_exp(world)
   end
 end
 

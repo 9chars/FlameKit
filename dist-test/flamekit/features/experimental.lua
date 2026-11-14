@@ -264,7 +264,7 @@ end
 local function duelist(guid)
   return MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[DUEL_GUID] or { "Vukah", "Melee", DUEL_GUID, false }
 end
-local MAX_LEVEL = 255
+local MAX_LEVEL = 105  -- the game's own top: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
 local DUEL_FACTION = 1                                      -- HitAll
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
@@ -1089,17 +1089,23 @@ local function debug_rows(world, rows)
   return rows
 end
 
-local function panel_rows(world)
-  local v
+local function my_view(world)
   if hosting(world) then
     load_saved()
     local account = me(world)
-    v = account and view(account)
-  else
-    v = shown
+    return account and view(account)
   end
+  return shown
+end
+
+-- The F4 tab (0.15.74, owner): the switches but PvP, and the Debug section (test players, log level). Fast Travel, PvP
+-- and the test bodies are in FlameKit's Experimental window (F.window_rows below).
+local function panel_rows(world)
+  local v = my_view(world)
   local rows = {
     { color = "#ffb060", text = "Experimental: these bend the game's rules for you only. Every player has their own." },
+    { dim = true, text = "Fast Travel, PvP and the test monsters are in the Experimental window (F4 > Windows shows and hides it; "
+      .. "its key is a setting)." },
   }
   if not v then
     rows[#rows + 1] = { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."
@@ -1108,29 +1114,43 @@ local function panel_rows(world)
   end
   rows[#rows + 1] = { separator = true }
   for _, s in ipairs(SWITCHES) do
-    local on = v[s[1]] == true
-    local text = (on and "On    " or "Off   ") .. s[2]
-    if v[s[1] .. "_dead"] then text = text .. " (not working on this game version)" end
-    rows[#rows + 1] = { button = "sw:" .. s[1], text = text, selected = on, tooltip = TIPS[s[1]] }
+    if s[1] ~= "pvp" then
+      local on = v[s[1]] == true
+      local text = (on and "On    " or "Off   ") .. s[2]
+      if v[s[1] .. "_dead"] then text = text .. " (not working on this game version)" end
+      rows[#rows + 1] = { button = "sw:" .. s[1], text = text, selected = on, tooltip = TIPS[s[1]] }
+    end
   end
-  rows[#rows + 1] = { separator = true }
+  return debug_rows(world, rows)
+end
+
+-- FlameKit's Experimental window (0.15.74, owner): a pinned window that stays on screen while playing. Fast Travel at
+-- the top, then PvP, then the test bodies (the dummy and the duelist). Drawn by the DLL from ui_exp.dat
+-- (features/native_ui.lua); its clicks come back to F.click like the tab's.
+function F.window_rows(world)
+  local v = my_view(world)
+  if not v then
+    return { { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."
+      or "This server does not run FlameKit (or not this version)." } }
+  end
+  local rows = {}
   rows[#rows + 1] = { heading = "Fast Travel" }
-  rows[#rows + 1] = { button = "home", text = "Nearest Flame Altar",
+  rows[#rows + 1] = { button = "home", text = "Flame Altar",
     tooltip = "Takes you to the nearest flame altar at once. Works where the map's fast travel does not: inside the shroud, in lava, while stuck." }
-  rows[#rows + 1] = { button = "spire", text = "Nearest Ancient Spire", same_line = true,
+  rows[#rows + 1] = { button = "spire", text = "Ancient Spire", same_line = true,
     tooltip = "Takes you to the nearest Ancient Spire on your map, unlocked or not. Works inside the shroud too." }
   rows[#rows + 1] = { button = "waypoint", text = "Map Waypoint", same_line = true,
     tooltip = "Takes you straight to the waypoint you set on your map, onto the ground there. Fall damage is off for 30 seconds "
       .. "after the move, in case there is no ground right at the waypoint." }
-  if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
-  debug_rows(world, rows)
-  rows[#rows + 1] = { text = "PvP test bodies, 3 m in front of you (one at a time, gone after a reload):" }
-  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn PvP dummy", selected = v.body == "dummy",
+  rows[#rows + 1] = { heading = "PvP" }
+  local on = v.pvp == true
+  rows[#rows + 1] = { button = "sw:pvp", text = (on and "On    " or "Off   ") .. "PvP (free-for-all)" .. (v.pvp_dead and " (not working)" or ""),
+    selected = on, tooltip = TIPS.pvp }
+  rows[#rows + 1] = { heading = "Test monsters" }
+  rows[#rows + 1] = { button = "dbg:body:dummy", text = "PvP dummy", selected = v.body == "dummy",
     tooltip = "A player-like body (faction Player). With PvP on it swings at you but does no damage: hit it to see whether your weapons hurt a player." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test body." }
-  rows[#rows + 1] = { text = "Duelist: it attacks everyone with full damage, PvP on or off. It never hurts animals, pets or "
-    .. "buildings; villagers are fair game. Spawn it away from your base." }
   -- (0.15.73, owner: the group buttons and pages were too confusing) One drop-down with every monster under its group's
   -- heading, bosses in orange; the level with < > and five quick picks.
   local pick = duelist(duel_what)
@@ -1144,23 +1164,23 @@ local function panel_rows(world)
       end
     end
   end
-  rows[#rows + 1] = { label = true, text = "Monster" }
-  rows[#rows + 1] = { options = options, text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil, same_line = true,
+  rows[#rows + 1] = { options = options, text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
     tooltip = "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
-  local lvl_tip = duel_level > 50 and "Above the game's level 50 it gets very strong: a level 75 one beat a level 50 player."
-    or "Its level: the game sets its health and damage from it (level 50: about 6700 health)."
+  local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, 105: the game's top, about 62700)."
   rows[#rows + 1] = { label = true, text = "Level" }
   rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = duel_level <= 1, tooltip = "One level lower" }
   rows[#rows + 1] = { label = true, text = tostring(duel_level), same_line = true, color = duel_level > 50 and "#ff8060" or nil,
     tooltip = lvl_tip }
   rows[#rows + 1] = { button = "dbg:lvl:1", text = ">", same_line = true, disabled = duel_level >= MAX_LEVEL, tooltip = "One level higher" }
-  for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
+  for _, q in ipairs({ 1, 25, 50, 75, 105 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q, tooltip = lvl_tip }
   end
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel",
-    tooltip = "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It replaces your test body." }
+    tooltip = "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
+      .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test body." }
+  if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
   return rows
 end
 
@@ -1239,13 +1259,19 @@ function F.setup(k)
   -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;
   -- "flamekit.pvptest off" takes all of it back. The duelist's AI lines in the log tell whether it fights.
   local test = nil  -- { account, player, rule }
-  pcall(emf.command, "duelist", "<player entity> [level 1-255] [template GUID from core/monsters.lua]: a duelist 3 m in front of that player (PvP on or off, it fights)",
+  pcall(emf.command, "duelist", "<player entity> [level|off] [template GUID from core/monsters.lua]: a duelist 3 m in front of that player (PvP on or off, it fights)",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
       local player, level = tonumber(args[1]), tonumber(args[2])
       local ok, account = pcall(world.account, world, player)
       if not player or not ok or not account then emf.reply("duelist: no player with entity " .. tostring(args[1])) return end
-      if level then level = math.max(1, math.min(255, math.floor(level))) end
+      if args[2] == "off" then
+        drop_bodies_of(world, tostring(account), true)
+        emf.reply("duelist: removed")
+        return
+      end
+      -- the game sets any level above 105 back to 105
+      if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
       local why = spawn_body(world, tostring(account), player, "duel", level, args[3])
       emf.reply("duelist: " .. (why or "spawned"))
     end, "the duelist command"))
