@@ -1,3 +1,7 @@
+0.15.62 Nov 14, 2026
+- "Hide all of FlameKit in build mode" moved from the Minimap tab to FlameKit's window, tab Windows (it affects all of FlameKit's UI).
+- Build mode: FlameKit stayed hidden after you left build mode (the game keeps the building cursor where it was). Until the right signal is found, nothing is hidden in build mode; FlameKit logs the building cursor's details while you enter and leave build mode, to find it.
+
 0.15.61 Nov 14, 2026
 - Build mode now hides all of FlameKit on your screen, the FlameKit lines in the lower left corner too. Only FlameKit's window (F6) still opens.
 - Fix: a setting added by an update did not exist until the second game start after it (EMF reads FlameKit's settings before the update is put in place), so "Hide FlameKit's windows in build mode" (0.15.59) read as off and nothing was hidden. A few seconds after an update is put in place, FlameKit now makes EMF read its settings again.

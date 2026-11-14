@@ -426,18 +426,21 @@ settings.show_label = false
 step(1)
 check(hud.label == "", "the label can be switched off")
 settings.show_label = true
--- build mode: the building cursor moves away from zero; FlameKit's windows hide (ui_hud.dat "build 1"), if the setting is on
-check(hud.build == false, "not building: no build line")
-comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryTransform.position.x = 12345
+-- build mode (0.15.62): only measured: the building cursor's fields are logged when they change, nothing is hidden
+local probes = 0
+for _, l in ipairs(logged) do if l:find("build probe:", 1, true) then probes = probes + 1 end end
+comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryFlags = 0
+comps.ClientPlayerInput[PLAYER].data.cursorInput.secondaryFlags = 0
+comps.ClientPlayerInput[PLAYER].data.cursorInput.hoveredVoxelMaterialId = 0
+comps.ClientPlayerInput[PLAYER].data.cursorInput.isCursorAttachedToProp = false
+comps.ClientPlayerInput[PLAYER].data.mask = 0
+comps.ClientPlayerInput[PLAYER].inputMode = 0
 step(2)
-check(hud.build == true, "building (the cursor is placed): ui_hud.dat says build 1")
-settings.ui_hide_build = false
+comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryFlags = 3
 step(2)
-check(hud.build == false, "with the setting off, nothing is hidden")
-settings.ui_hide_build = true
-comps.ClientPlayerInput[PLAYER].data.cursorInput.primaryTransform.position.x = 0
-step(2)
-check(hud.build == false, "out of build mode: the line goes")
+local after = 0
+for _, l in ipairs(logged) do if l:find("build probe:", 1, true) then after = after + 1 end end
+check(after > probes and hud.build == false, "the building cursor's fields are logged when they change; nothing is hidden yet")
 settings.notify = false
 local newest_before = hud.newest
 comps.Inventory[201].slots[1] = stack(0x11, 4)

@@ -52,6 +52,7 @@ constexpr float kPi = 3.14159265358979f;
 
 struct Settings {
     bool show = true;
+    bool hide_build = true;  // ui_hide_build: all of FlameKit's UI hides in build mode (switched in the Windows tab)
     int size = 300;          // the dial's width and height in pixels
     int margin = 24;         // distance from the game window's edges in pixels
     int corner = 1;          // 0 top right, 1 bottom right, 2 bottom left, 3 top left
@@ -127,6 +128,7 @@ void read_settings() {
     s.where = emf::setting_bool(kKit, "map_where", true);
     s.labels = emf::setting_bool(kKit, "map_labels", true);
     s.hide_menus = emf::setting_bool(kKit, "map_hide_in_menus", true);
+    s.hide_build = emf::setting_bool(kKit, "ui_hide_build", true);
     s.move = false;  // set by the UI thread while the pointer is out (the setting map_move is gone since 0.15.34)
     s.pos_x = static_cast<int>(emf::setting_float(kKit, "map_x", -1.0));
     s.pos_y = static_cast<int>(emf::setting_float(kKit, "map_y", -1.0));
@@ -3335,7 +3337,7 @@ struct WindowLayer : Layer {
         std::wstring level, type, command;
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem };
     struct Hit {
         RECT r;
         Kind kind;
@@ -3859,6 +3861,16 @@ struct WindowLayer : Layer {
         text.draw(canvas, kPad, y + 5, L"FlameKit window", 230, 230, 235);
         button(kPad + 320, y, 150, L"Reset place", false, kPinReset, g_pinned.size());  // its place and size
         y += 40;
+        {  // (0.15.62, owner: it affects all of FlameKit's UI, so it belongs here; it was in the Minimap tab)
+            static const std::wstring kTip = L"While you build, all of FlameKit on your screen is hidden so nothing is in the way: "
+                                              L"the minimap, the party window, Messages, Notices and the lines in the lower left "
+                                              L"corner. This window (F6) still opens.";
+            const bool on = settings().hide_build;
+            text.draw(canvas, kPad, y + 5, L"In build mode", 230, 230, 235);
+            button(kPad + 200, y, 270, on ? L"Hide all of FlameKit: ON" : L"Hide all of FlameKit: OFF", on, kHideBuild);
+            hits.back().tip = &kTip;
+            y += 40;
+        }
         y += 10;
         static const wchar_t* kHelp[] = {
             L"Hold the pointer key (Right Alt unless changed in Settings) to get",
@@ -4262,6 +4274,9 @@ struct WindowLayer : Layer {
                 break;
             case kOpt:
                 if (h.index < opts.size()) act("opt", opts[h.index].key);
+                break;
+            case kHideBuild:  // the setting is switched by the Lua part (features/settings.lua), like the Auto Junk List's options
+                act("opt", "b:ui_hide_build");
                 break;
             case kScrollThumb:
                 thumb_drag = true;

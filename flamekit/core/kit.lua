@@ -184,12 +184,32 @@ end
 -- player in your game's world, is all zero outside build mode (EMF docs, engine_parts/re_villager_jobs.md, for the
 -- server's copy of the same input). Any non-zero position: building.
 local build_was = nil
+local BUILD_HIDES = false  -- MEASUREMENT (0.15.62): true again once the build mode signal is right
+-- MEASUREMENT (0.15.62): the cursor position stays where it was when build mode ends (seen in the owner's game), so
+-- it is no signal for leaving. Every field of the building cursor is logged when one changes, to find the one that
+-- goes back when the player leaves build mode.
+local probe_was, probe_pos, probe_at = nil, nil, 0
+local function probe(input)
+  local c = input.data.cursorInput
+  local p = c.primaryTransform.position
+  local pos = string.format("%d,%d,%d", p.x // 2 ^ 28, p.y // 2 ^ 28, p.z // 2 ^ 28)
+  local moving = probe_pos ~= nil and pos ~= probe_pos
+  if os.clock() - probe_at >= 0.5 then probe_pos, probe_at = pos, os.clock() end
+  local sig = string.format("flags %d/%d attached %s material %d moving %s inputmode %s mask %d",
+    c.primaryFlags, c.secondaryFlags, tostring(c.isCursorAttachedToProp), c.hoveredVoxelMaterialId, tostring(moving),
+    tostring(input.inputMode), input.data.mask)
+  if sig ~= probe_was then
+    probe_was = sig
+    kit.debug("info", "build probe: %s", sig)
+  end
+end
 local function in_build_mode(world)
   local me = emf.local_player()
   if not me or me == 0 then return false end
   local ok, on = pcall(function()
     local input = world:get("ClientPlayerInput", me)
     if not input then return false end
+    pcall(probe, input)
     local p = input.data.cursorInput.primaryTransform.position
     return p.x ~= 0 or p.y ~= 0 or p.z ~= 0
   end)
@@ -217,7 +237,10 @@ local function hud_tick(world)
     local note = kit.server_note(world)
     if note then lines[#lines + 1] = "notice " .. note end
   end
-  if kit.setting("ui_hide_build", true) and in_build_mode(world) then lines[#lines + 1] = "build 1" end
+  -- 0.15.62: build mode is only measured (in_build_mode logs the cursor's fields), nothing is hidden until a signal
+  -- that also switches back is known (the cursor position stays when build mode ends: FlameKit stayed hidden)
+  local building = in_build_mode(world)
+  if BUILD_HIDES and building and kit.setting("ui_hide_build", true) then lines[#lines + 1] = "build 1" end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"
   if text == hud_written then return end
