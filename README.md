@@ -87,3 +87,9 @@ The updater reads the newest commit of this repository, downloads the channel's 
 ## Third-party code
 
 The native part contains zstd's decoder (`zstddeclib.c`, BSD licence) and bcdec (`bcdec.h`). Their licence texts are beside them in `flamekit_native/src/`.
+
+## Thank You
+
+A heartfelt thank you to Keen Games, the studio behind Enshrouded. You built a world that is a joy to explore, to build in and to share with friends, and it is that world that made us want to add our own small touches to it. FlameKit exists because Enshrouded is so much fun to play. Thank you for making such an excellent game.
+
+https://www.keengames.com/about
