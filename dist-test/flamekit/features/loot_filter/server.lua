@@ -263,6 +263,7 @@ function S.handle(world, from, msg)
     st.opts = clean_opts(msg.opts)
     st.ids = nil
     save(st)
+    send(world, st, { op = "synced" })  -- (0.15.57) the player's game stops resending once it has this
     tell_auto_loot(world, st)  -- a game that just said hello learns it at once
   elseif msg.op == "dump" then
     local why = dump(world, st)

@@ -256,12 +256,16 @@ join_all()
 local server = require("features.loot_filter.server")
 
 local UI = JOINED and CW or SW  -- the world keys and the window run in
+lose_next_sync = false
 local function step(n)
   for _ = 1, n or 1 do
     side = "server"
     local msgs = to_server
     to_server = {}
-    for _, data in ipairs(msgs) do channel.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
+    for _, data in ipairs(msgs) do
+      if lose_next_sync and data:find('"op":"sync"', 1, true) then lose_next_sync = false  -- lost on the way (a test)
+      else channel.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
+    end
     local run = pending
     pending = {}
     for _, f in ipairs(run) do f() end
@@ -541,6 +545,16 @@ cmd({ "clear" })
 cmd({ "clear", "yes" })
 step(31)
 check(#junk_view().junk == 0, "junk clear yes empties the list")
+if JOINED then  -- a list lost on the way (the server's link may drop the first message while the game loads)
+  lose_next_sync = true
+  ui_action("junk", "Material_T1_Stone")
+  step(60)
+  check(not (pdata[ACCOUNT] or ""):find("Material_T1_Stone", 1, true), "the list was lost on the way: the server does not have it")
+  step(320)
+  check((pdata[ACCOUNT] or ""):find("Material_T1_Stone", 1, true) ~= nil, "unconfirmed, the game sends it again within about 5 s: now the server has it")
+  ui_action("keep", "Material_T1_Stone")
+  step(SYNC + 20)
+end
 
 toggle_panel()  -- the other features' tabs (panel rows), as the tests drive them
 -- the Minimap tab's marker filters
