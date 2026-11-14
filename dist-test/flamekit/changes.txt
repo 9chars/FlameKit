@@ -1,3 +1,7 @@
+0.15.107 Nov 14, 2026
+- The Messages window hides while the bag or any of the game's menus is open, like the other windows.
+- Clicking another program while a game menu is open no longer brings FlameKit's windows up over the menu: FlameKit keeps the last menu state while the game is in the background.
+
 0.15.106 Nov 14, 2026
 - Auto Junk List: the buttons are Auto, Drop/Delete, then Dump Junk last, at the end of the row where it is easiest to hit.
 - Auto Junk List: the Drop/Delete tooltip says "With Drop mode set, turn off the game's Auto-Collect Scattered Loot setting...".

@@ -3226,7 +3226,8 @@ struct MessagesLayer : PinnedLayer {
         stick = scroll >= max_scroll;
     }
 
-    bool active(const Frame& f) override { return f.in_world; }
+    // (0.15.107, owner) hidden in the game's menus like the other windows
+    bool active(const Frame& f) override { return f.in_world && !f.in_menu; }
 
     void read_file(uint64_t now) {
         WIN32_FILE_ATTRIBUTE_DATA info{};
@@ -6465,10 +6466,19 @@ void ui_thread_body() {
         // One of the game's menus is open (bag, map, skills, ...): the game's own window is in front and shows the
         // pointer (a pointer "showing" without a picture is hidden: the game hides it that way too). FlameKit's own
         // pointer is not a menu: then FlameKit's overlay is in front.
+        // (0.15.107, owner) While another program is in front, the last state is kept: a click outside the game while a
+        // menu was open made FlameKit's windows appear over the game's menu (the menu check only works with the game in
+        // front).
+        static bool menu_was = false;
         if (f.game_front && !g_pointer_mode) {
             CURSORINFO ci{};
             ci.cbSize = sizeof(ci);
             f.in_menu = GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) != 0 && ci.hCursor != nullptr;
+            menu_was = f.in_menu;
+        } else if (!f.ours_front) {
+            f.in_menu = menu_was;
+        } else if (g_pointer_mode) {
+            menu_was = false;  // FlameKit's own pointer: not a game menu
         }
 
         if (f.game_front) look_for_game_cursor();  // the game's pointer, while the game shows it in its menus
