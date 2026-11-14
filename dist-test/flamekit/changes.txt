@@ -1,3 +1,8 @@
+0.15.54 Nov 13, 2026
+- New Notices window: warnings that stay on screen until they are solved, instead of scrolling away in Messages. It has no title bar; hold the pointer key to drag it anywhere or size it at its lower right corner. It shows only while there is a notice (and not in the game's menus); FlameKit's window, tab Windows, can reset its place.
+- Auto Junk List: the "Auto-Collect Scattered Loot" warning moved from Messages to the Notices window. It is there for as long as junk is set to Drop while that game option is on, and goes away by itself once you turn the option off or set Delete.
+- Party window: the buff and debuff badges are bigger (30 px) and show the time left inside the icon (seconds under a minute, then minutes, then hours). A player with buffs takes 10 px more room than one without.
+
 0.15.53 Nov 13, 2026
 - Auto Junk List: when you turn "Auto-Collect Scattered Loot" off in the game, its red warnings leave the Messages window by themselves (within a second or so).
 

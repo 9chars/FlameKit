@@ -92,25 +92,59 @@ local MOST_MESSAGES = 20
 -- `always` (warnings the player has to see). Also written to the log. emf\mods\flamekit\ui_messages.dat:
 --   m <number> <rrggbb> <text>     (the last 20, oldest first)
 --   end                            (a file without it is half written: the DLL reads it again later)
-function kit.note(text, colour, always, tag)
+function kit.note(text, colour, always)
   emf.log(tostring(text))
   if not always and not kit.setting("notify", true) then return end
   message_n = message_n + 1
   messages[#messages + 1] = { n = message_n, colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060",
-    text = (tostring(text):gsub("[%c]", " ")), tag = tag }
+    text = (tostring(text):gsub("[%c]", " ")) }
   if #messages > MOST_MESSAGES then table.remove(messages, 1) end
   messages_dirty = true
 end
 
--- Takes every message noted with `tag` out of the Messages window (what it warned about is over).
-function kit.unnote(tag)
-  if tag == nil then return end
-  for i = #messages, 1, -1 do
-    if messages[i].tag == tag then
-      table.remove(messages, i)
-      messages_dirty = true
+-- Notices (since 0.15.54): warnings that stay on screen in FlameKit's Notices window until the feature takes them back,
+-- written into emf\mods\flamekit\ui_notices.dat: "n <tag> <rrggbb> <text>" lines, then "end" (DLL: NoticeLayer).
+-- kit.notice(tag, text, colour) puts one up (or changes it), kit.notice(tag) takes it back. The file is written at the
+-- next step; after a reload of FlameKit it is written again (empty until the features say otherwise).
+local notices = {}        -- tag -> { colour, text, order }
+local notice_order = 0
+local notices_dirty = true
+
+function kit.notice(tag, text, colour)
+  if type(tag) ~= "string" or not tag:match("^[%w_%.]+$") then return end
+  if text == nil then
+    if notices[tag] then
+      notices[tag] = nil
+      notices_dirty = true
     end
+    return
   end
+  local c = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ff5a50"
+  local t = (tostring(text):gsub("[%c]", " "))
+  local had = notices[tag]
+  if had and had.text == t and had.colour == c then return end
+  if not had then notice_order = notice_order + 1 end
+  notices[tag] = { colour = c, text = t, order = had and had.order or notice_order }
+  notices_dirty = true
+end
+
+local function write_notices()
+  if not notices_dirty then return end
+  local list = {}
+  for tag, n in pairs(notices) do list[#list + 1] = { tag = tag, n = n } end
+  table.sort(list, function(a, b) return a.n.order < b.n.order end)
+  local lines = {}
+  for _, e in ipairs(list) do lines[#lines + 1] = string.format("n %s %s %s", e.tag, e.n.colour, e.n.text) end
+  lines[#lines + 1] = "end"
+  local f = io.open(emf.dir .. "\\ui_notices.dat", "w")
+  if not f then
+    kit.debug("warn", "notices: ui_notices.dat could not be written")
+    return
+  end
+  f:write(table.concat(lines, "\n") .. "\n")
+  f:close()
+  notices_dirty = false
+  kit.debug("info", "notices: %d on screen", #list)
 end
 
 local function write_messages()
@@ -146,6 +180,7 @@ end
 -- The updater's line under the label comes from the DLL itself. ui_hud.dat is a runtime file: never deployed.
 local function hud_tick(world)
   write_messages()
+  write_notices()
   local label = ""
   if kit.setting("show_label", true) then
     label = string.format("%s v%s", kit.name, kit.version)

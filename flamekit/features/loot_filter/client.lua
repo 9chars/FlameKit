@@ -25,11 +25,9 @@ local warning_shown = false
 local for_host = {}        -- in a world this game hosts: requests made on the client world (FlameKit's window), handed to
                            -- the server half on the server world's next step (C.server_tick)
 
--- The game calls its auto loot setting "Auto-Collect Scattered Loot". The banner: one red message in FlameKit's
--- Messages window (kit.note), at most once a minute.
-local AUTO_LOOT_BANNER = { "FlameKit Junk List: dropped junk is coming back into your bag.",
-                           "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings." }
--- The warning line in FlameKit's window (the Auto Junk List's view), shown as long as the problem is there.
+-- The game calls its auto loot setting "Auto-Collect Scattered Loot". While junk is set to Drop and it is on, dropped
+-- junk comes straight back: a red notice stays on screen (kit.notice, FlameKit's Notices window; 0.15.54, owner: in
+-- Messages it got lost) and a red line shows over the bag in FlameKit's window (C.ui_warning), until it is solved.
 local AUTO_LOOT_WARNING = "\"Auto-Collect Scattered Loot\" is on in the game's settings: dropped junk comes straight back "
   .. "into your bag. Turn it off, or set Drop / Delete to Delete."
 
@@ -38,20 +36,11 @@ local function auto_loot_problem()
   return auto_loot == true and emf.setting("lf_action") ~= "delete" and emf.setting("lf_enabled") ~= false
 end
 
--- The banner: a red message, at most once a minute (FlameKit's Messages window keeps it in its list).
-local banner_at = 0
-
-local function banner()
-  if os.time() < banner_at then return end
-  kit.note(table.concat(AUTO_LOOT_BANNER, " "), "#ff5a50", true, "autoloot")
-  banner_at = os.time() + 60
-end
-
 local function refresh_warning()
   local show = auto_loot_problem()
   if show == warning_shown then return end
   warning_shown = show
-  if show then banner() end
+  if show then kit.notice("autoloot", "Auto Junk List: " .. AUTO_LOOT_WARNING, "#ff5a50") else kit.notice("autoloot") end
 end
 
 -- ---- the list ----
@@ -173,10 +162,8 @@ function C.receive(world, msg)
   kit.debug("debug", "junk list (client): from the server half: %s", tostring(msg.op))
   if msg.op == "done" and type(msg.total) == "number" then
     kit.note(server.summary(msg), JUNK_RED)
-    if msg.action == "drop" and auto_loot_problem() then banner() end  -- each time junk is dropped into auto loot (once a minute at most)
   elseif msg.op == "autoloot" then
     auto_loot = msg.on == true
-    if not auto_loot then kit.unnote("autoloot") end  -- turned off in the game: its warnings leave the Messages window
     refresh_warning()
   elseif msg.op == "info" and type(msg.text) == "string" then
     kit.note(msg.text, nil, true)

@@ -483,8 +483,15 @@ comps.Inventory[201].slots[1] = stack(0x11, 30)
 pickup({ itemId = 0x11, itemCount = 30, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = gives[1].id })
 step(10)
 check(count(201, 0x11) == 30 and #gives == n_gives, "a drop that came back stays in the bag (no loop)")
--- the game's auto loot is on (the mock's flags have bit 12): the player is warned while junk is dropped
+-- the game's auto loot is on (the mock's flags have bit 12): a notice stays on screen while junk is set to drop
 step(70)
+local function notice()
+  local f = io.open(TMP .. "\\ui_notices.dat", "r")
+  if not f then return nil end
+  local t = f:read("a")
+  f:close()
+  return t:match("\nn autoloot ff5a50 ([^\n]*)") or t:match("^n autoloot ff5a50 ([^\n]*)"), t
+end
 local function yells()
   local n = 0
   local f = io.open(TMP .. "\\ui_messages.dat", "r")
@@ -493,37 +500,19 @@ local function yells()
   f:close()
   return n
 end
-check(yells() == 1, "auto loot on and junk dropped: a red message came")
+local text, whole = notice()
+check(text and text:find("Auto%-Collect Scattered Loot") and whole:find("\nend\n$"), "auto loot on and junk dropped: a red notice in ui_notices.dat (the Notices window)")
+check(yells() == 0, "and nothing about it in the Messages window any more")
 check((junk_view().warning or ""):find("Auto%-Collect Scattered Loot") ~= nil, "and the window's Auto Junk List view shows the warning over the bag")
 check((hud.autoloot or "") == "", "no extra line is left on the screen")
-clock = clock + 8
-step(2)
-check(yells() == 1, "the message is not repeated within a minute")
 ui_action("action", "delete")
-check(junk_view().action == "delete" and junk_view().warning == nil, "junk set to delete: the warning goes")
+check(junk_view().action == "delete" and junk_view().warning == nil and notice() == nil, "junk set to delete: the notice and the line go")
 ui_action("action", "drop")
-check(junk_view().action == "drop" and junk_view().warning ~= nil, "back to drop: the warning is back")
+check(junk_view().action == "drop" and junk_view().warning ~= nil and notice() ~= nil, "back to drop: both are back")
 step(SYNC)
--- each drop into auto loot brings the banner back
-clock = clock + 60
-local before = yells()
-comps.Inventory[201].slots[1] = stack(0x11, 5)
-pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
-step(10)
-check(yells() == before + 1, "junk dropped while auto loot is on: the banner comes again")
-pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
-comps.Inventory[201].slots[2] = stack(0x11, 5)
-step(10)
-check(yells() == before + 1, "but not twice within a minute")
 comps.PlayerInput[PLAYER].fromClientSettings.flags = 0x0853
 step(70)
-clock = clock + 60
-before = yells()
-comps.Inventory[201].slots[1] = stack(0x11, 5)
-pickup({ itemId = 0x11, itemCount = 5, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
-step(10)
-check(yells() == before and junk_view().warning == nil, "auto loot switched off in the game: no more warnings, the line goes")
-check(yells() == 0, "and its earlier warnings are gone from the Messages window")
+check(notice() == nil and junk_view().warning == nil, "auto loot switched off in the game: the notice and the line go")
 comps.Inventory[201].slots[1] = stack()
 
 -- the chat command runs on the server half and the player's own game follows

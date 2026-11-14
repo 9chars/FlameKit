@@ -2389,7 +2389,9 @@ struct PinnedLayer : Layer {
     std::wstring title;
     int default_w = 300, min_w = 220, max_w = 640;
     int def_x_pm = 12, def_y_pm = 333;  // the first place: per mille of the game window's width and height
-    static constexpr int kHead = 28, kGrip = 14;
+    static constexpr int kGrip = 14;
+    int kHead = 28;          // the title bar's height (0 with headless)
+    bool headless = false;   // no title bar (the Notices window): dragged anywhere in pointer mode, sized at its corner
     TextPainter text, little;  // ("small" is a macro in Windows' headers)
     bool fonts = false, dirty = true, was_pointer = false;
     enum Drag { kNone, kMove, kSize } drag = kNone;
@@ -2440,12 +2442,19 @@ struct PinnedLayer : Layer {
                 box(w - 8, ty, w - 3, ty + thumb, 120, 128, 145, 1.0f);
             }
         }
-        box(0, 0, w, kHead, 30, 34, 44, 0.92f);                     // the title bar
+        if (!headless) box(0, 0, w, kHead, 30, 34, 44, 0.92f);      // the title bar
         if (g_pointer_mode) {                                       // movable now: a lit frame
             box(0, 0, w, 1, 120, 160, 220, 1.0f);
             box(0, h - 1, w, h, 120, 160, 220, 1.0f);
             box(0, 0, 1, h, 120, 160, 220, 1.0f);
             box(w - 1, 0, w, h, 120, 160, 220, 1.0f);
+        }
+        if (headless) {  // no title, no buttons: only the resize grip while the pointer is out
+            hide_r = collapse_r = RECT{};
+            if (g_pointer_mode)
+                for (int k = 0; k < kGrip; k += 3) box(w - kGrip + k, h - 2 - k / 3, w - 2, h - 1 - k / 3, 140, 170, 220, 0.9f);
+            changed = true;
+            return;
         }
         text.draw(canvas, 8, 5, title, 235, 225, 205);
         // the buttons at the right of the title bar: "-" collapse (or "+" open), "x" hide
@@ -2553,7 +2562,7 @@ struct PinnedLayer : Layer {
         } else if (!e.collapsed && x >= canvas.w - kGrip && y >= canvas.h - kGrip) {
             drag = kSize;
             grab = {canvas.w - x, canvas.h - y};
-        } else if (y < kHead) {
+        } else if (y < kHead || headless) {
             drag = kMove;
             grab = {x, y};
             e.x = rect.left;
@@ -2587,10 +2596,10 @@ struct PartyLayer : PinnedLayer {
     bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
     uint64_t stamp = 0, next_read = 0;
     static constexpr int kRow = 76;
-    // the buffs (since 0.15.52 on the name line, behind the name, so a player's tile is no taller): a small badge per
-    // buff (the game's icon on its slot's colour), as many as fit before the level; the last one says "+N" when there
-    // are more. The time left is in the tooltip (pointer out, over a badge).
-    static constexpr int kBadge = 18, kBadgeGap = 2, kBuffIcon = 14;
+    // the buffs (since 0.15.52 on the name line, behind the name; 0.15.54: 30 px, the time left inside, the tile 10 px
+    // taller while that player has buffs): a badge per buff (the game's icon on its slot's colour), as many as fit
+    // before the level; the last one says "+N" when there are more. Name, kind and exact time in the tooltip.
+    static constexpr int kBadge = 30, kBadgeGap = 3, kBuffIcon = 22, kBuffExtra = 10;
     int last_width = 300;
     int hover_member = -1, hover_buff = -1;  // the badge under the pointer (-1: none; hover_buff -2: the "+N" badge)
     std::unordered_map<uint32_t, std::vector<uint8_t>> buff_pics;  // buff type -> its icon (empty: none to be had)
@@ -2600,7 +2609,7 @@ struct PartyLayer : PinnedLayer {
     };
     std::vector<Spot> spots;             // the badges as last drawn
 
-    int member_height(const Member&, int) const { return kRow; }
+    int member_height(const Member& m, int) const { return kRow + (m.buffs.empty() ? 0 : kBuffExtra); }
     // the time left, for the tooltip: "12:05 left"
     static std::wstring long_time(int s) {
         if (s < 0) return L"no time limit";
@@ -2796,7 +2805,18 @@ struct PartyLayer : PinnedLayer {
             canvas.picture(have->second.data(), kBuffIcon, x + kBadge * 0.5f, y + kBadge * 0.5f, fade > 0.9f ? 1.0f : 0.6f);
         } else {
             const std::wstring letter = b.name.empty() ? std::wstring(L"?") : b.name.substr(0, 1);
-            little.draw(canvas, x + (kBadge - little.width(letter)) / 2, y + 1, letter, 245, 245, 245);
+            text.draw(canvas, x + (kBadge - text.width(letter)) / 2, y + 4, letter, 245, 245, 245);
+        }
+        if (b.left >= 0) {  // the time left, over the icon's lower part: light text on a dark outline
+            wchar_t t[16];
+            if (b.left < 60) swprintf_s(t, L"%d", b.left);
+            else if (b.left < 3600) swprintf_s(t, L"%dm", (b.left + 30) / 60);
+            else swprintf_s(t, L"%dh", (b.left + 1800) / 3600);
+            const int tx = x + (kBadge - little.width(t)) / 2, ty = y + kBadge - little.font_px - 3;
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy) little.draw(canvas, tx + dx, ty + dy, t, 0, 0, 0);
+            little.draw(canvas, tx, ty, t, 255, 255, 255);
         }
     }
     void more_badge(int x, int y, int n, bool over) {
@@ -2805,7 +2825,7 @@ struct PartyLayer : PinnedLayer {
         box(x, y + 1, x + kBadge, y + kBadge - 1, 30, 32, 38, 0.95f);
         box(x + 2, y + 2, x + kBadge - 2, y + kBadge - 2, v, v + 4, v + 12, 0.95f);
         const std::wstring t = L"+" + std::to_wstring(n);
-        little.draw(canvas, x + (kBadge - little.width(t)) / 2, y + 1, t, 235, 235, 240);
+        text.draw(canvas, x + (kBadge - text.width(t)) / 2, y + 4, t, 235, 235, 240);
     }
 
     // A bar in the game's style: a dark frame, the fill with a lighter top, a notch every 100 points, a bright end, and
@@ -2855,23 +2875,25 @@ struct PartyLayer : PinnedLayer {
                 box(width - 4, y - 2, width - 3, y + mh - 2, 255, 214, 90, 1.0f);
             }
             if (down) box(4, y - 1, width - 4, y + mh - 3, 120, 20, 20, 0.45f);  // health 0: a red glow
-            draw_player_mark(canvas, 16.0f, static_cast<float>(y + 11), 13.0f, st);
+            draw_player_mark(canvas, 16.0f, static_cast<float>(y + 11 + (m.buffs.empty() ? 0 : kBuffExtra / 2)), 13.0f, st);
+            const int extra = m.buffs.empty() ? 0 : kBuffExtra;  // the badges are taller than the name line
+            const int ny = y + 2 + extra / 2;
             const std::wstring nm = widen(m.name) + (m.you ? L" (you)" : L"");
-            text.draw(canvas, 30, y + 2, nm, st.r, st.g, st.b);
+            text.draw(canvas, 30, ny, nm, st.r, st.g, st.b);
             int right = width - 10;
             if (m.level >= 0) {
                 const std::wstring lv = L"Lv " + std::to_wstring(m.level);
                 right -= text.width(lv);
-                text.draw(canvas, right, y + 2, lv, 200, 200, 210);
+                text.draw(canvas, right, ny, lv, 200, 200, 210);
                 right -= 10;
             }
-            if (down) text.draw(canvas, right - text.width(L"DOWN"), y + 2, L"DOWN", 255, 70, 60);
+            if (down) text.draw(canvas, right - text.width(L"DOWN"), ny, L"DOWN", 255, 70, 60);
             {  // the buffs, behind the name: as many as fit before the level (and DOWN)
                 const int from = 30 + text.width(nm) + 8, to = (down ? right - text.width(L"DOWN") - 6 : right) - 2;
                 const int room = std::max(0, (to - from + kBadgeGap) / (kBadge + kBadgeGap));
                 const int n = static_cast<int>(m.buffs.size());
                 const int shown = n <= room ? n : std::max(0, room - 1);  // the last place: "+N"
-                const int by = y + 3;
+                const int by = y + 2;
                 for (int bi = 0; bi < shown; ++bi) {
                     const int bx = from + bi * (kBadge + kBadgeGap);
                     const bool over = static_cast<int>(mi) == hover_member && bi == hover_buff;
@@ -2902,9 +2924,9 @@ struct PartyLayer : PinnedLayer {
                     }
                 }
             }
-            if (!m.where.empty()) little.draw(canvas, 30, y + 23, m.where, 170, 175, 185);  // where they are
-            bar(10, y + 42, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
-            bar(10, y + 60, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
+            if (!m.where.empty()) little.draw(canvas, 30, y + 23 + extra, m.where, 170, 175, 185);  // where they are
+            bar(10, y + 42 + extra, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
+            bar(10, y + 60 + extra, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
             y += mh;
         }
         if (!tip.empty()) {  // the tooltip of the badge under the pointer: name, kind and time left (or the "+N" list)
@@ -3062,6 +3084,120 @@ struct MessagesLayer : PinnedLayer {
 };
 
 std::string version_in(const std::wstring& mod_json);  // (the monitor's, further down)
+
+// ---- the Notices window (since 0.15.54): warnings that stay on screen until FlameKit takes them back ----
+// From the Lua part (kit.notice in core/kit.lua) in emf\mods\flamekit\ui_notices.dat: "n <tag> <rrggbb> <text>" lines,
+// then "end". Unlike Messages, nothing scrolls a notice away: it stays until the feature that set it takes it back
+// (the owner, 0.15.53: the Auto-Collect warning got lost among the messages). No title bar: in pointer mode it is
+// dragged anywhere and sized at its lower right corner; its place is kept in ui_layout.txt as "notices". Shown only
+// while there is a notice, hidden in the game's menus like the party window.
+struct NoticeLayer : PinnedLayer {
+    struct Note {
+        std::string tag;
+        uint8_t r = 255, g = 90, b = 80;
+        std::wstring text;
+    };
+    std::vector<Note> notes;
+    std::vector<std::pair<size_t, std::wstring>> lines;  // (note index, a wrapped line)
+    uint64_t stamp = 0, next_read = 0;
+    static constexpr int kLine = 21, kBar = 4;
+
+    NoticeLayer() : PinnedLayer("notices", L"Notices", 420) {
+        headless = true;
+        kHead = 0;
+        hide_in_menus = true;
+        def_x_pm = 330;
+        def_y_pm = 70;
+    }
+
+    bool active(const Frame& f) override { return f.in_world && !notes.empty() && !(hide_in_menus && f.in_menu); }
+
+    bool refresh(const Frame& f) override {
+        if (f.now < next_read) return false;
+        next_read = f.now + 250;
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        const std::wstring file = g_flamekit_dir + L"ui_notices.dat";
+        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
+                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
+                                : 2;
+        if (st == stamp) return false;
+        std::vector<Note> list;
+        bool complete = st == 2;  // no file: no notices
+        if (FILE* fp = st == 2 ? nullptr : _wfsopen(file.c_str(), L"rb", _SH_DENYNO)) {
+            char line[1024];
+            while (fgets(line, sizeof line, fp)) {
+                line[std::strcspn(line, "\r\n")] = 0;
+                if (std::strcmp(line, "end") == 0) {
+                    complete = true;
+                    break;
+                }
+                char tag[64] = "";
+                unsigned rgb = 0;
+                int used = 0;
+                if (sscanf_s(line, "n %63s %6x %n", tag, static_cast<unsigned>(sizeof tag), &rgb, &used) == 2 && used > 0) {
+                    Note n;
+                    n.tag = tag;
+                    n.r = static_cast<uint8_t>(rgb >> 16), n.g = static_cast<uint8_t>(rgb >> 8), n.b = static_cast<uint8_t>(rgb);
+                    n.text = widen(line + used);
+                    list.push_back(std::move(n));
+                }
+            }
+            fclose(fp);
+        }
+        if (!complete) return false;  // half written: read again later
+        stamp = st;
+        notes = std::move(list);
+        FK_LOG(fklog::kInfo, "notices: %d on screen", static_cast<int>(notes.size()));
+        return true;
+    }
+
+    int content_height(int width) override {
+        lines.clear();
+        for (size_t i = 0; i < notes.size(); ++i) {  // each notice wrapped to the width, words kept whole
+            const std::wstring& t = notes[i].text;
+            std::wstring cur;
+            size_t at = 0;
+            while (at <= t.size()) {
+                size_t sp = t.find(L' ', at);
+                if (sp == std::wstring::npos) sp = t.size();
+                const std::wstring word = t.substr(at, sp - at);
+                const std::wstring tryline = cur.empty() ? word : cur + L" " + word;
+                if (!cur.empty() && text.width(tryline) > width - 24 - kBar) {
+                    lines.push_back({i, cur});
+                    cur = word;
+                } else {
+                    cur = tryline;
+                }
+                at = sp + 1;
+            }
+            if (!cur.empty()) lines.push_back({i, cur});
+        }
+        return static_cast<int>(lines.size()) * kLine + static_cast<int>(notes.empty() ? 0 : notes.size() - 1) * 8 + 4;
+    }
+
+    void draw_content(int top, int width) override {
+        int y = top;
+        size_t last = static_cast<size_t>(-1);
+        int from = y;
+        auto bar = [&](size_t i, int y0, int y1) {
+            if (i < notes.size()) box(6, y0, 6 + kBar, y1, notes[i].r, notes[i].g, notes[i].b, 1.0f);  // the notice's colour, at its left
+        };
+        for (const auto& l : lines) {
+            if (l.first != last) {
+                if (last != static_cast<size_t>(-1)) {
+                    bar(last, from, y);
+                    y += 8;
+                }
+                last = l.first;
+                from = y;
+            }
+            const Note& n = notes[l.first];
+            text.draw(canvas, 14 + kBar, y, l.second, n.r, n.g, n.b);
+            y += kLine;
+        }
+        if (last != static_cast<size_t>(-1)) bar(last, from, y);
+    }
+};
 
 // ---- item tiles: the same everywhere in FlameKit's UI ----
 // An Enshrouded item in FlameKit's UI is a tile: its icon on its rarity's colour (WindowLayer::tile) and, under the
@@ -4689,7 +4825,8 @@ void ui_thread_body() {
     backdrop.window = &window;
     PartyLayer party;
     MessagesLayer messages;
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    NoticeLayer notices;
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
