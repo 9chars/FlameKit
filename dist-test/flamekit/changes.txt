@@ -1,3 +1,6 @@
+0.15.80 Nov 14, 2026
+- "Press the pointer key once": the second press now puts the pointer away. Before, the moment the game took the front back looked like a new press and switched it straight back on.
+
 0.15.79 Nov 14, 2026
 - Minimap: a marker's name on hover is smaller and sits right above the marker (below it near the top), never cut off at the edge.
 - The PvP dummy is level 100, so it takes a long beating (it never hurts anyone).

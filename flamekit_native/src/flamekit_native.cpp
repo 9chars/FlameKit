@@ -5611,24 +5611,32 @@ void ui_thread_body() {
         // goes off when the world ends or another program takes the front. Without it: out while the key is held.
         bool hold = key_now;
         {
+            // (0.15.80) the press is taken from the key alone: when the pointer goes away the game takes the front back, and
+            // for a moment no window of ours is in front, which looked like a new press and switched it on again (59 ms
+            // later in the owner's log). A press counts only when the key went down, while ours is in front, and at
+            // least 250 ms after the last switch.
             static bool key_was = false, esc_was = false, toggled = false;
+            static uint64_t switched_at = 0;
+            const bool raw = (GetAsyncKeyState(pointer_vk) & 0x8000) != 0;
             if (ps.pointer_toggle) {
-                if (key_now && !key_was) {
+                if (raw && !key_was && f.ours_front && f.in_world && f.now - switched_at >= 250) {
+                    switched_at = f.now;
                     toggled = !toggled;
                     FK_LOG(fklog::kInfo, "pointer: switched %s with its key", toggled ? "on" : "off");
                 }
                 const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
                 if (esc && !esc_was && toggled) {
+                    switched_at = f.now;
                     toggled = false;
                     FK_LOG(fklog::kInfo, "pointer: switched off with Esc");
                 }
                 esc_was = esc;
-                if (!f.in_world || !f.ours_front) toggled = false;
+                if (!f.in_world || (!f.ours_front && f.now - switched_at >= 250)) toggled = false;  // (not in the moment the front changes)
                 hold = toggled;
             } else {
                 toggled = false;
             }
-            key_was = key_now;
+            key_was = raw;
         }
         if (hold != g_pointer_hold) {
             g_pointer_hold = hold;
