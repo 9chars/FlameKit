@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.114.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.115.
 
 ## What FlameKit is
 
@@ -186,6 +186,11 @@ equal kills+deaths share a rank. Kills announced via chat.announce. Console: fla
 (PinnedLayer "board", key board_window_key F5, hidden until the key is first pressed). Not yet tested with real kills.
 0.15.96: Experimental window button "Show/Hide PvP Leaderboard [F5]" (label from ui_layout.txt's board line); a click
 writes ui_board_toggle.request, which BoardLayer deletes and toggles on (checked every 100 ms).
+
+## Scroll bars (0.15.115)
+PinnedLayer and AboutDialog scroll bars take the mouse (handle drag, page click above/below); PinnedLayer::scrolled()
+tells Messages to stop following the newest. The F4 menu's tabs had this already; the Experimental window's drop-down
+list scrolls with the wheel only.
 
 ## Corner lines and short notices (0.15.113, 0.15.114)
 In a world nothing in the lower left corner (owner). kit.notice(tag, text, colour, seconds): `seconds` makes a short

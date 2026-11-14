@@ -2656,7 +2656,10 @@ struct PinnedLayer : Layer {
     bool headless = false;   // no title bar (the Notices window): dragged anywhere in pointer mode, sized at its corner
     TextPainter text, little;  // ("small" is a macro in Windows' headers)
     bool fonts = false, dirty = true, was_pointer = false;
-    enum Drag { kNone, kMove, kSize } drag = kNone;
+    enum Drag { kNone, kMove, kSize, kScroll } drag = kNone;
+    // (0.15.115, owner) the scroll bar takes the mouse: drag its handle, or click above or below it for a page
+    int bar_top = 0, bar_len = 0, thumb_y = 0, thumb_len = 0, scroll_grab = 0;
+    virtual void scrolled() {}  // the player scrolled (wheel or bar): Messages stops following the newest
     POINT grab{};
     int mouse_x = -1, mouse_y = -1;
     RECT collapse_r{}, hide_r{};
@@ -2705,7 +2708,9 @@ struct PinnedLayer : Layer {
                 const int track = h - kHead - 6, thumb = std::max(20, track * (h - kHead) / std::max(1, natural - kHead));
                 const int ty = kHead + 3 + (track - thumb) * scroll / max_scroll;
                 box(w - 8, kHead + 3, w - 3, kHead + 3 + track, 40, 42, 50, 1.0f);
-                box(w - 8, ty, w - 3, ty + thumb, 120, 128, 145, 1.0f);
+                const bool held = drag == kScroll;
+                box(w - 8, ty, w - 3, ty + thumb, held ? 170.0f : 120.0f, held ? 178.0f : 128.0f, held ? 200.0f : 145.0f, 1.0f);
+                bar_top = kHead + 3, bar_len = track, thumb_y = ty, thumb_len = thumb;
             }
         }
         if (!headless) box(0, 0, w, kHead, 30, 34, 44, 0.92f);      // the title bar
@@ -2794,6 +2799,7 @@ struct PinnedLayer : Layer {
         if (to != scroll) {
             scroll = to;
             dirty = true;
+            scrolled();
         }
     }
 
@@ -2814,6 +2820,14 @@ struct PinnedLayer : Layer {
                 e.w = std::clamp(x + static_cast<int>(grab.x), min_w, max_w);
                 e.h = std::max(kHead + 40, y + static_cast<int>(grab.y));
                 dirty = true;
+            } else if (drag == kScroll && max_scroll > 0) {  // the scroll bar's handle follows the pointer
+                const int room = std::max(1, bar_len - thumb_len);
+                const int to = std::clamp((y - scroll_grab - bar_top) * max_scroll / room, 0, max_scroll);
+                if (to != scroll) {
+                    scroll = to;
+                    dirty = true;
+                    scrolled();
+                }
             }
             if (x != mouse_x || y != mouse_y) {
                 const bool hover_change = in(collapse_r) != (mouse_x >= collapse_r.left && mouse_y >= collapse_r.top && mouse_x < collapse_r.right && mouse_y < collapse_r.bottom) ||
@@ -2826,7 +2840,12 @@ struct PinnedLayer : Layer {
             return;
         }
         if (msg == WM_LBUTTONUP) {
-            if (drag != kNone) end_drag();
+            if (drag == kScroll) {
+                drag = kNone;
+                dirty = true;
+            } else if (drag != kNone) {
+                end_drag();
+            }
             return;
         }
         if (msg != WM_LBUTTONDOWN) return;
@@ -2843,6 +2862,15 @@ struct PinnedLayer : Layer {
         } else if (!e.collapsed && x >= canvas.w - kGrip && y >= canvas.h - kGrip) {
             drag = kSize;
             grab = {canvas.w - x, canvas.h - y};
+        } else if (max_scroll > 0 && !e.collapsed && x >= canvas.w - 12 && y >= bar_top && y < bar_top + bar_len) {
+            if (y >= thumb_y && y < thumb_y + thumb_len) {  // the handle: dragged
+                drag = kScroll;
+                scroll_grab = y - thumb_y;
+            } else {  // above or below it: a page up or down
+                scroll = std::clamp(scroll + (y < thumb_y ? -1 : 1) * std::max(20, canvas.h - kHead - 20), 0, max_scroll);
+                scrolled();
+            }
+            dirty = true;
         } else if (headless && !e.collapsed && press(x, y)) {
             // (0.15.114) a headless window's own button (the Notices window's x): not a drag
         } else if (y < kHead || headless) {
@@ -3292,10 +3320,7 @@ struct MessagesLayer : PinnedLayer {
     // scrolls back; at the bottom again it follows the newest)
     MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_x_pm = 6; def_y_pm = 20; fixed_height = true; max_w = 1400; }  // top left
     bool stick = true;  // follows the newest message
-    void wheel(int delta, int x, int y) override {
-        PinnedLayer::wheel(delta, x, y);
-        stick = scroll >= max_scroll;
-    }
+    void scrolled() override { stick = scroll >= max_scroll; }  // the wheel or the scroll bar
 
     // (0.15.107, owner) hidden in the game's menus like the other windows
     bool active(const Frame& f) override { return f.in_world && !f.in_menu; }
@@ -5375,6 +5400,8 @@ struct AboutDialog : Layer {
     TextPainter text, head;
     RECT ok_r{}, box_r{};
     int mouse_x = -1, mouse_y = -1, scroll = 0, max_scroll = 0, w = 0, h = 0, wrapped_w = -1;
+    bool dragging = false;  // the scroll bar's handle is held
+    int bar_top = 0, bar_len = 0, thumb_y = 0, thumb_len = 0, grab = 0;
     std::wstring status = L"Loading README.md from GitHub...";
     static constexpr int kHead = 32, kLine = 20;
 
@@ -5492,11 +5519,15 @@ struct AboutDialog : Layer {
                 if (lines[i].head) head.draw(canvas, box_r.left + 12, y, lines[i].text, 255, 210, 122);
                 else text.draw(canvas, box_r.left + 12, y, lines[i].text, 225, 225, 230);
             }
-            if (max_scroll > 0) {  // the scroll bar
+            if (max_scroll > 0) {  // the scroll bar (0.15.115: dragged with the mouse, or a click above or below its handle)
                 const int track = box_r.bottom - box_r.top - 8, th = std::max(24, track * view_h / std::max(1, total));
                 const int ty = box_r.top + 4 + (track - th) * scroll / max_scroll;
-                fill(box_r.right - 10, box_r.top + 4, box_r.right - 4, box_r.bottom - 4, 40, 42, 50, 1.0f);
-                fill(box_r.right - 10, ty, box_r.right - 4, ty + th, 120, 128, 145, 1.0f);
+                fill(box_r.right - 14, box_r.top + 4, box_r.right - 4, box_r.bottom - 4, 40, 42, 50, 1.0f);
+                fill(box_r.right - 14, ty, box_r.right - 4, ty + th, dragging ? 170.0f : 120.0f, dragging ? 178.0f : 128.0f,
+                     dragging ? 200.0f : 145.0f, 1.0f);
+                bar_top = box_r.top + 4, bar_len = track, thumb_y = ty, thumb_len = th;
+            } else {
+                bar_len = 0;
             }
         }
         const int bw = 120, bh = 32;
@@ -5541,7 +5572,8 @@ struct AboutDialog : Layer {
             changed = true;
         }
         if (!visible) return;
-        const int nw = std::min(720, std::max(320, f.gw - 40)), nh = std::min(600, std::max(240, f.gh - 40));
+        // (0.15.115, owner: bigger) up to 1100 x 900, 40 px inside the game window on each side
+        const int nw = std::min(1100, std::max(320, f.gw - 80)), nh = std::min(900, std::max(240, f.gh - 80));
         if (nw != w || nh != h) {
             w = nw;
             h = nh;
@@ -5577,11 +5609,30 @@ struct AboutDialog : Layer {
     }
     void mouse(UINT msg, int x, int y) override {
         if (msg == WM_MOUSEMOVE) {
+            if (dragging && max_scroll > 0) {  // the handle follows the pointer (draw keeps scroll in range)
+                scroll = (y - grab - bar_top) * max_scroll / std::max(1, bar_len - thumb_len);
+                dirty = true;
+            }
             if (x != mouse_x || y != mouse_y) {
                 mouse_x = x;
                 mouse_y = y;
                 dirty = true;
             }
+            return;
+        }
+        if (msg == WM_LBUTTONDOWN && bar_len > 0 && x >= box_r.right - 18 && x < box_r.right && y >= bar_top && y < bar_top + bar_len) {
+            if (y >= thumb_y && y < thumb_y + thumb_len) {  // the handle: dragged
+                dragging = true;
+                grab = y - thumb_y;
+            } else {  // above or below it: a page
+                scroll += (y < thumb_y ? -1 : 1) * (box_r.bottom - box_r.top - 40);
+            }
+            dirty = true;
+            return;
+        }
+        if (msg == WM_LBUTTONUP && dragging) {
+            dragging = false;
+            dirty = true;
             return;
         }
         if (msg == WM_LBUTTONUP && x >= ok_r.left && y >= ok_r.top && x < ok_r.right && y < ok_r.bottom) close("OK");

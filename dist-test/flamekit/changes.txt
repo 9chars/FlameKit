@@ -1,3 +1,7 @@
+0.15.115 Nov 14, 2026
+- About window: bigger (up to 1100 x 900, leaving 40 pixels of the game around it).
+- Scroll bars take the mouse: drag the handle, or click above or below it for a page. In the About window and in the pinned windows (Messages, Party, Experimental, PvP Leaderboard, Notices; hold the pointer key). The mouse wheel still works too.
+
 0.15.114 Nov 14, 2026
 - Nothing in the lower left corner any more while you play.
 - Short notices instead, in the Notices window (top centre) for about 10 seconds: "FlameKit v0.15.114 connected to server!" (white) when you join a server with FlameKit, "FlameKit not supported by server!" (orange) when the server has no FlameKit, "Server runs older FlameKit v...!" (orange) when it is older, and "FlameKit v... update downloaded!" (green) when a new version arrives.
