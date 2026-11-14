@@ -1,3 +1,8 @@
+0.15.117 Nov 14, 2026
+- Messages window: "FlameKit connected to server!" (or "not supported by server!"), the server's FlameKit version, and "update downloaded!" are now lines here instead of notices.
+- After an update, the Messages line is just "FlameKit was updated to vX." (no pointer to the What's New tab).
+- Notices window: grows to fit every notice, so a new one is never cut off.
+
 0.15.116 Nov 14, 2026
 - Experimental tab, Debug: "Test leaderboard data" fills your PvP Leaderboard with a dozen made-up players (long and short names, shared ranks, big numbers, your own row), to see how it looks. Only in your game; switch it off to see the real board again.
 

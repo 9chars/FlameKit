@@ -490,10 +490,7 @@ std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
 // dialog again, even when it was shown for that version already
 std::atomic<uint64_t> g_update_ask_until{0};
 std::atomic<bool> g_about_request{false};
-// (0.15.114, owner) a new update downloaded: a short green notice in the Notices window (UpdateDialog sets it, NoticeLayer
-// shows it until g_update_note_until; UI thread only)
-std::wstring g_update_note;
-uint64_t g_update_note_until = 0;  // (0.15.103) the What's New tab's About button: AboutDialog opens
+// (0.15.103) the What's New tab's About button: AboutDialog opens
 
 // A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
 std::wstring key_label(uint32_t vk) {
@@ -2648,6 +2645,8 @@ struct PinnedLayer : Layer {
     // this many pixels from the right edge (the window's right side), so the right-hand windows line up at any resolution
     bool def_center = false;
     int def_right_px = -1;
+    // (0.15.117, owner: a new notice was cut off) always as tall as its content: a height the player gave it is ignored
+    bool fit_height = false;
     bool fixed_height = false;  // (0.15.105) a height the player gave it is kept even when the content is shorter
     bool default_hidden = false;  // (0.15.112) hidden until the player shows it: decided before its entry first exists
     bool default_checked = false;
@@ -2694,6 +2693,7 @@ struct PinnedLayer : Layer {
         const int w = std::clamp(e.w > 0 ? e.w : default_w, min_w, max_w);
         const int natural = kHead + (e.collapsed ? 0 : content_height(w) + 8);
         const int h = e.collapsed ? kHead
+                      : fit_height ? natural
                       : e.h > 0 ? (fixed_height ? std::max(e.h, kHead + 40) : std::min(natural, std::max(e.h, kHead + 40)))  // e.h: at most this tall
                                 : natural;
         max_scroll = std::max(0, natural - h);
@@ -3567,35 +3567,28 @@ struct NoticeLayer : PinnedLayer {
     std::vector<std::pair<size_t, std::wstring>> lines;  // (note index, a wrapped line)
     std::vector<std::pair<RECT, size_t>> closers;         // each shown note's x (canvas coordinates)
     uint64_t stamp = 0, next_read = 0;
-    bool update_shown = false, was_pointer_out = false;
+    bool was_pointer_out = false;
     static constexpr int kLine = 21, kBar = 4, kX = 16;
 
     NoticeLayer() : PinnedLayer("notices", L"Notices", 420) {
         headless = true;
         kHead = 0;
         hide_in_menus = true;
+        fit_height = true;  // grows with each new notice
         def_center = true;  // top centre
         def_y_pm = 90;
     }
 
     bool active(const Frame& f) override { return f.in_world && !notes.empty() && !(hide_in_menus && f.in_menu); }
 
-    void rebuild(uint64_t now) {
+    void rebuild(uint64_t) {
         std::vector<Note> list;
         for (const Note& n : from_file)
             if (!closed.count(n.key())) list.push_back(n);
-        if (now < g_update_note_until && !g_update_note.empty()) {
-            Note u;
-            u.tag = "update";
-            u.r = 90, u.g = 220, u.b = 110;  // green
-            u.text = g_update_note;
-            if (!closed.count(u.key())) list.push_back(std::move(u));
-        }
         // a closed notice that is no longer up may show again if it comes back
         for (auto it = closed.begin(); it != closed.end();) {
             bool up = false;
             for (const Note& n : from_file) up = up || n.key() == *it;
-            if (now < g_update_note_until) up = up || (L"update\x1f" + g_update_note) == *it;
             it = up ? std::next(it) : closed.erase(it);
         }
         notes = std::move(list);
@@ -3637,11 +3630,6 @@ struct NoticeLayer : PinnedLayer {
 
     bool refresh(const Frame& f) override {
         bool again = false;
-        const bool update_now = f.now < g_update_note_until;
-        if (update_now != update_shown) {  // this DLL's own update notice came or went
-            update_shown = update_now;
-            again = true;
-        }
         if (was_pointer_out != g_pointer_mode) {  // the x buttons come and go with the pointer
             was_pointer_out = g_pointer_mode;
             again = true;
@@ -5680,10 +5668,6 @@ struct UpdateDialog : Layer {
         for (v += 2; *v && *v != ' ' && *v != ':' && *v != '\r' && *v != '\n'; ++v) ver += *v;
         if (ver.empty() || (ver == announced && !asked)) return;
         if (asked) g_update_ask_until = 0;
-        if (ver != announced) {  // a new version (not Check for updates asking again): a short green notice too
-            g_update_note = L"FlameKit v" + widen(ver) + L" update downloaded!";
-            g_update_note_until = now + 10000;
-        }
         announced = ver;
         version = widen(ver);
         open = true;

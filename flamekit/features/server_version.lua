@@ -1,8 +1,8 @@
 -- features/server_version.lua: which FlameKit version the server runs, so the player sees when it is older.
 --
 -- A player's game asks the server half on the channel "ver" (to = both) once a minute and gets its version back
--- (kit.version, from the server's mod.json). kit.server_note() then gives a short orange notice for 10 s (kit.lua
--- server_notices, since 0.15.114; it was a line in the lower left corner):
+-- (kit.version, from the server's mod.json). kit.server_note() then gives an orange line in the Messages window (kit.lua
+-- server_messages, since 0.15.117; a short notice in 0.15.114, a line in the lower left corner before):
 --   the server runs an older FlameKit: "Server runs older FlameKit v0.15.30!"
 --   the server's FlameKit has no "ver" channel at all (older than 0.15.45) but other FlameKit channels: "Server runs
 --   an older FlameKit!"
@@ -16,7 +16,14 @@ local CHANNEL = "ver"
 local steps = 0
 local server_version = nil  -- what the server half answered (this session), nil: no answer yet
 
+local session_seen = nil
 function F.client_tick(world)
+  local okS, session = pcall(emf.session)
+  if session ~= session_seen then  -- another game session (maybe another server): its version is asked again
+    session_seen = session
+    server_version = nil
+    steps = 0
+  end
   steps = steps + 1
   if kit.is_host() or steps % 3600 ~= 120 then return end  -- 2 s after the world is there, then once a minute
   pcall(emf.net.send, CHANNEL, "?")
@@ -41,6 +48,7 @@ end
 function F.setup(k)
   kit = k
   kit.server_note = server_note
+  kit.server_version = function() return server_version end  -- (0.15.117) for the "Server runs FlameKit vX." message
   local ok = emf.net.channel(CHANNEL, {
     version = 1, to = "both", max = 32, per_10s = 10,
     on_server = kit.guard(F, function(world, from, data)

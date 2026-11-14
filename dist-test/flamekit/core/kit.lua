@@ -224,30 +224,50 @@ local function in_build_mode(world)
   return on
 end
 
--- (0.15.114, owner) The server's state as a short notice (10 s) instead of a line in the lower left corner: once per
--- game session, in a game that joined a server. Connected at once when the server's FlameKit answers; "not supported"
--- only after 20 s without an answer (a joining game needs a few seconds for it); an older FlameKit on the server once
--- per version it reports.
-local NOTE_SECONDS = 10
-local conn = { session = nil, state = nil, steps = 0, older = nil }
-local function server_notices(world, connected)
+-- (0.15.117, owner) The server's state as lines in the Messages window (0.15.114 had short notices; before, a line in
+-- the lower left corner): once per game session, in a game that joined a server. "Connected" at once when the server's
+-- FlameKit answers, then the server's version when it is known; "not supported" only after 20 s without an answer (a
+-- joining game needs a few seconds for it); an older FlameKit on the server once per version it reports.
+local conn = { session = nil, state = nil, steps = 0, older = nil, told = nil }
+local function server_messages(world, connected)
   local okS, session = pcall(emf.session)
-  if conn.session ~= session then conn = { session = session, state = nil, steps = 0, older = nil } end
+  if conn.session ~= session then conn = { session = session, state = nil, steps = 0, older = nil, told = nil } end
   conn.steps = conn.steps + 1
   if kit.is_host() then return end  -- your own world: there is no server to tell about
   if connected then
     if conn.state ~= "yes" then
       conn.state = "yes"
-      kit.notice("server", string.format("%s v%s connected to server!", kit.name, kit.version), "#ffffff", NOTE_SECONDS)
+      kit.note(string.format("%s v%s connected to server!", kit.name, kit.version), "#ffffff", true)
+    end
+    local v = kit.server_version and kit.server_version()
+    if v and v ~= conn.told then
+      conn.told = v
+      kit.note(string.format("Server runs FlameKit v%s.", v), "#ffffff", true)
     end
     local note = kit.server_note and kit.server_note(world)
     if note and note ~= conn.older then
       conn.older = note
-      kit.notice("server_old", note, "#ff9632", NOTE_SECONDS)
+      kit.note(note, "#ff9632", true)
     end
   elseif conn.state == nil and conn.steps >= 1200 then
     conn.state = "no"
-    kit.notice("server", "FlameKit not supported by server!", "#ff9632", NOTE_SECONDS)
+    kit.note("FlameKit not supported by server!", "#ff9632", true)
+  end
+end
+
+-- (0.15.117, owner) A new update downloaded: a green line in the Messages window (FlameKit's DLL also opens its update
+-- window). Read from update_status.txt (the DLL's updater writes it), every 2 s, once per version.
+local update_told, update_steps = nil, 0
+local function update_message()
+  update_steps = update_steps + 1
+  if update_steps % 120 ~= 0 then return end
+  local f = io.open(emf.dir .. "\\update_status.txt", "r")
+  local line = f and f:read("l") or ""
+  if f then f:close() end
+  local v = line:match("^ready|Update v([%d%.]+)")
+  if v and v ~= update_told then
+    update_told = v
+    kit.note(string.format("%s v%s update downloaded!", kit.name, v), "#5adc6e", true)
   end
 end
 
@@ -261,7 +281,8 @@ local function hud_tick(world)
     label = string.format("%s v%s", kit.name, kit.version)
   end
   local lines = { "label " .. label }
-  server_notices(world, connected)
+  server_messages(world, connected)
+  update_message()
   if kit.setting("ui_hide_build", true) and in_build_mode(world) then lines[#lines + 1] = "build 1" end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"

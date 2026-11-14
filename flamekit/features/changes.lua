@@ -72,9 +72,7 @@ function F.client_tick(world)
   if pending then
     pending = false
     kit.store.save("seen_version", { version = kit.version })
-    local key = kit.setting("window_key", "F4")
-    kit.note(string.format("%s was updated to v%s: see What's New in FlameKit's window (%s).", kit.name, kit.version,
-      key ~= "" and key or "its key is not set"), "#9fd2ff")
+    kit.note(string.format("%s was updated to v%s.", kit.name, kit.version), "#9fd2ff")
     open_window()
   elseif kit.setting("open_on_start", false) == true then
     open_window()

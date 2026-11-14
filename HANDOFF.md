@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.116.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.117.
 
 ## What FlameKit is
 
@@ -93,7 +93,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - `WindowLayer` (F4 by default since 0.15.63, owner: players know F4 from the old versions; F6 in 0.15.26-0.15.62; setting `window_key`): title bar, frame, move, resize (min 560×440); tabs wrap; sizes are members set by `lay_out()`. Tab order from `main.lua`, What's New first; it opens by itself on What's New after an update (or every game with `open_on_start`). Auto Junk List has its own icon view (pages); every other tab is rows from `ui_tabs.dat` with a scroll bar. Another program in front does not close it (`lost_front`).
 - **Build mode** (0.15.59, owner: declutter while building; setting `ui_hide_build`, group "Windows", switched in the F4 menu → Windows since 0.15.62, default on): kit.lua reads `ClientPlayerInput.data.mask` of the player in the client world: its two low bits (most likely the two building cursors) are set (3) exactly while the building tool is out, 0 or 256 otherwise (measured 0.15.62, two rounds). Not the cursor position: it stays where it was after build mode ends (0.15.61: FlameKit stayed hidden) and writes `build 1` into `ui_hud.dat`; the DLL (`g_build_hide`) hides every layer whose `stays_in_build()` is false. **Owner's rule (0.15.61): ALL FlameKit UI on screen hides in build mode**, the lower left lines too, and every new window does so by default; only `WindowLayer` and `BackdropLayer` (the F4 menu, opened on purpose; the update and About windows too) opt out, and a future feature made for build mode may opt out (`stays_in_build`). The compositor uses `Layer::shown()`, never `visible` alone.
 - `NoticeLayer` (0.15.54, owner: the Auto-Collect warning got lost in Messages): warnings that stay until the feature takes them back. A `PinnedLayer` with `headless` (no title bar, `kHead` 0): dragged anywhere and sized at its corner in pointer mode; shown only while there is a notice; hidden in menus. Rule: a warning about a state that lasts (a setting conflict) is a notice, not a message.
-- `PinnedLayer` (party, messages, notices, experimental, board): stay on screen while playing, collapse/hide, move, resize (height = maximum, content scrolls; `fixed_height` keeps the given height: messages), `content_click`, `hide_in_menus` (all of them hide in the game's menus since 0.15.107), `default_hidden` (the board: hidden until shown, decided before its layout entry exists, 0.15.112), first places from `def_x_pm`/`def_y_pm`, `def_center` or `def_right_px`. They take the mouse only in pointer mode.
+- `PinnedLayer` (party, messages, notices, experimental, board): stay on screen while playing, collapse/hide, move, resize (height = maximum, content scrolls; `fixed_height` keeps the given height: messages; `fit_height` always fits the content: notices), `content_click`, `hide_in_menus` (all of them hide in the game's menus since 0.15.107), `default_hidden` (the board: hidden until shown, decided before its layout entry exists, 0.15.112), first places from `def_x_pm`/`def_y_pm`, `def_center` or `def_right_px`. They take the mouse only in pointer mode.
 - Pointer mode (`g_pointer_mode`): one of the windows in `g_ui_modal` open (the F4 menu, the update window, the About window: the one list, set in ui_thread_body; the backdrop reads it too), or the pointer key held (`pointer_key`: Right Alt default, Right Ctrl, Caps Lock; `g_pointer_hold`). The pointer returns to where it was last time. The game's own pointer is copied from Windows (`look_for_game_cursor`: only a colour pointer with its hot spot in the top left quarter; the real one is 64×64, hot spot 3,3). `Frame::in_menu`: the game shows its own pointer outside pointer mode.
 - Party window buffs (0.15.49): the server half reads `emf.buffs` per player (types the game hides left out) and sends `b <type hex>:<slot>:<seconds>,...` after each `p` line; each player's game adds the names (`emf.buff_type`, its own language) and writes one `b <type hex> <slot> <seconds> <name>` line per buff into `ui_party.dat`. `PartyLayer` draws the buffs on the name line, behind the name (0.15.52, owner: the extra row made the window too long): 30 px badges since 0.15.54 (slot colour, the game's icon from `game_files().buff_icon`, the time left inside on a dark outline; debuffs first; a player with buffs is `kBuffExtra` 10 px taller), as many as fit before the level, the last one "+N" when more; name, kind and exact time in a tooltip on hover (pointer mode, `PinnedLayer::content_hover`, `spots`). Buff icons: `item_icons.hpp` (buff registry layout there). `game_files()` is the one shared reader of the game's data files (UI thread).
 - FlameKit's own raw memory reads (`peek`: map markers, names, quest marks; and the item-definition offsets) run only on game build 1287369 (`kLayoutsBuild`, `g_layouts_ok` from `emf::game_build()`); another build logs `FlameKit's own memory reads are OFF`.
@@ -192,13 +192,16 @@ PinnedLayer and AboutDialog scroll bars take the mouse (handle drag, page click 
 tells Messages to stop following the newest. The F4 menu's tabs had this already; the Experimental window's drop-down
 list scrolls with the wheel only.
 
-## Corner lines and short notices (0.15.113, 0.15.114)
-In a world nothing in the lower left corner (owner). kit.notice(tag, text, colour, seconds): `seconds` makes a short
-notice that goes by itself (kit.lua expire_notices). kit.lua server_notices: once per game session in a joined game,
-"FlameKit vX connected to server!" (white) when kit.connected, "FlameKit not supported by server!" (orange) after 20 s
-without, "Server runs older FlameKit vY!" (orange, server_version.lua) once per version, each 10 s. The DLL adds its
-own green "FlameKit vX update downloaded!" for 10 s (UpdateDialog sets g_update_note). NoticeLayer: an x per notice in
-pointer mode (PinnedLayer::press for headless windows), closed ones stay closed while the same notice is up.
+## Corner lines, server and update messages (0.15.113, 0.15.117)
+In a world nothing in the lower left corner (owner). Since 0.15.117 the server's state and a new update are lines in
+the Messages window, not notices (owner). kit.lua server_messages, once per game session in a joined game:
+"FlameKit vX connected to server!" (white) when kit.connected, then "Server runs FlameKit vY." (white, from
+kit.server_version() in server_version.lua), "Server runs older FlameKit vY!" (orange) when older, and "FlameKit not
+supported by server!" (orange) after 20 s without. kit.lua update_message: "FlameKit vX update downloaded!" (green)
+once per version, read from update_status.txt. The DLL has no notice of its own any more. kit.notice(tag, text,
+colour, seconds) still makes short notices. NoticeLayer: `fit_height` (always as tall as its notices, so a new one is
+never cut off), an x per notice in pointer mode (PinnedLayer::press for headless windows), closed ones stay closed
+while the same notice is up.
 show_label only switches the main screen's version line.
 
 ## Main screen line (0.15.88 to 0.15.94)

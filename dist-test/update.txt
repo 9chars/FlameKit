@@ -1,17 +1,17 @@
-0.15.116
+0.15.117
 2020 a354e5f1 flamekit/README.md
-43633 8f4e6001 flamekit/changes.txt
+44022 310ac257 flamekit/changes.txt
 1173 8453d5ba flamekit/main.lua
-12273 b37f48e4 flamekit/mod.json
+12273 af2aefe5 flamekit/mod.json
 4360 9fe38834 flamekit/core/bag.lua
 8501 7015348a flamekit/core/items.lua
-16107 17f414c7 flamekit/core/kit.lua
+17040 e51e37a5 flamekit/core/kit.lua
 23486 22490b54 flamekit/core/monsters.lua
 2778 3208929c flamekit/core/players.lua
 1487 2d2b1cdf flamekit/core/store.lua
 3683 8c55c376 flamekit/core/test_players.lua
 1617 2d8b038a flamekit/features/_template.lua
-3608 c783524f flamekit/features/changes.lua
+3469 1c73071a flamekit/features/changes.lua
 3498 bca8f75c flamekit/features/chat.lua
 72192 bd537716 flamekit/features/experimental.lua
 9570 ae120a1d flamekit/features/leaderboard.lua
@@ -19,10 +19,10 @@
 14941 1383df2c flamekit/features/native_ui.lua
 11136 fd157b5e flamekit/features/party.lua
 1785 24de30b4 flamekit/features/server_save.lua
-2621 78b8a78d flamekit/features/server_version.lua
+3024 9255679b flamekit/features/server_version.lua
 9234 f221c55c flamekit/features/settings.lua
 14104 887ae13d flamekit/features/loot_filter/client.lua
 2187 55496808 flamekit/features/loot_filter/init.lua
 17063 82cfd943 flamekit/features/loot_filter/server.lua
-872448 526075a7 flamekit_native/flamekit_native.dll
-401 177f8304 flamekit_native/mod.json
+870912 0fea9d2d flamekit_native/flamekit_native.dll
+401 50e61975 flamekit_native/mod.json

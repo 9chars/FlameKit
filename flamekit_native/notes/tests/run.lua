@@ -1117,10 +1117,10 @@ do
   check(what == "changes", "after an update FlameKit's window is asked to open on the What's New tab")
 end
 check(require("core.items").is_keeper("_Material_TX_Trophy_Wolf_Heavy_head"), "a trophy is kept: not offered in the bag list")
--- the server's FlameKit version (features/server_version.lua) and the server's state (0.15.114): short notices
--- (10 s) in the Notices window, never in the lower left corner
-local function notices_text()
-  local f = io.open(TMP .. "\\ui_notices.dat", "r")
+-- the server's FlameKit version (features/server_version.lua), the server's state and a new update (0.15.117): lines in
+-- the Messages window, never in the lower left corner
+local function messages_text()
+  local f = io.open(TMP .. "\\ui_messages.dat", "r")
   local t = f and f:read("a") or ""
   if f then f:close() end
   return t
@@ -1130,26 +1130,32 @@ if JOINED then
   local real_session = emf.session
   emf.session = function() return 2 end  -- a new game session: told again
   step(2)
-  check(notices_text():find("n server ffffff FlameKit v9.9.9 connected to server!", 1, true) ~= nil,
-    "a joined game with FlameKit on the server: \"FlameKit v9.9.9 connected to server!\" in white")
-  emf.session = real_session
+  check(messages_text():find("m %d+ ffffff FlameKit v9.9.9 connected to server!") ~= nil,
+    "a joined game with FlameKit on the server: \"FlameKit v9.9.9 connected to server!\" in white, in Messages")
   check((ver_asks or 0) >= 1, "the player's game asks the server for its FlameKit version")
   channels.ver.on_player(CW, {}, "0.15.30")
   step(2)
-  check(notices_text():find("n server_old ff9632 Server runs older FlameKit v0.15.30!", 1, true) ~= nil,
-    "an older FlameKit on the server: a short orange notice: " .. notices_text():gsub("\n", "|"))
+  check(messages_text():find("ffffff Server runs FlameKit v0.15.30.", 1, true) ~= nil, "then the server's version")
+  check(messages_text():find("ff9632 Server runs older FlameKit v0.15.30!", 1, true) ~= nil,
+    "an older FlameKit on the server: an orange line")
   local hf = io.open(TMP .. "\\ui_hud.dat", "r")
   local hud_text = hf and hf:read("a") or ""
   if hf then hf:close() end
-  check(not hud_text:find("notice", 1, true), "nothing for the lower left corner any more")
-  local real_time = os.time
-  os.time = function(...) return real_time(...) + 11 end
-  step(2)
-  os.time = real_time
-  check(not notices_text():find("server_old", 1, true), "after 10 s the notice is gone by itself")
-  channels.ver.on_player(CW, {}, "9.9.9")
-  step(2)
-  check(not notices_text():find("server_old", 1, true), "the same version: no notice")
+  check(not hud_text:find("notice", 1, true), "nothing for the lower left corner")
+  check(not (io.open(TMP .. "\\ui_notices.dat", "r") or { read = function() return "" end }):read("a"):find("server", 1, true),
+    "and nothing about the server in the Notices window")
+  emf.session = real_session
+end
+do  -- a new update downloaded (update_status.txt from the DLL's updater): a green line in Messages, once
+  local f = io.open(TMP .. "\\update_status.txt", "w"); f:write("ready|Update v9.9.10 is ready: restart the game"); f:close()
+  step(130)
+  local t = messages_text()
+  check(t:find("5adc6e FlameKit v9.9.10 update downloaded!", 1, true) ~= nil, "a downloaded update: a green line in Messages")
+  local _, n1 = t:gsub("update downloaded", "")
+  step(130)
+  local _, n2 = messages_text():gsub("update downloaded", "")
+  check(n1 == n2, "only once per version")
+  os.remove(TMP .. "\\update_status.txt")
 end
 -- a world save on request from the restart helper (features/server_save.lua)
 do
