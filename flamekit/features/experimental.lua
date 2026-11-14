@@ -315,7 +315,21 @@ local function shield(world, id, b)
 end
 
 -- Returns nil, or why there is no body now.
-local function spawn_body(world, account, player, kind)
+-- A body's level (console only: flamekit.duelist <player> <level>). EMF re_companion_orders.md: writing
+-- Level.dataStorage and DynamicEnemyScaling.nextUpdateTime = 0 makes the game's next scaling update use it (level 10:
+-- health 119 -> 417, hits 48 -> 156). Levels above the world's range were never tried.
+local function set_level(world, id, level)
+  local lv = world:get("Level", id)
+  if not lv then return false end
+  lv.dataStorage[1] = level
+  local sc = world:get("DynamicEnemyScaling", id)
+  if sc then
+    if type(sc.nextUpdateTime) == "table" then sc.nextUpdateTime.value = 0 else sc.nextUpdateTime = 0 end
+  end
+  return true
+end
+
+local function spawn_body(world, account, player, kind, level)
   drop_bodies_of(world, account, true)
   if kind ~= "dummy" and kind ~= "duel" then return nil end
   local x, y, z = where(world, player)
@@ -331,6 +345,12 @@ local function spawn_body(world, account, player, kind)
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {} }
   bodies[id] = b
+  if level then
+    local okl, set = pcall(set_level, world, id, level)
+    b.level = level
+    emf.log(string.format("experimental: the PvP test %s (entity %s) set to level %d: %s", kind, tostring(id), level,
+      okl and (set and "done" or "it has no Level") or tostring(set)))
+  end
   if kind == "duel" then
     pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
     local okr, r = pcall(emf.hit_rule, { from = id, to = "objects", cancel = true })
@@ -350,14 +370,16 @@ local function bodies_tick(world)
     if b.session == session then
       pcall(function()
         local hp = world:get("NetworkHealth", id)
-        alive = world:position(id) ~= nil and (hp == nil or hp.health > 0)
+        local placed = world:position(id) ~= nil
+        alive = placed and (hp == nil or hp.health > 0)
+        b.why = not placed and "no longer in the world (removed by the game)" or (hp and hp.health <= 0 and "killed") or nil
       end)
     end
     -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a
     -- far place may not be streamed in yet.) So a body counts as gone only when it was missing three checks in a row.
     if not alive then b.missing = (b.missing or 0) + 1 else b.missing = 0 end
     if not alive and b.missing >= 3 and b.session == session then
-      emf.log(string.format("experimental: the PvP test %s (entity %s) is gone", b.kind, tostring(id)))
+      emf.log(string.format("experimental: the PvP test %s (entity %s) is gone: %s", b.kind, tostring(id), b.why or "?"))
       drop_body(world, id, false)
     elseif not alive and b.session ~= session then
       drop_body(world, id, false)
@@ -371,6 +393,15 @@ local function bodies_tick(world)
         local t = st and st.targets[1].targetEntityId
         if type(t) == "table" then t = t.id end
         local line = string.format("AI state %s, target %s", ai and tostring(ai.state) or "-", tostring(t))
+        if b.level and not b.health_said then
+          local hp = world:get("NetworkHealth", id)
+          local lv = world:get("NetworkLevel", id)
+          if hp and hp.healthMax and hp.healthMax > 0 then
+            b.health_said = true
+            emf.log(string.format("experimental: the PvP test %s (entity %s): health %s / %s, level %s", b.kind, tostring(id),
+              tostring(hp.health), tostring(hp.healthMax), lv and tostring(lv.level or lv.value or "?") or "?"))
+          end
+        end
         if line ~= b.last then  -- logged when the state or target changes, with the threat table at that moment
           b.last = line
           local okl, al = pcall(F._aggro_line, world, id)
@@ -1147,6 +1178,16 @@ function F.setup(k)
   -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;
   -- "flamekit.pvptest off" takes all of it back. The duelist's AI lines in the log tell whether it fights.
   local test = nil  -- { account, player, rule }
+  pcall(emf.command, "duelist", "<player entity> [level 1-255]: a duelist 3 m in front of that player (PvP on or off, it fights)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      local player, level = tonumber(args[1]), tonumber(args[2])
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("duelist: no player with entity " .. tostring(args[1])) return end
+      if level then level = math.max(1, math.min(255, math.floor(level))) end
+      local why = spawn_body(world, tostring(account), player, "duel", level)
+      emf.reply("duelist: " .. (why or "spawned"))
+    end, "the duelist command"))
   pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
