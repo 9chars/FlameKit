@@ -1,3 +1,6 @@
+0.15.51 Nov 13, 2026
+- Auto Junk List: the red message about "Auto-Collect Scattered Loot" no longer says "(drop failed)".
+
 0.15.50 Nov 13, 2026
 - Auto Junk List: the warning is back in FlameKit's window. While junk is set to Drop and the game's "Auto-Collect Scattered Loot" is on, a red line over your bag says so (it was lost with the old panel in 0.15.49's cleanup). The red message in Messages when junk is dropped stays as it was.
 

@@ -27,7 +27,7 @@ local for_host = {}        -- in a world this game hosts: requests made on the c
 
 -- The game calls its auto loot setting "Auto-Collect Scattered Loot". The banner: one red message in FlameKit's
 -- Messages window (kit.note), at most once a minute.
-local AUTO_LOOT_BANNER = { "FlameKit Junk List: dropped junk is coming back into your bag (drop failed).",
+local AUTO_LOOT_BANNER = { "FlameKit Junk List: dropped junk is coming back into your bag.",
                            "Turn OFF \"Auto-Collect Scattered Loot\" in the game settings." }
 -- The warning line in FlameKit's window (the Auto Junk List's view), shown as long as the problem is there.
 local AUTO_LOOT_WARNING = "\"Auto-Collect Scattered Loot\" is on in the game's settings: dropped junk comes straight back "
