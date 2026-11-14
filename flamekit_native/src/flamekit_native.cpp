@@ -5416,7 +5416,9 @@ struct HudLayer : Layer {
             changed = true;
             FK_LOG(fklog::kDebug, "lower left lines: %d line(s), first '%ls'", static_cast<int>(shown.size()), shown.empty() ? L"" : shown[0].text.c_str());
         }
-        place(in_world ? f.gw * 12 / 1000 : f.gw - f.gw * 12 / 1000 - canvas.w, f.gh - f.gh * 20 / 1000 - canvas.h);
+        // (0.15.91, owner) 5 pixels from the corner's edges (it was 1.2% and 2% in, over some of the game's own UI); the
+        // text's own top and side padding is inside the picture
+        place(in_world ? 5 - 4 : f.gw - 5 - canvas.w, f.gh - 5 - canvas.h + (in_world ? 2 : 0));
     }
 };
 

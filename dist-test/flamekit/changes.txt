@@ -1,3 +1,6 @@
+0.15.91 Nov 14, 2026
+- The lower left lines in a world (and the main screen's line in the lower right) now sit 5 pixels from the screen's edges, off the game's own UI.
+
 0.15.90 Nov 14, 2026
 - Main screen: the "FlameKit ... Loaded" line sits on a translucent dark box so it stands out.
 - After Alt+Tab back to the main screen, FlameKit's overlay could stay behind the game. When the usual repair does not take, the overlay is now hidden and shown again on top, and the log says why Windows refused.
