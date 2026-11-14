@@ -2587,27 +2587,21 @@ struct PartyLayer : PinnedLayer {
     bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
     uint64_t stamp = 0, next_read = 0;
     static constexpr int kRow = 76;
-    // the buff row under a player's bars: a badge per buff (the game's icon on its slot's colour), its time under it
-    static constexpr int kBadge = 26, kBadgeGap = 4, kBuffLine = 40, kBuffIcon = 20;
+    // the buffs (since 0.15.52 on the name line, behind the name, so a player's tile is no taller): a small badge per
+    // buff (the game's icon on its slot's colour), as many as fit before the level; the last one says "+N" when there
+    // are more. The time left is in the tooltip (pointer out, over a badge).
+    static constexpr int kBadge = 18, kBadgeGap = 2, kBuffIcon = 14;
     int last_width = 300;
-    int hover_member = -1, hover_buff = -1;  // the badge under the pointer (-1: none)
+    int hover_member = -1, hover_buff = -1;  // the badge under the pointer (-1: none; hover_buff -2: the "+N" badge)
     std::unordered_map<uint32_t, std::vector<uint8_t>> buff_pics;  // buff type -> its icon (empty: none to be had)
+    struct Spot {
+        int member, buff, first_hidden;  // buff -2: the "+N" badge, which stands for buffs first_hidden.. of that player
+        RECT r;                          // in content coordinates (from the content's top, as content_hover gets them)
+    };
+    std::vector<Spot> spots;             // the badges as last drawn
 
-    int per_line(int width) const { return std::max(1, (width - 20 + kBadgeGap) / (kBadge + kBadgeGap)); }
-    int member_height(const Member& m, int width) const {
-        if (m.buffs.empty()) return kRow;
-        const int n = static_cast<int>(m.buffs.size()), k = per_line(width);
-        return kRow + (n + k - 1) / k * kBuffLine;
-    }
-    // "45s", "12m", "2h" (and the long form for the tooltip: "12:05 left")
-    static std::wstring short_time(int s) {
-        if (s < 0) return L"";
-        wchar_t b[16];
-        if (s < 60) swprintf_s(b, L"%ds", s);
-        else if (s < 3600) swprintf_s(b, L"%dm", (s + 30) / 60);
-        else swprintf_s(b, L"%dh", (s + 1800) / 3600);
-        return b;
-    }
+    int member_height(const Member&, int) const { return kRow; }
+    // the time left, for the tooltip: "12:05 left"
     static std::wstring long_time(int s) {
         if (s < 0) return L"no time limit";
         wchar_t b[32];
@@ -2766,21 +2760,13 @@ struct PartyLayer : PinnedLayer {
 
     // The badge under the pointer: which player and which of their buffs.
     bool content_hover(int x, int y) override {
-        int hm = -1, hb = -1, top = 0;
+        int hm = -1, hb = -1;
         if (x >= 0 && y >= 0)
-            for (size_t i = 0; i < members.size(); ++i) {
-                const int h = member_height(members[i], last_width);
-                if (y >= top + kRow && y < top + h) {
-                    const int line = (y - top - kRow) / kBuffLine, in_y = (y - top - kRow) % kBuffLine;
-                    const int col = (x - 10) / (kBadge + kBadgeGap), in_x = (x - 10) % (kBadge + kBadgeGap);
-                    const int k = line * per_line(last_width) + col;
-                    if (x >= 10 && in_x < kBadge && in_y < kBadge && col < per_line(last_width) && k < static_cast<int>(members[i].buffs.size())) {
-                        hm = static_cast<int>(i);
-                        hb = k;
-                    }
+            for (const Spot& sp : spots)
+                if (x >= sp.r.left && x < sp.r.right && y >= sp.r.top && y < sp.r.bottom) {
+                    hm = sp.member;
+                    hb = sp.buff;
                 }
-                top += h;
-            }
         if (hm == hover_member && hb == hover_buff) return false;
         hover_member = hm;
         hover_buff = hb;
@@ -2788,14 +2774,15 @@ struct PartyLayer : PinnedLayer {
     }
 
     // A buff's badge: a rounded square in its slot's colour (green buff, red debuff, amber food, blue rested, brown
-    // terrain) with the game's icon on it (a letter where the game has none), its time under it.
+    // terrain) with the game's icon on it (a letter where the game has none). Under 10 s left it is drawn fainter.
     void badge(int x, int y, const Buff& b, bool over) {
         static const float kSlot[5][3] = {{170, 120, 40}, {40, 125, 85}, {165, 45, 45}, {55, 95, 160}, {130, 80, 40}};
         const float* c = kSlot[std::clamp(b.slot, 0, 4)];
         const float lift = over ? 1.25f : 1.0f;
+        const float fade = b.left >= 0 && b.left < 10 ? 0.55f : 0.95f;
         box(x + 1, y, x + kBadge - 1, y + kBadge, c[0] * 0.45f, c[1] * 0.45f, c[2] * 0.45f, 0.95f);  // the rim
         box(x, y + 1, x + kBadge, y + kBadge - 1, c[0] * 0.45f, c[1] * 0.45f, c[2] * 0.45f, 0.95f);
-        box(x + 2, y + 2, x + kBadge - 2, y + kBadge - 2, std::min(255.0f, c[0] * lift), std::min(255.0f, c[1] * lift), std::min(255.0f, c[2] * lift), 0.95f);
+        box(x + 2, y + 2, x + kBadge - 2, y + kBadge - 2, std::min(255.0f, c[0] * lift), std::min(255.0f, c[1] * lift), std::min(255.0f, c[2] * lift), fade);
         auto have = buff_pics.find(b.type);
         if (have == buff_pics.end()) {
             std::vector<uint8_t> pic;
@@ -2806,13 +2793,19 @@ struct PartyLayer : PinnedLayer {
                        static_cast<int>(game_files().buff_icon_guid.size()), game_files().note.empty() ? "" : "; ", game_files().note.c_str());
         }
         if (!have->second.empty()) {
-            canvas.picture(have->second.data(), kBuffIcon, x + kBadge * 0.5f, y + kBadge * 0.5f, 1.0f);
+            canvas.picture(have->second.data(), kBuffIcon, x + kBadge * 0.5f, y + kBadge * 0.5f, fade > 0.9f ? 1.0f : 0.6f);
         } else {
             const std::wstring letter = b.name.empty() ? std::wstring(L"?") : b.name.substr(0, 1);
-            text.draw(canvas, x + (kBadge - text.width(letter)) / 2, y + 3, letter, 245, 245, 245);
+            little.draw(canvas, x + (kBadge - little.width(letter)) / 2, y + 1, letter, 245, 245, 245);
         }
-        const std::wstring t = short_time(b.left);
-        if (!t.empty()) little.draw(canvas, x + (kBadge - little.width(t)) / 2, y + kBadge, t, 200, 205, 215);
+    }
+    void more_badge(int x, int y, int n, bool over) {
+        const float v = over ? 95.0f : 70.0f;
+        box(x + 1, y, x + kBadge - 1, y + kBadge, 30, 32, 38, 0.95f);
+        box(x, y + 1, x + kBadge, y + kBadge - 1, 30, 32, 38, 0.95f);
+        box(x + 2, y + 2, x + kBadge - 2, y + kBadge - 2, v, v + 4, v + 12, 0.95f);
+        const std::wstring t = L"+" + std::to_wstring(n);
+        little.draw(canvas, x + (kBadge - little.width(t)) / 2, y + 1, t, 235, 235, 240);
     }
 
     // A bar in the game's style: a dark frame, the fill with a lighter top, a notch every 100 points, a bright end, and
@@ -2842,7 +2835,8 @@ struct PartyLayer : PinnedLayer {
         int y = top;
         last_width = width;
         int tip_x = -1, tip_y = -1;
-        const Buff* tip = nullptr;
+        std::vector<std::pair<std::wstring, int>> tip;  // the tooltip's lines (text, slot for its colour; -1: grey)
+        spots.clear();
         if (members.empty()) {
             text.draw(canvas, 10, y + 4, L"...", 150, 150, 160);
             y += kRow;
@@ -2872,36 +2866,68 @@ struct PartyLayer : PinnedLayer {
                 right -= 10;
             }
             if (down) text.draw(canvas, right - text.width(L"DOWN"), y + 2, L"DOWN", 255, 70, 60);
+            {  // the buffs, behind the name: as many as fit before the level (and DOWN)
+                const int from = 30 + text.width(nm) + 8, to = (down ? right - text.width(L"DOWN") - 6 : right) - 2;
+                const int room = std::max(0, (to - from + kBadgeGap) / (kBadge + kBadgeGap));
+                const int n = static_cast<int>(m.buffs.size());
+                const int shown = n <= room ? n : std::max(0, room - 1);  // the last place: "+N"
+                const int by = y + 3;
+                for (int bi = 0; bi < shown; ++bi) {
+                    const int bx = from + bi * (kBadge + kBadgeGap);
+                    const bool over = static_cast<int>(mi) == hover_member && bi == hover_buff;
+                    badge(bx, by, m.buffs[static_cast<size_t>(bi)], over);
+                    spots.push_back({static_cast<int>(mi), bi, 0, {bx, by - top, bx + kBadge, by - top + kBadge}});
+                    if (over) {
+                        static const wchar_t* kKind[5] = {L"Food", L"Buff", L"Debuff", L"Rested", L"Terrain"};
+                        const Buff& b = m.buffs[static_cast<size_t>(bi)];
+                        const int sl = std::clamp(b.slot, 0, 4);
+                        tip = {{b.name.empty() ? std::wstring(kKind[sl]) : b.name, sl}, {std::wstring(kKind[sl]) + L" \u00B7 " + long_time(b.left), -1}};
+                        tip_x = bx;
+                        tip_y = by;
+                    }
+                }
+                if (shown < n && room > 0) {
+                    const int bx = from + shown * (kBadge + kBadgeGap);
+                    const bool over = static_cast<int>(mi) == hover_member && hover_buff == -2;
+                    more_badge(bx, by, n - shown, over);
+                    spots.push_back({static_cast<int>(mi), -2, shown, {bx, by - top, bx + kBadge, by - top + kBadge}});
+                    if (over) {
+                        tip.clear();
+                        for (int bi = shown; bi < n; ++bi) {
+                            const Buff& b = m.buffs[static_cast<size_t>(bi)];
+                            tip.push_back({(b.name.empty() ? std::wstring(L"?") : b.name) + L" \u00B7 " + long_time(b.left), std::clamp(b.slot, 0, 4)});
+                        }
+                        tip_x = bx;
+                        tip_y = by;
+                    }
+                }
+            }
             if (!m.where.empty()) little.draw(canvas, 30, y + 23, m.where, 170, 175, 185);  // where they are
             bar(10, y + 42, width - 20, 16, m.hp, m.hp_max, 120, 200, 110);       // health: green
             bar(10, y + 60, width - 20, 12, m.mana, m.mana_max, 80, 150, 225);    // mana: blue, thinner
-            const int k = per_line(width);
-            for (size_t bi = 0; bi < m.buffs.size(); ++bi) {  // the buff row(s)
-                const int bx = 10 + static_cast<int>(bi % k) * (kBadge + kBadgeGap), by = y + kRow + static_cast<int>(bi / k) * kBuffLine;
-                const bool over = static_cast<int>(mi) == hover_member && static_cast<int>(bi) == hover_buff;
-                badge(bx, by, m.buffs[bi], over);
-                if (over) {
-                    tip = &m.buffs[bi];
-                    tip_x = bx;
-                    tip_y = by;
-                }
-            }
             y += mh;
         }
-        if (tip) {  // the tooltip of the badge under the pointer: its name, kind and time left
-            static const wchar_t* kKind[5] = {L"Food", L"Buff", L"Debuff", L"Rested", L"Terrain"};
-            const std::wstring head = tip->name.empty() ? std::wstring(kKind[std::clamp(tip->slot, 0, 4)]) : tip->name;
-            const std::wstring sub = std::wstring(kKind[std::clamp(tip->slot, 0, 4)]) + L" \u00B7 " + long_time(tip->left);
-            const int w = std::max(text.width(head), little.width(sub)) + 16, h = 44;
+        if (!tip.empty()) {  // the tooltip of the badge under the pointer: name, kind and time left (or the "+N" list)
+            static const float kTint[5][3] = {{235, 190, 110}, {120, 220, 160}, {255, 120, 110}, {140, 180, 245}, {215, 160, 110}};
+            int w = 0;
+            for (const auto& l : tip) w = std::max(w, (l.second >= 0 && tip.size() == 2 && &l == &tip[0] ? text.width(l.first) : little.width(l.first)));
+            w += 16;
+            const int h = static_cast<int>(tip.size()) * 20 + 8;
             const int x = std::clamp(tip_x, 4, std::max(4, width - w - 4));
-            const int ty = tip_y + kBadge + 16 + h <= canvas.h ? tip_y + kBadge + 14 : tip_y - h - 2;
+            const int ty = tip_y + kBadge + 4 + h <= canvas.h ? tip_y + kBadge + 4 : tip_y - h - 4;
             box(x, ty, x + w, ty + h, 22, 24, 30, 0.97f);
             box(x, ty, x + w, ty + 1, 120, 128, 145, 1.0f);
-            const float* c = nullptr;
-            static const float kTint[5][3] = {{235, 190, 110}, {120, 220, 160}, {255, 120, 110}, {140, 180, 245}, {215, 160, 110}};
-            c = kTint[std::clamp(tip->slot, 0, 4)];
-            text.draw(canvas, x + 8, ty + 4, head, c[0], c[1], c[2]);
-            little.draw(canvas, x + 8, ty + 25, sub, 190, 195, 205);
+            for (size_t i = 0; i < tip.size(); ++i) {
+                const auto& l = tip[i];
+                const int ly = ty + 4 + static_cast<int>(i) * 20;
+                if (l.second >= 0) {
+                    const float* c = kTint[l.second];
+                    if (tip.size() == 2 && i == 0) text.draw(canvas, x + 8, ly - 1, l.first, c[0], c[1], c[2]);
+                    else little.draw(canvas, x + 8, ly + 1, l.first, c[0], c[1], c[2]);
+                } else {
+                    little.draw(canvas, x + 8, ly + 1, l.first, 190, 195, 205);
+                }
+            }
         }
         if (!server) {
             little.draw(canvas, 10, y + 2, L"Mana, level and other players need", 255, 176, 96);
