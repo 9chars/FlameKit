@@ -754,6 +754,9 @@ do
   local list_text = f and f:read("a") or ""
   if f then f:close() end
   check(list_text:find("\nP b:lf_keep_hotbar 1 Never touch the action bar: ON", 1, true) ~= nil, "the Auto Junk List's view has its action bar switch")
+  local b_line = list_text:match("\n(B\t[^\n]*)")
+  local _, n_tabs = (b_line or ""):gsub("\t", "")
+  check(n_tabs == 7 and b_line:find("\tMaterial, tier %d\t") ~= nil, "a bag item comes as an item tile: id, count, command name, rarity, level, type, name")
   ui_action("opt", "b:lf_keep_hotbar")
   step(6)
   check(settings.lf_keep_hotbar == false, "clicking it switches the setting")

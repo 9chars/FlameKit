@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.35.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.36.
 
 ## What FlameKit is
 
@@ -71,8 +71,9 @@ The older updater through the game server was removed in 0.15.9 (with `make_upda
 
 ## State right now
 
-- Local server: 0.15.35. Client: 0.15.35 through the GitHub updater (needs a game restart).
+- Local server: 0.15.36. Client: 0.15.36 through the GitHub updater (needs a game restart).
 - 0.15.34 (owner: move the minimap with the mouse, no special option): MinimapLayer takes the mouse in pointer mode (`g_pointer_mode`) and is drawn over the backdrop (layer order: hud, backdrop, minimap, party, messages, window); a drag saves map_x/map_y as before; the light ring shows while the pointer is out; the "hide in menus" check is skipped in pointer mode (FlameKit's own pointer). Setting `map_move` and the Move button are gone.
+- 0.15.36 (owner: item tooltips, standardized for every feature): **item tiles are a standard UI element.** Lua: `kit.items.tip(id, debug_name)` gives rarity, item level, type, command name. A feature's panel row `{ item = <id>, count = n, text = name, tooltip = what a click does, button = key (optional), selected }` becomes an item tile ("r i ..." in ui_tabs.dat with 6 more fields); the Auto Junk List's B/J lines in ui_list.dat are tab-separated item tiles. DLL: `ItemTip` + `draw_item_tip()` (name in rarity colour, item level, rarity, type, carried, command name, hint; frame in the rarity colour), `WindowLayer::tile` draws every tile; kind `kRowItem` for tiles in tabs of rows. Use these for any future item UI.
 - UI text (owner, 0.15.35): keep the UI short; no explanations of what players understand by themselves (how to drag things). Tooltips may explain.
 - TO DO (found 0.15.32): once the updater holds an update (ready), it stops checking until the game restarts, so two versions published close together need two restarts. Make it keep checking while an update is held and replace the held one with a newer one.
 - 0.15.31 (owner: What's New text cut off): `TextPainter` drew into a 640 px scratch bitmap and `width()` clamped to 640, so `wrap()` never wrapped past 640 px and lines were cut off in a wider window. Now 2048 px and `width()` returns the real width (drawing stops at the bitmap's edge).

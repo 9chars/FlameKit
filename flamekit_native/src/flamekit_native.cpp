@@ -3002,6 +3002,62 @@ struct MessagesLayer : PinnedLayer {
 };
 
 std::string version_in(const std::wstring& mod_json);  // (the monitor's, further down)
+
+// ---- item tiles: the same everywhere in FlameKit's UI ----
+// An Enshrouded item in FlameKit's UI is a tile: its icon on its rarity's colour (WindowLayer::tile) and, under the
+// pointer, this tooltip. The details come from the Lua part (core/items.lua items.tip), so the DLL never reads the game
+// for them: the Auto Junk List's B and J lines (ui_list.dat) and any tab's item rows ("r i ..." in ui_tabs.dat).
+struct ItemTip {
+    std::wstring name;     // the game's name in the player's language
+    int rarity = -1;       // 0 Common .. 4 Legendary, -1 not known
+    std::wstring level;    // item level: "12" or "12-14", "" not known
+    std::wstring type;     // "Material", "Ammunition, Arrows", ...
+    int count = 0;         // how many the player carries (0: not shown)
+    std::wstring command;  // the debug name, for chat commands
+    std::wstring hint;     // what a click does, dimmed at the bottom
+};
+constexpr uint8_t kRarityRgb[5][3] = {{217, 212, 199}, {95, 211, 95}, {79, 163, 255}, {181, 107, 255}, {255, 180, 60}};
+const wchar_t* const kRarityName[5] = {L"Common", L"Uncommon", L"Rare", L"Epic", L"Legendary"};
+
+// Draws an item's tooltip near the pointer (mx, my), kept inside a canvas of w x h: the name in its rarity's colour, then
+// item level, rarity, type, carried, the command name and the hint; a frame in the rarity's colour.
+void draw_item_tip(Canvas& c, TextPainter& text, int mx, int my, int w, int h, const ItemTip& t) {
+    const bool known = t.rarity >= 0 && t.rarity < 5;
+    const uint8_t* rc = known ? kRarityRgb[t.rarity] : kRarityRgb[0];
+    struct Line {
+        std::wstring s;
+        float r, g, b;
+    };
+    std::vector<Line> lines;
+    lines.push_back({t.name.empty() ? t.command : t.name, static_cast<float>(rc[0]), static_cast<float>(rc[1]), static_cast<float>(rc[2])});
+    if (!t.level.empty()) lines.push_back({L"Item level " + t.level, 225, 225, 230});
+    if (known) lines.push_back({std::wstring(L"Rarity: ") + kRarityName[t.rarity], 225, 225, 230});
+    if (!t.type.empty()) lines.push_back({L"Type: " + t.type, 225, 225, 230});
+    if (t.count > 0) lines.push_back({L"Carried: " + std::to_wstring(t.count), 225, 225, 230});
+    if (!t.command.empty()) lines.push_back({L"Command name: " + t.command, 140, 145, 155});
+    if (!t.hint.empty()) lines.push_back({t.hint, 160, 190, 230});
+    int tw = 0;
+    for (const Line& l : lines) tw = std::max(tw, text.width(l.s));
+    tw += 20;
+    const int th = 22 * static_cast<int>(lines.size()) + 12;
+    const int x0 = std::clamp(mx + 16, 0, std::max(0, w - tw)), y0 = std::clamp(my + 20, 0, std::max(0, h - th));
+    for (int y = y0; y < y0 + th; ++y)
+        for (int x = x0; x < x0 + tw; ++x) c.blend(x, y, 24, 25, 30, 0.97f);
+    for (int x = x0; x < x0 + tw; ++x) {  // the frame in the rarity's colour
+        c.blend(x, y0, rc[0], rc[1], rc[2], 1.0f);
+        c.blend(x, y0 + th - 1, rc[0], rc[1], rc[2], 1.0f);
+    }
+    for (int y = y0; y < y0 + th; ++y) {
+        c.blend(x0, y, rc[0], rc[1], rc[2], 1.0f);
+        c.blend(x0 + tw - 1, y, rc[0], rc[1], rc[2], 1.0f);
+    }
+    int ly = y0 + 6;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (i == lines.size() - 1 && !t.hint.empty()) ly += 4;  // a little room before the hint
+        text.draw(c, x0 + 10, ly, lines[i].s, lines[i].r, lines[i].g, lines[i].b);
+        ly += 22;
+    }
+}
 std::string read_text(const std::wstring& path, size_t max);
 
 // ---- FlameKit's window: a tab per feature ----
@@ -3021,6 +3077,8 @@ struct WindowLayer : Layer {
         int count = 0;      // how many you carry
         std::string key;    // the game's debug name: what the Lua part knows the item by
         std::wstring name;  // the game's own name for it
+        int rarity = -1;    // the item tile's details (core/items.lua items.tip): for the tooltip
+        std::wstring level, type;
     };
     struct Tab {
         std::string id;
@@ -3038,13 +3096,18 @@ struct WindowLayer : Layer {
         uint8_t r = 0, g = 0, b = 0;
         int number = 0;  // a button's number in its generation
         std::wstring text, tip;
+        // an item tile (kind i): the item and its details for the tooltip
+        uint32_t item = 0;
+        int count = 0, rarity = -1;
+        std::wstring level, type, command;
     };
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose, kOpt };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem };
     struct Hit {
         RECT r;
         Kind kind;
         size_t index;
         const std::wstring* tip = nullptr;
+        const Row* row = nullptr;  // an item tile of a tab of rows: its details for the tooltip
     };
     static constexpr int kIcon = 64, kGap = 8, kPad = 16, kTitle = 32, kGrip = 16, kBarW = 10;
     static constexpr int kDefW = 2 * kPad + 10 * kIcon + 9 * kGap, kDefH = 860, kMinW = 560, kMinH = 440;
@@ -3131,9 +3194,33 @@ struct WindowLayer : Layer {
             if (sscanf_s(line, "O %d %15s", &on, action, static_cast<unsigned>(sizeof action)) == 2) {
                 a = on != 0;
                 del = std::strcmp(action, "delete") == 0;
+            } else if ((line[0] == 'B' || line[0] == 'J') && line[1] == '\t') {  // an item tile: id, count, key, rarity, level, type, name
+                std::vector<std::string> f;
+                for (const char* at = line + 2;;) {
+                    const char* tab = std::strchr(at, '\t');
+                    f.emplace_back(at, tab ? static_cast<size_t>(tab - at) : std::strlen(at));
+                    if (!tab) break;
+                    at = tab + 1;
+                }
+                if (f.size() >= 7) {
+                    Entry e;
+                    e.id = static_cast<uint32_t>(std::strtoul(f[0].c_str(), nullptr, 16));
+                    e.count = std::atoi(f[1].c_str());
+                    e.key = f[2];
+                    e.rarity = std::atoi(f[3].c_str());
+                    e.level = widen(f[4]);
+                    e.type = widen(f[5]);
+                    e.name = widen(f[6]);
+                    (line[0] == 'B' ? b : j).push_back(std::move(e));
+                }
             } else if ((line[0] == 'B' || line[0] == 'J') &&
                        sscanf_s(line + 1, " %x %d %399s %n", &id, &count, key, static_cast<unsigned>(sizeof key), &used) == 3 && used > 0) {
-                (line[0] == 'B' ? b : j).push_back({id, count, key, widen(line + 1 + used)});
+                Entry e;  // the older form (before 0.15.36): no details
+                e.id = id;
+                e.count = count;
+                e.key = key;
+                e.name = widen(line + 1 + used);
+                (line[0] == 'B' ? b : j).push_back(std::move(e));
             } else if (line[0] == 'P' && sscanf_s(line + 1, " %399s %d %n", key, static_cast<unsigned>(sizeof key), &on, &used) == 2 && used > 0) {
                 o.push_back({key, on != 0, widen(line + 1 + used)});  // one of the feature's settings, as a button
             }
@@ -3213,6 +3300,16 @@ struct WindowLayer : Layer {
                 row.number = std::atoi(f[7].c_str());
                 row.text = unescape(f[8]);
                 row.tip = unescape(f[9]);
+                if (row.kind == 'i' && f.size() >= 16) {  // an item tile
+                    row.item = static_cast<uint32_t>(std::strtoul(f[10].c_str(), nullptr, 16));
+                    row.count = std::atoi(f[11].c_str());
+                    row.rarity = std::atoi(f[12].c_str());
+                    row.level = widen(f[13]);
+                    row.type = unescape(f[14]);
+                    row.command = widen(f[15]);
+                } else if (row.kind == 'i') {
+                    row.kind = 't';
+                }
                 r.push_back(std::move(row));
             }
         }
@@ -3404,12 +3501,13 @@ struct WindowLayer : Layer {
                 line_h = 0;
             };
             for (const Row& r : rows) {
-                if (r.kind == 'b') {
-                    const int w = std::max(34, text.width(r.text) + 22);
+                if (r.kind == 'b' || r.kind == 'i') {  // buttons and item tiles run along the line and wrap
+                    const bool tile_row = r.kind == 'i';
+                    const int w = tile_row ? kIcon : std::max(34, text.width(r.text) + 22), h = tile_row ? kIcon : 30;
                     if (!(r.same && x > left && x + w <= right)) newline();
-                    placed.push_back({&r, x, y, w, 30, {}});
-                    x += w + 6;
-                    line_h = 30;
+                    placed.push_back({&r, x, y, w, h, {}});
+                    x += w + (tile_row ? kGap : 6);
+                    line_h = std::max(line_h, h);
                 } else {
                     newline();
                     if (r.kind == 's') {
@@ -3438,7 +3536,15 @@ struct WindowLayer : Layer {
             const int y = kViewTop + p.y - rows_scroll;
             if (y + p.h < kViewTop || y > kViewBottom) continue;  // out of view
             const Row& r = *p.row;
-            if (r.kind == 'b') {
+            if (r.kind == 'i') {  // an item tile: the same as the Auto Junk List's, with the same tooltip
+                Entry e;
+                e.id = r.item;
+                e.count = r.count;
+                e.name = r.text;
+                tile(e, p.x, y, kRowItem, static_cast<size_t>(r.number));
+                hits.back().row = &r;
+                if (r.selected) frame_box(p.x - 3, y - 3, p.x + kIcon + 3, y + kIcon + 3, 3, 255, 200, 60);
+            } else if (r.kind == 'b') {
                 button(p.x, y, p.w, r.text, r.selected, kRowButton, static_cast<size_t>(r.number), r.disabled, &r);
             } else if (r.kind == 's') {
                 box(p.x, y, p.x + p.w, y + 1, 90, 90, 100, 1.0f);
@@ -3639,12 +3745,35 @@ struct WindowLayer : Layer {
         // the frame, and the grip in the lower right corner that resizes the window
         frame_box(0, 0, kW, kH, 1, 120, 160, 220);
         for (int k = 0; k < kGrip; k += 3) box(kW - kGrip + k, kH - 2 - k / 3, kW - 2, kH - 1 - k / 3, 140, 170, 220, 0.9f);
-        for (const Hit& h : hits) {  // under the pointer: an item's name, or a button's tooltip
+        for (const Hit& h : hits) {  // under the pointer: an item's tooltip (the standard one), or a button's
             if (!inside(h.r)) continue;
+            if ((h.kind == kBagItem && h.index < bag.size()) || (h.kind == kJunkItem && h.index < junk.size())) {
+                const Entry& e = h.kind == kBagItem ? bag[h.index] : junk[h.index];
+                ItemTip t;
+                t.name = e.name;
+                t.rarity = e.rarity;
+                t.level = e.level;
+                t.type = e.type;
+                t.count = e.count;
+                t.command = widen(e.key);
+                t.hint = h.kind == kBagItem ? L"Click: put it on your junk list" : L"Click: take it off your junk list";
+                draw_item_tip(canvas, text, mouse_x, mouse_y, kW, kH, t);
+                break;
+            }
+            if (h.kind == kRowItem && h.row) {
+                ItemTip t;
+                t.name = h.row->text;
+                t.rarity = h.row->rarity;
+                t.level = h.row->level;
+                t.type = h.row->type;
+                t.count = h.row->count;
+                t.command = h.row->command;
+                t.hint = h.row->tip;
+                draw_item_tip(canvas, text, mouse_x, mouse_y, kW, kH, t);
+                break;
+            }
             std::wstring tip;
-            if (h.kind == kBagItem && h.index < bag.size()) tip = bag[h.index].name.empty() ? widen(bag[h.index].key) : bag[h.index].name;
-            else if (h.kind == kJunkItem && h.index < junk.size()) tip = junk[h.index].name.empty() ? widen(junk[h.index].key) : junk[h.index].name;
-            else if (h.tip) tip = *h.tip;
+            if (h.tip) tip = *h.tip;
             if (tip.empty()) continue;
             const std::vector<std::wstring> lines = wrap(tip, 420);
             int tw = 0;
@@ -3867,6 +3996,8 @@ struct WindowLayer : Layer {
                 FK_LOG(fklog::kInfo, "window: Check for updates");
                 break;
             case kRowButton:
+            case kRowItem:
+                if (h.kind == kRowItem && h.index == 0) break;  // an item tile without a click
                 act("tab", rows_of + "/" + std::to_string(generation) + "/" + std::to_string(h.index));
                 break;
             case kRowPrev: if (rows_page > 0) --rows_page; break;

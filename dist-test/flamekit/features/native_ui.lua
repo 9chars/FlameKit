@@ -7,11 +7,13 @@
 --   ui_list.dat     written here when it changed: the Auto Junk List window's content, a line per entry, then "end"
 --                   (a file without "end" is half written: the DLL reads it again later)
 --                     O <0|1 auto> <drop|delete>                            the options
---                     B <item id hex> <count> <debug name> <name>           an item you carry that is not junk (but can be)
---                     J <item id hex, 0 = unknown> <count carried> <debug name> <name>   an entry of the junk list
+--                     B<tab><item id hex><tab><count><tab><debug name><tab><rarity 0-4|-1><tab><item level><tab><type><tab><name>
+--                                                                           an item you carry that is not junk (but can be)
+--                     J<tab>... the same                                    an entry of the junk list (id 0: unknown)
 --                     P <click key> <0|1 lit> <label>                       one of the feature's settings, as a button
 --                                                                           (features/settings.lua: "b:lf_keep_hotbar")
---                   (the name, the game's own text in your language, is the rest of the line)
+--                   (B and J are item tiles: core/items.lua items.tip; the DLL draws every item tile and its tooltip the same
+--                   way: the name in its rarity's colour, item level, rarity, type, carried, command name)
 --   ui_actions.txt  written by the DLL (replaced whole): the last clicks, a line "<number> <what> <argument>":
 --                     junk <debug name> | keep <debug name> | dump - | auto 0|1 | action drop|delete
 --                   The numbers only grow. A number not seen before is done once. At a (re)load the numbers already
@@ -21,7 +23,9 @@
 --                   separated by tabs, newlines in a text are written as \n; then "end"
 --                     tab <feature id> <title>
 --                     view <feature id> <generation>          (the rows below belong to this generation)
---                     r <kind h|t|b|s> <same line 0|1> <selected 0|1> <disabled 0|1> <dim 0|1> <colour rrggbb|-> <button number|0> <text> <tooltip>
+--                     r <kind h|t|b|s|i> <same line 0|1> <selected 0|1> <disabled 0|1> <dim 0|1> <colour rrggbb|-> <button number|0> <text> <tooltip>
+--                       and for an item tile (kind i: a row with item = <id>, count = <n>, text = its name, tooltip =
+--                       what a click does): <item id hex> <count> <rarity> <item level> <type> <command name>
 --   ui_actions.txt  also: view <feature id>|- (the DLL shows that tab, or none) and tab <feature id>/<generation>/<button
 --                   number> (a click on a row's button: done only when the generation is still the one shown) and
 --                   key <name> (a key pressed in the window: to the Settings rows waiting for a key, else to the shown
@@ -60,12 +64,14 @@ local function write_list(world)
     settings.value_text("lf_keep_hotbar"))
   lines[#lines + 1] = string.format("P k:lf_dump_key:c %d Dump key: %s", settings.capturing() == "lf_dump_key" and 1 or 0,
     settings.value_text("lf_dump_key"))
-  for _, e in ipairs(in_bag) do
-    lines[#lines + 1] = string.format("B %x %d %s %s", e.item, e.count, e.debug_name, one_line(e.name))
+  local items = kit.items
+  local function tile(kind, e)
+    local t = items.tip(e.item, e.debug_name)
+    return table.concat({ kind, string.format("%x", e.item or 0), tostring(e.count or 0), e.debug_name, tostring(t.rarity), t.level,
+      one_line(t.type), one_line(e.name) }, "\t")
   end
-  for _, e in ipairs(junk) do
-    lines[#lines + 1] = string.format("J %x %d %s %s", e.item or 0, e.count, e.debug_name, one_line(e.name))
-  end
+  for _, e in ipairs(in_bag) do lines[#lines + 1] = tile("B", e) end
+  for _, e in ipairs(junk) do lines[#lines + 1] = tile("J", e) end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"
   if text == last_list then return end
@@ -108,15 +114,22 @@ local function write_tabs(world)
     if type(rows) == "table" then
       local body, map = {}, {}
       for _, r in ipairs(rows) do
-        local kind = r.separator and "s" or r.heading and "h" or (r.button or r.slot) and "b" or "t"
+        local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or (r.button or r.slot) and "b" or "t"
         local number = 0
-        if kind == "b" then
+        if (kind == "b" or kind == "i") and (r.button or r.slot) then
           map[#map + 1] = r.button or r.slot
           number = #map
         end
         local colour = type(r.color) == "string" and r.color:match("^#?(%x%x%x%x%x%x)$") or "-"
-        body[#body + 1] = table.concat({ "r", kind, r.same_line and "1" or "0", r.selected and "1" or "0", r.disabled and "1" or "0",
-          r.dim and "1" or "0", colour, tostring(number), clean(r.heading or r.text), clean(r.tooltip) }, "\t")
+        local fields = { "r", kind, r.same_line and "1" or "0", r.selected and "1" or "0", r.disabled and "1" or "0",
+          r.dim and "1" or "0", colour, tostring(number), clean(r.heading or r.text), clean(r.tooltip) }
+        if kind == "i" then  -- an item tile: its details for the tooltip (core/items.lua items.tip)
+          local debug_name = kit.items.debug_name(r.item)
+          local t = kit.items.tip(r.item, debug_name)
+          for _, v in ipairs({ string.format("%x", r.item), tostring(r.count or 0), tostring(t.rarity), t.level, clean(t.type),
+                               clean(debug_name or "") }) do fields[#fields + 1] = v end
+        end
+        body[#body + 1] = table.concat(fields, "\t")
       end
       local text = table.concat(body, "\n")
       if text ~= last_rows then

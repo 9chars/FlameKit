@@ -217,6 +217,25 @@ function items.details(id, debug_name, count)
   return lines
 end
 
+-- An item's details for FlameKit's item tiles (the DLL draws the tile and its tooltip the same way everywhere):
+--   { rarity = 0..4 (Common .. Legendary) or -1, level = "12" / "12-14" / "", type = "Material" / "", command = debug name }
+-- Where the game's item details are not there (item_details.dat), the kind and tier from the debug name.
+function items.tip(id, debug_name)
+  local t = { rarity = -1, level = "", type = "", command = debug_name or "" }
+  local d = items.data(id)
+  if d then
+    if d.level_max > 0 then t.level = d.level_min == d.level_max and tostring(d.level_max) or (d.level_min .. "-" .. d.level_max) end
+    if items.RARITY_NAME[d.rarity] then t.rarity = d.rarity end
+    local kind = CATEGORY[d.category]
+    if kind and d.category == 8 and AMMUNITION[d.sub] then kind = kind .. ", " .. AMMUNITION[d.sub] end
+    t.type = kind or ""
+  elseif debug_name then
+    local tier = items.tier(debug_name)
+    t.type = tostring(items.kind(debug_name)) .. (tier and (", tier " .. tier) or "")
+  end
+  return t
+end
+
 -- The colour for an item in a list: its rarity as the game colours it (Common .. Legendary); where the game's item
 -- details are not there, its kind's colour, else nil.
 function items.color(debug_name, id)

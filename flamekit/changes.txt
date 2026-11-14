@@ -1,3 +1,7 @@
+0.15.36 Nov 13, 2026
+- Hovering an item in the Auto Junk List shows its details again: the name in its rarity's colour, item level, rarity, type, how many you carry, its name for chat commands, and what a click does.
+- Item tiles are now a standard part of FlameKit's window: every feature that shows Enshrouded items shows them the same way, with the same tooltip.
+
 0.15.35 Nov 13, 2026
 - Minimap tab: the section is called Location, its button Reset Default Position; the text about dragging is gone.
 
