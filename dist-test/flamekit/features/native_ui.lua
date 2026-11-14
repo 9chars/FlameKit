@@ -232,6 +232,9 @@ local function act(world, what, arg)
     last_rows = nil
     tabs_now = true
     exp_now = true
+  elseif what == "wp" then  -- a click on a minimap marker (0.15.75): the waypoint there, or "clear"
+    local f = feature("experimental")
+    if f and f.minimap_waypoint then kit.call(f, "minimap_waypoint", world, arg) end
   elseif what == "exp" then  -- a click in the Experimental window
     local gen, number = tostring(arg):match("^(%d+)/(%d+)$")
     local map = gen and exp_keys[tonumber(gen)]

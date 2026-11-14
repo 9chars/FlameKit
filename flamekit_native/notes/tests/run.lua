@@ -791,6 +791,15 @@ check(rule_count() == rules_before + 1, "and fall damage is off for them for a w
 clock = clock + 31
 step(2)
 check(rule_count() == rules_before, "30 s later the fall protection is gone again")
+-- (0.15.75) a click on a minimap marker: the server writes the player's own waypoint there, a second click clears it
+require("features.experimental").minimap_waypoint(UI, "1234.5,2345.5")
+step(40)
+local wpc = comps.PlayerWaypoint[PLAYER]
+check(wpc.enabled == true and wpc.waypointPosition.x == math.floor(1234.5 * 2 ^ 32) and wpc.waypointPosition.z == math.floor(2345.5 * 2 ^ 32),
+  "a minimap marker click sets the waypoint there")
+require("features.experimental").minimap_waypoint(UI, "clear")
+step(40)
+check(wpc.enabled == false, "and the clear click takes it away")
 comps.DynamicLocomotion = { [PLAYER] = { state = 4, flags = 0 } }
 local function slot() return { impulse = { x = 0, y = 0, z = 0 }, type = 0, startTime = 0, endTime = 0, keepAliveMask = 0 } end
 comps.Impulse = { [PLAYER] = { impulses = { slot(), slot(), slot(), slot() } } }

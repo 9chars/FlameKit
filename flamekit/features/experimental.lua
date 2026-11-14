@@ -471,6 +471,29 @@ local function handle(world, account, entity, msg)
     if not ok then emf.log("experimental: go_home failed: " .. tostring(why)) end
     return v
   end
+  if msg.op == "setwp" or msg.op == "clearwp" then  -- (0.15.75) a click on a minimap marker: the player's own waypoint
+    local ok, why = pcall(function()
+      local w = world:get("PlayerWaypoint", entity)
+      if not w then error("the player has no waypoint component") end
+      if msg.op == "clearwp" then
+        w.enabled = false
+        emf.log(string.format("experimental: waypoint of player %s cleared from the minimap", tostring(entity)))
+        return
+      end
+      local x, z = tonumber(msg.x), tonumber(msg.z)
+      if not x or not z or x ~= x or z ~= z or x < -1000 or z < -1000 or x > 20000 or z > 20000 then error("not a place on the map") end
+      local _, py = world:position(entity)  -- the marker's height is not known here: the player's (Map Waypoint looks for ground)
+      w.waypointPosition.x = math.floor(x * 2 ^ 32)
+      w.waypointPosition.y = math.floor((py or 0) * 2 ^ 32)
+      w.waypointPosition.z = math.floor(z * 2 ^ 32)
+      w.enabled = true
+      emf.log(string.format("experimental: waypoint of player %s set from the minimap at %.0f %.0f", tostring(entity), x, z))
+    end)
+    if not ok then emf.log("experimental: the minimap waypoint failed: " .. tostring(why)) end
+    local v = view(account)
+    v.note = not ok and "The waypoint could not be set on this game version." or nil
+    return v
+  end
   if msg.op == "body" then
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
@@ -1186,6 +1209,25 @@ end
 
 function F.panel(world)
   return panel_rows(world)
+end
+
+-- (0.15.75) The minimap's waypoint click (features/native_ui.lua, "wp x,z" or "wp clear"): sent to the server, which
+-- writes the player's PlayerWaypoint (the game's own waypoint: its map and compass show it, Map Waypoint goes there).
+function F.minimap_waypoint(world, arg)
+  local msg
+  if arg == "clear" then
+    msg = { op = "clearwp" }
+  else
+    local x, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+)$")
+    if not x then return end
+    msg = { op = "setwp", x = tonumber(x), z = tonumber(z) }
+  end
+  if hosting(world) then
+    local account, player = me(world)
+    if account then note = handle(world, account, player, msg).note end
+  else
+    ask(msg)
+  end
 end
 
 function F.click(world, key)

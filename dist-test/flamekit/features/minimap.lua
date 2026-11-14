@@ -150,7 +150,7 @@ function F.panel(world)
   local placed = (tonumber(kit.setting("map_x", -1)) or -1) >= 0
   rows[#rows + 1] = { button = "reset", text = "Reset Default Position", disabled = not placed,
                       tooltip = "Puts the minimap back in its corner of the screen (the corner is below)." }
-  for _, r in ipairs(require("features.settings").rows({ "map_corner", "map_margin" })) do rows[#rows + 1] = r end
+  for _, r in ipairs(require("features.settings").rows({ "map_shape", "map_corner", "map_margin" })) do rows[#rows + 1] = r end
   rows[#rows + 1] = { separator = true }
   rows[#rows + 1] = { heading = "Size" }
   local size = tonumber(kit.setting("map_size", 300)) or 300

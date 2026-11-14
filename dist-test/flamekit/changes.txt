@@ -1,3 +1,7 @@
+0.15.75 Nov 14, 2026
+- Minimap: hold the pointer key (Right Alt) and click a map marker on the minimap to set your waypoint there (the game's own waypoint: its map and compass show it, and Map Waypoint takes you there). Click the waypoint's marker again to clear it; clicking another marker moves the waypoint there. Dragging the minimap still moves it.
+- Minimap: a Shape setting (Minimap tab and settings): Circle or Square.
+
 0.15.74 Nov 14, 2026
 - New: the Experimental window, a pinned window that stays on screen while you play (shown at first; hide it with its x, in F4 > Windows, or with its key F6, a setting in the Windows group). Fast Travel at the top (Flame Altar, Ancient Spire, Map Waypoint), then PvP, then the test monsters (the PvP dummy and the duelist with its monster list and level). Hold the pointer key (Right Alt) to click in it. These are no longer in the F4 Experimental tab, which keeps the other switches and the Debug section.
 - Test monsters: the level goes up to 105, the game's own top (measured: any higher level is set back to 105, 62687 health). The quick levels are 1, 25, 50, 75, 105.

@@ -14,6 +14,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <functional>
 #include <cctype>
 #include <atomic>
 #include <cmath>
@@ -56,6 +57,7 @@ struct Settings {
     int size = 300;          // the dial's width and height in pixels
     int margin = 24;         // distance from the game window's edges in pixels
     int corner = 1;          // 0 top right, 1 bottom right, 2 bottom left, 3 top left
+    bool square = false;     // map_shape: the dial is a square instead of a circle (0.15.75)
     uint32_t toggle_vk = VK_F10;
     uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
     uint32_t exp_vk = VK_F6;      // shows and hides the Experimental window (setting exp_window_key, 0.15.74)
@@ -105,6 +107,7 @@ void read_settings() {
     s.margin = std::clamp(static_cast<int>(emf::setting_float(kKit, "map_margin", 24.0)), 0, 400);
     const std::string corner = emf::setting_text(kKit, "map_corner", "bottom_right");
     s.corner = corner == "top_right" ? 0 : corner == "bottom_left" ? 2 : corner == "top_left" ? 3 : 1;
+    s.square = emf::setting_text(kKit, "map_shape", "circle") == "square";
     const std::string key = emf::setting_text(kKit, "map_toggle_key", "F10");
     s.toggle_vk = key.empty() ? 0 : emf::keys::parse_key(std::wstring(key.begin(), key.end()));
     const std::string zin = emf::setting_text(kKit, "map_zoom_in_key", "NumpadAdd");
@@ -1749,7 +1752,7 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
         for (int y = 0; y <= n; ++y) {
             for (int x = 0; x <= n; ++x) {
                 const float dx = static_cast<float>(x) + 0.5f - mid, dy = static_cast<float>(y) + 0.5f - mid;
-                if (dx * dx + dy * dy > (R + 2.0f) * (R + 2.0f)) continue;
+                if (s.square ? std::max(std::fabs(dx), std::fabs(dy)) > R + 2.0f : dx * dx + dy * dy > (R + 2.0f) * (R + 2.0f)) continue;
                 heights[static_cast<size_t>(y) * (n + 1) + x] = map.height(px0 + dx * mpp, py0 + dy * mpp, fine);
             }
         }
@@ -1757,7 +1760,9 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
     for (int y = 0; y < n; ++y) {
         for (int x = 0; x < n; ++x) {
             const float dx = static_cast<float>(x) + 0.5f - mid, dy = static_cast<float>(y) + 0.5f - mid;
-            const float d = std::sqrt(dx * dx + dy * dy);
+            // the distance from the middle: round for the circle, the larger of the two for the square (0.15.75), so the
+            // ground, its soft edge and the rim follow the dial's shape
+            const float d = s.square ? std::max(std::fabs(dx), std::fabs(dy)) : std::sqrt(dx * dx + dy * dy);
             if (d > R + 1.0f) continue;
             if (map.ok) {
                 const float h = heights[static_cast<size_t>(y) * (n + 1) + x];
@@ -1787,7 +1792,7 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
     // Where a place in the world is on the dial; false when it is outside. clamp: put it at the edge instead.
     auto place = [&](float wx, float wz, float margin, bool clamp, float& sx, float& sy, bool& outside) {
         float dx = (wx - x_east) / mpp, dy = -(wz - z_north) / mpp;
-        const float d = std::sqrt(dx * dx + dy * dy), limit = inner - margin;
+        const float d = s.square ? std::max(std::fabs(dx), std::fabs(dy)) : std::sqrt(dx * dx + dy * dy), limit = inner - margin;
         outside = d > limit;
         if (outside) {
             if (!clamp) return false;
@@ -1995,7 +2000,18 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
     quad(0, -L, -W, L * 0.62f, 0, L * 0.20f, W, L * 0.62f, 240, 98, 64, 222, 82, 54);
     quad(0, L * 0.42f, -W * 0.55f, L * 0.95f, 0, L * 0.78f, W * 0.55f, L * 0.95f, 240, 98, 64, 222, 82, 54);
 
-    if (s.move) c.disc(mid, mid, R + 1.0f, 110, 226, 255, 0.95f, std::max(3.0f, rim));  // the pointer is out: it can be dragged
+    if (s.move) {  // the pointer is out: it can be dragged (and its markers clicked)
+        if (s.square) {
+            const float t2 = std::max(3.0f, rim), a0 = mid - R - 1.0f, a1 = mid + R + 1.0f;
+            for (int yy = static_cast<int>(a0); yy < static_cast<int>(a1); ++yy)
+                for (int xx = static_cast<int>(a0); xx < static_cast<int>(a1); ++xx) {
+                    const float ex = std::min(xx - a0, a1 - 1 - xx), ey = std::min(yy - a0, a1 - 1 - yy);
+                    if (std::min(ex, ey) < t2) c.blend(xx, yy, 110, 226, 255, 0.95f);
+                }
+        } else {
+            c.disc(mid, mid, R + 1.0f, 110, 226, 255, 0.95f, std::max(3.0f, rim));
+        }
+    }
 
     // ---- under the dial: one line with the clock and, at its end, how high the player is ----
     const bool show_clock = s.clock && ov.time_of_day >= 0;
@@ -2210,6 +2226,10 @@ std::string window_info(HWND h) {
 bool g_pointer_mode = false;  // the pointer is out: FlameKit's window is open or Right Alt is held (UI thread)
 bool g_pointer_hold = false;  // Right Alt is held while the game's process is in front (UI thread)
 
+// A click for the Lua part, through FlameKit's window's ui_actions.txt (set when the window exists; 0.15.75, for the
+// minimap's waypoint clicks).
+std::function<void(const std::string&, const std::string&)> g_act;
+
 struct MinimapLayer : Layer {
     const char* name() const override { return "minimap"; }
     TextPainter text;
@@ -2221,6 +2241,13 @@ struct MinimapLayer : Layer {
     bool dragging = false, has_drag = false, dropped = false;
     POINT grab{}, drag_pos{};  // where in the picture it was grabbed; the picture's top left corner (client coordinates)
     int pad = 0, dial_w = 0, dial_h = 0;
+    // (0.15.75, owner) A click on a map marker with the pointer out sets the waypoint there; on the marker that is the
+    // waypoint already, it clears it. What the last picture showed, to find the marker under the pointer.
+    std::vector<Marker> last_markers;
+    float last_x = 0, last_z = 0, last_range = 1;
+    bool last_square = false;
+    POINT down_at{};
+    bool pressed = false;
     // timing, for the log at full
     uint64_t draws = 0, draw_us = 0, draw_max_us = 0, timing_at = 0;
 
@@ -2295,7 +2322,12 @@ struct MinimapLayer : Layer {
         QueryPerformanceCounter(&t0);
         text.ready(g_screen, letter_px(s, s.size));
         const float more = s.big_text ? 1.0f : std::max(1.0f, static_cast<float>(s.size) / 300.0f);
-        draw_dial(canvas, map, g_x.load(), g_z.load(), kRanges[s.zoom] * more, g_heading.load(), over, s, text, icons);
+        last_x = g_x.load();
+        last_z = g_z.load();
+        last_range = kRanges[s.zoom] * more;
+        last_square = s.square;
+        last_markers = over.markers;
+        draw_dial(canvas, map, last_x, last_z, last_range, g_heading.load(), over, s, text, icons);
         QueryPerformanceCounter(&t1);
         QueryPerformanceFrequency(&freq);
         const uint64_t us = static_cast<uint64_t>((t1.QuadPart - t0.QuadPart) * 1000000 / freq.QuadPart);
@@ -2341,16 +2373,65 @@ struct MinimapLayer : Layer {
     }
 
     bool wants_mouse() const override { return g_pointer_mode && visible; }
+    // Pressed and let go on the same spot: a click (a marker's waypoint). Moved more than a few pixels: a drag.
     void mouse(UINT msg, int x, int y) override {
         if (msg == WM_LBUTTONDOWN) {
             grab = {x, y};
-            drag_pos = {rect.left, rect.top};
-            dragging = has_drag = true;
-        } else if (msg == WM_MOUSEMOVE && dragging) {
-            drag_pos = {rect.left + x - grab.x, rect.top + y - grab.y};
-        } else if (msg == WM_LBUTTONUP && dragging) {
-            dragging = false;
-            dropped = true;
+            down_at = {x, y};
+            pressed = true;
+        } else if (msg == WM_MOUSEMOVE && pressed) {
+            if (!dragging && (std::abs(x - down_at.x) > 4 || std::abs(y - down_at.y) > 4)) {
+                drag_pos = {rect.left, rect.top};
+                dragging = has_drag = true;
+            }
+            if (dragging) drag_pos = {rect.left + x - grab.x, rect.top + y - grab.y};
+        } else if (msg == WM_LBUTTONUP && pressed) {
+            pressed = false;
+            if (dragging) {
+                dragging = false;
+                dropped = true;
+            } else {
+                click(x - pad, y);
+            }
+        }
+    }
+    // The marker nearest the click within 14 pixels: its place goes to the Lua part as the waypoint ("wp x z", metres),
+    // or "wp clear" when it is the waypoint already (within 3 m). The server writes the player's PlayerWaypoint.
+    void click(int cx, int cy) {
+        const int n = dial_w;
+        if (cx < 0 || cy < 0 || cx >= n || cy >= n || !g_act) return;
+        const float mid = static_cast<float>(n) * 0.5f, R = mid - 2.0f, rim = std::max(3.0f, static_cast<float>(n) * 0.022f);
+        const float mpp = last_range / (R - rim);
+        const Marker* best = nullptr;
+        float best_d = 14.0f;
+        for (const Marker& k : last_markers) {
+            const float sx = mid + (k.x - last_x) / mpp, sy = mid - (k.z - last_z) / mpp;
+            const float d = std::hypot(sx - static_cast<float>(cx), sy - static_cast<float>(cy));
+            if (d < best_d) {
+                best_d = d;
+                best = &k;
+            }
+        }
+        if (!best) {
+            FK_LOG(fklog::kDebug, "minimap: click at %d,%d: no marker there", cx, cy);
+            return;
+        }
+        bool is_wp = false;
+        float wx = 0, wz = 0;
+        {
+            std::lock_guard<std::mutex> l(g_shared.lock);
+            is_wp = g_shared.waypoint && std::hypot(g_shared.wx - best->x, g_shared.wz - best->z) < 3.0f;
+            wx = g_shared.wx;
+            wz = g_shared.wz;
+        }
+        if (is_wp) {
+            FK_LOG(fklog::kInfo, "minimap: click on the waypoint's marker (%.0f %.0f): waypoint cleared", wx, wz);
+            g_act("wp", "clear");
+        } else {
+            char arg[64];
+            snprintf(arg, sizeof arg, "%.1f,%.1f", best->x, best->z);
+            FK_LOG(fklog::kInfo, "minimap: click on a marker (kind %d) at %.0f %.0f: waypoint set there", best->kind, best->x, best->z);
+            g_act("wp", arg);
         }
     }
 };
@@ -5397,6 +5478,7 @@ void ui_thread_body() {
     NoticeLayer notices;
     ExperimentalLayer experimental;
     experimental.window = &window;
+    g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
     g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
