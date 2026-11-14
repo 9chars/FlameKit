@@ -590,7 +590,9 @@ local function handle(world, account, entity, msg)
           local name = require("core.players").name(world, entity, "a player")  -- the character name first, as everywhere
           local line = string.format("%s for %s %s.", s[4], name, msg.on == true and "ENABLED" or "DISABLED")
           local colour = nil
-          if s[1] == "pvp" and msg.on == true then line, colour = name .. " joined PvP!", "#ff9632" end  -- (0.15.121, owner)
+          if s[1] == "pvp" then  -- (0.15.121, 0.15.122, owner) both in orange
+            line, colour = name .. (msg.on == true and " joined PvP!" or " has left PvP."), "#ff9632"
+          end
           -- (0.15.76, owner) to the Messages window of everyone with FlameKit (features/chat.lua), no longer the game's chat
           local sent, why = pcall(require("features.chat").announce, world, line, colour)
           if not sent then emf.log("experimental: the announcement was not sent (" .. tostring(why) .. ")") end

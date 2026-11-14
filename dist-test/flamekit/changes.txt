@@ -1,3 +1,6 @@
+0.15.122 Nov 14, 2026
+- PvP: switching it off now says "<name> has left PvP." in orange, to match "<name> joined PvP!".
+
 0.15.121 Nov 14, 2026
 - PvP: when a player switches PvP on, everyone's Messages window says "<name> joined PvP!" in orange.
 

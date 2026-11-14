@@ -737,7 +737,7 @@ click(find_row("PvP", "sw:pvp").button)
 step(3)
 check(comps.Faction[PLAYER].faction == 7 and rule_count() == 0 and not find_row("PvP", "sw:pvp").selected,
   "PvP off: faction 7 again and no rule left")
-check(casts[#casts] == "PvP for a player DISABLED.", "everyone is told it is off")
+check(casts[#casts] == "a player has left PvP.", "everyone is told it is off: " .. tostring(casts[#casts]))
 casts[#casts], casts[#casts - 1] = nil, nil  -- the glider test below counts the shroud lines only
 do  -- (0.15.118, owner: no cheating in PvP) PvP holds every other option off, except the glider; they come back after
   local casts_before = #casts
