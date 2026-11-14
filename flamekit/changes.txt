@@ -1,3 +1,8 @@
+0.15.70 Nov 14, 2026
+- PvP duelist (Experimental, Debug section): pick what it is (Vukah Warrior, Vukah Brawler mini-boss, Skeleton, Wolf, Boar, Sabretooth, Hound) and its level (buttons -10, -1, +1, +10, or 1, 25, 50; up to 255), then spawn it. The game sets its health and damage from the level: level 50 is about 6700 health, level 75 about 20800 and beat a level 50 player.
+- Server console: "flamekit.duelist <player> [level] [kind]" does the same.
+- The log says whether a test body was killed or removed by the game.
+
 0.15.69 Nov 14, 2026
 - PvP: with several PvP players near a monster, every one of them is now in its threat table, and the game itself chooses whom it fights (by aggro: who hits it, how hard, how close), the same way it does with normal players. Before, one of them was picked at random and forced as its target.
 - Server console: "flamekit.pvptest <player>" and "flamekit.pvptest off" try PvP against a duelist without a second player (the player cannot die meanwhile).

@@ -248,6 +248,23 @@ end
 -- player clicks Remove or leaves, when it dies, or when the world reloads.
 local DUMMY_GUID = "9543cfb0-b4d7-408e-905c-ccb79a15136d"  -- FakePlayer_Vukah_Melee
 local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
+-- What a duelist can be (0.15.70, owner: pick it from a list). Game templates that EMF's own mods spawn and that fight
+-- when spawned away from their camp: raids/champion (Vukah, the brawler mini-boss), necromancer (skeleton),
+-- beastmaster (the four beasts). Key, the name on the button, the template GUID.
+local DUELISTS = {
+  { "vukah", "Vukah Warrior", DUEL_GUID },
+  { "brawler", "Vukah Brawler (mini-boss)", "9c8e2008-7259-4114-b6fc-615f0f181c04" },
+  { "skeleton", "Skeleton", "b3e66f3b-7b13-4fa0-a68c-d2a41d8c84d9" },
+  { "wolf", "Wolf", "478381c5-585f-4264-b373-dbb1ea596eca" },
+  { "boar", "Boar", "255fd8d9-4447-445d-8ffc-4d9dc0afdd16" },
+  { "sabretooth", "Sabretooth", "50b96064-3ffc-47a2-8c7d-1d592a3c459c" },
+  { "hound", "Hound", "87575915-bc75-4611-ab71-0cd4e79535b1" },
+}
+local function duelist(key)
+  for _, d in ipairs(DUELISTS) do if d[1] == key then return d end end
+  return DUELISTS[1]
+end
+local MAX_LEVEL = 255
 local DUEL_FACTION = 1                                      -- HitAll
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
@@ -315,7 +332,21 @@ local function shield(world, id, b)
 end
 
 -- Returns nil, or why there is no body now.
-local function spawn_body(world, account, player, kind)
+-- A body's level (console only: flamekit.duelist <player> <level>). EMF re_companion_orders.md: writing
+-- Level.dataStorage and DynamicEnemyScaling.nextUpdateTime = 0 makes the game's next scaling update use it (level 10:
+-- health 119 -> 417, hits 48 -> 156). Levels above the world's range were never tried.
+local function set_level(world, id, level)
+  local lv = world:get("Level", id)
+  if not lv then return false end
+  lv.dataStorage[1] = level
+  local sc = world:get("DynamicEnemyScaling", id)
+  if sc then
+    if type(sc.nextUpdateTime) == "table" then sc.nextUpdateTime.value = 0 else sc.nextUpdateTime = 0 end
+  end
+  return true
+end
+
+local function spawn_body(world, account, player, kind, level, what)
   drop_bodies_of(world, account, true)
   if kind ~= "dummy" and kind ~= "duel" then return nil end
   local x, y, z = where(world, player)
@@ -327,17 +358,25 @@ local function spawn_body(world, account, player, kind)
     local len = math.sqrt(ax * ax + az * az)
     if len > 0.01 then fx, fz = ax / len, az / len end
   end)
-  local ok, id = pcall(emf.spawn, world, kind == "duel" and DUEL_GUID or DUMMY_GUID, x + fx * 3, y, z + fz * 3)
+  local d = duelist(what)
+  local ok, id = pcall(emf.spawn, world, kind == "duel" and d[3] or DUMMY_GUID, x + fx * 3, y, z + fz * 3)
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
-  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {} }
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = kind == "duel" and d[2] or nil }
   bodies[id] = b
+  if level then
+    local okl, set = pcall(set_level, world, id, level)
+    b.level = level
+    emf.log(string.format("experimental: the PvP test %s (entity %s) set to level %d: %s", kind, tostring(id), level,
+      okl and (set and "done" or "it has no Level") or tostring(set)))
+  end
   if kind == "duel" then
     pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
     local okr, r = pcall(emf.hit_rule, { from = id, to = "objects", cancel = true })
     if okr and r then b.rules.objects = r else emf.log("experimental: the duelist's rule for buildings was refused (" .. tostring(r) .. ")") end
     shield(world, id, b)
   end
-  emf.log(string.format("experimental: a PvP test %s (entity %s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id), tostring(player)))
+  emf.log(string.format("experimental: a PvP test %s (entity %s%s%s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id),
+    b.what and (", " .. b.what) or "", level and (", level " .. level) or "", tostring(player)))
 end
 
 local function bodies_tick(world)
@@ -350,14 +389,16 @@ local function bodies_tick(world)
     if b.session == session then
       pcall(function()
         local hp = world:get("NetworkHealth", id)
-        alive = world:position(id) ~= nil and (hp == nil or hp.health > 0)
+        local placed = world:position(id) ~= nil
+        alive = placed and (hp == nil or hp.health > 0)
+        b.why = not placed and "no longer in the world (removed by the game)" or (hp and hp.health <= 0 and "killed") or nil
       end)
     end
     -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a
     -- far place may not be streamed in yet.) So a body counts as gone only when it was missing three checks in a row.
     if not alive then b.missing = (b.missing or 0) + 1 else b.missing = 0 end
     if not alive and b.missing >= 3 and b.session == session then
-      emf.log(string.format("experimental: the PvP test %s (entity %s) is gone", b.kind, tostring(id)))
+      emf.log(string.format("experimental: the PvP test %s (entity %s) is gone: %s", b.kind, tostring(id), b.why or "?"))
       drop_body(world, id, false)
     elseif not alive and b.session ~= session then
       drop_body(world, id, false)
@@ -371,6 +412,15 @@ local function bodies_tick(world)
         local t = st and st.targets[1].targetEntityId
         if type(t) == "table" then t = t.id end
         local line = string.format("AI state %s, target %s", ai and tostring(ai.state) or "-", tostring(t))
+        if b.level and not b.health_said then
+          local hp = world:get("NetworkHealth", id)
+          local lv = world:get("NetworkLevel", id)
+          if hp and hp.healthMax and hp.healthMax > 0 then
+            b.health_said = true
+            emf.log(string.format("experimental: the PvP test %s (entity %s): health %s / %s, level %s", b.kind, tostring(id),
+              tostring(hp.health), tostring(hp.healthMax), lv and tostring(lv.level or lv.value or "?") or "?"))
+          end
+        end
         if line ~= b.last then  -- logged when the state or target changes, with the threat table at that moment
           b.last = line
           local okl, al = pcall(F._aggro_line, world, id)
@@ -421,7 +471,10 @@ local function handle(world, account, entity, msg)
     return v
   end
   if msg.op == "body" then
-    local ok, why = pcall(spawn_body, world, account, entity, msg.kind)
+    local level = tonumber(msg.level)
+    if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
+    local what = type(msg.what) == "string" and msg.what or nil
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what)
     if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
     local v = view(account)
     v.note = not ok and "That did not work on this game version." or why
@@ -901,6 +954,7 @@ local ASK_STEPS = 300   -- say hello every 5 seconds: the server keeps your rule
 local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
+local duel_what, duel_level = "vukah", 1  -- the Debug section's duelist choice, this session (0.15.70)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
 -- The game's number for a map marker type: FNV-1a over the type's GUID, as the game keeps it in memory or as written.
@@ -1072,10 +1126,27 @@ local function panel_rows(world)
   rows[#rows + 1] = { text = "PvP test bodies, 3 m in front of you (one at a time, gone after a reload):" }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn PvP dummy", selected = v.body == "dummy",
     tooltip = "A player-like body (faction Player). With PvP on it swings at you but does no damage: hit it to see whether your weapons hurt a player." }
-  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn PvP duelist", same_line = true, selected = v.body == "duel",
-    tooltip = "A Vukah fighter that attacks everyone with full damage, PvP on or off. It never hurts animals, pets or buildings; villagers are fair game. Spawn it away from your base." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test body." }
+  rows[#rows + 1] = { text = "Duelist: it attacks everyone with full damage, PvP on or off. It never hurts animals, pets or "
+    .. "buildings; villagers are fair game. Spawn it away from your base." }
+  for i, d in ipairs(DUELISTS) do
+    rows[#rows + 1] = { button = "dbg:what:" .. d[1], text = d[2], selected = duel_what == d[1], same_line = i > 1,
+      tooltip = "The duelist is a " .. d[2] .. "." }
+  end
+  local lvl_tip = duel_level > 50 and "Above the game's level 50 it gets very strong: a level 75 one beat a level 50 player."
+    or "Its level: the game sets its health and damage from it (level 50: about 6700 health)."
+  rows[#rows + 1] = { text = "Level " .. duel_level .. (duel_level > 50 and "  (beyond the game's levels)" or ""),
+    color = duel_level > 50 and "#ff8060" or nil, tooltip = lvl_tip }
+  for i, step in ipairs({ -10, -1, 1, 10 }) do
+    rows[#rows + 1] = { button = "dbg:lvl:" .. step, text = (step > 0 and "+" or "") .. step, same_line = i > 1,
+      disabled = (step < 0 and duel_level <= 1) or (step > 0 and duel_level >= MAX_LEVEL), tooltip = lvl_tip }
+  end
+  for _, q in ipairs({ 1, 25, 50 }) do
+    rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q }
+  end
+  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn " .. duelist(duel_what)[2] .. " (level " .. duel_level .. ")",
+    selected = v.body == "duel", tooltip = "Replaces your test body." }
   return rows
 end
 
@@ -1085,14 +1156,21 @@ end
 
 function F.click(world, key)
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
+  local what = key:match("^dbg:what:(%a+)$")
+  if what then duel_what = duelist(what)[1] return end
+  local step = key:match("^dbg:lvl:(%-?%d+)$")
+  if step then duel_level = math.max(1, math.min(MAX_LEVEL, duel_level + tonumber(step))) return end
+  local set = key:match("^dbg:lvlset:(%d+)$")
+  if set then duel_level = math.max(1, math.min(MAX_LEVEL, tonumber(set))) return end
   local kind = key:match("^dbg:body:(%a+)$")
   if kind then
     note = nil
+    local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or nil, level = kind == "duel" and duel_level or nil }
     if hosting(world) then
       local account, player = me(world)
-      if account then note = handle(world, account, player, { op = "body", kind = kind }).note end
+      if account then note = handle(world, account, player, msg).note end
     else
-      ask({ op = "body", kind = kind })
+      ask(msg)
     end
     return
   end
@@ -1147,6 +1225,16 @@ function F.setup(k)
   -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;
   -- "flamekit.pvptest off" takes all of it back. The duelist's AI lines in the log tell whether it fights.
   local test = nil  -- { account, player, rule }
+  pcall(emf.command, "duelist", "<player entity> [level 1-255] [vukah|brawler|skeleton|wolf|boar|sabretooth|hound]: a duelist 3 m in front of that player (PvP on or off, it fights)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      local player, level = tonumber(args[1]), tonumber(args[2])
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("duelist: no player with entity " .. tostring(args[1])) return end
+      if level then level = math.max(1, math.min(255, math.floor(level))) end
+      local why = spawn_body(world, tostring(account), player, "duel", level, args[3])
+      emf.reply("duelist: " .. (why or "spawned"))
+    end, "the duelist command"))
   pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end

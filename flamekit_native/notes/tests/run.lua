@@ -682,14 +682,32 @@ local real_position = SW.position
 local function near(self, id) if id == 951 or id == 900 or id == 901 then return 1, 0, 3 end return real_position(self, id) end
 SW.position = near
 local rb = rule_count()
-click(find_row("Spawn PvP duelist").button)
+click(find_row("Spawn Vukah Warrior").button)
 step(40)
 check(#spawned == 1 and spawned[1].guid == "d5d05217-52dc-467a-9192-26b4f661d8d9" and spawned[1].z == 3, "the duelist is spawned 3 m in front of the player")
 check(comps.Faction[951].faction == 1, "and given faction 1 (HitAll)")
-check(rule_count() == rb + 2 and find_row("Spawn PvP duelist").selected, "one rule keeps it off buildings, one off the animal next to it")
+check(rule_count() == rb + 2 and find_row("Spawn Vukah Warrior").selected, "one rule keeps it off buildings, one off the animal next to it")
 click(find_row("Remove").button)
 step(40)
-check(destroyed[1] == 951 and rule_count() == rb and not find_row("Spawn PvP duelist").selected, "Remove: the duelist and its rules are gone")
+check(destroyed[1] == 951 and rule_count() == rb and not find_row("Spawn Vukah Warrior").selected, "Remove: the duelist and its rules are gone")
+-- the duelist's kind and level (0.15.70): picked in the tab, sent with the spawn
+comps.Level = { [952] = { dataStorage = { 1, 0 } } }
+comps.DynamicEnemyScaling = { [952] = { nextUpdateTime = { value = 99 } } }
+comps.NetworkHealth[952] = { health = 100 }
+comps.Faction[952] = { faction = 6 }
+click(find_row("^Wolf$").button)
+step(12)
+click(find_row("^%+10$").button)
+step(12)
+click(find_row("^%+1$").button)
+step(12)
+check(find_row("Level 12") ~= nil and find_row("Spawn Wolf %(level 12%)") ~= nil, "the tab shows the picked duelist and level")
+click(find_row("Spawn Wolf").button)
+step(40)
+check(#spawned == 2 and spawned[2].guid == "478381c5-585f-4264-b373-dbb1ea596eca", "the duelist is the picked creature")
+check(comps.Level[952].dataStorage[1] == 12 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
+click(find_row("Remove").button)
+step(40)
 SW.position = real_position
 comps.Faction[900] = nil
 comps.Faction[PLAYER].faction = 1  -- left over from a crash: PvP is off, the faction is not
