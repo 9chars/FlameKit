@@ -1,3 +1,6 @@
+0.15.121 Nov 14, 2026
+- PvP: when a player switches PvP on, everyone's Messages window says "<name> joined PvP!" in orange.
+
 0.15.120 Nov 14, 2026
 - PvP: the test monster drop-downs and the duelist's level buttons are greyed out too while your PvP is on.
 

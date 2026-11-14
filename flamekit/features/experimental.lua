@@ -589,8 +589,10 @@ local function handle(world, account, entity, msg)
         if s[4] then  -- everyone on the server is told (not for the glider: it changes nothing for others)
           local name = require("core.players").name(world, entity, "a player")  -- the character name first, as everywhere
           local line = string.format("%s for %s %s.", s[4], name, msg.on == true and "ENABLED" or "DISABLED")
+          local colour = nil
+          if s[1] == "pvp" and msg.on == true then line, colour = name .. " joined PvP!", "#ff9632" end  -- (0.15.121, owner)
           -- (0.15.76, owner) to the Messages window of everyone with FlameKit (features/chat.lua), no longer the game's chat
-          local sent, why = pcall(require("features.chat").announce, world, line)
+          local sent, why = pcall(require("features.chat").announce, world, line, colour)
           if not sent then emf.log("experimental: the announcement was not sent (" .. tostring(why) .. ")") end
         end
         save_all()

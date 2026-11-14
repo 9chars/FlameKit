@@ -393,7 +393,7 @@ do  -- (0.15.76) FlameKit's announcements go to the Messages window (features/ch
   -- `casts` now collects them there, and emf.broadcast must not be used any more
   local chat = require("features.chat")
   local real = chat.announce
-  chat.announce = function(w, t) casts[#casts + 1] = t; return real(w, t) end
+  chat.announce = function(w, t, k) casts[#casts + 1] = t; return real(w, t, k) end
   local real_broadcast = emf.broadcast
   emf.broadcast = function(...) broadcasts = broadcasts + 1; return real_broadcast(...) end
 end
@@ -685,7 +685,13 @@ step(3)
 r = select(2, next(hit_rules)) or {}
 check(find_row("PvP", "sw:pvp").selected == true and comps.Faction[PLAYER].faction == 1, "PvP on: the player has faction 1 (HitAll)")
 check(rule_count() == 1 and r.from == "players" and r.to == "players" and r.scale == 0.25, "and one rule scales player-on-player hits to 25%")
-check(casts[#casts] == "PvP for a player ENABLED.", "everyone is told: " .. tostring(casts[#casts]))
+check(casts[#casts] == "a player joined PvP!", "everyone is told: " .. tostring(casts[#casts]))
+do  -- (0.15.121, owner) in orange in the Messages window
+  local mf = io.open(TMP .. "\\ui_messages.dat", "r")
+  local mt = mf and mf:read("a") or ""
+  if mf then mf:close() end
+  check(JOINED or mt:find("ff9632 a player joined PvP!", 1, true) ~= nil, "the PvP line is orange in Messages")
+end
 if not JOINED then  -- (0.15.109) the party list says who has PvP on (host: the list is written right here)
   step(35)
   local pf = io.open(TMP .. "\\ui_party.dat", "r")

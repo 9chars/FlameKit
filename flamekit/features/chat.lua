@@ -5,7 +5,7 @@
 --    only: the game still shows it in its own chat) and sends it over the channel flamekit/chat. A player's own game
 --    is told by EMF's mod messages; the host's own game gets it directly. Each line has the player's colour, the same as
 --    in the Party window (0.15.82).
--- 2. FlameKit's own announcements (for example "PvP for Ninechars ENABLED."): no longer chat lines, only the Messages
+-- 2. FlameKit's own announcements (for example "Ninechars joined PvP!", in orange): no longer chat lines, only the Messages
 --    window of every player with FlameKit (F.announce). Players without FlameKit do not see them.
 -- The Notices window is not touched here.
 
@@ -22,6 +22,7 @@ local kit
 local function show(msg)
   if type(msg) ~= "table" or type(msg.t) ~= "string" or msg.t == "" then return end
   local colour = msg.c == "a" and ANNOUNCE_COLOUR or CHAT_COLOUR
+  if msg.c == "a" and type(msg.k) == "string" and msg.k:match("^#%x%x%x%x%x%x$") then colour = msg.k end  -- (0.15.121) its own colour
   local who = msg.c ~= "a" and type(msg.n) == "string" and msg.n ~= "" and msg.n or nil
   kit.note(msg.t:sub(1, 400), colour, true, who)
 end
@@ -50,9 +51,10 @@ local function name_of(world, entity)
 end
 
 -- An announcement from FlameKit to everyone with FlameKit (server world): see the top.
-function F.announce(world, text)
+-- `colour` ("#rrggbb", optional): the line's own colour instead of the announcements' yellow (0.15.121).
+function F.announce(world, text, colour)
   emf.log("announcement: " .. tostring(text))
-  to_all(world, { t = tostring(text), c = "a" })
+  to_all(world, { t = tostring(text), c = "a", k = colour })
 end
 
 function F.setup(k)
