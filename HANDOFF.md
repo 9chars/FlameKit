@@ -122,6 +122,10 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
 
+## Restart button (owner, 2026-11-14)
+
+When a restart is due, offer it as a button (AskUserQuestion: "Restart client" / "Not now", or server/both as fits) instead of asking the owner to type "restart".
+
 ## To do (owner's list)
 
 1. **#2 Release update test** (owner: tomorrow): test the main release path to players, the `dist` channel. Start from the old FlameKit release players have now, then update the server and the players' clients to a new release version, and check that each side ends up on it. Also install FlameKit from nothing the way a new player would. Not before the owner says so (rule 8). Players now have 0.14.2 (`release\FlameKit-0.14.2`), which has no updater (its DLL is `flamekit_map.dll`): the owner updates them by hand tomorrow, after that the updater keeps them current. The new install must remove the old `flamekit_map` folder (else two overlays and two minimaps). A 0.14.2 player on a new server keeps the junk list, experimental and far players (same channels lf/exp/map at version 1, same messages, same saved list format) and gets nothing on the new channels; FlameKit has no `side: both`, so EMF's mod check never kicks over the version.
