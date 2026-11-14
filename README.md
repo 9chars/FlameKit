@@ -66,8 +66,6 @@ FlameKit needs EMF (the Enshrouded Modding Framework) 0.6.6 with its Lua host. E
 
 In your game, put the folders `flamekit` and `flamekit_native` into `Enshrouded\emf\mods\`. On a dedicated server, put only `flamekit` into the server's `emf\mods\`. Both need the same FlameKit version for every feature to work; your game updates itself, the server is updated by its owner.
 
-Coming from FlameKit 0.14 or older: delete the old `emf\mods\flamekit_map` folder; its minimap is now part of FlameKit.
-
 ## Your data
 
 Nothing from the game is in this repository: item icons and item details are read on your own PC from your own game files, and FlameKit never changes the game's files. FlameKit's log (`emf\mods\flamekit\logs\`) leaves out account ids, so it is safe to share with a bug report.
