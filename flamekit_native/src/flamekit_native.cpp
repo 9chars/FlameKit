@@ -489,7 +489,11 @@ std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
 // (0.15.100, owner) "Check for updates" clicked: until then (GetTickCount64), an update that is ready shows the update
 // dialog again, even when it was shown for that version already
 std::atomic<uint64_t> g_update_ask_until{0};
-std::atomic<bool> g_about_request{false};  // (0.15.103) the What's New tab's About button: AboutDialog opens
+std::atomic<bool> g_about_request{false};
+// (0.15.114, owner) a new update downloaded: a short green notice in the Notices window (UpdateDialog sets it, NoticeLayer
+// shows it until g_update_note_until; UI thread only)
+std::wstring g_update_note;
+uint64_t g_update_note_until = 0;  // (0.15.103) the What's New tab's About button: AboutDialog opens
 
 // A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
 std::wstring key_label(uint32_t vk) {
@@ -2670,6 +2674,7 @@ struct PinnedLayer : Layer {
     virtual void content_click(int x, int y) {}                 // a click on the content (y from the content's top)
     virtual bool content_hover(int x, int y) { return false; }  // the pointer over the content (-1, -1: gone); true: draw again
     virtual uint32_t hotkey() const { return 0; }                // the key that shows and hides it, for its title (0: none)
+    virtual bool press(int x, int y) { return false; }           // a headless window's own button under a press (true: taken)
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -2838,6 +2843,8 @@ struct PinnedLayer : Layer {
         } else if (!e.collapsed && x >= canvas.w - kGrip && y >= canvas.h - kGrip) {
             drag = kSize;
             grab = {canvas.w - x, canvas.h - y};
+        } else if (headless && !e.collapsed && press(x, y)) {
+            // (0.15.114) a headless window's own button (the Notices window's x): not a drag
         } else if (y < kHead || headless) {
             drag = kMove;
             grab = {x, y};
@@ -3513,22 +3520,30 @@ struct BoardLayer : PinnedLayer {
 
 std::string version_in(const std::wstring& mod_json);  // (the monitor's, further down)
 
-// ---- the Notices window (since 0.15.54): warnings that stay on screen until FlameKit takes them back ----
+// ---- the Notices window (since 0.15.54): warnings and short news ----
 // From the Lua part (kit.notice in core/kit.lua) in emf\mods\flamekit\ui_notices.dat: "n <tag> <rrggbb> <text>" lines,
-// then "end". Unlike Messages, nothing scrolls a notice away: it stays until the feature that set it takes it back
-// (the owner, 0.15.53: the Auto-Collect warning got lost among the messages). No title bar: in pointer mode it is
-// dragged anywhere and sized at its lower right corner; its place is kept in ui_layout.txt as "notices". Shown only
-// while there is a notice, hidden in the game's menus like the party window.
+// then "end". A warning stays until the feature that set it takes it back (the owner, 0.15.53: the Auto-Collect warning
+// got lost among the messages); short news (0.15.114: the server's state, an older server) goes by itself after 10 s
+// (the Lua part takes it back). This DLL adds its own short news: a new update downloaded (green, 10 s, from
+// UpdateDialog). With the pointer out each notice has an x that closes it (0.15.114, owner): it stays closed while the
+// same notice is up; a notice that comes back later shows again. No title bar: in pointer mode it is dragged anywhere
+// and sized at its lower right corner; its place is kept in ui_layout.txt as "notices". Shown only while there is a
+// notice, hidden in the game's menus.
 struct NoticeLayer : PinnedLayer {
     struct Note {
         std::string tag;
         uint8_t r = 255, g = 90, b = 80;
         std::wstring text;
+        std::wstring key() const { return widen(tag) + L"\x1f" + text; }
     };
-    std::vector<Note> notes;
+    std::vector<Note> from_file;  // what ui_notices.dat says
+    std::vector<Note> notes;      // what is shown: the file's and this DLL's own, less the closed ones
+    std::unordered_set<std::wstring> closed;  // closed with their x (Note::key)
     std::vector<std::pair<size_t, std::wstring>> lines;  // (note index, a wrapped line)
+    std::vector<std::pair<RECT, size_t>> closers;         // each shown note's x (canvas coordinates)
     uint64_t stamp = 0, next_read = 0;
-    static constexpr int kLine = 21, kBar = 4;
+    bool update_shown = false, was_pointer_out = false;
+    static constexpr int kLine = 21, kBar = 4, kX = 16;
 
     NoticeLayer() : PinnedLayer("notices", L"Notices", 420) {
         headless = true;
@@ -3540,9 +3555,28 @@ struct NoticeLayer : PinnedLayer {
 
     bool active(const Frame& f) override { return f.in_world && !notes.empty() && !(hide_in_menus && f.in_menu); }
 
-    bool refresh(const Frame& f) override {
-        if (f.now < next_read) return false;
-        next_read = f.now + 250;
+    void rebuild(uint64_t now) {
+        std::vector<Note> list;
+        for (const Note& n : from_file)
+            if (!closed.count(n.key())) list.push_back(n);
+        if (now < g_update_note_until && !g_update_note.empty()) {
+            Note u;
+            u.tag = "update";
+            u.r = 90, u.g = 220, u.b = 110;  // green
+            u.text = g_update_note;
+            if (!closed.count(u.key())) list.push_back(std::move(u));
+        }
+        // a closed notice that is no longer up may show again if it comes back
+        for (auto it = closed.begin(); it != closed.end();) {
+            bool up = false;
+            for (const Note& n : from_file) up = up || n.key() == *it;
+            if (now < g_update_note_until) up = up || (L"update\x1f" + g_update_note) == *it;
+            it = up ? std::next(it) : closed.erase(it);
+        }
+        notes = std::move(list);
+    }
+
+    bool read_file() {
         const std::wstring file = g_flamekit_dir + L"ui_notices.dat";
         const uint64_t st = file_stamp(file);
         if (st == stamp) return false;
@@ -3571,21 +3605,54 @@ struct NoticeLayer : PinnedLayer {
         }
         if (!complete) return false;  // half written: read again later
         stamp = st;
-        notes = std::move(list);
-        FK_LOG(fklog::kInfo, "notices: %d on screen", static_cast<int>(notes.size()));
+        from_file = std::move(list);
+        FK_LOG(fklog::kInfo, "notices: %d from the Lua part", static_cast<int>(from_file.size()));
         return true;
+    }
+
+    bool refresh(const Frame& f) override {
+        bool again = false;
+        const bool update_now = f.now < g_update_note_until;
+        if (update_now != update_shown) {  // this DLL's own update notice came or went
+            update_shown = update_now;
+            again = true;
+        }
+        if (was_pointer_out != g_pointer_mode) {  // the x buttons come and go with the pointer
+            was_pointer_out = g_pointer_mode;
+            again = true;
+        }
+        if (f.now >= next_read) {
+            next_read = f.now + 250;
+            if (read_file()) again = true;
+        }
+        if (again) rebuild(f.now);
+        return again;
+    }
+
+    bool press(int x, int y) override {
+        for (const auto& [r, i] : closers) {
+            if (x < r.left || y < r.top || x >= r.right || y >= r.bottom || i >= notes.size()) continue;
+            closed.insert(notes[i].key());
+            FK_LOG(fklog::kInfo, "notices: '%s' closed with its x", notes[i].tag.c_str());
+            rebuild(GetTickCount64());
+            dirty = true;
+            return true;
+        }
+        return false;
     }
 
     int content_height(int width) override {
         lines.clear();
+        const int room = width - 24 - kBar - (g_pointer_mode ? kX + 6 : 0);  // the x takes room only while it is there
         for (size_t i = 0; i < notes.size(); ++i) {  // each notice wrapped to the width, words kept whole
             if (notes[i].text.empty()) continue;
-            for (std::wstring& l : wrap_words(text, notes[i].text, width - 24 - kBar)) lines.push_back({i, std::move(l)});
+            for (std::wstring& l : wrap_words(text, notes[i].text, room)) lines.push_back({i, std::move(l)});
         }
         return static_cast<int>(lines.size()) * kLine + static_cast<int>(notes.empty() ? 0 : notes.size() - 1) * 8 + 4;
     }
 
     void draw_content(int top, int width) override {
+        closers.clear();
         int y = top;
         size_t last = static_cast<size_t>(-1);
         int from = y;
@@ -3600,6 +3667,12 @@ struct NoticeLayer : PinnedLayer {
                 }
                 last = l.first;
                 from = y;
+                if (g_pointer_mode) {  // its x, at the right of its first line
+                    const RECT r{width - kX - 6, y + 2, width - 6, y + 2 + kX};
+                    box(r.left, r.top, r.right, r.bottom, 60, 62, 72, 1.0f);
+                    little.draw(canvas, r.left + (kX - little.width(L"×")) / 2, r.top, L"×", 235, 235, 240);
+                    closers.push_back({r, l.first});
+                }
             }
             const Note& n = notes[l.first];
             text.draw(canvas, 14 + kBar, y, l.second, n.r, n.g, n.b);
@@ -5556,6 +5629,10 @@ struct UpdateDialog : Layer {
         for (v += 2; *v && *v != ' ' && *v != ':' && *v != '\r' && *v != '\n'; ++v) ver += *v;
         if (ver.empty() || (ver == announced && !asked)) return;
         if (asked) g_update_ask_until = 0;
+        if (ver != announced) {  // a new version (not Check for updates asking again): a short green notice too
+            g_update_note = L"FlameKit v" + widen(ver) + L" update downloaded!";
+            g_update_note_until = now + 10000;
+        }
         announced = ver;
         version = widen(ver);
         open = true;
@@ -5779,12 +5856,11 @@ void look_for_game_cursor() {
     FK_LOG(fklog::kInfo, "cursor: the game's pointer is used for FlameKit's windows (%ldx%ld, hot spot %lu,%lu)", w, h, ii.xHotspot, ii.yHotspot);
 }
 
-// ---- the corner lines ----
-// In a world, the lower left corner shows only the orange notice from the Lua part's ui_hud.dat (kit.lua: the server runs
-// an older FlameKit). Since 0.15.113 (owner: screen space; the update window tells about updates, the menu shows the
-// version) no version label, update line or debug line. On the game's main screen: "FlameKit vX" in the lower RIGHT
-// corner, unless the player switched show_label off (ui_hud.dat's label line is empty then). ui_hud.dat also carries
-// "build 1" (build mode: g_build_hide).
+// ---- the main screen's version line ----
+// In a world nothing at all (owner, 0.15.113/0.15.114: screen space; the server's state, an older server and a new
+// update are short notices in the Notices window). On the game's main screen: "FlameKit vX" in the lower RIGHT corner,
+// unless the player switched show_label off (the Lua part's ui_hud.dat: its label line is empty then). ui_hud.dat also
+// carries "build 1" (build mode: g_build_hide).
 struct HudLayer : Layer {
     const char* name() const override { return "lower left lines"; }
     struct Line {
@@ -5795,7 +5871,7 @@ struct HudLayer : Layer {
     TextPainter text;
     bool font = false;
     std::vector<Line> shown;
-    std::wstring label, notice;
+    std::wstring label;
     uint64_t next_read = 0;
     bool in_world = false, hud_file = false, drawn_in_world = false;  // hud_file: ui_hud.dat was there (its label line says whether the label is on)
     std::wstring version;                     // the Lua part's version, for the label before a world (0.15.88)
@@ -5813,7 +5889,7 @@ struct HudLayer : Layer {
             }
         }
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_hud.dat").c_str(), L"rb", _SH_DENYNO)) {
-            std::wstring new_label, new_notice;
+            std::wstring new_label;
             bool complete = false, build = false;
             char line[512];
             while (fgets(line, sizeof line, fp)) {
@@ -5826,8 +5902,6 @@ struct HudLayer : Layer {
                     build = true;
                 } else if (std::strncmp(line, "label ", 6) == 0) {
                     new_label = widen(line + 6);
-                } else if (std::strncmp(line, "notice ", 7) == 0) {
-                    new_notice = widen(line + 7);
                 }
             }
             fclose(fp);
@@ -5839,7 +5913,6 @@ struct HudLayer : Layer {
                     FK_LOG(fklog::kInfo, "build mode: FlameKit's windows %s", build ? "hidden" : "shown again");
                 }
                 label = new_label;
-                notice = new_notice;
             }
         }
     }
@@ -5854,8 +5927,6 @@ struct HudLayer : Layer {
             // the label off (ui_hud.dat from the last game). The version is the one running now.
             if (version.empty()) version = widen(version_in(g_flamekit_dir + L"mod.json"));
             if (!hud_file || !label.empty()) want.push_back({L"FlameKit v" + version, 235, 225, 205});  // (0.15.103, owner: no "Loaded")
-        } else if (!notice.empty()) {
-            want.push_back({notice, 255, 150, 50});  // orange: the server runs an older FlameKit
         }
         const bool vis = f.gw > 0 && f.gh > 0 && !want.empty();
         if (vis != visible) {

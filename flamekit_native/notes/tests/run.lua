@@ -1117,23 +1117,39 @@ do
   check(what == "changes", "after an update FlameKit's window is asked to open on the What's New tab")
 end
 check(require("core.items").is_keeper("_Material_TX_Trophy_Wolf_Heavy_head"), "a trophy is kept: not offered in the bag list")
--- the server's FlameKit version (features/server_version.lua): an older one gets an orange notice in a joined game
+-- the server's FlameKit version (features/server_version.lua) and the server's state (0.15.114): short notices
+-- (10 s) in the Notices window, never in the lower left corner
+local function notices_text()
+  local f = io.open(TMP .. "\\ui_notices.dat", "r")
+  local t = f and f:read("a") or ""
+  if f then f:close() end
+  return t
+end
 if JOINED then
   step(3700)
+  local real_session = emf.session
+  emf.session = function() return 2 end  -- a new game session: told again
+  step(2)
+  check(notices_text():find("n server ffffff FlameKit v9.9.9 connected to server!", 1, true) ~= nil,
+    "a joined game with FlameKit on the server: \"FlameKit v9.9.9 connected to server!\" in white")
+  emf.session = real_session
   check((ver_asks or 0) >= 1, "the player's game asks the server for its FlameKit version")
   channels.ver.on_player(CW, {}, "0.15.30")
   step(2)
-  local f = io.open(TMP .. "\\ui_hud.dat", "r")
-  local hud_text = f and f:read("a") or ""
-  if f then f:close() end
-  check(hud_text:find("notice This server runs FlameKit v0.15.30 (you: v9.9.9): some features are off", 1, true) ~= nil,
-    "an older FlameKit on the server gets the orange notice")
+  check(notices_text():find("n server_old ff9632 Server runs older FlameKit v0.15.30!", 1, true) ~= nil,
+    "an older FlameKit on the server: a short orange notice: " .. notices_text():gsub("\n", "|"))
+  local hf = io.open(TMP .. "\\ui_hud.dat", "r")
+  local hud_text = hf and hf:read("a") or ""
+  if hf then hf:close() end
+  check(not hud_text:find("notice", 1, true), "nothing for the lower left corner any more")
+  local real_time = os.time
+  os.time = function(...) return real_time(...) + 11 end
+  step(2)
+  os.time = real_time
+  check(not notices_text():find("server_old", 1, true), "after 10 s the notice is gone by itself")
   channels.ver.on_player(CW, {}, "9.9.9")
   step(2)
-  f = io.open(TMP .. "\\ui_hud.dat", "r")
-  hud_text = f and f:read("a") or ""
-  if f then f:close() end
-  check(not hud_text:find("notice", 1, true), "the same version: no notice")
+  check(not notices_text():find("server_old", 1, true), "the same version: no notice")
 end
 -- a world save on request from the restart helper (features/server_save.lua)
 do

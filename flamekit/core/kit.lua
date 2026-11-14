@@ -110,7 +110,9 @@ local notices = {}        -- tag -> { colour, text, order }
 local notice_order = 0
 local notices_dirty = true
 
-function kit.notice(tag, text, colour)
+-- (0.15.114, owner) `seconds`: the notice goes away by itself after that long (short news such as "connected to
+-- server"); without it, it stays until the feature takes it back. The player can also close any notice with its x.
+function kit.notice(tag, text, colour, seconds)
   if type(tag) ~= "string" or not tag:match("^[%w_%.]+$") then return end
   if text == nil then
     if notices[tag] then
@@ -122,10 +124,25 @@ function kit.notice(tag, text, colour)
   local c = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ff5a50"
   local t = (tostring(text):gsub("[%c]", " "))
   local had = notices[tag]
-  if had and had.text == t and had.colour == c then return end
+  local expires = tonumber(seconds) and os.time() + tonumber(seconds) or nil
+  if had and had.text == t and had.colour == c then
+    had.expires = expires
+    return
+  end
   if not had then notice_order = notice_order + 1 end
-  notices[tag] = { colour = c, text = t, order = had and had.order or notice_order }
+  notices[tag] = { colour = c, text = t, order = had and had.order or notice_order, expires = expires }
   notices_dirty = true
+end
+
+-- Short notices whose time is up go (each step of your own screen's world).
+local function expire_notices()
+  local now = os.time()
+  for tag, n in pairs(notices) do
+    if n.expires and now >= n.expires then
+      notices[tag] = nil
+      notices_dirty = true
+    end
+  end
 end
 
 local function write_notices()
@@ -207,8 +224,36 @@ local function in_build_mode(world)
   return on
 end
 
+-- (0.15.114, owner) The server's state as a short notice (10 s) instead of a line in the lower left corner: once per
+-- game session, in a game that joined a server. Connected at once when the server's FlameKit answers; "not supported"
+-- only after 20 s without an answer (a joining game needs a few seconds for it); an older FlameKit on the server once
+-- per version it reports.
+local NOTE_SECONDS = 10
+local conn = { session = nil, state = nil, steps = 0, older = nil }
+local function server_notices(world, connected)
+  local okS, session = pcall(emf.session)
+  if conn.session ~= session then conn = { session = session, state = nil, steps = 0, older = nil } end
+  conn.steps = conn.steps + 1
+  if kit.is_host() then return end  -- your own world: there is no server to tell about
+  if connected then
+    if conn.state ~= "yes" then
+      conn.state = "yes"
+      kit.notice("server", string.format("%s v%s connected to server!", kit.name, kit.version), "#ffffff", NOTE_SECONDS)
+    end
+    local note = kit.server_note and kit.server_note(world)
+    if note and note ~= conn.older then
+      conn.older = note
+      kit.notice("server_old", note, "#ff9632", NOTE_SECONDS)
+    end
+  elseif conn.state == nil and conn.steps >= 1200 then
+    conn.state = "no"
+    kit.notice("server", "FlameKit not supported by server!", "#ff9632", NOTE_SECONDS)
+  end
+end
+
 local function hud_tick(world)
   write_messages()
+  expire_notices()
   write_notices()
   local label = ""
   local connected = kit.connected(world)
@@ -216,10 +261,7 @@ local function hud_tick(world)
     label = string.format("%s v%s", kit.name, kit.version)
   end
   local lines = { "label " .. label }
-  if connected and kit.server_note then  -- the server runs an older FlameKit (features/server_version.lua)
-    local note = kit.server_note(world)
-    if note then lines[#lines + 1] = "notice " .. note end
-  end
+  server_notices(world, connected)
   if kit.setting("ui_hide_build", true) and in_build_mode(world) then lines[#lines + 1] = "build 1" end
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"

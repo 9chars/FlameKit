@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.113.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.114.
 
 ## What FlameKit is
 
@@ -187,10 +187,14 @@ equal kills+deaths share a rank. Kills announced via chat.announce. Console: fla
 0.15.96: Experimental window button "Show/Hide PvP Leaderboard [F5]" (label from ui_layout.txt's board line); a click
 writes ui_board_toggle.request, which BoardLayer deletes and toggles on (checked every 100 ms).
 
-## Corner lines (0.15.113)
-In a world the lower left corner shows only the orange older-server notice (owner: screen space; no version label,
-update line or debug line, and the unused "status" line is gone from HudLayer). show_label now only switches the main
-screen's version line.
+## Corner lines and short notices (0.15.113, 0.15.114)
+In a world nothing in the lower left corner (owner). kit.notice(tag, text, colour, seconds): `seconds` makes a short
+notice that goes by itself (kit.lua expire_notices). kit.lua server_notices: once per game session in a joined game,
+"FlameKit vX connected to server!" (white) when kit.connected, "FlameKit not supported by server!" (orange) after 20 s
+without, "Server runs older FlameKit vY!" (orange, server_version.lua) once per version, each 10 s. The DLL adds its
+own green "FlameKit vX update downloaded!" for 10 s (UpdateDialog sets g_update_note). NoticeLayer: an x per notice in
+pointer mode (PinnedLayer::press for headless windows), closed ones stay closed while the same notice is up.
+show_label only switches the main screen's version line.
 
 ## Main screen line (0.15.88 to 0.15.94)
 Outside a world HudLayer shows one line in the lower RIGHT corner, 1 px from the edges, on a dark box: "FlameKit v<running

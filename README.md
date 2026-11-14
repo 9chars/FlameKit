@@ -53,7 +53,7 @@ All keys can be changed in the FlameKit Menu (F4): F4 and the pointer key in the
 
 ### Messages and Notices
 - Messages: everything FlameKit has to say, and a copy of the players' chat, each player in their own colour (the same as in the Party window and on the minimap).
-- Notices: warnings that stay until they no longer apply.
+- Notices (top centre): warnings that stay until they no longer apply, and short news for a few seconds: connected to the server (or not supported by it), and a new update downloaded. Close any notice with its x.
 
 ### Updates
 - FlameKit updates itself from this repository. When a new version has downloaded, a window says so; "Restart Game" closes the game and starts it again with the new version. "Check for updates" on the What's New tab looks right away.

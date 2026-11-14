@@ -1,3 +1,8 @@
+0.15.114 Nov 14, 2026
+- Nothing in the lower left corner any more while you play.
+- Short notices instead, in the Notices window (top centre) for about 10 seconds: "FlameKit v0.15.114 connected to server!" (white) when you join a server with FlameKit, "FlameKit not supported by server!" (orange) when the server has no FlameKit, "Server runs older FlameKit v...!" (orange) when it is older, and "FlameKit v... update downloaded!" (green) when a new version arrives.
+- Every notice has an x to close it (hold the pointer key, Right Alt unless changed).
+
 0.15.113 Nov 14, 2026
 - The lower left corner no longer shows FlameKit's version, the update line or the debug level while you play (more room for windows: updates have their own window, and the FlameKit Menu shows the version). Only the orange warning that the server runs an older FlameKit is still shown there.
 - "Show FlameKit mod version" is now "Show the FlameKit version on the game's main screen": it switches the line in the lower right corner of the main screen.
