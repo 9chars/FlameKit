@@ -90,6 +90,6 @@ The native part contains zstd's decoder (`zstddeclib.c`, BSD licence) and bcdec 
 
 ## Thank You
 
-A heartfelt thank you to Keen Games, the studio behind Enshrouded. You built a world that is a joy to explore, to build in and to share with friends, and it is that world that made us want to add our own small touches to it. FlameKit exists because Enshrouded is so much fun to play. Thank you for making such an excellent game.
+A heartfelt thank you to Keen Games, the studio behind Enshrouded. You built a world that is a joy to explore, to build in and to share with friends, and it is that world that made us want to add our own small touches to it. FlameKit exists because Enshrouded is so much fun to play. Thank you for making such an excellent game. We look forward to your continued support and future content updates.
 
 https://www.keengames.com/about
