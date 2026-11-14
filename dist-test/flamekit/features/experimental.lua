@@ -1032,6 +1032,11 @@ local function marker_ids(guid)
 end
 F._marker_ids = marker_ids
 
+-- (0.15.109, owner) Has the player with this account PvP on right now? (where the world is hosted; for the party list)
+function F.pvp_of(account)
+  return account ~= nil and is_on(tostring(account), "pvp") == true
+end
+
 local SPIRES = { [2708501182] = true, [2561857117] = true }  -- an Ancient Spire, and one not yet unlocked
 F._spires = SPIRES
 

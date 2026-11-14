@@ -2815,6 +2815,7 @@ struct PartyLayer : PinnedLayer {
         std::string name;
         std::wstring where;    // the location line, made when the list is read
         std::vector<Buff> buffs;
+        bool pvp = false;      // PvP on (0.15.109): a red "PvP" tag on the name line, for everyone to see
     };
     std::vector<Member> members;
     bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
@@ -2940,6 +2941,10 @@ struct PartyLayer : PinnedLayer {
                     bf.name = widen(line + 2 + used);
                     list.back().buffs.push_back(std::move(bf));
                 }
+                continue;
+            }
+            if (std::strcmp(line, "v\tpvp") == 0) {  // the player above has PvP on (0.15.109)
+                if (!list.empty()) list.back().pvp = true;
                 continue;
             }
             if (line[0] != 'p' || line[1] != '\t') continue;
@@ -3124,6 +3129,13 @@ struct PartyLayer : PinnedLayer {
                 right -= text.width(lv);
                 text.draw(canvas, right, ny, lv, 200, 200, 210);
                 right -= 10;
+            }
+            if (m.pvp) {  // (0.15.109, owner) PvP on: a red tag before the level, everyone sees who can be fought
+                static const std::wstring kPvp = L"PvP";
+                const int tw = text.width(kPvp) + 10;
+                box(right - tw, ny + 1, right, ny + 20, 150, 30, 30, 0.9f);
+                text.draw(canvas, right - tw + 5, ny, kPvp, 255, 225, 220);
+                right -= tw + 8;
             }
             if (down) text.draw(canvas, right - text.width(L"DOWN"), ny, L"DOWN", 255, 70, 60);
             {  // the buffs, behind the name: as many as fit before the level (and DOWN)

@@ -8,6 +8,7 @@
 --     known; x east and z north in metres: the DLL shows the region and how far away and where from you)
 --   b <buff type id hex> <slot 0-4> <seconds left, -1: none> <name>   (since 0.15.49: that player's buffs and debuffs,
 --     after their p line; slot 0 food, 1 buff, 2 debuff, 3 rested, 4 terrain; the DLL draws the game's own icon)
+--   v pvp   (since 0.15.109: that player has PvP on; after their p and b lines)
 --   end
 -- Buffs travel from the server half as one line per player, "b <type hex>:<slot>:<seconds>,...", and each player's
 -- game adds the names in its own language (emf.buff_type; a dedicated server has no names). Types the game hides are
@@ -103,7 +104,9 @@ local function receive(world, text)
   local lines = {}
   for line in text:gmatch("[^\n]+") do
     local list = line:match("^b\t(.*)$")
-    if list then
+    if line == "v\tpvp" then
+      lines[#lines + 1] = line
+    elseif list then
       for _, l in ipairs(buff_lines(world, list)) do lines[#lines + 1] = l end
     else
       lines[#lines + 1] = line
@@ -140,7 +143,8 @@ function F.tick(world)
       end
       present[id] = true
       local okp, x, _, z = pcall(world.position, world, id)
-      here[#here + 1] = { id = id, name = player_name(world, id), hp = okh and hp or nil, hp_max = okh and hp_max or nil,
+      local okv, pvp = pcall(function() return require("features.experimental").pvp_of(account) end)
+      here[#here + 1] = { id = id, name = player_name(world, id), hp = okh and hp or nil, hp_max = okh and hp_max or nil, pvp = okv and pvp == true,
         mana = attr("mana"), mana_max = attr("max_mana"), level = attr("level"), x = okp and x or nil, z = okp and z or nil,
         buffs = buffs_of(world, id) }
     end
@@ -152,6 +156,7 @@ function F.tick(world)
       lines[#lines + 1] = table.concat({ "p", p.id == to.id and "1" or "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max),
         num(p.level), num(p.x), num(p.z), clean(p.name) }, "\t")
       if p.buffs ~= "" then lines[#lines + 1] = "b\t" .. p.buffs end  -- everyone sees everyone's buffs
+      if p.pvp then lines[#lines + 1] = "v\tpvp" end  -- (0.15.109) PvP on: everyone sees who can be fought
     end
     for _, p in ipairs(test_players.list(world, to.id)) do  -- this player's own test players, sent like real ones
       lines[#lines + 1] = table.concat({ "p", "0", num(p.hp), num(p.hp_max), num(p.mana), num(p.mana_max), num(p.level), num(p.x), num(p.z),

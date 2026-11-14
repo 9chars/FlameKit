@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.108.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.109.
 
 ## What FlameKit is
 
@@ -124,6 +124,10 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## PvP in the party list (0.15.109)
+party.lua (server tick) asks experimental.pvp_of(account) and adds a "v\tpvp" line after the player's p and b lines;
+PartyLayer reads it into Member.pvp and draws a red "PvP" tag before the level.
 
 ## Player names (0.15.108)
 Everywhere: world:character_name first, world:name (the connection/account name) only as a fallback. character_name

@@ -681,6 +681,17 @@ r = select(2, next(hit_rules)) or {}
 check(find_row("PvP", "sw:pvp").selected == true and comps.Faction[PLAYER].faction == 1, "PvP on: the player has faction 1 (HitAll)")
 check(rule_count() == 1 and r.from == "players" and r.to == "players" and r.scale == 0.25, "and one rule scales player-on-player hits to 25%")
 check(casts[#casts] == "PvP for a player ENABLED.", "everyone is told: " .. tostring(casts[#casts]))
+if not JOINED then  -- (0.15.109) the party list says who has PvP on (host: the list is written right here)
+  step(35)
+  local pf = io.open(TMP .. "\\ui_party.dat", "r")
+  local pt = pf and pf:read("a") or ""
+  if pf then pf:close() end
+  check(pt:find("\nv\tpvp\n", 1, true) ~= nil, "the party list marks a player with PvP on: " .. pt:gsub("\n", "|"):sub(1, 200))
+else
+  local before = #party_down
+  step(35)
+  check(#party_down > before and party_down[#party_down]:find("\nv\tpvp", 1, true) ~= nil, "the party list sent to players marks PvP on")
+end
 comps.Faction[PLAYER].faction = 7  -- the game sets it back (a death, say)
 step(2)
 check(comps.Faction[PLAYER].faction == 1, "a faction the game set back is written again")
