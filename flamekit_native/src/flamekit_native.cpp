@@ -2277,8 +2277,6 @@ struct MinimapLayer : Layer {
     bool dragging = false, has_drag = false, dropped = false;
     POINT grab{}, drag_pos{};  // where in the picture it was grabbed; the picture's top left corner (client coordinates)
     int pad = 0, dial_w = 0, dial_h = 0;
-    uint64_t panel_looked = 0;
-    bool panel_open = false;
     // timing, for the log at full
     uint64_t draws = 0, draw_us = 0, draw_max_us = 0, timing_at = 0;
 
@@ -2294,26 +2292,6 @@ struct MinimapLayer : Layer {
                loca_note.c_str(), g_loca.rows);
         FK_LOG(fklog::kInfo, "minimap: map: %s: %s (%llu ms)", map.ok ? "read from the game's data files" : "no map, plain dial",
                map.note.c_str(), GetTickCount64() - began);
-    }
-
-    // FlameKit's old panel is open: it is drawn by EMF inside the game's picture, so the minimap would lie over it. The
-    // panel (Lua) writes "1" into panel_open.dat twice a second while it is open and "0" when it closes; a file not
-    // written for 1.5 s counts as closed.
-    bool read_panel_open() {
-        WIN32_FILE_ATTRIBUTE_DATA info{};
-        const std::wstring flag = g_flamekit_dir + L"panel_open.dat";
-        if (!GetFileAttributesExW(flag.c_str(), GetFileExInfoStandard, &info)) return false;
-        FILETIME now_ft;
-        GetSystemTimeAsFileTime(&now_ft);
-        const uint64_t written = static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime;
-        const uint64_t now_100ns = static_cast<uint64_t>(now_ft.dwHighDateTime) << 32 | now_ft.dwLowDateTime;
-        if (now_100ns >= written + 15000000ull) return false;
-        bool open = false;
-        if (FILE* fp = _wfsopen(flag.c_str(), L"rb", _SH_DENYNO)) {
-            open = fgetc(fp) == '1';
-            fclose(fp);
-        }
-        return open;
     }
 
     void update(const Frame& f) override {
@@ -2333,16 +2311,12 @@ struct MinimapLayer : Layer {
             // a pointer that is "showing" but has no picture is not on screen: the game hides its pointer that way too
             in_menu = GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) != 0 && ci.hCursor != nullptr;
         }
-        if (f.now - panel_looked > 150) {
-            panel_looked = f.now;
-            panel_open = read_panel_open();
-        }
-        const bool want = s.show && f.in_world && !in_menu && !panel_open && !g_travelling.load() && f.game && f.gw > 0;
+        const bool want = s.show && f.in_world && !in_menu && !g_travelling.load() && f.game && f.gw > 0;
         if (want != visible) {
             visible = want;
             changed = true;
-            FK_LOG(fklog::kDebug, "minimap: %s (show %d, world %d, menu %d, panel %d, travelling %d)", want ? "shown" : "hidden", s.show,
-                   f.in_world, in_menu, panel_open, g_travelling.load() ? 1 : 0);
+            FK_LOG(fklog::kDebug, "minimap: %s (show %d, world %d, menu %d, travelling %d)", want ? "shown" : "hidden", s.show,
+                   f.in_world, in_menu, g_travelling.load() ? 1 : 0);
         }
         if (!visible) return;
         if (f.now - drawn_at < 33 && !dragging) return;  // about 30 pictures a second

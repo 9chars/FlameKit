@@ -12,6 +12,11 @@
 //   this DLL (flamekit_native\): it is in use, so the old file is renamed and the new one takes over at the next start
 //   the Lua part (flamekit\): held in emf\flamekit_update\ with a list (ready.txt); at the next start, before anything
 //   else, this DLL checks the held files against the list and puts them in place (install_pending), mod.json last
+// Every update.txt is signed (since 0.15.45): <channel>/update.sig holds the ECDSA P-256 signature (SHA-256, 64 bytes as
+// 128 hex digits) of update.txt's exact bytes, made on the owner's PC with a key that never leaves it (the restart
+// helper's "sign"; the key lives in that Windows user's key store and cannot be exported). This DLL carries the public
+// key (kReleaseKey) and takes nothing from a list whose signature is missing or wrong; the list's sizes and hashes then
+// cover every file. So a change to the repository alone cannot put code on a player's PC.
 // The channel is "dist", or "dist-test" where emf\mods\flamekit\update_channel.txt says "test" (the developer's PC).
 // A game never takes an older version, and never writes outside emf\mods\flamekit and emf\mods\flamekit_native.
 // What it is doing is written to emf\mods\flamekit\update_status.txt as "<kind>|<text>" (kind: busy, failed, ok or
@@ -19,7 +24,9 @@
 #pragma once
 
 #include <windows.h>
+#include <bcrypt.h>
 #include <winhttp.h>
+#pragma comment(lib, "bcrypt.lib")
 
 #include <atomic>
 #include <cctype>
@@ -92,6 +99,58 @@ inline bool newer(const std::string& a, const std::string& b) {
     for (int i = 0; i < 4; ++i)
         if (x[i] != y[i]) return x[i] > y[i];
     return false;
+}
+
+// The release signing key's public half (BCRYPT_ECCPUBLIC_BLOB: "ECS1", 32, X, Y), made 2026-11-13 on the owner's PC.
+inline const uint8_t kReleaseKey[72] = {
+    0x45, 0x43, 0x53, 0x31, 0x20, 0x00, 0x00, 0x00, 0xe2, 0xa6, 0xcb, 0xc8,
+    0x92, 0x39, 0xba, 0xf4, 0xd9, 0xfa, 0xcb, 0xd2, 0xab, 0x33, 0xc2, 0xfc,
+    0x77, 0xcc, 0x70, 0x19, 0xe4, 0xe6, 0xb1, 0x61, 0xeb, 0xb3, 0xd3, 0x85,
+    0xa9, 0x89, 0xb7, 0x34, 0x55, 0x0e, 0x16, 0xaa, 0x8e, 0xcf, 0xb6, 0x6d,
+    0x43, 0x19, 0x07, 0x2c, 0x0a, 0x08, 0x2f, 0x1f, 0xfa, 0x22, 0xa0, 0x22,
+    0x70, 0x7a, 0xe5, 0xf0, 0x23, 0x14, 0x7e, 0xb3, 0x97, 0x0c, 0xf6, 0xa6,
+};
+
+// True when sig_hex (128 hex digits) is the release key's ECDSA P-256 signature of data's SHA-256.
+inline bool signed_by_release_key(const std::vector<uint8_t>& data, std::string sig_hex, std::string& why) {
+    while (!sig_hex.empty() && (sig_hex.back() == '\r' || sig_hex.back() == '\n' || sig_hex.back() == ' ')) sig_hex.pop_back();
+    if (sig_hex.size() != 128) {
+        why = "the signature is not 64 bytes";
+        return false;
+    }
+    uint8_t sig[64];
+    for (int i = 0; i < 64; ++i) {
+        const auto nib = [](char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
+        const int hi = nib(sig_hex[2 * i]), lo = nib(sig_hex[2 * i + 1]);
+        if (hi < 0 || lo < 0) {
+            why = "the signature is not hex";
+            return false;
+        }
+        sig[i] = static_cast<uint8_t>(hi * 16 + lo);
+    }
+    uint8_t digest[32];
+    BCRYPT_ALG_HANDLE sha = nullptr, ecdsa = nullptr;
+    BCRYPT_HASH_HANDLE hash = nullptr;
+    BCRYPT_KEY_HANDLE key = nullptr;
+    bool ok = BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&sha, BCRYPT_SHA256_ALGORITHM, nullptr, 0)) &&
+              BCRYPT_SUCCESS(BCryptCreateHash(sha, &hash, nullptr, 0, nullptr, 0, 0)) &&
+              BCRYPT_SUCCESS(BCryptHashData(hash, const_cast<PUCHAR>(data.data()), static_cast<ULONG>(data.size()), 0)) &&
+              BCRYPT_SUCCESS(BCryptFinishHash(hash, digest, sizeof digest, 0));
+    if (!ok) why = "SHA-256 is not available (Windows' bcrypt)";
+    if (ok) {
+        ok = BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&ecdsa, BCRYPT_ECDSA_P256_ALGORITHM, nullptr, 0)) &&
+             BCRYPT_SUCCESS(BCryptImportKeyPair(ecdsa, nullptr, BCRYPT_ECCPUBLIC_BLOB, &key, const_cast<PUCHAR>(kReleaseKey), sizeof kReleaseKey, 0));
+        if (!ok) why = "the release key could not be loaded (Windows' bcrypt)";
+    }
+    if (ok) {
+        ok = BCRYPT_SUCCESS(BCryptVerifySignature(key, nullptr, digest, sizeof digest, sig, sizeof sig, 0));
+        if (!ok) why = "the signature does not match: this list was not signed with FlameKit's release key";
+    }
+    if (key) BCryptDestroyKey(key);
+    if (hash) BCryptDestroyHash(hash);
+    if (ecdsa) BCryptCloseAlgorithmProvider(ecdsa, 0);
+    if (sha) BCryptCloseAlgorithmProvider(sha, 0);
+    return ok;
 }
 
 // One file over HTTPS (from raw.githubusercontent.com unless `host` says otherwise); `got` counts the bytes as they arrive.
@@ -315,6 +374,17 @@ struct Updater {
             say("update: check failed: could not read " + channel + "/update.txt from GitHub: " + g_fetch_error + " (tried again later)", 2);
             if (asked) status("failed|Could not reach GitHub: tried again later");
             return false;
+        }
+        {  // the list must carry FlameKit's release signature (update.sig), else nothing in it is taken
+            std::vector<uint8_t> sig;
+            std::string why;
+            if (!fetch(base + L"update.sig", sig, nullptr)) why = "there is no update.sig (" + g_fetch_error + ")";
+            else if (signed_by_release_key(raw, std::string(sig.begin(), sig.end()), why)) why.clear();
+            if (!why.empty()) {
+                say("update: REFUSED: " + channel + "/update.txt is not signed by FlameKit's release key: " + why + ". Nothing was changed.", 2);
+                status("failed|An update was refused: it is not signed by FlameKit");
+                return false;
+            }
         }
         const std::string text(raw.begin(), raw.end());
         const size_t eol = text.find('\n');

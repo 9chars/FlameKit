@@ -6,6 +6,11 @@
 #   client  close the game client (like Alt+F4) and start it again through Steam
 #   server  close the game client, have the server save its world, stop it and start it again, then start the client
 #   both    the same as server
+#   keygen  make FlameKit's release signing key once (ECDSA P-256) in this Windows user's key store, not exportable:
+#           the private key never leaves this PC. Its public key goes to signing\public_key.txt (hex, BCRYPT_ECCPUBLIC_BLOB),
+#           which the DLL carries (web_update.hpp) to check updates with
+#   sign    sign signing\update.txt with that key (SHA-256, ECDSA P-256): the signature (64 bytes, hex) goes to
+#           signing\update.sig, which is published next to the channel's update.txt
 #   build   build FlameKit's DLL: ..\flamekit_native\build.cmd, its output in build.log and its result code in build.done
 #           there (the same as build_watch.cmd, which is no longer needed)
 #   stop    stop this helper
@@ -188,6 +193,41 @@ function Build {
     return $p.ExitCode -eq 0
 }
 
+$keyName = 'FlameKit release signing'
+$signDir = Join-Path $here 'signing'
+
+function Release-Key([bool]$create) {
+    if ([System.Security.Cryptography.CngKey]::Exists($keyName)) { return [System.Security.Cryptography.CngKey]::Open($keyName) }
+    if (-not $create) { return $null }
+    $p = New-Object System.Security.Cryptography.CngKeyCreationParameters
+    $p.ExportPolicy = [System.Security.Cryptography.CngExportPolicies]::None
+    $p.KeyUsage = [System.Security.Cryptography.CngKeyUsages]::Signing
+    Log 'keygen: making the release signing key (ECDSA P-256, in this user''s key store, not exportable)'
+    return [System.Security.Cryptography.CngKey]::Create([System.Security.Cryptography.CngAlgorithm]::ECDsaP256, $keyName, $p)
+}
+
+function Keygen {
+    $k = Release-Key $true
+    if (-not (Test-Path $signDir)) { New-Item -ItemType Directory -Path $signDir | Out-Null }
+    $blob = $k.Export([System.Security.Cryptography.CngKeyBlobFormat]::EccPublicBlob)
+    Set-Content -Path (Join-Path $signDir 'public_key.txt') -Value (($blob | ForEach-Object { $_.ToString('x2') }) -join '') -Encoding ASCII -NoNewline
+    Log "keygen: public key written to signing\public_key.txt ($($blob.Length) bytes)"
+    return $true
+}
+
+function Sign {
+    $k = Release-Key $false
+    if (-not $k) { Log 'sign: FAILED: there is no release signing key yet (request keygen first)'; return $false }
+    $file = Join-Path $signDir 'update.txt'
+    if (-not (Test-Path $file)) { Log 'sign: FAILED: signing\update.txt is missing'; return $false }
+    $ecdsa = New-Object System.Security.Cryptography.ECDsaCng($k)
+    $ecdsa.HashAlgorithm = [System.Security.Cryptography.CngAlgorithm]::Sha256
+    $sig = $ecdsa.SignData([System.IO.File]::ReadAllBytes($file))
+    Set-Content -Path (Join-Path $signDir 'update.sig') -Value (($sig | ForEach-Object { $_.ToString('x2') }) -join '') -Encoding ASCII -NoNewline
+    Log "sign: signing\update.txt signed ($($sig.Length) bytes)"
+    return $true
+}
+
 function Finish([bool]$ok, [string]$text) {
     Set-Content -Path $doneFile -Value ("{0} {1}" -f $(if ($ok) { 'ok' } else { 'failed' }), $text) -Encoding UTF8
     Log "done: $(if ($ok) { 'ok' } else { 'FAILED' }): $text"
@@ -213,8 +253,10 @@ while ($true) {
                     Finish $ok 'client and server restart'
                 }
                 'build' { $ok = Build; Finish $ok 'build' }
+                'keygen' { $ok = Keygen; Finish $ok 'keygen' }
+                'sign' { $ok = Sign; Finish $ok 'sign' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"

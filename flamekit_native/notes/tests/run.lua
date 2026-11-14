@@ -174,7 +174,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
+      if name == "map" or name == "party" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -185,6 +185,7 @@ emf = {
       assert(#data <= 16384)
       if name == "exp" then exp_up[#exp_up + 1] = data; return true end
       if name == "party_test" then ptest_up[#ptest_up + 1] = data; last_ask = data; return true end
+      if name == "ver" then ver_asks = (ver_asks or 0) + 1; return true end
       to_server[#to_server + 1] = data
       return true
     end,
@@ -794,6 +795,24 @@ do
   check(what == "changes", "after an update FlameKit's window is asked to open on the What's New tab")
 end
 check(require("core.items").is_keeper("_Material_TX_Trophy_Wolf_Heavy_head"), "a trophy is kept: not offered in the bag list")
+-- the server's FlameKit version (features/server_version.lua): an older one gets an orange notice in a joined game
+if JOINED then
+  step(3700)
+  check((ver_asks or 0) >= 1, "the player's game asks the server for its FlameKit version")
+  channels.ver.on_player(CW, {}, "0.15.30")
+  step(2)
+  local f = io.open(TMP .. "\\ui_hud.dat", "r")
+  local hud_text = f and f:read("a") or ""
+  if f then f:close() end
+  check(hud_text:find("notice This server runs FlameKit v0.15.30 (you: v9.9.9): some features are off", 1, true) ~= nil,
+    "an older FlameKit on the server gets the orange notice")
+  channels.ver.on_player(CW, {}, "9.9.9")
+  step(2)
+  f = io.open(TMP .. "\\ui_hud.dat", "r")
+  hud_text = f and f:read("a") or ""
+  if f then f:close() end
+  check(not hud_text:find("notice", 1, true), "the same version: no notice")
+end
 -- a world save on request from the restart helper (features/server_save.lua)
 do
   local f = io.open(TMP .. "\\save_now.request", "w"); f:write("1234\n"); f:close()

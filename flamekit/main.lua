@@ -17,5 +17,6 @@ kit.start({
   "features.party",         -- no tab of its own
   "features.native_ui",
   "features.server_save",
+  "features.server_version",  -- the notice when the server's FlameKit is older
   -- "features.my_next_feature",
 })
