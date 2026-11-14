@@ -1341,6 +1341,20 @@ do  -- (0.15.116) the Debug section's test data for the PvP Leaderboard (this ga
   click("W:dbg:fakeboard")
   check(board_text() == before or board_text():find("source", 1, true) == 1, "off: the real board again")
 end
+do  -- (0.15.124, owner) the update channel in the Debug section: update_channel.txt, and a look for updates at once
+  local function row(k) for _, r in ipairs(require("features.experimental").panel(UI) or {}) do if r.button == k then return r end end end
+  local function read(n) local f = io.open(TMP .. "\\" .. n, "r"); local t = f and f:read("a"); if f then f:close() end; return t end
+  os.remove(TMP .. "\\update_channel.txt")
+  check(row("dbg:chan:stable") and row("dbg:chan:stable").selected and not row("dbg:chan:test").selected, "no file: Stable is lit")
+  click("W:dbg:chan:test")
+  check(read("update_channel.txt") == "test\n" and read("ui_update_check.request") ~= nil and row("dbg:chan:test").selected,
+    "Development: update_channel.txt says test, and the DLL is asked to look now")
+  os.remove(TMP .. "\\ui_update_check.request")
+  click("W:dbg:chan:stable")
+  check(read("update_channel.txt") == "stable\n" and row("dbg:chan:stable").selected, "Stable again: the file no longer says test")
+  os.remove(TMP .. "\\update_channel.txt")
+  os.remove(TMP .. "\\ui_update_check.request")
+end
 do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
   os.remove(TMP .. "\\ui_layout.txt")
   local function board_row() for _, r in ipairs(exp_rows()) do if r.button == "W:board" then return r end end end

@@ -1172,6 +1172,16 @@ end
 
 -- The Debug section at the bottom of the tab: the test players (features/party.lua) and FlameKit's log level
 -- (debug.txt: off, normal, full; the same as Ctrl+Shift+F12 in the game). Keys "dbg:...".
+-- (0.15.124, owner) the update channel: update_channel.txt in FlameKit's folder, "test" for the development versions
+-- (dist-test), anything else or no file for the released ones (dist). The DLL's updater reads it at every look.
+local function dev_channel()
+  local f = io.open(emf.dir .. "\\update_channel.txt", "r")
+  if not f then return false end
+  local t = f:read("a") or ""
+  f:close()
+  return t:sub(1, 4) == "test"
+end
+
 local function debug_rows(world, rows)
   rows[#rows + 1] = { separator = true }
   rows[#rows + 1] = { heading = "Debug" }
@@ -1192,6 +1202,14 @@ local function debug_rows(world, rows)
   end
   rows[#rows + 1] = { dim = true, text = "The logs are in emf\\mods\\flamekit\\logs in the game's folder (the last 10 games)." }
   rows[#rows + 1] = { button = "dbg:openlogs", text = "Open log folder", tooltip = "Opens FlameKit's log folder in Explorer." }  -- (0.15.106)
+  local dev = dev_channel()
+  rows[#rows + 1] = { text = "Updates:" }
+  rows[#rows + 1] = { button = "dbg:chan:stable", text = "Stable", selected = not dev,
+    tooltip = "Released versions only: tested and the same for everyone. Recommended. Switching back from Development keeps the "
+      .. "version you have until a newer stable one comes out." }
+  rows[#rows + 1] = { button = "dbg:chan:test", text = "Development", selected = dev, same_line = true,
+    tooltip = "The very latest development versions, as soon as they are made: new things first, but they may have bugs. "
+      .. "FlameKit looks for one every minute instead of every 10 minutes." }
   return rows
 end
 
@@ -1381,6 +1399,21 @@ function F.click(world, key)
   if key == "dbg:fakeboard" then
     local lb = require("features.leaderboard")
     lb.set_fake(world, not lb.fake_on())
+    return
+  end
+  local chan = key:match("^dbg:chan:(%a+)$")
+  if chan == "stable" or chan == "test" then
+    local f = io.open(emf.dir .. "\\update_channel.txt", "w")
+    if f then
+      f:write(chan == "test" and "test\n" or "stable\n")
+      f:close()
+    end
+    local r = io.open(emf.dir .. "\\ui_update_check.request", "w")  -- the DLL looks for updates at once (HudLayer)
+    if r then
+      r:write("1")
+      r:close()
+    end
+    kit.log("update channel: " .. (chan == "test" and "development (dist-test)" or "stable (dist)"))
     return
   end
   if key == "dbg:openlogs" then  -- FlameKit's DLL opens Explorer on the logs when this file appears (HudLayer)

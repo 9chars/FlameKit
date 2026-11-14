@@ -5977,6 +5977,14 @@ struct HudLayer : Layer {
                        static_cast<long long>(reinterpret_cast<INT_PTR>(r)));
             }
         }
+        {  // (0.15.124) the Debug section's update channel buttons: look for updates at once on the new channel
+            const std::wstring req = g_flamekit_dir + L"ui_update_check.request";
+            if (GetFileAttributesW(req.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                DeleteFileW(req.c_str());
+                web_update::g_check_now = true;
+                FK_LOG(fklog::kInfo, "update channel changed: looking for updates now");
+            }
+        }
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_hud.dat").c_str(), L"rb", _SH_DENYNO)) {
             std::wstring new_label;
             bool complete = false, build = false;

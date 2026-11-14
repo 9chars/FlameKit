@@ -1,3 +1,6 @@
+0.15.124 Nov 14, 2026
+- Experimental tab, Debug: "Updates: Stable / Development". Stable (the default) gets the released versions; Development gets the very latest versions as soon as they are made, which may have bugs. FlameKit looks for an update right away when you switch.
+
 0.15.123 Nov 14, 2026
 - Messages window: its own key, F8 (a setting in F4 > Windows), shown in its title like the other windows.
 - New default places and sizes for all windows (Party, Messages, Experimental, Notices, PvP Leaderboard, FlameKit Menu), laid out by Ninechars. Windows you already moved keep their place; "Reset place" in F4 > Windows puts one at its new default.
