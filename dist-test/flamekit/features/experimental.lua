@@ -142,8 +142,9 @@ end
 -- What a player's tab shows.
 local input_broken = false  -- the game's own input cannot be read: players' games send the S and Space keys instead
 
+local body_of  -- forward: the PvP test bodies, below
 local function view(account)
-  local v = { op = "state", keys = input_broken or nil }
+  local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if refused[s[1]] then v[s[1] .. "_dead"] = true end
@@ -231,6 +232,147 @@ local function go_waypoint(world, player, msg)
   emf.log(string.format("experimental: player %s sent to the waypoint %.0f %.0f %.0f (asked height %.0f)", tostring(player), x, y, z, ty))
 end
 
+-- ---- PvP test bodies (Debug section, 0.15.66) ----
+-- To try PvP alone, a player can have one test body spawned 3 m in front of them (EMF companion research,
+-- engine_parts/re_companions.md):
+--   dummy:   FakePlayer_Vukah_Melee, faction 7 (Player) like a player. With PvP on it is your enemy: it swings at you,
+--            but its hits do 0 damage (a player-faction body uses the player damage model and has no gear). Your hits
+--            on it show whether a PvP player's weapons land on a faction 7 target at all.
+--   duelist: Enemy_Vukah_Melee given faction 1 (HitAll): it fights everyone with full monster damage (about 48 a hit
+--            at level 1), with PvP on or off. Owner's rule: it may hit and kill everything but pets and animals, and
+--            never damage buildings. So it gets an EMF hit rule against placed objects, and every 3 s a rule against
+--            each animal or pet within 40 m (Wildlife, Animal or IsTame component, faction 5 Wildlife, 6 WildBeast,
+--            12 FarmAnimal, or 11 PlayerAlly unless it is a villager, with NpcState). Villagers are fair game.
+--            Voxel walls and terrain never take hits (EMF), and monsters do not break them.
+-- Spawned bodies are not saved with the world. One body per player; a new one replaces the old. It goes when its
+-- player clicks Remove or leaves, when it dies, or when the world reloads.
+local DUMMY_GUID = "9543cfb0-b4d7-408e-905c-ccb79a15136d"  -- FakePlayer_Vukah_Melee
+local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
+local DUEL_FACTION = 1                                      -- HitAll
+local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
+local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
+local body_steps = 0
+
+local function has(world, comp, id)
+  local ok, c = pcall(world.get, world, comp, id)
+  return ok and c ~= nil
+end
+
+local function protected(world, id)
+  if has(world, "Wildlife", id) or has(world, "Animal", id) or has(world, "IsTame", id) then return true end
+  local ok, f = pcall(world.get, world, "Faction", id)
+  local n = ok and f and tonumber(tostring(f.faction))
+  if n == 5 or n == 6 or n == 12 then return true end
+  return n == 11 and not has(world, "NpcState", id)
+end
+
+local function drop_body(world, id, destroy)
+  local b = bodies[id]
+  if not b then return end
+  for _, r in pairs(b.rules) do pcall(emf.hit_rule_remove, r) end
+  for _, r in pairs(b.guard) do pcall(emf.hit_rule_remove, r) end
+  bodies[id] = nil
+  if destroy then pcall(emf.destroy, world, id) end
+end
+
+local function drop_bodies_of(world, account, destroy)
+  for id, b in pairs(bodies) do
+    if b.owner == account then drop_body(world, id, destroy) end
+  end
+end
+
+-- The duelist's shield: a hit rule against each animal or pet near it, none for anything farther away.
+local function shield(world, id, b)
+  local x, _, z = world:position(id)
+  if not x then return end
+  local keep, n = {}, 0
+  for _ in pairs(b.guard) do n = n + 1 end
+  for _, e in ipairs(world:entities()) do
+    if e ~= id and not bodies[e] then
+      local okp, ex, _, ez = pcall(world.position, world, e)
+      if okp and ex and (ex - x) ^ 2 + (ez - z) ^ 2 < SHIELD_R * SHIELD_R then
+        local oka, account = pcall(world.account, world, e)
+        if not (oka and account) and protected(world, e) then
+          keep[e] = true
+          if not b.guard[e] and n < SHIELD_MAX then
+            local ok, r = pcall(emf.hit_rule, { from = id, to = e, cancel = true })
+            if ok and r then b.guard[e], n = r, n + 1 end
+          end
+        end
+      end
+    end
+  end
+  for e, r in pairs(b.guard) do
+    if not keep[e] then
+      pcall(emf.hit_rule_remove, r)
+      b.guard[e] = nil
+    end
+  end
+  if n >= SHIELD_MAX and not b.full_said then
+    b.full_said = true
+    emf.log(string.format("experimental: the duelist %s protects only %d animals and pets near it (more are around)", tostring(id), SHIELD_MAX))
+  end
+end
+
+-- Returns nil, or why there is no body now.
+local function spawn_body(world, account, player, kind)
+  drop_bodies_of(world, account, true)
+  if kind ~= "dummy" and kind ~= "duel" then return nil end
+  local x, y, z = where(world, player)
+  if not x then return "Your position is not known." end
+  local fx, fz = 0, 1
+  pcall(function()
+    local q = world:get("CurrentTransform", player).transform.orientation
+    local ax, az = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+    local len = math.sqrt(ax * ax + az * az)
+    if len > 0.01 then fx, fz = ax / len, az / len end
+  end)
+  local ok, id = pcall(emf.spawn, world, kind == "duel" and DUEL_GUID or DUMMY_GUID, x + fx * 3, y, z + fz * 3)
+  if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {} }
+  bodies[id] = b
+  if kind == "duel" then
+    pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
+    local okr, r = pcall(emf.hit_rule, { from = id, to = "objects", cancel = true })
+    if okr and r then b.rules.objects = r else emf.log("experimental: the duelist's rule for buildings was refused (" .. tostring(r) .. ")") end
+    shield(world, id, b)
+  end
+  emf.log(string.format("experimental: a PvP test %s (entity %s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id), tostring(player)))
+end
+
+local function bodies_tick(world)
+  if next(bodies) == nil then return end
+  body_steps = body_steps + 1
+  if body_steps % 30 ~= 0 then return end
+  local session = emf.session()
+  for id, b in pairs(bodies) do
+    local alive = false
+    if b.session == session then
+      pcall(function()
+        local hp = world:get("NetworkHealth", id)
+        alive = world:position(id) ~= nil and (hp == nil or hp.health > 0)
+      end)
+    end
+    if not alive then
+      emf.log(string.format("experimental: the PvP test %s (entity %s) is gone", b.kind, tostring(id)))
+      drop_body(world, id, false)
+    elseif b.kind == "duel" then
+      pcall(function()
+        local f = world:get("Faction", id)
+        if f and tonumber(tostring(f.faction)) ~= DUEL_FACTION then f.faction = DUEL_FACTION end
+      end)
+      if body_steps % SHIELD_STEPS == 0 then shield(world, id, b) end
+    end
+  end
+end
+
+-- What the Debug section shows about your body.
+body_of = function(account)
+  for id, b in pairs(bodies) do
+    if b.owner == account then return b.kind end
+  end
+end
+
 -- A word from a player about their own switches. Returns the view to send back.
 local function handle(world, account, entity, msg)
   load_saved()
@@ -253,6 +395,13 @@ local function handle(world, account, entity, msg)
     local v = view(account)
     v.note = not ok and "The move failed on this game version." or why
     if not ok then emf.log("experimental: go_home failed: " .. tostring(why)) end
+    return v
+  end
+  if msg.op == "body" then
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind)
+    if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
+    local v = view(account)
+    v.note = not ok and "That did not work on this game version." or why
     return v
   end
   if msg.op == "set" and type(msg.key) == "string" then
@@ -567,6 +716,7 @@ function F.tick(world)
   end
   lift(world)
   pvp(world)
+  bodies_tick(world)
   for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
     if os.time() >= g.till then
       pcall(emf.hit_rule_remove, g.rule)
@@ -756,7 +906,15 @@ local function panel_rows(world)
     tooltip = "Takes you straight to the waypoint you set on your map, onto the ground there. Fall damage is off for 30 seconds "
       .. "after the move, in case there is no ground right at the waypoint." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
-  return debug_rows(world, rows)
+  debug_rows(world, rows)
+  rows[#rows + 1] = { text = "PvP test bodies, 3 m in front of you (one at a time, gone after a reload):" }
+  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn PvP dummy", selected = v.body == "dummy",
+    tooltip = "A player-like body (faction Player). With PvP on it swings at you but does no damage: hit it to see whether your weapons hurt a player." }
+  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn PvP duelist", same_line = true, selected = v.body == "duel",
+    tooltip = "A Vukah fighter that attacks everyone with full damage, PvP on or off. It never hurts animals, pets or buildings; villagers are fair game. Spawn it away from your base." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
+    tooltip = "Removes your test body." }
+  return rows
 end
 
 function F.panel(world)
@@ -765,6 +923,17 @@ end
 
 function F.click(world, key)
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
+  local kind = key:match("^dbg:body:(%a+)$")
+  if kind then
+    note = nil
+    if hosting(world) then
+      local account, player = me(world)
+      if account then note = handle(world, account, player, { op = "body", kind = kind }).note end
+    else
+      ask({ op = "body", kind = kind })
+    end
+    return
+  end
   local level = key:match("^dbg:log:(%a+)$")
   if level then
     local f = io.open(emf.dir .. "\\debug.txt", "w")
@@ -826,6 +995,7 @@ function F.setup(k)
       drop_rules(online[account])
       online[account] = nil
     end
+    drop_bodies_of(world, account, true)
   end, "a player leaving"))
   pcall(emf.on_player_joined, kit.guard(F, function(world, p)
     if p and p.account and p.player and p.player ~= 0 then

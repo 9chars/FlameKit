@@ -74,6 +74,7 @@ left_fns = {}
 joined_fns = {}  -- EMF reports the players already there (the test player) after the world data
 SESSION_TOKEN = "run-1"
 held_key = nil
+spawned, destroyed = {}, {}
 local channels, exp_up, exp_down, hit_rules, next_rule, ADMIN, casts = {}, {}, {}, {}, 0, false, {}
 local window, gives, next_pickup = nil, {}, 5000
 local emf_hud = {}  -- what the mod asked EMF to show (nothing since 0.15.14: FlameKit draws its own lines)
@@ -166,6 +167,8 @@ emf = {
   sender = function() return sender end,
   local_player = function() return (JOINED and side == "server") and 0 or PLAYER end,
   session = function() return 1 end,
+  spawn = function(w, guid, x, y, z) spawned[#spawned + 1] = { guid = guid, x = x, y = y, z = z }; return 950 + #spawned end,
+  destroy = function(w, id) destroyed[#destroyed + 1] = id; return true end,
   setting = function(k) assert(settings[k] ~= nil, "unknown setting " .. k); return settings[k] end,
   set_setting = function(k, v) assert(settings[k] ~= nil); settings[k] = v end,
   item = function(n) return ITEMS[n] end,
@@ -642,6 +645,25 @@ check(comps.Faction[PLAYER].faction == 7 and rule_count() == 0 and not find_row(
   "PvP off: faction 7 again and no rule left")
 check(casts[#casts] == "PvP for a player DISABLED.", "everyone is told it is off")
 casts[#casts], casts[#casts - 1] = nil, nil  -- the glider test below counts the shroud lines only
+-- PvP test bodies (0.15.66): the duelist gets faction 1, a rule against buildings and one per animal near it
+comps.NetworkHealth = { [951] = { health = 100 } }
+comps.Faction[951] = { faction = 3 }
+comps.Faction[900] = { faction = 5 }  -- an animal (Wildlife) next to it
+comps.CurrentTransform = { [PLAYER] = { transform = { orientation = { x = 0, y = 0, z = 0, w = 1 } } } }
+local real_position = SW.position
+local function near(self, id) if id == 951 or id == 900 or id == 901 then return 1, 0, 3 end return real_position(self, id) end
+SW.position = near
+local rb = rule_count()
+click(find_row("Spawn PvP duelist").button)
+step(40)
+check(#spawned == 1 and spawned[1].guid == "d5d05217-52dc-467a-9192-26b4f661d8d9" and spawned[1].z == 3, "the duelist is spawned 3 m in front of the player")
+check(comps.Faction[951].faction == 1, "and given faction 1 (HitAll)")
+check(rule_count() == rb + 2 and find_row("Spawn PvP duelist").selected, "one rule keeps it off buildings, one off the animal next to it")
+click(find_row("Remove").button)
+step(40)
+check(destroyed[1] == 951 and rule_count() == rb and not find_row("Spawn PvP duelist").selected, "Remove: the duelist and its rules are gone")
+SW.position = real_position
+comps.Faction[900] = nil
 comps.Faction[PLAYER].faction = 1  -- left over from a crash: PvP is off, the faction is not
 step(65)
 check(comps.Faction[PLAYER].faction == 7, "a player without PvP found with faction 1 gets faction 7 back within a second")
