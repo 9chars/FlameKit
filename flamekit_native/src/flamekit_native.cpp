@@ -2248,6 +2248,7 @@ struct MinimapLayer : Layer {
     bool last_square = false;
     POINT down_at{};
     bool pressed = false;
+    int hover_x = -1, hover_y = -1;  // the pointer over the dial (picture coordinates), for the marker's name (0.15.77)
     // timing, for the log at full
     uint64_t draws = 0, draw_us = 0, draw_max_us = 0, timing_at = 0;
 
@@ -2328,6 +2329,7 @@ struct MinimapLayer : Layer {
         last_square = s.square;
         last_markers = over.markers;
         draw_dial(canvas, map, last_x, last_z, last_range, g_heading.load(), over, s, text, icons);
+        draw_hover_name();
         QueryPerformanceCounter(&t1);
         QueryPerformanceFrequency(&freq);
         const uint64_t us = static_cast<uint64_t>((t1.QuadPart - t0.QuadPart) * 1000000 / freq.QuadPart);
@@ -2373,13 +2375,19 @@ struct MinimapLayer : Layer {
     }
 
     bool wants_mouse() const override { return g_pointer_mode && visible; }
+    void mouse_left() override { hover_x = hover_y = -1; }
     // Pressed and let go on the same spot: a click (a marker's waypoint). Moved more than a few pixels: a drag.
     void mouse(UINT msg, int x, int y) override {
         if (msg == WM_LBUTTONDOWN) {
             grab = {x, y};
             down_at = {x, y};
             pressed = true;
-        } else if (msg == WM_MOUSEMOVE && pressed) {
+        }
+        if (msg == WM_MOUSEMOVE) {
+            hover_x = x;
+            hover_y = y;
+        }
+        if (msg == WM_MOUSEMOVE && pressed) {
             if (!dragging && (std::abs(x - down_at.x) > 4 || std::abs(y - down_at.y) > 4)) {
                 drag_pos = {rect.left, rect.top};
                 dragging = has_drag = true;
@@ -2395,11 +2403,10 @@ struct MinimapLayer : Layer {
             }
         }
     }
-    // The marker nearest the click within 14 pixels: its place goes to the Lua part as the waypoint ("wp x z", metres),
-    // or "wp clear" when it is the waypoint already (within 3 m). The server writes the player's PlayerWaypoint.
-    void click(int cx, int cy) {
+    // The marker nearest (cx, cy) on the dial within 14 pixels, or none (what the last picture showed).
+    const Marker* nearest(int cx, int cy) const {
         const int n = dial_w;
-        if (cx < 0 || cy < 0 || cx >= n || cy >= n || !g_act) return;
+        if (cx < 0 || cy < 0 || cx >= n || cy >= n) return nullptr;
         const float mid = static_cast<float>(n) * 0.5f, R = mid - 2.0f, rim = std::max(3.0f, static_cast<float>(n) * 0.022f);
         const float mpp = last_range / (R - rim);
         const Marker* best = nullptr;
@@ -2412,6 +2419,36 @@ struct MinimapLayer : Layer {
                 best = &k;
             }
         }
+        return best;
+    }
+    // (0.15.77, owner) With the pointer out, the name of the marker under it, in a small dark box beside it: the name
+    // a player gave it, else the game's name for that kind of marker (the same text as the labels under the markers).
+    void draw_hover_name() {
+        if (!g_pointer_mode || hover_x < 0 || dragging) return;
+        const Marker* k = nearest(hover_x - pad, hover_y);
+        if (!k) return;
+        const Style& st = kStyles[k->kind];
+        const std::wstring name = widen(k->name.empty() ? std::string(st.label) : k->name);
+        if (name.empty()) return;
+        const int tw = text.width(name), th = letter_px(settings(), dial_w) + 10;
+        int x0 = hover_x + 14, y0 = hover_y - th - 4;
+        if (x0 + tw + 12 > canvas.w) x0 = hover_x - tw - 26;
+        x0 = std::clamp(x0, 0, std::max(0, canvas.w - tw - 12));
+        y0 = std::clamp(y0, 0, std::max(0, canvas.h - th));
+        for (int y = y0; y < y0 + th && y < canvas.h; ++y)
+            for (int x = x0; x < x0 + tw + 12 && x < canvas.w; ++x) {
+                const bool edge = y == y0 || y == y0 + th - 1 || x == x0 || x == x0 + tw + 11;
+                if (edge) canvas.blend(x, y, 214, 176, 92, 1.0f);
+                else canvas.blend(x, y, 20, 22, 28, 0.92f);
+            }
+        text.draw(canvas, x0 + 6, y0 + 4, name, 240, 232, 210);
+    }
+
+    // The marker nearest the click within 14 pixels: its place goes to the Lua part as the waypoint ("wp x z", metres),
+    // or "wp clear" when it is the waypoint already (within 3 m). The server writes the player's PlayerWaypoint.
+    void click(int cx, int cy) {
+        if (!g_act) return;
+        const Marker* best = nearest(cx, cy);
         if (!best) {
             FK_LOG(fklog::kDebug, "minimap: click at %d,%d: no marker there", cx, cy);
             return;
