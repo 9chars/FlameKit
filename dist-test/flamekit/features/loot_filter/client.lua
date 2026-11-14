@@ -60,18 +60,21 @@ local function sorted_names()
   return names
 end
 
+-- The setting lf_show_all: every item in the bag can be put on the junk list, also weapons, armour, rings, tools,
+-- summoning items, trophies and pieces of gear (items.is_keeper, stack.gear). Off (the default), those are never junk:
+-- they are not offered, and if one is on the list (put there while it was on) it is left alone.
+local function show_all()
+  return kit.setting("lf_show_all", false) == true
+end
+
 local function load_list()
   junk = {}
   local data = kit.store.load(FILE, {})
   local list = type(data.items) == "table" and data.items or {}
-  local dropped = false
   for _, name in ipairs(list) do
-    if type(name) == "string" and name ~= "" then
-      if items.is_keeper(name) then dropped = true else junk[name] = true end  -- gear on a list from an older version
-    end
+    if type(name) == "string" and name ~= "" then junk[name] = true end
   end
   resolved = false
-  if dropped then kit.store.save(FILE, { version = 1, items = sorted_names() }) end
 end
 
 local function save_list()
@@ -80,7 +83,7 @@ end
 
 local function set_junk(name, on)
   kit.debug("info", "junk list (client): %s %s", on and "junk" or "keep", tostring(name))
-  if on and items.is_keeper(name) then return end  -- weapons, armour, rings, tools, summoning items: always kept
+  if on and items.is_keeper(name) and not show_all() then return end  -- weapons, armour, rings, tools, ...: kept
   if on and not junk[name] and #sorted_names() >= server.MAX_ITEMS then
     kit.note("Auto Junk List: your junk list is full (" .. server.MAX_ITEMS .. " items).", "#ff9050", true)
     return
@@ -107,6 +110,7 @@ local function options()
     auto = emf.setting("lf_auto") == true,
     action = emf.setting("lf_action") == "delete" and "delete" or "drop",
     keep_hotbar = emf.setting("lf_keep_hotbar") ~= false,
+    show_all = show_all(),
   }
 end
 
@@ -172,7 +176,7 @@ function C.receive(world, msg)
   elseif msg.op == "list" and type(msg.items) == "table" then  -- the chat command changed your list
     junk = {}
     for _, name in ipairs(msg.items) do
-      if type(name) == "string" and name ~= "" and not items.is_keeper(name) then junk[name] = true end
+      if type(name) == "string" and name ~= "" then junk[name] = true end
     end
     resolved = false
     save_list()
@@ -232,7 +236,7 @@ end
 local function removable(stack)
   if not junk_ids[stack.item] then return false end
   if stack.hotbar and emf.setting("lf_keep_hotbar") then return false end
-  if stack.gear then return false end
+  if not show_all() and (stack.gear or items.is_keeper(junk_ids[stack.item])) then return false end
   return true
 end
 
@@ -263,7 +267,7 @@ local function bag_list(world)
   local stacks, readable = bag.stacks(world, emf.local_player())
   for _, stack in ipairs(stacks) do
     local debug_name = items.debug_name(stack.item)
-    if stack.gear or items.is_keeper(debug_name) then
+    if not show_all() and (stack.gear or items.is_keeper(debug_name)) then
       kept = kept + 1  -- gear, tools, summoning items: never junk, so not listed
     else
       local e = by_item[stack.item]

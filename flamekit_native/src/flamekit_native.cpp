@@ -3012,7 +3012,7 @@ struct ItemTip {
     int rarity = -1;       // 0 Common .. 4 Legendary, -1 not known
     std::wstring level;    // item level: "12" or "12-14", "" not known
     std::wstring type;     // "Material", "Ammunition, Arrows", ...
-    int count = 0;         // how many the player carries (0: not shown)
+    int count = 0;         // how many the player carries (shown on the tile itself, not in the tooltip)
     std::wstring command;  // the debug name, for chat commands
     std::wstring hint;     // what a click does, dimmed at the bottom
 };
@@ -3020,7 +3020,7 @@ constexpr uint8_t kRarityRgb[5][3] = {{217, 212, 199}, {95, 211, 95}, {79, 163, 
 const wchar_t* const kRarityName[5] = {L"Common", L"Uncommon", L"Rare", L"Epic", L"Legendary"};
 
 // Draws an item's tooltip near the pointer (mx, my), kept inside a canvas of w x h: the name in its rarity's colour, then
-// item level, rarity, type, carried, the command name and the hint; a frame in the rarity's colour.
+// item level, rarity, type, the command name and the hint; a frame in the rarity's colour.
 void draw_item_tip(Canvas& c, TextPainter& text, int mx, int my, int w, int h, const ItemTip& t) {
     const bool known = t.rarity >= 0 && t.rarity < 5;
     const uint8_t* rc = known ? kRarityRgb[t.rarity] : kRarityRgb[0];
@@ -3033,7 +3033,6 @@ void draw_item_tip(Canvas& c, TextPainter& text, int mx, int my, int w, int h, c
     if (!t.level.empty()) lines.push_back({L"Item level " + t.level, 225, 225, 230});
     if (known) lines.push_back({std::wstring(L"Rarity: ") + kRarityName[t.rarity], 225, 225, 230});
     if (!t.type.empty()) lines.push_back({L"Type: " + t.type, 225, 225, 230});
-    if (t.count > 0) lines.push_back({L"Carried: " + std::to_wstring(t.count), 225, 225, 230});
     if (!t.command.empty()) lines.push_back({L"Command name: " + t.command, 140, 145, 155});
     if (!t.hint.empty()) lines.push_back({t.hint, 160, 190, 230});
     int tw = 0;

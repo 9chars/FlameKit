@@ -64,6 +64,8 @@ local function write_list(world)
     settings.value_text("lf_keep_hotbar"))
   lines[#lines + 1] = string.format("P k:lf_dump_key:c %d Dump key: %s", settings.capturing() == "lf_dump_key" and 1 or 0,
     settings.value_text("lf_dump_key"))
+  lines[#lines + 1] = string.format("P b:lf_show_all %d Show all bag items: %s", kit.setting("lf_show_all", false) and 1 or 0,
+    settings.value_text("lf_show_all"))
   local items = kit.items
   local function tile(kind, e)
     local t = items.tip(e.item, e.debug_name)

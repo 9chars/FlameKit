@@ -1,3 +1,8 @@
+0.15.37 Nov 13, 2026
+- Auto Junk List: trophies (the heads bosses leave) are never junk and are no longer offered in the bag list.
+- Auto Junk List: new button Show all bag items (off by default). On, every item in your bag is offered and can be junked, also weapons, armour, rings, tools, summoning items, trophies and high level gear. Off, those are never removed, even if one is on your junk list (client and server).
+- The item tooltip no longer shows how many you carry: the number is on the item itself.
+
 0.15.36 Nov 13, 2026
 - Hovering an item in the Auto Junk List shows its details again: the name in its rarity's colour, item level, rarity, type, how many you carry, its name for chat commands, and what a click does.
 - Item tiles are now a standard part of FlameKit's window: every feature that shows Enshrouded items shows them the same way, with the same tooltip.

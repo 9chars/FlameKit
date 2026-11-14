@@ -34,7 +34,7 @@ S.to_local = nil         -- set by init.lua: function(world, msg) for the player
 S.CHANNEL = "lf"
 
 local function default_opts()
-  return { auto = true, action = "drop", keep_hotbar = true }
+  return { auto = true, action = "drop", keep_hotbar = true, show_all = false }
 end
 
 local function new_state(account)
@@ -48,8 +48,8 @@ local function clean_names(list)
   local junk, n = {}, 0
   if type(list) == "table" then
     for _, name in ipairs(list) do
-      if type(name) == "string" and name ~= "" and #name <= 96 and not junk[name] and n < S.MAX_ITEMS
-         and not items.is_keeper(name) then  -- weapons, armour, rings, tools, summoning items are never junk
+      if type(name) == "string" and name ~= "" and #name <= 96 and not junk[name] and n < S.MAX_ITEMS then
+        -- (a kept kind on the list stays on it: it is only removed while the player's show_all is on: removable)
         junk[name] = true
         n = n + 1
       end
@@ -64,6 +64,7 @@ local function clean_opts(o)
     if type(o.auto) == "boolean" then opts.auto = o.auto end
     if o.action == "drop" or o.action == "delete" then opts.action = o.action end
     if type(o.keep_hotbar) == "boolean" then opts.keep_hotbar = o.keep_hotbar end
+    if type(o.show_all) == "boolean" then opts.show_all = o.show_all end  -- the player's lf_show_all
   end
   return opts
 end
@@ -167,7 +168,9 @@ end
 local function removable(st, stack)
   if not st.ids[stack.item] then return false end
   if stack.hotbar and st.opts.keep_hotbar then return false end
-  if stack.gear then return false end  -- a piece with its own level and perks is never junk
+  -- a piece with its own level and perks, and the kept kinds (weapons, armour, rings, tools, summoning items, trophies),
+  -- are junk only while the player has switched on Show all bag items
+  if not st.opts.show_all and (stack.gear or items.is_keeper(st.ids[stack.item])) then return false end
   return true
 end
 
@@ -349,7 +352,7 @@ local function command(world, args)
     local _, name = items.find(text)
     if not name then
       emf.reply("no item named \"" .. text .. "\": `items <part of the name>` lists names")
-    elseif items.is_keeper(name) then
+    elseif items.is_keeper(name) and not st.opts.show_all then
       emf.reply(items.name(name) .. " cannot be junk: weapons, armour, rings, tools and summoning items are always kept")
     elseif #S.names(st) >= S.MAX_ITEMS then
       emf.reply("your junk list is full (" .. S.MAX_ITEMS .. " items)")

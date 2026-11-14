@@ -62,7 +62,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { open_on_start = false, window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { lf_show_all = false, open_on_start = false, window_key = "F6", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", notify = true, show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
@@ -393,8 +393,7 @@ side = "server"
 channel.on_server(SW, { player = PLAYER, account = ACCOUNT }, emf.json.encode({ op = "sync",
   items = { "Material_T1_Twigs", "Weapon_T1_Sword", "Tool_T1_Torch", "NPC_Crafter_Farmer01" }, opts = { auto = false, action = "delete" } }))
 side = "client"
-check(not pdata[ACCOUNT]:find("Sword") and not pdata[ACCOUNT]:find("Torch") and not pdata[ACCOUNT]:find("Farmer"),
-  "the server refuses gear, tools and summoning items on a list")
+check(pdata[ACCOUNT]:find("Twigs") ~= nil, "the server keeps the list (kept kinds stay on it, but are never removed: below)")
 settings.lf_auto = false
 click("f1:auto"); click("f1:auto")
 check(settings.lf_auto == false, "the auto button switches the setting")
@@ -409,6 +408,20 @@ step(10)
 check(count(201, 0x11) == 0, "dump removes the junk in the backpack")
 check(count(201, 0x33) == 1 and count(201, 0x55) == 1 and count(201, 0x66) == 1, "sword, torch and summoning item are still there")
 check(count(203, 0x33) == 1, "worn equipment is never touched")
+-- Show all bag items (lf_show_all): the sword is offered, can be put on the list, and goes on a dump
+check(find_row("^Sword", ":t:") == nil, "the sword is not offered while Show all bag items is off")
+settings.lf_show_all = true
+require("features.loot_filter.client").setting_changed("lf_show_all")
+check(find_row("^Sword", ":t:") ~= nil, "with Show all bag items on, the sword is offered")
+click(find_row("^Sword", ":t:").button)
+step(SYNC + 40)
+click("f1:dump")
+step(10)
+check(count(201, 0x33) == 0, "and a dump removes it")
+check(count(203, 0x33) == 1, "worn equipment is still never touched")
+settings.lf_show_all = false
+require("features.loot_filter.client").setting_changed("lf_show_all")
+step(SYNC + 40)
 click("f1:dump")
 step(5)
 check(hud.status == "No junk in your bag.", "a dump with nothing to do says so: " .. tostring(hud.status))
@@ -780,6 +793,7 @@ do
   if f then f:close() end
   check(what == "changes", "after an update FlameKit's window is asked to open on the What's New tab")
 end
+check(require("core.items").is_keeper("_Material_TX_Trophy_Wolf_Heavy_head"), "a trophy is kept: not offered in the bag list")
 -- a world save on request from the restart helper (features/server_save.lua)
 do
   local f = io.open(TMP .. "\\save_now.request", "w"); f:write("1234\n"); f:close()

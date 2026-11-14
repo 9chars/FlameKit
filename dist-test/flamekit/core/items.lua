@@ -90,9 +90,11 @@ local KEEPERS = { Weapon = true, Armour = true, Shield = true, Ring = true, Amul
 -- Single items that are never junk either, by their debug name: Runes and Legendary Runes (a currency).
 local KEPT_ITEMS = { Material_T1_Token_WeaponUpgrade_Rune01 = true, Material_T2_Token_WeaponUpgrade_Rune02 = true }
 
+-- Trophies (the heads a boss leaves: "_Material_TX_Trophy_Wolf_Heavy_head") are kept too.
 function items.is_keeper(debug_name)
   if not debug_name then return false end
   if KEPT_ITEMS[debug_name] then return true end
+  if debug_name:lower():find("trophy", 1, true) then return true end
   return KEEPERS[(items.kind(debug_name))] == true
 end
 
