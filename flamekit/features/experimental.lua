@@ -684,7 +684,7 @@ local aggro_last = 0
 -- SelectedTargets target 0 while the player had PvP on, and went to Combat with target 1 within 6 s of PvP off. So
 -- the monsters near a PvP player also get the player written as their selected target every step (EMF ai.md: "or
 -- overwrite SelectedTargets.targets[0] after it runs").
-local hunters = {}   -- monster entity -> PvP player entity, rebuilt every AGGRO_STEPS
+local hunters = {}   -- monster entity -> { PvP player entity -> distance in m }, rebuilt every AGGRO_STEPS
 local target_broken = false
 
 local function set_id(holder, field, value)
@@ -702,23 +702,29 @@ end
 -- Its threat table (DynamicAggro, 6 slots of AggroTarget) keeps each candidate's faction (+80), state (Alarmed = 3)
 -- and aggro; the AI picks a fight from the Alarmed slots. So the PvP player is also put in a slot as Alarmed with
 -- faction 7 (Player, as the picker expects) and aggro 100.
-local ALARMED, AGGRO_VALUE = 3, 100
+-- (0.15.69, owner: several PvP players near one monster) Every PvP player within AGGRO_R goes into the monster's table,
+-- each in their own slot; the game's picker chooses between the Alarmed slots by aggro (hits and damage raise it,
+-- time lowers it; it switches at most every 2-2.5 s), as it does for normal players. FlameKit gives a new slot a
+-- starting aggro by distance (closest highest) and afterwards only keeps it from falling below AGGRO_FLOOR while the
+-- player is in range, so the game's own aggro decides. The target is no longer forced.
+local ALARMED, AGGRO_FLOOR = 3, 20
+local function start_aggro(dist) return math.max(40, 100 - 3 * dist) end
 
 local function eid(v)
   if type(v) == "table" then return v.id end
   return v
 end
 
-local function alarm(world, monster, player)
+local function alarm(world, monster, player, dist)
   local ag = world:get("DynamicAggro", monster)
   if not ag then return end
-  local slot
+  local slot, fresh
   for i = 1, 6 do
-    if eid(ag.targets[i].entityId) == player then slot = ag.targets[i] break end
+    if eid(ag.targets[i].entityId) == player and tonumber(tostring(ag.targets[i].state)) ~= 0 then slot = ag.targets[i] break end
   end
-  if not slot then
+  if not slot then  -- a free slot only: the game's own candidates (other monsters, villagers) are never pushed out
     for i = 1, 6 do
-      if tonumber(tostring(ag.targets[i].state)) == 0 then slot = ag.targets[i] break end
+      if tonumber(tostring(ag.targets[i].state)) == 0 then slot, fresh = ag.targets[i], true break end
     end
   end
   if not slot then return end
@@ -726,7 +732,11 @@ local function alarm(world, monster, player)
   set_id(slot, "targetId", player)
   if tonumber(tostring(slot.state)) ~= ALARMED then slot.state = ALARMED end
   if tonumber(tostring(slot.faction)) ~= PLAYER_FACTION then slot.faction = PLAYER_FACTION end
-  if slot.aggro < AGGRO_VALUE then slot.aggro = AGGRO_VALUE end
+  if fresh then
+    slot.aggro = start_aggro(dist or AGGRO_R)
+  elseif slot.aggro < AGGRO_FLOOR then
+    slot.aggro = AGGRO_FLOOR
+  end
 end
 
 -- A test body's threat table, for the log: "slot: state entity faction aggro" for the slots in use.
@@ -746,20 +756,13 @@ F._aggro_line = aggro_line
 local function hunt(world)
   if target_broken or next(hunters) == nil then return end
   local ok, err = pcall(function()
-    for monster, player in pairs(hunters) do
-      alarm(world, monster, player)
-      local st = world:get("SelectedTargets", monster)
-      if st then
-        local t = st.targets[1]
-        local a = set_id(t, "targetEntityId", player)
-        local b = set_id(t, "targetRootEntityId", player)
-        if a or b then t.changeCounter = (t.changeCounter + 1) & 0xffff end
-      end
+    for monster, near in pairs(hunters) do
+      for player, dist in pairs(near) do alarm(world, monster, player, dist) end
     end
   end)
   if not ok then
     target_broken = true
-    emf.log("experimental: PvP: a monster's target cannot be set on this game version (" .. tostring(err) .. ")")
+    emf.log("experimental: PvP: a monster's threat table cannot be written on this game version (" .. tostring(err) .. ")")
   end
 end
 
@@ -778,7 +781,8 @@ local function pvp_aggro(world, players)
             for _, pl in ipairs(players) do
               local px, _, pz = world:position(pl)
               if px and (px - x) ^ 2 + (pz - z) ^ 2 < AGGRO_R * AGGRO_R then
-                hunters[e] = pl
+                hunters[e] = hunters[e] or {}
+                hunters[e][pl] = math.sqrt((px - x) ^ 2 + (pz - z) ^ 2)
                 local done = emf.emit("server", "AddThreatTargetEvent", { attackerId = e, targetId = pl, threatValue = AGGRO_THREAT })
                 if done == false then error("the game refused AddThreatTargetEvent") end
                 sent = sent + 1
@@ -1138,6 +1142,40 @@ end
 
 function F.setup(k)
   kit = k
+  -- A console test for PvP (server console or emf\commands.txt, output in emf_core.log), so it can be tried without a
+  -- second player at the keyboard: "flamekit.pvptest <player entity>" switches PvP on for that player, makes them
+  -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;
+  -- "flamekit.pvptest off" takes all of it back. The duelist's AI lines in the log tell whether it fights.
+  local test = nil  -- { account, player, rule }
+  pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      load_saved()
+      if args[1] == "off" then
+        if test then
+          if online[test.account] then online[test.account].pvp = nil end
+          drop_bodies_of(world, test.account, true)
+          pcall(emf.hit_rule_remove, test.rule)
+          emf.log("experimental: pvptest: off for player " .. tostring(test.player))
+          test = nil
+        end
+        emf.reply("pvptest: off")
+        return
+      end
+      local player = tonumber(args[1])
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("pvptest: no player with entity " .. tostring(args[1])) return end
+      account = tostring(account)
+      seen(account, player)
+      online[account].pvp = true
+      local okr, rule = pcall(emf.hit_rule, { kinds = "all", to = player, min_health = 1 })
+      test = { account = account, player = player, rule = okr and rule or nil }
+      pvp(world)
+      local why = spawn_body(world, account, player, "duel")
+      emf.log(string.format("experimental: pvptest: PvP on for player %s (cannot die: %s), duelist: %s", tostring(player),
+        tostring(test.rule ~= nil), why or "spawned"))
+      emf.reply("pvptest: on")
+    end, "the pvptest command"))
   -- the game event that points monsters at PvP players (see pvp_aggro); EMF wants it named in the mod's first run
   local okx, said = pcall(emf.emits, { "AddThreatTargetEvent" }, "server")
   if not okx or said == false then emf.log("experimental: AddThreatTargetEvent cannot be sent (" .. tostring(said) .. "): monsters may ignore PvP players") end

@@ -642,7 +642,9 @@ step(2)
 check(comps.Faction[PLAYER].faction == 1, "a faction the game set back is written again")
 -- monsters ignore faction 1 players by themselves: each monster near a PvP player is told it is threatened by them
 comps.DynamicEnemy01BehaviorState = { [901] = {} }
-comps.SelectedTargets = { [901] = { targets = { { targetEntityId = 0, targetRootEntityId = 0, changeCounter = 3 } } } }
+local function aslot() return { state = 0, entityId = 0, targetId = 0, faction = 0, aggro = 0 } end
+comps.DynamicAggro[901] = { targets = { aslot(), aslot(), aslot(), aslot(), aslot(), aslot() } }
+comps.DynamicAggro[901].targets[1] = { state = 3, entityId = 777, targetId = 777, faction = 3, aggro = 50 }  -- the game's own candidate
 comps.NetworkHealth = comps.NetworkHealth or {}
 comps.Faction[901] = { faction = 3 }  -- a Vukah
 local pos0 = SW.position
@@ -652,10 +654,17 @@ local th = emitted[#emitted] or { f = {} }
 check(th.kind == "server" and th.name == "AddThreatTargetEvent" and th.f.attackerId == 901 and th.f.targetId == PLAYER,
   "a monster near a PvP player is pointed at them (AddThreatTargetEvent)")
 step(2)
-local tg = comps.SelectedTargets[901].targets[1]
-check(tg.targetEntityId == PLAYER and tg.changeCounter == 4 and tg.targetRootEntityId == PLAYER, "and the PvP player is written as its selected target")
+local ag = comps.DynamicAggro[901].targets
+check(ag[1].entityId == 777 and ag[2].entityId == PLAYER and ag[2].state == 3 and ag[2].faction == 7 and ag[2].aggro > 40,
+  "and the PvP player is put in a free slot of its threat table (Alarmed, faction 7), the game's own candidate stays")
+ag[2].aggro = 75
+step(2)
+check(ag[2].aggro == 75, "after that the game's own aggro is left alone")
+ag[2].aggro = 3
+step(2)
+check(ag[2].aggro == 20, "it is only kept from falling to nothing while the player is near")
 SW.position = pos0
-comps.DynamicEnemy01BehaviorState, comps.Faction[901], comps.SelectedTargets = {}, nil, {}
+comps.DynamicEnemy01BehaviorState, comps.Faction[901], comps.DynamicAggro = {}, nil, {}
 ef = io.open(TMP .. "\\experimental.json"); etext = ef:read("a"); ef:close()
 check(not etext:find("pvp", 1, true), "PvP is never saved: it is off again next time")
 click(find_row("PvP", "sw:pvp").button)

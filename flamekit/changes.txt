@@ -1,3 +1,7 @@
+0.15.69 Nov 14, 2026
+- PvP: with several PvP players near a monster, every one of them is now in its threat table, and the game itself chooses whom it fights (by aggro: who hits it, how hard, how close), the same way it does with normal players. Before, one of them was picked at random and forced as its target.
+- Server console: "flamekit.pvptest <player>" and "flamekit.pvptest off" try PvP against a duelist without a second player (the player cannot die meanwhile).
+
 0.15.68 Nov 14, 2026
 - PvP: monsters now really fight a player with PvP on (tested with the duelist: it attacks within a second). The game's own threat event was not enough: each monster within 20 m of a PvP player also gets that player as its target and in its threat table, the way the game keeps a normal player there.
 - PvP test bodies: a body spawned right after a long move is no longer lost track of.
