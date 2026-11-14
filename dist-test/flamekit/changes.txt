@@ -1,3 +1,6 @@
+0.15.83 Nov 14, 2026
+- When an update has downloaded, a small window in the middle of the screen says so (besides the green line in the lower left corner). OK, Enter or Esc close it. "Restart Game" closes the game the way Alt+F4 does and starts it again through Steam, with the new version.
+
 0.15.82 Nov 14, 2026
 - Messages window: each player's chat lines are in that player's colour, the same as their symbol in the Party window and on the minimap.
 

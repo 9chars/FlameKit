@@ -5035,12 +5035,174 @@ struct ExperimentalLayer : PinnedLayer {
     }
 };
 
+// ---- the update dialog (0.15.83, owner) ----
+// When the updater has a new version ready for the next start (update_status.txt "ready|Update vX is ready: ..."), a
+// small window in the middle of the game window says so, like a Windows dialog, besides the lower left line. Once per
+// version in a game session. OK, Esc or Enter close it; Restart Game closes the game the way Alt+F4 does (WM_CLOSE: the
+// owner's restart helper does the same) and a hidden PowerShell starts it again through Steam once the game's process
+// has ended (the new version is put in place at that start). If the game is still running after 120 s (the close did
+// not happen), nothing is started.
+struct UpdateDialog : Layer {
+    bool stays_in_build() const override { return true; }
+    const char* name() const override { return "update dialog"; }
+    bool open = false, dirty = true, fonts = false;
+    std::string announced;  // the version the dialog was shown for (once per version)
+    std::wstring version;
+    uint64_t next_read = 0;
+    TextPainter text, head;
+    RECT ok_r{}, restart_r{};
+    int mouse_x = -1, mouse_y = -1;
+    bool restarting = false;
+    static constexpr int kW = 440, kH = 176, kHead = 32;
+
+    void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
+        for (int y = y0; y < y1; ++y)
+            for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
+    }
+
+    void read_status(uint64_t now) {
+        next_read = now + 1000;
+        FILE* fp = _wfsopen((g_flamekit_dir + L"update_status.txt").c_str(), L"rb", _SH_DENYNO);
+        if (!fp) return;
+        char line[256] = "";
+        const bool got = fgets(line, sizeof line, fp) != nullptr;
+        fclose(fp);
+        if (!got || std::strncmp(line, "ready|", 6) != 0) return;
+        const char* v = std::strstr(line, " v");
+        if (!v) return;
+        std::string ver;
+        for (v += 2; *v && *v != ' ' && *v != ':' && *v != '\r' && *v != '\n'; ++v) ver += *v;
+        if (ver.empty() || ver == announced) return;
+        announced = ver;
+        version = widen(ver);
+        open = true;
+        dirty = true;
+        FK_LOG(fklog::kInfo, "update dialog: shown for v%s", ver.c_str());
+    }
+
+    void draw() {
+        if (!fonts) {
+            fonts = true;
+            head.ready(g_screen, 17);
+            text.ready(g_screen, 16);
+        }
+        resize(kW, kH);
+        std::fill(pixels.begin(), pixels.end(), 0u);
+        box(0, 0, kW, kH, 14, 15, 19, 0.94f);
+        box(0, 0, kW, kHead, 30, 34, 44, 1.0f);
+        box(0, 0, kW, 1, 120, 160, 220, 1.0f);
+        box(0, kH - 1, kW, kH, 120, 160, 220, 1.0f);
+        box(0, 0, 1, kH, 120, 160, 220, 1.0f);
+        box(kW - 1, 0, kW, kH, 120, 160, 220, 1.0f);
+        head.draw(canvas, 12, 6, L"FlameKit update", 235, 225, 205);
+        text.draw(canvas, 20, kHead + 18, L"FlameKit v" + version + L" has been downloaded.", 90, 220, 110);
+        text.draw(canvas, 20, kHead + 44, restarting ? L"Closing the game; it starts again by itself..." : L"It is used the next time the game starts.",
+                  225, 225, 230);
+        const int bw = 130, bh = 32, by = kH - bh - 16;
+        restart_r = {kW - 16 - bw, by, kW - 16, by + bh};
+        ok_r = {restart_r.left - 12 - bw, by, restart_r.left - 12, by + bh};
+        auto button = [&](const RECT& r, const wchar_t* label, bool main) {
+            const bool over = mouse_x >= r.left && mouse_y >= r.top && mouse_x < r.right && mouse_y < r.bottom;
+            const float base = main ? 62.0f : 50.0f;
+            box(r.left, r.top, r.right, r.bottom, over ? base + 30 : base, over ? base + 34 : base + 4, over ? base + 46 : base + 14, 1.0f);
+            if (main) {
+                box(r.left, r.top, r.right, r.top + 1, 120, 160, 220, 1.0f);
+                box(r.left, r.bottom - 1, r.right, r.bottom, 120, 160, 220, 1.0f);
+            }
+            text.draw(canvas, r.left + (r.right - r.left - text.width(label)) / 2, r.top + 6, label, 235, 235, 240);
+        };
+        button(ok_r, L"OK", true);
+        button(restart_r, L"Restart Game", false);
+        changed = true;
+    }
+
+    void update(const Frame& f) override {
+        if (!next_read) next_read = f.now + 5000;  // the updater clears the last session's line at its start first
+        if (f.now >= next_read && !restarting) read_status(f.now);
+        const bool want = open && f.gw > 0 && f.gh > 0;
+        if (want != visible) {
+            visible = want;
+            changed = true;
+        }
+        if (!visible) return;
+        if (dirty) {
+            dirty = false;
+            draw();
+        }
+        place(std::max(0, (f.gw - kW) / 2), std::max(0, (f.gh - kH) / 2));
+    }
+
+    void close(const char* how) {
+        open = false;
+        FK_LOG(fklog::kInfo, "update dialog: closed (%s)", how);
+    }
+
+    void restart_game() {
+        HWND g = game_window();
+        if (!g) {
+            FK_LOG(fklog::kWarn, "update dialog: Restart Game: the game's window was not found");
+            return;
+        }
+        const DWORD pid = GetCurrentProcessId();
+        // started first, so it is waiting before the game begins to close; it ends by itself either way
+        std::wstring cmd = L"\"";
+        wchar_t sys[MAX_PATH] = L"C:\\Windows";
+        GetWindowsDirectoryW(sys, MAX_PATH);
+        cmd += sys;
+        cmd += L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -WindowStyle Hidden -Command \"";
+        cmd += L"$p = Get-Process -Id " + std::to_wstring(pid) + L" -ErrorAction SilentlyContinue; ";
+        cmd += L"if ($p -and -not $p.WaitForExit(120000)) { exit 1 }; Start-Sleep -Seconds 3; Start-Process 'steam://rungameid/1203620'\"";
+        STARTUPINFOW si{};
+        si.cb = sizeof si;
+        PROCESS_INFORMATION pi{};
+        std::vector<wchar_t> line(cmd.begin(), cmd.end());
+        line.push_back(0);
+        if (!CreateProcessW(nullptr, line.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, nullptr, nullptr, &si, &pi)) {
+            FK_LOG(fklog::kWarn, "update dialog: Restart Game: the restarter could not be started (error %lu): the game is left running",
+                   GetLastError());
+            return;
+        }
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        restarting = true;
+        dirty = true;
+        FK_LOG(fklog::kInfo, "update dialog: Restart Game: closing the game (WM_CLOSE, like Alt+F4); it starts again through Steam");
+        PostMessageW(g, WM_CLOSE, 0, 0);
+    }
+
+    bool wants_mouse() const override { return open; }
+    bool wants_keys() const override { return open; }
+    void key(WPARAM vk) override {
+        if (vk == VK_ESCAPE) close("Esc");
+        else if (vk == VK_RETURN) close("Enter");
+    }
+    void mouse_left() override {
+        mouse_x = mouse_y = -1;
+        dirty = true;
+    }
+    void mouse(UINT msg, int x, int y) override {
+        if (msg == WM_MOUSEMOVE) {
+            if (x != mouse_x || y != mouse_y) {
+                mouse_x = x;
+                mouse_y = y;
+                dirty = true;
+            }
+            return;
+        }
+        if (msg != WM_LBUTTONUP || restarting) return;
+        const POINT p{x, y};
+        if (PtInRect(&ok_r, p)) close("OK");
+        else if (PtInRect(&restart_r, p)) restart_game();
+    }
+};
+
 struct BackdropLayer : Layer {
     bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "backdrop"; }
     const Layer* window = nullptr;
+    const Layer* dialog = nullptr;  // the update dialog (0.15.83): the pointer is out while it is open
     void update(const Frame& f) override {
-        const bool want = ((window && window->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
+        const bool want = ((window && window->visible) || (dialog && dialog->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
         if (want != visible) {
             visible = want;
             changed = true;
@@ -5580,8 +5742,10 @@ void ui_thread_body() {
     NoticeLayer notices;
     ExperimentalLayer experimental;
     experimental.window = &window;
+    UpdateDialog update_dialog;
+    backdrop.dialog = &update_dialog;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
@@ -5680,7 +5844,7 @@ void ui_thread_body() {
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
         // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
         {
-            const bool mode = hold || window.open;
+            const bool mode = hold || window.open || update_dialog.open;
             if (mode && !g_pointer_mode) {
                 restore_rounds = 5;
             } else if (!mode && g_pointer_mode) {
