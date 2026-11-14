@@ -14,6 +14,7 @@ All keys can be changed in the FlameKit Menu (F4): F4 and the pointer key in the
 | F5 | PvP Leaderboard |
 | F6 | Experimental window |
 | F7 | Party window |
+| F8 | Messages window |
 | F10 | Minimap on or off |
 | Numpad + / - | Minimap zoom |
 | Right Alt | The mouse pointer, to click, move, resize and hide FlameKit's windows (hold it, or press once if you switched that on in the Windows tab) |

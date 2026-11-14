@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.122.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.123.
 
 ## What FlameKit is
 
@@ -121,7 +121,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - PvP test bodies (0.15.66, Experimental Debug, op `body` on channel exp): dummy `FakePlayer_Vukah_Melee` (faction 7, 0 damage) and duelist `Enemy_Vukah_Melee` with faction 1 (rewritten every 30 steps), one per player, 3 m in front. Owner: the duelist may hurt everything but pets and animals, never buildings: rule `from duelist, to objects, cancel` plus, every 180 steps, a rule per animal/pet within 40 m (Wildlife/Animal/IsTame, faction 5/6/12, or 11 without NpcState), at most 40. Villagers are fair game (owner). Not saved; gone on Remove, death, reload or the owner leaving. Unknown: whether a spawned Vukah despawns after a while (EMF saw a hostile vanish within a minute).
 - Messages window: every message FlameKit sends the player (`kit.note`, always shown since 0.15.106: no setting), except persistent notices, which go to the notices window (`kit.notice`) (owner, 0.15.64). Last 5, 10 in pointer mode, all (up to 100) once the player sized it.
 
-**Features (Lua):** settings live only in their own feature's tab; the Settings tab (`features/settings.lua`, from mod.json) shows only the FlameKit groups and each feature's `enabled_setting` (Auto Junk List `lf_enabled`, Minimap `map_show` since 0.15.112). The "Windows" group (F5-F7 keys, pointer toggle) is shown at the bottom of the DLL's Windows tab (0.15.112), changed through settings.lua (`k:<key>:c`, `b:<key>`). Keys that act in the game (`lf_dump_key`, `map_zoom_in_key`, `map_zoom_out_key`) take only F1-F12 or numpad keys (settings.lua `GAME_KEYS`/`key_allowed`; checked where used too). Debug things go in Experimental → Debug (log level buttons, test players `dbg:test:N`). Party: the hosting side reads each player every 30 steps and sends the list on channel `party`; DOWN at 0 health; clicking a player in pointer mode follows them on the minimap. Test players: `core/test_players.lua`, via channel `party_test`. Server version: `features/server_version.lua`, channel `ver` (client asks at step 120, then every 3600; `kit.server_note`). Server save: `features/server_save.lua` (for the restart helper). Who is in the server world: `core/players.lua` (0.15.48), kept from `emf.on_player_joined` / `emf.on_player_left` (EMF Lua 1.20; the installed one is 1.24). Measured on the owner's server: after a FlameKit reload EMF reports every player already there again (`joined: entity id 1` in the same moment), so the list has no gap; the owner's player was id 1, no player id in 65-1023. EMF's docs: player entity ids are 1..0x3FF and a leaving player's id goes to the next who joins. Never scan entity ids for players again; the 1-64 scan stays only as the fallback for an EMF without the events. The Auto Junk List never junks trophies, runes, Legendary Runes, eternal arrows/spells (unless `lf_show_all`).
+**Features (Lua):** settings live only in their own feature's tab; the Settings tab (`features/settings.lua`, from mod.json) shows only the FlameKit groups and each feature's `enabled_setting` (Auto Junk List `lf_enabled`, Minimap `map_show` since 0.15.112). The "Windows" group (F5-F8 keys, pointer toggle) is shown at the bottom of the DLL's Windows tab (0.15.112), changed through settings.lua (`k:<key>:c`, `b:<key>`). Keys that act in the game (`lf_dump_key`, `map_zoom_in_key`, `map_zoom_out_key`) take only F1-F12 or numpad keys (settings.lua `GAME_KEYS`/`key_allowed`; checked where used too). Debug things go in Experimental → Debug (log level buttons, test players `dbg:test:N`). Party: the hosting side reads each player every 30 steps and sends the list on channel `party`; DOWN at 0 health; clicking a player in pointer mode follows them on the minimap. Test players: `core/test_players.lua`, via channel `party_test`. Server version: `features/server_version.lua`, channel `ver` (client asks at step 120, then every 3600; `kit.server_note`). Server save: `features/server_save.lua` (for the restart helper). Who is in the server world: `core/players.lua` (0.15.48), kept from `emf.on_player_joined` / `emf.on_player_left` (EMF Lua 1.20; the installed one is 1.24). Measured on the owner's server: after a FlameKit reload EMF reports every player already there again (`joined: entity id 1` in the same moment), so the list has no gap; the owner's player was id 1, no player id in 65-1023. EMF's docs: player entity ids are 1..0x3FF and a leaving player's id goes to the next who joins. Never scan entity ids for players again; the 1-64 scan stays only as the fallback for an EMF without the events. The Auto Junk List never junks trophies, runes, Legendary Runes, eternal arrows/spells (unless `lf_show_all`).
 
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
@@ -154,11 +154,14 @@ PinnedLayer::fixed_height: a player-given height (e.h) is kept even when the con
 that tall). MessagesLayer uses it: with e.h set it shows all kept messages (kit.lua MOST_MESSAGES 100), sticks to the
 newest unless scrolled up; max width 1400.
 
-## Default window places (0.15.104)
-PinnedLayer: def_x_pm / def_y_pm (per mille), or def_center, or def_right_px (px from the right edge). Messages 6,20‰ top
-left; Party 6,240‰; Notices centred, 90‰; Leaderboard 12 px from the right, 190‰; Experimental 324 px from the right
-(left of the Leaderboard's 300 px), 190‰. Based on the owner's own arrangement at 1920x1080. Saved places
-(ui_layout.txt) win; "Reset place" goes back to these.
+## Default window places (0.15.104, 0.15.123)
+Taken from the owner's own ui_layout.txt at 1920x1080 (0.15.123). PinnedLayer: def_x_pt / def_y_pt (1/10000 of the game
+window, rounded), or def_center, or def_right_px (px from the right edge), def_bottom_px (px above the bottom);
+default_w; default_h (the first height in px at 1080 high, scaled with the game window; `given_h()` = the player's height
+or that). Party 29,255 (151, 2361‱) 432 wide, at most 792; Experimental 121 px from the right, 204 (1889‱), 256 wide, at
+most 500; Messages 4 px (21‱) from the left, 3 px above the bottom, 548 x 138 (fixed); Notices centred, 104 (963‱), 640
+wide; Leaderboard centred, 246 (2278‱), 640 wide, at most 361, hidden at first; F4 window 569,11 (2964, 102‱), 895 wide,
+9852‱ of the height. Saved places (ui_layout.txt) always win; Reset place goes back to these.
 
 ## Labels and About (0.15.103)
 Main screen line: "FlameKit vX". In-world label (kit.lua hud_tick): "FlameKit vX is Connected|Not Connected" from

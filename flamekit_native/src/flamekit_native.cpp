@@ -63,6 +63,7 @@ struct Settings {
     uint32_t exp_vk = VK_F6;      // shows and hides the Experimental window (setting exp_window_key, 0.15.74)
     uint32_t party_vk = VK_F7;    // shows and hides the Party window (setting party_window_key, 0.15.81)
     uint32_t board_vk = VK_F5;    // shows and hides the PvP Leaderboard (setting board_window_key, 0.15.95)
+    uint32_t messages_vk = VK_F8; // shows and hides the Messages window (setting messages_window_key, 0.15.123)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     bool pointer_toggle = false;  // pointer_toggle (0.15.79): one press shows the pointer, the next (or Esc) puts it away
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
@@ -126,6 +127,8 @@ void read_settings() {
     s.exp_vk = ekey.empty() ? 0 : emf::keys::parse_key(std::wstring(ekey.begin(), ekey.end()));
     const std::string pwkey = emf::setting_text(kKit, "party_window_key", "F7");
     s.party_vk = pwkey.empty() ? 0 : emf::keys::parse_key(std::wstring(pwkey.begin(), pwkey.end()));
+    const std::string mkey = emf::setting_text(kKit, "messages_window_key", "F8");
+    s.messages_vk = mkey.empty() ? 0 : emf::keys::parse_key(std::wstring(mkey.begin(), mkey.end()));
     const std::string bkey = emf::setting_text(kKit, "board_window_key", "F5");
     s.board_vk = bkey.empty() ? 0 : emf::keys::parse_key(std::wstring(bkey.begin(), bkey.end()));
     const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
@@ -485,6 +488,7 @@ std::unordered_map<uint32_t, ItemMeta> g_item_meta;  // filled once, when the it
 std::atomic<bool> g_ui_request{false};  // F4 (window_key) was pressed: FlameKit's own UI (ui_thread)
 std::atomic<bool> g_exp_toggle{false};  // the Experimental window's key was pressed (ui_thread shows or hides it)
 std::atomic<bool> g_party_toggle{false};  // the Party window's key (0.15.81)
+std::atomic<bool> g_messages_toggle{false};  // the Messages window's key (0.15.123)
 std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
 // (0.15.100, owner) "Check for updates" clicked: until then (GetTickCount64), an update that is ready shows the update
 // dialog again, even when it was shown for that version already
@@ -518,6 +522,8 @@ void on_world_tick(emf::World w) {
     if (s.party_vk && party_key.pressed(emf::keys::down(s.party_vk))) g_party_toggle = true;
     static emf::keys::Edge board_key;
     if (s.board_vk && board_key.pressed(emf::keys::down(s.board_vk))) g_board_toggle = true;
+    static emf::keys::Edge messages_key;
+    if (s.messages_vk && messages_key.pressed(emf::keys::down(s.messages_vk))) g_messages_toggle = true;
     const auto* t = w.get<gen::CurrentTransform>(emf::local_player());
     if (!t) return;
     // Item details for FlameKit's panel (a Lua mod cannot read the game's item definitions): once per game start,
@@ -2640,8 +2646,14 @@ struct PinnedLayer : Layer {
     std::string id;
     std::wstring title;
     int default_w = 300, min_w = 220, max_w = 640;
-    int def_x_pm = 12, def_y_pm = 333;  // the first place: per mille of the game window's width and height
-    // (0.15.104, owner: the default places were all over the place) instead of def_x_pm: centred across the screen, or
+    // the first place: in 1/10000 of the game window's width and height (rounded), measured in the owner's layout at
+    // 1920x1080 (0.15.123); def_bottom_px instead of def_y_pt: this many pixels above the bottom edge
+    int def_x_pt = 120, def_y_pt = 3330, def_bottom_px = -1;
+    // the first height (at most this tall; fixed_height: this tall), in pixels at 1080 high, scaled with the game window;
+    // 0: as tall as the content
+    int default_h = 0, game_h = 1080;
+    int given_h() { const LayoutEntry& e = lay(); return e.h > 0 ? e.h : default_h > 0 ? (default_h * game_h + 540) / 1080 : 0; }
+    // (0.15.104, owner: the default places were all over the place) instead of def_x_pt: centred across the screen, or
     // this many pixels from the right edge (the window's right side), so the right-hand windows line up at any resolution
     bool def_center = false;
     int def_right_px = -1;
@@ -2692,10 +2704,11 @@ struct PinnedLayer : Layer {
         LayoutEntry& e = lay();
         const int w = std::clamp(e.w > 0 ? e.w : default_w, min_w, max_w);
         const int natural = kHead + (e.collapsed ? 0 : content_height(w) + 8);
+        const int eh = given_h();
         const int h = e.collapsed ? kHead
                       : fit_height ? natural
-                      : e.h > 0 ? (fixed_height ? std::max(e.h, kHead + 40) : std::min(natural, std::max(e.h, kHead + 40)))  // e.h: at most this tall
-                                : natural;
+                      : eh > 0 ? (fixed_height ? std::max(eh, kHead + 40) : std::min(natural, std::max(eh, kHead + 40)))  // at most this tall
+                               : natural;
         max_scroll = std::max(0, natural - h);
         scroll = std::clamp(scroll, 0, max_scroll);
         resize(w, h);
@@ -2767,6 +2780,10 @@ struct PinnedLayer : Layer {
             FK_LOG(fklog::kDebug, "pinned: %s %s", id.c_str(), want ? "shown" : "hidden");
         }
         if (!visible) return;
+        if (f.gh > 0 && f.gh != game_h) {  // the default height follows the game window's
+            game_h = f.gh;
+            dirty = true;
+        }
         if (was_pointer != g_pointer_mode) {
             was_pointer = g_pointer_mode;
             dirty = true;
@@ -2776,8 +2793,11 @@ struct PinnedLayer : Layer {
             dirty = false;
             draw_all();
         }
-        int x = e.x >= 0 ? e.x : def_center ? (f.gw - canvas.w) / 2 : def_right_px >= 0 ? f.gw - def_right_px - canvas.w : f.gw * def_x_pm / 1000;
-        int y = e.y >= 0 ? e.y : f.gh * def_y_pm / 1000;
+        int x = e.x >= 0 ? e.x
+                : def_center ? (f.gw - canvas.w) / 2
+                : def_right_px >= 0 ? f.gw - def_right_px - canvas.w
+                : (f.gw * def_x_pt + 5000) / 10000;
+        int y = e.y >= 0 ? e.y : def_bottom_px >= 0 ? f.gh - def_bottom_px - canvas.h : (f.gh * def_y_pt + 5000) / 10000;
         x = std::clamp(x, 0, std::max(0, f.gw - canvas.w));
         y = std::clamp(y, 0, std::max(0, f.gh - canvas.h));
         place(x, y);
@@ -2933,7 +2953,7 @@ struct PartyLayer : PinnedLayer {
         return b;
     }
 
-    PartyLayer() : PinnedLayer("party", L"Party", 300) { hide_in_menus = true; def_x_pm = 6; def_y_pm = 240; }  // left, under Messages
+    PartyLayer() : PinnedLayer("party", L"Party", 432) { hide_in_menus = true; def_x_pt = 151; def_y_pt = 2361; default_h = 792; }  // left
     uint32_t hotkey() const override { return settings().party_vk; }
     // its key (party_window_key, 0.15.81) shows and hides it, like the Experimental window's
     bool party_key(const Frame& f) {
@@ -3318,9 +3338,16 @@ struct MessagesLayer : PinnedLayer {
     // (0.15.105, owner: it holds the chat now) sized freely in both directions at its lower right corner: once the
     // player gave it a height it keeps that height and shows every kept message, scrolled to the newest (the mouse wheel
     // scrolls back; at the bottom again it follows the newest)
-    MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_x_pm = 6; def_y_pm = 20; fixed_height = true; max_w = 1400; }  // top left
+    MessagesLayer() : PinnedLayer("messages", L"Messages", 548) {  // lower left, 3 px above the bottom
+        def_x_pt = 21;
+        def_bottom_px = 3;
+        default_h = 138;
+        fixed_height = true;
+        max_w = 1400;
+    }
     bool stick = true;  // follows the newest message
     void scrolled() override { stick = scroll >= max_scroll; }  // the wheel or the scroll bar
+    uint32_t hotkey() const override { return settings().messages_vk; }  // (0.15.123, owner) in its title, like the others
 
     // (0.15.107, owner) hidden in the game's menus like the other windows
     bool active(const Frame& f) override { return f.in_world && !f.in_menu; }
@@ -3381,12 +3408,20 @@ struct MessagesLayer : PinnedLayer {
     }
 
     bool refresh(const Frame& f) override {
+        bool keyed = false;
+        if (g_messages_toggle.exchange(false) && f.in_world) {  // its key shows and hides it (0.15.123)
+            LayoutEntry& le = lay();
+            le.hidden = !le.hidden;
+            g_layout.save();
+            keyed = true;
+            FK_LOG(fklog::kInfo, "messages window: %s (its key)", le.hidden ? "hidden" : "shown");
+        }
         if (f.now >= next_read) {
             next_read = f.now + 250;
             read_file(f.now);
         }
-        std::vector<size_t> want;  // the last 5, or 10 while the pointer is out; all when the player sized it
-        const size_t n = lay().h > 0 ? all.size() : g_pointer_mode ? kAll : kNew;
+        std::vector<size_t> want;  // the last 5, or 10 while the pointer is out; all when it has a height (the player's or its default)
+        const size_t n = given_h() > 0 ? all.size() : g_pointer_mode ? kAll : kNew;
         for (size_t i = all.size() > n ? all.size() - n : 0; i < all.size(); ++i) want.push_back(i);
         if (want == shown) {
             if (stick && lay().h > 0 && scroll < max_scroll) {  // sized just now: to the newest
@@ -3439,7 +3474,13 @@ struct BoardLayer : PinnedLayer {
     uint64_t stamp = 0, next_read = 0, next_ask = 0;
     static constexpr int kLine = 22;
 
-    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_right_px = 12; def_y_pm = 190; default_hidden = true; }  // right edge
+    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 640) {  // centred
+        hide_in_menus = true;
+        def_center = true;
+        def_y_pt = 2278;
+        default_h = 361;
+        default_hidden = true;
+    }
     uint32_t hotkey() const override { return settings().board_vk; }
 
     bool read_file() {
@@ -3570,13 +3611,13 @@ struct NoticeLayer : PinnedLayer {
     bool was_pointer_out = false;
     static constexpr int kLine = 21, kBar = 4, kX = 16;
 
-    NoticeLayer() : PinnedLayer("notices", L"Notices", 420) {
+    NoticeLayer() : PinnedLayer("notices", L"Notices", 640) {
         headless = true;
         kHead = 0;
         hide_in_menus = true;
         fit_height = true;  // grows with each new notice
         def_center = true;  // top centre
-        def_y_pm = 90;
+        def_y_pt = 963;
     }
 
     bool active(const Frame& f) override { return f.in_world && !notes.empty() && !(hide_in_menus && f.in_menu); }
@@ -3810,7 +3851,7 @@ struct WindowLayer : Layer {
         const Row* row = nullptr;  // an item tile of a tab of rows: its details for the tooltip
     };
     static constexpr int kIcon = 64, kGap = 8, kPad = 16, kTitle = 32, kGrip = 16, kBarW = 10;
-    static constexpr int kDefW = 2 * kPad + 10 * kIcon + 9 * kGap, kDefH = 860, kMinW = 560, kMinH = 440;
+    static constexpr int kDefW = 895, kDefH = 860, kMinW = 560, kMinH = 440;
     // The window's size and layout now (lay_out). They were constants before the window could be resized (0.15.28),
     // hence the k names. The size comes from ui_layout.txt ("window"), else the default.
     int kW = kDefW, kH = kDefH;
@@ -4388,9 +4429,11 @@ struct WindowLayer : Layer {
         const wchar_t* label;
         const char* key;
     };
-    static constexpr WinKey kWinKeys[3] = {{L"Key that shows and hides the PvP Leaderboard", "board_window_key"},
+    static constexpr int kWinKeyCount = 4;
+    static constexpr WinKey kWinKeys[kWinKeyCount] = {{L"Key that shows and hides the PvP Leaderboard", "board_window_key"},
                                            {L"Key that shows and hides the Experimental window", "exp_window_key"},
-                                           {L"Key that shows and hides the Party window", "party_window_key"}};
+                                           {L"Key that shows and hides the Party window", "party_window_key"},
+                                           {L"Key that shows and hides the Messages window", "messages_window_key"}};
     int capture_win = -1;  // the key setting of the Windows tab waiting for a key (-1: none)
     void stop_capture() {  // the Lua part's Settings waits too: the same click again ends it there
         if (capture_win < 0) return;
@@ -4429,8 +4472,8 @@ struct WindowLayer : Layer {
             text.draw(canvas, kPad, y, L"Keys and pointer", 255, 210, 122);
             y += 34;
             const Settings st = settings();
-            const uint32_t vks[3] = {st.board_vk, st.exp_vk, st.party_vk};
-            for (int i = 0; i < 3; ++i) {
+            const uint32_t vks[kWinKeyCount] = {st.board_vk, st.exp_vk, st.party_vk, st.messages_vk};
+            for (int i = 0; i < kWinKeyCount; ++i) {
                 text.draw(canvas, kPad, y + 5, kWinKeys[i].label, 230, 230, 235);
                 const std::wstring k = key_label(vks[i]);
                 button(kPad + 430, y, 150, capture_win == i ? L"press a key" : k.empty() ? L"none" : k, capture_win == i, kWinKey,
@@ -4743,8 +4786,9 @@ struct WindowLayer : Layer {
             }
         }
         LayoutEntry& e = g_layout.get("window");  // its size and place: the player's (ui_layout.txt), else the defaults
+        // (0.15.123) the default: the owner's layout at 1920x1080 (895 wide, 1064 of 1080 high), the height scaled
         const int w = std::clamp(e.w > 0 ? e.w : kDefW, kMinW, std::max(kMinW, f.gw));
-        const int h = std::clamp(e.h > 0 ? e.h : kDefH, kMinH, std::max(kMinH, f.gh));
+        const int h = std::clamp(e.h > 0 ? e.h : (f.gh * 9852 + 5000) / 10000, kMinH, std::max(kMinH, f.gh));
         if (w != kW || h != kH) {
             kW = w;
             kH = h;
@@ -4755,7 +4799,7 @@ struct WindowLayer : Layer {
             draw();
         }
         visible = true;
-        const int x = e.x >= 0 ? e.x : (f.gw - kW) / 2, y = e.y >= 0 ? e.y : (f.gh - kH) / 2;
+        const int x = e.x >= 0 ? e.x : (f.gw * 2964 + 5000) / 10000, y = e.y >= 0 ? e.y : (f.gh * 102 + 5000) / 10000;
         place(std::clamp(x, 0, std::max(0, f.gw - kW)), std::clamp(y, 0, std::max(0, f.gh - kH)));
     }
 
@@ -4861,7 +4905,7 @@ struct WindowLayer : Layer {
                 }
                 break;
             case kPinReset:
-                if (h.index == g_pinned.size()) {  // FlameKit's window: the middle of the screen, its first size
+                if (h.index == g_pinned.size()) {  // FlameKit's window: its default place and size
                     g_layout.get("window") = LayoutEntry{};
                     g_layout.save();
                     FK_LOG(fklog::kInfo, "window: back to its first place and size");
@@ -4882,7 +4926,7 @@ struct WindowLayer : Layer {
                 act("opt", "b:ui_hide_build");
                 break;
             case kWinKey:  // (0.15.112) wait for a key (the same click again: stop waiting)
-                if (h.index < 3) {
+                if (h.index < kWinKeyCount) {
                     const int i = static_cast<int>(h.index);
                     act("opt", std::string("k:") + kWinKeys[i].key + ":c");
                     capture_win = capture_win == i ? -1 : i;  // another one waiting: the Lua part switches to this one too
@@ -5021,7 +5065,13 @@ struct ExperimentalLayer : PinnedLayer {
 
     uint32_t hotkey() const override { return settings().exp_vk; }
     // right side, left of the PvP Leaderboard's place (12 px + its 300 + 12 px from the right edge)
-    ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 380) { def_right_px = 324; def_y_pm = 190; hide_in_menus = true; max_w = 760; }
+    ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 256) {  // right, 121 px from the edge
+        def_right_px = 121;
+        def_y_pt = 1889;
+        default_h = 500;
+        hide_in_menus = true;
+        max_w = 760;
+    }
 
     static std::wstring unescape(const std::string& s) {
         std::wstring w = widen(s);
