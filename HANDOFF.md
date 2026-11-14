@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.124.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.124 (the first Stable release).
 
 ## What FlameKit is
 
@@ -22,7 +22,7 @@ It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Fea
 5. **One version per round of work.** Every time anything changes, the version goes up; one version can hold many changes. Never leave changed code under an old number.
 6. **The change log lists everything.** `flamekit/changes.txt` gets a line for every change in every version. Nothing is trimmed, merged or hidden. Format: a line `0.15.8 Nov 13, 2026`, then `- ` lines, then an empty line; newest first.
 7. **Test the way production works.** Nothing is copied onto the owner's client by hand. New versions reach the client only through the updater.
-8. **No release package until told.** Do not build zips or touch `dist` (the players' channel) until the owner says to roll to production.
+8. **Releases only when told.** `dist` (the players' channel, Stable) gets a new version only when the owner says to release one; every other version goes to `dist-test` only. First release: 0.15.124 (2026-11-14, owner).
 9. **Do not modify game data.** Read only. Prefer few frameworks. When a game update breaks something, fall back to a generic label or icon; disable a feature only if needed to prevent a crash.
 10. **Short labels, short chat lines, no explanatory text in the panel.** Always say "client" or "server" explicitly.
 11. **Keep replies short** and lead with the result.
@@ -46,7 +46,8 @@ Folder names on the owner's PC are not in this repository (it is public). `<work
 
 - **GitHub:** `9chars/FlameKit` (public). Source, notes, tools, and the update channels. The Claude GitHub App is installed on it; pushing works.
   - `dist-test/`: development versions. The owner's PC downloads from here (it has `emf\mods\flamekit\update_channel.txt` containing `test`). Since 0.15.124 any player can pick it: Experimental tab → Debug → Updates: Stable / Development (experimental.lua `dbg:chan:*` writes the file, "test" or "stable", and `ui_update_check.request`, which the DLL's HudLayer turns into an update look at once).
-  - `dist/`: players' versions. Does not exist yet; create it only on release.
+  - `dist/`: players' versions (Stable). Since 0.15.124. A release: `dist` = a copy of a `dist-test` version that was tried (update.txt does not name its channel, so the same update.sig is good for both; `tools/check_sig.py dist`).
+  - Release packages (on the owner's PC, `<work folder>\release\`, never in the repository): `FlameKit-<v>.zip` for players (the 0.14.2 package's EMF 0.6.6 + Lua host, with `flamekit` and `flamekit_native`; its `install.ps1` has `Remove-OldFlameKit`: it deletes `emf\mods\flamekit_map`, `emf\mods\flamekit_native`, `emf\flamekit_update` and every file in `emf\mods\flamekit` but the player's `.json` files other than mod.json, `ui_layout.txt`, `update_channel.txt`, `debug.txt` and `logs\`) and `FlameKit-<v>-server-mod.zip` (the `flamekit` folder and SERVER-README.txt with the manual steps for G-Portal). The package's own texts are in `tools/release/` (install.ps1 = EMF 0.6.6's with `Remove-OldFlameKit`, README.txt, SERVER-README.txt; change the version in the READMEs). A new package: the last one, with `game\emf\mods\flamekit` and `flamekit_native` replaced by the release's `dist` folders. Tested 2026-11-14 with the restart helper's `installold`/`installnew` (a fake server folder `restart_helper\installtest\game`): 0.14.2, then 0.15.124 over it with seeded data: flamekit_map, the old files, the .old DLL and a held update gone; junk list, layout, channel and logs kept.
 - **Owner's PC working copies:** `<work folder>\flamekit` (Lua), `<work folder>\flamekit_native` (C++: `src\`, `build.cmd`, `notes\`).
 - **Client install:** `<game folder>\emf\mods\{lua, flamekit, flamekit_native}`.
 - **Local dedicated server:** `<server folder>\emf\mods\{lua, flamekit}`.
@@ -74,11 +75,11 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Signing key:** "FlameKit release signing", ECDSA P-256, in the owner's Windows user key store, not exportable (restart helper `keygen`, 2026-11-13). Only the public key is in the repository (`web_update.hpp` `kReleaseKey`, `tools/check_sig.py`). If the owner's PC or Windows account is lost, no update can be signed again: a new key needs a new DLL, which players must install by hand.
 
 **Proven in the owner's game:** download and install from `dist-test` (0.15.10); holding the Lua part to the next start; replacing a waiting Lua part (0.15.40 → 0.15.41) and a waiting DLL while the old one runs (0.15.45 → 0.15.46: `v0.15.46 replaces v0.15.45`); a signed list accepted (0.15.46, 0.15.47); a tampered list refused (`update.txt` changed to 0.15.47 with the 0.15.46 signature: `REFUSED ... the signature does not match`, nothing changed). The old updater through the game server is gone since 0.15.9.
-**Not yet tested:** a clean PC installing from scratch, and the `dist` channel (owner: next session).
+**Not yet tested:** a clean PC installing from scratch in a real game folder, and a game updating from `dist` (the first release is 0.15.124: the first update from `dist` comes with the next release).
 
 ## State right now
 
-- **Versions:** see the line at the top. The owner's client and the local server follow every version through dist-test. Players are still on 0.14.2 until the release (To do #1); the `dist` channel does not exist yet, so a player's updater finds nothing until it does.
+- **Versions:** see the line at the top. The owner's client and the local server follow every version through dist-test. Players were on 0.14.2 (no updater) until the 0.15.124 release package; from it on, their games update from `dist`.
 - Every version's detail is in `flamekit/changes.txt` and the git log. Below: how things are built, so new work fits.
 
 ## Design (how FlameKit is built)
@@ -236,7 +237,7 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
 
 ## To do (owner's list)
 
-1. **#2 Release update test** (owner: tomorrow): test the main release path to players, the `dist` channel. Start from the old FlameKit release players have now, then update the server and the players' clients to a new release version, and check that each side ends up on it. Also install FlameKit from nothing the way a new player would. Not before the owner says so (rule 8). Players now have 0.14.2 (`release\FlameKit-0.14.2`), which has no updater (its DLL is `flamekit_map.dll`): the owner updates them by hand tomorrow, after that the updater keeps them current. The new install must remove the old `flamekit_map` folder (else two overlays and two minimaps). A 0.14.2 player on a new server keeps the junk list, experimental and far players (same channels lf/exp/map at version 1, same messages, same saved list format) and gets nothing on the new channels; FlameKit has no `side: both`, so EMF's mod check never kicks over the version.
+1. **#2 Release roll-out** (0.15.124 built 2026-11-14: `dist`, `release\FlameKit-0.15.124.zip`, `-server-mod.zip`): the owner updates the G-Portal server (SERVER-README.txt) and the two players (install.cmd: it removes 0.14.2's `flamekit_map`, else two overlays and two minimaps). Still to see: a real game installed from the package, and the first update from `dist` (the next release). A 0.14.2 player on a new server keeps the junk list, experimental and far players (same channels lf/exp/map at version 1) and gets nothing on the new channels; FlameKit has no `side: both`, so EMF's mod check never kicks over the version.
 2. **Boss challenge / arena mode** (owner, 2026-11-14): turn the duelist into a game mode: a boss challenge (pick a level and a place, a duelist appears for you or the party to beat) or an arena with waves of duelists, each wave stronger than the last. Measured: level 50 duelist = 6692 health, a fair fight for a level 50 player; level 75 = 20760 health, beat the owner (needed Invincible Mode). Starts from `flamekit.duelist <player> [level]` and `set_level` in experimental.lua (Level.dataStorage + DynamicEnemyScaling.nextUpdateTime = 0). Tomorrow.
 3. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
 

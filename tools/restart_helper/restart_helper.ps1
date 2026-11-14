@@ -13,6 +13,10 @@
 #           signing\update.sig, which is published next to the channel's update.txt
 #   build   build FlameKit's DLL: ..\flamekit_native\build.cmd, its output in build.log and its result code in build.done
 #           there (the same as build_watch.cmd, which is no longer needed)
+#   installold, installnew  (0.15.124, the release packages) a test install into a scratch folder, never the game:
+#           installtest\game (a fake dedicated server folder: an empty enshrouded_server.exe, so no save backup is made)
+#           gets installtest\old\install.ps1 (the old FlameKit package) or installtest\new\install.ps1 (the new one),
+#           -NoDesktopShortcut; the output goes to installtest\old.log or installtest\new.log
 #   stop    stop this helper
 # Whenever a file chime.request appears, it plays a chime: Claude is done and waits for the owner.
 #
@@ -228,6 +232,20 @@ function Sign {
     return $true
 }
 
+function Install-Test([string]$which) {
+    $t = Join-Path $here 'installtest'
+    $game = Join-Path $t 'game'
+    $script = Join-Path $t "$which\install.ps1"
+    if (-not (Test-Path (Join-Path $game 'enshrouded_server.exe'))) { Log "install${which}: FAILED: installtest\game\enshrouded_server.exe is missing"; return $false }
+    if (-not (Test-Path $script)) { Log "install${which}: FAILED: installtest\$which\install.ps1 is missing"; return $false }
+    $out = Join-Path $t "$which.log"
+    Log "install${which}: installtest\$which\install.ps1 into installtest\game"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $script -Game $game -NoDesktopShortcut *> $out
+    $code = $LASTEXITCODE
+    Log "install${which}: exit code $code (installtest\$which.log)"
+    return $code -eq 0
+}
+
 function Finish([bool]$ok, [string]$text) {
     Set-Content -Path $doneFile -Value ("{0} {1}" -f $(if ($ok) { 'ok' } else { 'failed' }), $text) -Encoding UTF8
     Log "done: $(if ($ok) { 'ok' } else { 'FAILED' }): $text"
@@ -255,8 +273,10 @@ while ($true) {
                 'build' { $ok = Build; Finish $ok 'build' }
                 'keygen' { $ok = Keygen; Finish $ok 'keygen' }
                 'sign' { $ok = Sign; Finish $ok 'sign' }
+                'installold' { $ok = Install-Test 'old'; Finish $ok 'installold' }
+                'installnew' { $ok = Install-Test 'new'; Finish $ok 'installnew' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"

@@ -1,0 +1,500 @@
+0.15.124 Nov 14, 2026
+- Experimental tab, Debug: "Updates: Stable / Development". Stable (the default) gets the released versions; Development gets the very latest versions as soon as they are made, which may have bugs. FlameKit looks for an update right away when you switch.
+
+0.15.123 Nov 14, 2026
+- Messages window: its own key, F8 (a setting in F4 > Windows), shown in its title like the other windows.
+- New default places and sizes for all windows (Party, Messages, Experimental, Notices, PvP Leaderboard, FlameKit Menu), laid out by Ninechars. Windows you already moved keep their place; "Reset place" in F4 > Windows puts one at its new default.
+
+0.15.122 Nov 14, 2026
+- PvP: switching it off now says "<name> has left PvP." in orange, to match "<name> joined PvP!".
+
+0.15.121 Nov 14, 2026
+- PvP: when a player switches PvP on, everyone's Messages window says "<name> joined PvP!" in orange.
+
+0.15.120 Nov 14, 2026
+- PvP: the test monster drop-downs and the duelist's level buttons are greyed out too while your PvP is on.
+
+0.15.119 Nov 14, 2026
+- PvP: fast travel (Flame Altar, Ancient Spire, Map Waypoint) is off and greyed out while your PvP is on, so nobody can escape a fight. It comes back when you switch PvP off.
+- PvP: test monsters cannot be spawned while your PvP is on, and switching PvP on removes your duelist. The harmless dummy stays: spawn it before you switch PvP on to test your weapons.
+
+0.15.118 Nov 14, 2026
+- PvP: while your PvP is on, your experimental options (no shroud damage, no fall damage, invincible mode, unlimited stamina) are off and greyed out, so nobody can cheat in a fight. The enhanced glider stays. They come back when you switch PvP off.
+
+0.15.117 Nov 14, 2026
+- Messages window: "FlameKit connected to server!" (or "not supported by server!"), the server's FlameKit version, and "update downloaded!" are now lines here instead of notices.
+- After an update, the Messages line is just "FlameKit was updated to vX." (no pointer to the What's New tab).
+- Notices window: grows to fit every notice, so a new one is never cut off.
+
+0.15.116 Nov 14, 2026
+- Experimental tab, Debug: "Test leaderboard data" fills your PvP Leaderboard with a dozen made-up players (long and short names, shared ranks, big numbers, your own row), to see how it looks. Only in your game; switch it off to see the real board again.
+
+0.15.115 Nov 14, 2026
+- About window: bigger (up to 1100 x 900, leaving 40 pixels of the game around it).
+- Scroll bars take the mouse: drag the handle, or click above or below it for a page. In the About window and in the pinned windows (Messages, Party, Experimental, PvP Leaderboard, Notices; hold the pointer key). The mouse wheel still works too.
+
+0.15.114 Nov 14, 2026
+- Nothing in the lower left corner any more while you play.
+- Short notices instead, in the Notices window (top centre) for about 10 seconds: "FlameKit v0.15.114 connected to server!" (white) when you join a server with FlameKit, "FlameKit not supported by server!" (orange) when the server has no FlameKit, "Server runs older FlameKit v...!" (orange) when it is older, and "FlameKit v... update downloaded!" (green) when a new version arrives.
+- Every notice has an x to close it (hold the pointer key, Right Alt unless changed).
+
+0.15.113 Nov 14, 2026
+- The lower left corner no longer shows FlameKit's version, the update line or the debug level while you play (more room for windows: updates have their own window, and the FlameKit Menu shows the version). Only the orange warning that the server runs an older FlameKit is still shown there.
+- "Show FlameKit mod version" is now "Show the FlameKit version on the game's main screen": it switches the line in the lower right corner of the main screen.
+
+0.15.112 Nov 14, 2026
+- The PvP Leaderboard now really starts hidden for a new player (it was shown from the start: its "first time" check came too late).
+- Windows tab: the F5, F6 and F7 keys and "Press the pointer key once instead of holding it" can be changed at the bottom of the Windows tab (they were in no tab before).
+- Settings, Features: the Minimap has an on/off switch, like the Auto Junk List (it replaces "Show the minimap"; F10 still switches it while you play).
+- The Dump Junk key and the minimap's zoom keys can only be F1-F12 or numpad keys, so typing in the game's chat never sets them off.
+- Names: one rule everywhere (Party, minimap, chat, announcements, PvP Leaderboard): the character name, or the account name where the character name cannot be read (a server without FlameKit). The leaderboard no longer uses the account name of the player who died, and nearby players on the minimap keep their account names on a server without FlameKit.
+- Chat: Enter that does not open the game's chat (no pointer within a second) no longer keeps FlameKit's windows up over a menu opened next.
+- Removed a leftover from 0.15.90 that could make FlameKit's overlay flash if it ever fell behind the game.
+- Under the hood, nothing to see: one copy each of the player-colour formula (in the DLL), the list of windows that bring the pointer out, the "file changed" check and the word wrap.
+
+0.15.111 Nov 14, 2026
+- Minimap: it no longer appears over the bag or a game menu when you click another program (0.15.107 fixed that for the other windows only; the minimap had its own copy of the menu check). It also stays up while you type in the game's chat, like the other windows.
+
+0.15.110 Nov 14, 2026
+- Typing in the game's chat (Enter) no longer hides FlameKit's windows: the chat box shows the game's mouse pointer, which FlameKit took for a menu. Enter with no menu open now counts as chat until Enter or Esc closes it.
+
+0.15.109 Nov 14, 2026
+- Party window: a player with PvP on has a red "PvP" tag on their name line, so everyone can see who is up for a fight. The server needs this version too.
+
+0.15.108 Nov 14, 2026
+- Players are shown by their character name (the one in the game's Social tab), not their account name: in the Party window, on the minimap, in chat lines in the Messages window, in announcements and on the PvP Leaderboard. Right after someone joins, their account name may show for a few seconds until the game knows the character name. Player colours follow the character name, so they may differ from before. The server needs this version too.
+
+0.15.107 Nov 14, 2026
+- The Messages window hides while the bag or any of the game's menus is open, like the other windows.
+- Clicking another program while a game menu is open no longer brings FlameKit's windows up over the menu: FlameKit keeps the last menu state while the game is in the background.
+
+0.15.106 Nov 14, 2026
+- Auto Junk List: the buttons are Auto, Drop/Delete, then Dump Junk last, at the end of the row where it is easiest to hit.
+- Auto Junk List: the Drop/Delete tooltip says "With Drop mode set, turn off the game's Auto-Collect Scattered Loot setting...".
+- Experimental tab, Debug: an "Open log folder" button opens FlameKit's log folder in Explorer.
+- Settings: "Show FlameKit's messages (the Messages window)" is gone; the Messages window always shows FlameKit's messages.
+
+0.15.105 Nov 14, 2026
+- Messages window: size it at its lower right corner (pointer key held) in both directions, wider and taller. Once you have given it a height it keeps that height and shows all kept messages (now the last 100, chat included), scrolled to the newest; the mouse wheel scrolls back, and at the bottom again it follows new messages. "Reset place" in the Windows tab puts it back to its small size.
+
+0.15.104 Nov 14, 2026
+- New default places for FlameKit's windows (used until you move a window, and by "Reset place" in the Windows tab): Messages top left, Party on the left under it, Notices top centre, the PvP Leaderboard at the right edge and the Experimental window just left of it. The right-hand windows line up with the right edge at any screen size. The minimap stays in the lower right corner and the FlameKit Menu in the middle.
+
+0.15.103 Nov 14, 2026
+- Main screen: the line in the lower right reads just "FlameKit v0.15.103".
+- In a world: the label reads "FlameKit v0.15.103 is Connected" when the server runs FlameKit, or "is Not Connected" when it does not (instead of "by Ninechars"; the separate orange "This server does not run FlameKit" line is gone).
+- What's New tab: an About button (left of Check for updates) opens a window with FlameKit's README from GitHub, scrollable (mouse wheel, arrow keys, Page Up/Down), with an OK button. Esc closes it too.
+
+0.15.102 Nov 14, 2026
+- Windows tab: "FlameKit window" is now called "FlameKit Menu".
+
+0.15.101 Nov 14, 2026
+- Minimap: the Corner and "Distance from the screen edge" settings are gone. It sits in the lower right corner until you drag it somewhere else; "Reset Default Position" puts it back there.
+- Minimap: where you are is one line under the dial now, "Region / Place" (for example "Blackmire / Flame Altar").
+- Minimap: the mouse wheel over it zooms in and out (hold the pointer key, as for moving it).
+
+0.15.100 Nov 14, 2026
+- "Check for updates" while an update is already downloaded brings up the update window again, with its Restart Game button.
+
+0.15.99 Nov 14, 2026
+- Experimental window: shorter tooltips (PvP's, the dummy's and the duelist's drop-downs); the leaderboard button is just "Leaderboard", lit while the leaderboard is shown.
+
+0.15.98 Nov 14, 2026
+- Settings: "Press the pointer key once instead of holding it" moved to the Windows group.
+
+0.15.97 Nov 14, 2026
+- Experimental window, Test monsters: the blocks of text above the dummy's and the duelist's drop-downs are gone; that explanation is now in their tooltips (hold the pointer key and point at them). The Experimental window shows tooltips now.
+- The dummy's tooltips say you must have PvP on to hit it.
+- The first dummy choice is now "Dummy: Player-like", and it spawns a random human-looking body (a Scavenger fighter or the game's fake-player ranger) instead of the Vukah one.
+- A drop-down's text no longer runs out of its box: it is cut short with "...".
+
+0.15.96 Nov 14, 2026
+- Experimental window, PvP section: a "Show PvP Leaderboard [F5]" button ("Hide ..." while it is shown), so the leaderboard is easy to find.
+
+0.15.95 Nov 14, 2026
+- New: PvP Leaderboard, a window that ranks players by how many other players they killed (fewer deaths first when kills are equal) and shows how often each one was killed by another player. F5 shows and hides it (Settings, Windows group); it starts hidden. Your own row is lit and names are in each player's colour. Only kills between players count; deaths to monsters, falls and the like do not. The server keeps the counts across restarts, and each kill is announced in the Messages window. The server needs this version too. Server console: flamekit.board_reset clears the board.
+
+0.15.94 Nov 14, 2026
+- After Alt+Tab back to the main screen the "Loaded" line (all of FlameKit's overlay) stayed hidden behind the game. FlameKit's overlay now belongs to the game's window, which Windows always keeps it in front of.
+
+0.15.93 Nov 14, 2026
+- Main screen line: its dark box 2 pixels tighter again, still 1 pixel from the right and bottom edges.
+
+0.15.92 Nov 14, 2026
+- Main screen line: its dark box is 2 pixels tighter around the text and sits 1 pixel from the right and bottom edges.
+
+0.15.91 Nov 14, 2026
+- The lower left lines in a world (and the main screen's line in the lower right) now sit 5 pixels from the screen's edges, off the game's own UI.
+
+0.15.90 Nov 14, 2026
+- Main screen: the "FlameKit ... Loaded" line sits on a translucent dark box so it stands out.
+- After Alt+Tab back to the main screen, FlameKit's overlay could stay behind the game. When the usual repair does not take, the overlay is now hidden and shown again on top, and the log says why Windows refused.
+
+0.15.89 Nov 14, 2026
+- Main screen: instead of the lower left lines (they covered the game's copyright lines), one line in the lower right corner: "FlameKit v0.15.89 Loaded". In a world the lower left lines are as before.
+
+0.15.88 Nov 14, 2026
+- The FlameKit version line in the lower left corner now shows on the game's main screen too, before you join a world (with the update line under it). If you switched the label off, it stays off.
+
+0.15.87 Nov 14, 2026
+- A test update, to try the update window's Restart Game. Nothing else changed.
+
+0.15.86 Nov 14, 2026
+- Update window, Restart Game: the game now starts again properly. Before, Steam said the game was still running, because the part that waits for the game to close had been started by the game itself (Steam counts that as the game). It is now started by Windows on its own, and also waits until Steam has let go of the game.
+- Update window: back to taking the pointer and the keyboard when it appears, so OK, Restart Game and Esc work at once without the pointer key.
+
+0.15.85 Nov 14, 2026
+- The update window no longer takes the keyboard or the mouse when it appears, so a fight goes on undisturbed. Click its buttons with the pointer key (Right Alt) like the other windows; Esc closes it. Its text now reads "Restart the game to load it!".
+
+0.15.84 Nov 14, 2026
+- A test update, to show the new update window. Nothing else changed.
+
+0.15.83 Nov 14, 2026
+- When an update has downloaded, a small window in the middle of the screen says so (besides the green line in the lower left corner). OK, Enter or Esc close it. "Restart Game" closes the game the way Alt+F4 does and starts it again through Steam, with the new version.
+
+0.15.82 Nov 14, 2026
+- Messages window: each player's chat lines are in that player's colour, the same as their symbol in the Party window and on the minimap.
+
+0.15.81 Nov 14, 2026
+- Window titles show the key that opens and closes them: "FlameKit v0.15.81 [F4]", "Experimental [F6]", "Party [F7]".
+- New key: F7 shows and hides the Party window (a setting in the Windows group, like the Experimental window's F6).
+- Test monsters: the dummy is now picked from its own drop-down like the duelist (the player-like body first, then every monster). Whatever it is, it never hurts anyone (it gets the players' faction, whose hits do no damage) and it is level 100. A line now divides the dummy from the duelist.
+
+0.15.80 Nov 14, 2026
+- "Press the pointer key once": the second press now puts the pointer away. Before, the moment the game took the front back looked like a new press and switched it straight back on.
+
+0.15.79 Nov 14, 2026
+- Minimap: a marker's name on hover is smaller and sits right above the marker (below it near the top), never cut off at the edge.
+- The PvP dummy is level 100, so it takes a long beating (it never hurts anyone).
+- FlameKit's window: its key (F4) now closes it when it is open, without the window flickering open again.
+- New setting (Settings tab): "Press the pointer key once instead of holding it". On: one press of Right Alt (or the key you chose) shows the mouse pointer for FlameKit's windows and the minimap, the next press or Esc puts it away.
+
+0.15.78 Nov 14, 2026
+- Test monsters: the highest level is 100 (was 105); the quick levels are 1, 25, 50, 75, 100.
+
+0.15.77 Nov 14, 2026
+- Minimap: hold the pointer key (Right Alt) and point at a map marker: its name shows in a small box beside it (the name you gave it, else the game's name for that kind of marker).
+
+0.15.76 Nov 14, 2026
+- Chat: every line a player types is also copied into the Messages window (the game's chat lines fade away; the game still shows them in its chat too). Needs FlameKit on the server.
+- FlameKit's own announcements (for example "PvP for Ninechars ENABLED.") now go to the Messages window of everyone with FlameKit instead of the game's chat. The Notices window is unchanged.
+
+0.15.75 Nov 14, 2026
+- Minimap: hold the pointer key (Right Alt) and click a map marker on the minimap to set your waypoint there (the game's own waypoint: its map and compass show it, and Map Waypoint takes you there). Click the waypoint's marker again to clear it; clicking another marker moves the waypoint there. Dragging the minimap still moves it.
+- Minimap: a Shape setting (Minimap tab and settings): Circle or Square.
+
+0.15.74 Nov 14, 2026
+- New: the Experimental window, a pinned window that stays on screen while you play (shown at first; hide it with its x, in F4 > Windows, or with its key F6, a setting in the Windows group). Fast Travel at the top (Flame Altar, Ancient Spire, Map Waypoint), then PvP, then the test monsters (the PvP dummy and the duelist with its monster list and level). Hold the pointer key (Right Alt) to click in it. These are no longer in the F4 Experimental tab, which keeps the other switches and the Debug section.
+- Test monsters: the level goes up to 105, the game's own top (measured: any higher level is set back to 105, 62687 health). The quick levels are 1, 25, 50, 75, 105.
+- Server console: "flamekit.duelist <player> off" removes that player's test monster.
+
+0.15.73 Nov 14, 2026
+- PvP duelist: the monster is now picked from one drop-down list (every monster under its group's heading, bosses in orange, scrolled with the mouse wheel) instead of group buttons and pages. The level is set with < and > or one of 1, 25, 50, 75, 100. Then "Spawn duelist".
+- FlameKit's window has a drop-down list control and labels between buttons (for the tabs of every feature).
+
+0.15.72 Nov 14, 2026
+- PvP duelist: pick any of 189 monsters, read from the game's own data, in groups (Vukah, Scavengers, Shroud, Undead, Beasts, Drak, Ancients), 12 to a page; bosses are shown in orange. Untried ones may stand still.
+
+0.15.71 Nov 14, 2026
+- PvP duelist: quick level buttons 75 and 100 next to 1, 25 and 50.
+- PvP switch tooltip: villagers cannot be hurt (tried in game).
+
+0.15.70 Nov 14, 2026
+- PvP duelist (Experimental, Debug section): pick what it is (Vukah Warrior, Vukah Brawler mini-boss, Skeleton, Wolf, Boar, Sabretooth, Hound) and its level (buttons -10, -1, +1, +10, or 1, 25, 50; up to 255), then spawn it. The game sets its health and damage from the level: level 50 is about 6700 health, level 75 about 20800 and beat a level 50 player.
+- Server console: "flamekit.duelist <player> [level] [kind]" does the same.
+- The log says whether a test body was killed or removed by the game.
+
+0.15.69 Nov 14, 2026
+- PvP: with several PvP players near a monster, every one of them is now in its threat table, and the game itself chooses whom it fights (by aggro: who hits it, how hard, how close), the same way it does with normal players. Before, one of them was picked at random and forced as its target.
+- Server console: "flamekit.pvptest <player>" and "flamekit.pvptest off" try PvP against a duelist without a second player (the player cannot die meanwhile).
+
+0.15.68 Nov 14, 2026
+- PvP: monsters now really fight a player with PvP on (tested with the duelist: it attacks within a second). The game's own threat event was not enough: each monster within 20 m of a PvP player also gets that player as its target and in its threat table, the way the game keeps a normal player there.
+- PvP test bodies: a body spawned right after a long move is no longer lost track of.
+
+0.15.67 Nov 14, 2026
+- PvP: monsters ignored a player with PvP on (the game's monsters only pick players as targets, and a PvP player no longer counts as one). Now every monster within 20 m of a PvP player is pointed at them every 2 seconds with the game's own threat event, so PvP never makes you safe from monsters.
+
+0.15.66 Nov 14, 2026
+- PvP test bodies, to try PvP alone (Experimental, Debug section): "Spawn PvP dummy" puts a player-like body 3 m in front of you. With PvP on it swings at you but does no damage; hit it to see whether your weapons hurt a player. "Spawn PvP duelist" puts a Vukah fighter there that attacks everyone with full damage, PvP on or off. It never hurts animals, pets or buildings; villagers are fair game. "Remove" takes your body away. One at a time; it is gone after a reload or when you leave.
+
+0.15.65 Nov 14, 2026
+- New in Experimental: "PvP (free-for-all)". Players who switch it on can hurt each other with their normal weapons, arrows and spells, at 25% of the damage. Players without it cannot hurt them or be hurt by them. Everyone on the server is told who switched it on. It goes off again when you leave the server. Careful: while it is on, your hits can also hurt your own summons, pets and villagers. Not yet tried with two players.
+
+0.15.64 Nov 14, 2026
+- Build mode works: while the building tool is out, all of FlameKit on your screen is hidden, and it comes back as soon as you put the tool away (F4, tab Windows, "Hide all of FlameKit" switches it). FlameKit now reads the game's own sign of an active building cursor, measured in game.
+
+0.15.63 Nov 14, 2026
+- FlameKit's window opens with F4 by default again, the key players know from the older versions (it was F6). A key you set yourself stays; change it in the Settings tab.
+- The message after an update names the key your FlameKit window opens with.
+
+0.15.62 Nov 14, 2026
+- "Hide all of FlameKit in build mode" moved from the Minimap tab to FlameKit's window, tab Windows (it affects all of FlameKit's UI).
+- Build mode: FlameKit stayed hidden after you left build mode (the game keeps the building cursor where it was). Until the right signal is found, nothing is hidden in build mode; FlameKit logs the building cursor's details while you enter and leave build mode, to find it.
+
+0.15.61 Nov 14, 2026
+- Build mode now hides all of FlameKit on your screen, the FlameKit lines in the lower left corner too. Only FlameKit's window (F6) still opens.
+- Fix: a setting added by an update did not exist until the second game start after it (EMF reads FlameKit's settings before the update is put in place), so "Hide FlameKit's windows in build mode" (0.15.59) read as off and nothing was hidden. A few seconds after an update is put in place, FlameKit now makes EMF read its settings again.
+
+0.15.60 Nov 13, 2026
+- Experimental, Fast Travel: new button "Map Waypoint": takes you straight to the waypoint you set on your map, onto the ground there (the game's own ground search, within about 10 m). Fall damage is off for 30 seconds after the move, in case there is no ground right at the waypoint. Needs FlameKit on the server.
+
+0.15.59 Nov 13, 2026
+- New setting in the Minimap tab, on by default: "Hide FlameKit's windows in build mode". While you build, the minimap, the party window, Messages and Notices are hidden so they are not in the way; the FlameKit label and its lines in the lower left corner stay, and FlameKit's window (F6) still opens. Windows added later hide the same way.
+
+0.15.58 Nov 13, 2026
+- Auto Junk List: on joining a server, your list and the Auto-Collect notice are there the moment you are in the world. The server received your list up to 15 s before that (connected, but not in the world yet) and threw it away; it now keeps it and takes it as soon as you join, and reads your Auto-Collect setting right then instead of at its next check.
+- Auto Junk List: 0.15.57's reading of the Auto-Collect setting in your own game is gone again: the game keeps that setting on the server only, so there was nothing to read.
+
+0.15.57 Nov 13, 2026
+- Auto Junk List: the Auto-Collect notice comes up as soon as the world runs: your game reads the "Auto-Collect Scattered Loot" setting itself instead of waiting for the server to report it.
+- Auto Junk List: on joining a server, your junk list no longer goes missing for about 2 minutes. The first message after joining was often lost (the link to the server drops messages while the game is still loading); now the server confirms each list and your game sends it again every 5 seconds until it does (6 times at most).
+
+0.15.56 Nov 13, 2026
+- Party window: the time inside a buff badge is drawn hollow: only a thin black outline around each digit, so the icon shows through the number (13 px, the size before 0.15.55).
+
+0.15.55 Nov 13, 2026
+- Party window: the time inside a buff badge is smaller and lighter (11 px, normal weight, on a soft dark strip instead of a heavy black outline).
+- Auto Junk List: the Auto-Collect warning now ends "Turn it off or set auto junk to delete instead of drop." (in the notice and over the bag in FlameKit's window).
+
+0.15.54 Nov 13, 2026
+- New Notices window: warnings that stay on screen until they are solved, instead of scrolling away in Messages. It has no title bar; hold the pointer key to drag it anywhere or size it at its lower right corner. It shows only while there is a notice (and not in the game's menus); FlameKit's window, tab Windows, can reset its place.
+- Auto Junk List: the "Auto-Collect Scattered Loot" warning moved from Messages to the Notices window. It is there for as long as junk is set to Drop while that game option is on, and goes away by itself once you turn the option off or set Delete.
+- Party window: the buff and debuff badges are bigger (30 px) and show the time left inside the icon (seconds under a minute, then minutes, then hours). A player with buffs takes 10 px more room than one without.
+
+0.15.53 Nov 13, 2026
+- Auto Junk List: when you turn "Auto-Collect Scattered Loot" off in the game, its red warnings leave the Messages window by themselves (within a second or so).
+
+0.15.52 Nov 13, 2026
+- Party window: the buffs and debuffs moved onto the name line, behind each player's name, as small badges (debuffs first), so a player takes no more room than before. When more are active than fit, the last badge says "+3" and lists the rest when you point at it. The time left is in the tooltip; a buff with less than 10 s left is drawn fainter.
+
+0.15.51 Nov 13, 2026
+- Auto Junk List: the red message about "Auto-Collect Scattered Loot" no longer says "(drop failed)".
+
+0.15.50 Nov 13, 2026
+- Auto Junk List: the warning is back in FlameKit's window. While junk is set to Drop and the game's "Auto-Collect Scattered Loot" is on, a red line over your bag says so (it was lost with the old panel in 0.15.49's cleanup). The red message in Messages when junk is dropped stays as it was.
+
+0.15.49 Nov 13, 2026
+- Party window: every player's buffs and debuffs, with the game's own icons: a badge per buff (green buff, red debuff, amber food, blue rested, brown terrain) and the time left under it. Debuffs come first. Hold the pointer key and point at a badge for its name and the exact time left. Everyone in the game sees everyone's buffs. Test players have some too.
+- Auto Junk List: Dump Junk in FlameKit's window now works in a world you host yourself (single player or hosting); before, it only worked on a server.
+- Privacy: the server's log no longer names players by their account number (it could be shared with a bug report); it uses their number in the game instead.
+- After a game update FlameKit no longer reads the places in the game's memory it found on the current game version (map markers, names, quest marks, item details) until a FlameKit version knows the new one: nothing wrong is read.
+- FlameKit Native says in its mod.json that it is only needed in a player's game, not on a server (EMF.exe shows that to server owners).
+- Cleanup: the old Auto Junk List panel (from the EMF window) and its icon files are gone; FlameKit's window does all of it.
+
+0.15.48 Nov 13, 2026
+- Party window and minimap: the server now knows who is playing from EMF's own join and leave reports, instead of guessing the first 64 player numbers. A player is never missed, however many have come and gone.
+
+0.15.47 Nov 13, 2026
+- Updates: after a failed or refused update, the message at the bottom left goes away once a later check finds everything in order.
+
+0.15.46 Nov 13, 2026
+- Test release: the DLL is rebuilt with no feature change, to check that a second update in one game session replaces the first one that is still waiting.
+
+0.15.45 Nov 13, 2026
+- Updates are signed: FlameKit only installs an update that carries the signature of FlameKit's release key, which never leaves the developer's PC. A change to the update files on GitHub alone can no longer reach your game.
+- On a server with an older FlameKit than yours, an orange line under the FlameKit label says so (and that some features are off).
+- Cleanup: leftovers of the old panel that EMF drew are gone.
+
+0.15.44 Nov 13, 2026
+- Auto Junk List: in the Drop button's tooltip, the warning about the game's "Auto-Collect Scattered Loot" setting is in red.
+
+0.15.43 Nov 13, 2026
+- Auto Junk List: Auto, Dump Junk and Drop / Delete (and the two choices under Drop) explain themselves when you hover them.
+
+0.15.42 Nov 13, 2026
+- FlameKit's windows use the game's mouse pointer again: a Windows resize pointer the game showed for a moment is no longer taken for it.
+
+0.15.41 Nov 13, 2026
+- FlameKit's window (F6) stays open when you click another program or Alt+Tab; F6, Esc or its x close it.
+- The Messages window stays on screen all the time in a world: the last 5 messages, the last 10 while the pointer is out.
+
+0.15.40 Nov 13, 2026
+- Auto Junk List: the key button says Set Dump Key and comes last in its row.
+
+0.15.39 Nov 13, 2026
+- The updater keeps looking for updates while one waits for the game restart: a newer version takes the waiting one's place, so one restart always brings the newest version (client).
+- The party window hides while one of the game's menus is open (bag, map, skills, ...), like the minimap.
+
+0.15.38 Nov 13, 2026
+- Auto Junk List: the option buttons are called Exclude Action Bar, Dump Key and Show All Bag Items, and hovering one explains it.
+
+0.15.37 Nov 13, 2026
+- Auto Junk List: trophies (the heads bosses leave) are never junk and are no longer offered in the bag list.
+- Auto Junk List: new button Show all bag items (off by default). On, every item in your bag is offered and can be junked, also weapons, armour, rings, tools, summoning items, trophies and high level gear. Off, those are never removed, even if one is on your junk list (client and server).
+- The item tooltip no longer shows how many you carry: the number is on the item itself.
+
+0.15.36 Nov 13, 2026
+- Hovering an item in the Auto Junk List shows its details again: the name in its rarity's colour, item level, rarity, type, how many you carry, its name for chat commands, and what a click does.
+- Item tiles are now a standard part of FlameKit's window: every feature that shows Enshrouded items shows them the same way, with the same tooltip.
+
+0.15.35 Nov 13, 2026
+- Minimap tab: the section is called Location, its button Reset Default Position; the text about dragging is gone.
+
+0.15.34 Nov 13, 2026
+- The minimap can be dragged with the mouse while FlameKit's window is open or while you hold the pointer key (it gets a light ring then), like the pinned windows. It stays where you let go; "Back to its corner" in the Minimap tab puts it back. The "Move the minimap" button and its setting are gone.
+- The minimap no longer hides while FlameKit's window is open or the pointer key is held.
+
+0.15.33 Nov 13, 2026
+- Auto Junk List: an item moved straight back (you changed your mind) has no gold frame any more; it is back where it was.
+
+0.15.32 Nov 13, 2026
+- What's New tab: the line beside Check for updates says how often FlameKit looks for updates (every 10 minutes; every minute on the test channel).
+
+0.15.31 Nov 13, 2026
+- Long lines in FlameKit's windows wrap to the next line instead of being cut off (in a window wider than its first size, for example the What's New tab).
+
+0.15.30 Nov 13, 2026
+- After an update, FlameKit's window opens by itself on the What's New tab, once, the first time you are in a world. What's New is also the tab the window opens on the first time in a game.
+- New setting (Settings tab): open FlameKit's window every time you enter a world (off unless you switch it on).
+- Auto Junk List: an item you just moved gets a gold frame, and the list it moved to shows the page it is on, so you can see what you just moved. In both directions (to the junk list and back to the bag). The frames go when the window closes.
+
+0.15.29 Nov 13, 2026
+- FlameKit's window: What's New is the first tab. The Party tab is gone; its test players are in a new Debug section at the bottom of the Experimental tab, with FlameKit's log level (Off, Normal, Full; Ctrl+Shift+F12 still works) and where the logs are.
+- Each feature's settings are in its own tab only: the minimap's corner, distance from the edge and keys are in the Minimap tab; the Auto Junk List's "never touch the action bar" switch and its dump key are buttons on its tab. The Settings tab keeps FlameKit's own settings and the switches that turn a feature on or off (a feature switched off has no tab).
+
+0.15.28 Nov 13, 2026
+- FlameKit's window (F6) looks like the pinned windows: a title bar with FlameKit's version and an x that closes it, and a frame. Drag it by the title bar, and resize it from its lower right corner; it opens where and as big as you left it (the Windows tab can put it back in the middle).
+- The Auto Junk List's icon grids fit the window's size: more icons across and more rows when the window is bigger.
+- The tabs no longer run off the window: narrower tabs, and a second row when they still do not fit. The tabs are now Auto Junk List, Minimap, Experimental, Party, Settings, What's New, Windows.
+- "Check for updates" moved into the What's New tab.
+- Pinned windows (Party, Messages) can also be made shorter: their content then scrolls with the mouse wheel while the pointer key is held.
+- Party window: the gold frame around the followed player sits one pixel under the mana bar instead of on it.
+
+0.15.27 Nov 13, 2026
+- FlameKit's window (F6): long tabs (Settings, Minimap, Experimental, Party, What's New) scroll instead of showing pages: with the mouse wheel, or the scroll bar at the right (drag it, or click above or below it).
+
+0.15.26 Nov 13, 2026
+- FlameKit's window (F6) has a Settings tab with every FlameKit setting: switches, choices, sizes with - and +, and keys (Change, then press the new key). They are the same settings as in EMF's Mods tab.
+- The old FlameKit panel that EMF drew (F4) is gone: everything is in FlameKit's own window. Its key is a setting now (Key that opens FlameKit's window, F6).
+- The pointer key for the pinned windows is a setting: Right Alt (as before), Right Ctrl or Caps Lock.
+- A Messages window (pinned, top left): what FlameKit just did, for example "Junk discarded: Twigs x3", shows for 12 seconds; hold the pointer key to see the last 10. Warnings that EMF used to show at the top of the screen are there too. It can be moved, resized, collapsed or hidden like the party window.
+- After an update, a message says so; what is new is in the What's New tab of FlameKit's window (instead of a window that opened by itself).
+- Party window: a player with 0 health is marked DOWN in red, and has a red ring on the minimap.
+- Party window: hold the pointer key and click a player to follow them on the minimap (a gold ring, and their name even at the minimap's edge); click them again to stop.
+
+0.15.25 Nov 13, 2026
+- The party window shows where each player is, under their name: the region, and for the other players how far away and in which direction from you (for example "Revelwood · 320 m NE"). For you it shows the region and the named place you are in or near, the same as under the minimap (client and server).
+
+0.15.24 Nov 13, 2026
+- When you hold Right Alt (or open FlameKit's window), the mouse pointer appears where it was the last time, instead of somewhere else each time; the first time, in the middle of the screen (client).
+
+0.15.23 Nov 13, 2026
+- For FlameKit's development: the server saves the world at once when FlameKit's restart helper asks for it, before a restart of the local dedicated server (server). Nothing changes in the game.
+
+0.15.22 Nov 13, 2026
+- Test players, for trying the party window and the minimap alone: FlameKit's window (F6), tab Party, buttons Off, 1, 3 and 6. The server makes them up and sends them to you the same way as real players (only you see them; it needs FlameKit on the server). They walk around you, some near and some far away at the minimap's edge, with health and mana that go up and down; Test Dain is down (0 health) for 4 seconds every 20 seconds. A server restart forgets them; your game asks again within 10 seconds.
+
+0.15.21 Nov 13, 2026
+- A party window, pinned on the screen while you play (client): every player in the game, you first, each with their level, a green health bar and a blue mana bar with the exact numbers. Each player's name has its own colour and symbol, the same as on the minimap.
+- Hold Right Alt while playing to get the mouse pointer: then the party window can be dragged by its title bar, made wider or narrower from its lower right corner, collapsed (–) or hidden (×). Let go of Right Alt to play on. Where it is and how it looks is kept for the next game.
+- FlameKit's window (F6) has a Windows tab: show or hide each pinned window, or put it back in its first place. It also shows the log level key (Ctrl+Shift+F12) and where the logs are.
+- The minimap marks other players with their own symbol and colour instead of a white dot.
+- On a server without FlameKit: an orange line under the FlameKit label says some features are off; the party window then shows only you and your health, and says what is missing.
+
+0.15.20 Nov 13, 2026
+- Updates arrive without GitHub's cache delay: the updater first asks GitHub for the newest commit and then downloads the files at that exact commit (client). Before, GitHub could hand out an old update list for up to 5 minutes after a new version.
+- The test channel checks for updates every minute; players' games still check every 10 minutes.
+- A "Check for updates" button in FlameKit's window (F6) checks at once; the lower left corner then says "FlameKit is up to date" for a few seconds, or shows the green "ready" line.
+- FlameKit's log: a repeated "up to date" check is a detail (full level only); failed checks are warnings.
+
+0.15.19 Nov 13, 2026
+- FlameKit's window (F6, client) has tabs: Auto Junk List, Minimap and Experimental. The Minimap and Experimental tabs have the same buttons as in the old panel and do the same things; any feature with a tab shows up there.
+- Long tabs show in pages (< 1/2 >) instead of scrolling. Hovering a button shows its explanation.
+- While FlameKit's window is open the mouse pointer shows over the whole game window, not only over FlameKit's window; a click outside FlameKit's window does nothing.
+- FlameKit's windows use the game's own mouse pointer once the game has shown it (in the bag, the map or any menu); until then Windows' arrow.
+- The client writes the tabs and the rows of the tab shown into ui_tabs.dat for FlameKit's window; clicks come back through ui_actions.txt.
+- Tests: the tab bridge (rows written only while the tab is shown, a click does what the panel's button does, a click for rows no longer shown is dropped).
+
+0.15.18 Nov 13, 2026
+- FlameKit's log (client) no longer records other programs' window titles: a window that is not the game's is logged only by its program's file name (e.g. notepad.exe) and window class.
+- FlameKit's log never contains the Windows user name: it is written as <user> (it appears in folder paths).
+
+0.15.17 Nov 13, 2026
+- A new version no longer changes anything in a running game: the updater downloads it, holds FlameKit's Lua part in emf\flamekit_update until the next game start and puts it in place then, so FlameKit's label keeps showing the version you are running until you restart (client).
+- The update line in the lower left corner is green when an update is ready and says "Update v... is ready: restart the game"; red when an update failed, orange while downloading.
+
+0.15.16 Nov 13, 2026
+- FlameKit's UI (client) is drawn in one overlay window instead of three: the minimap, the Auto Junk List window (F6) and the lines in the lower left corner are layers of one picture. The picture is plain memory, so it can later be drawn inside the game's own frame (Vulkan) instead.
+- The overlay counts as "in front" whenever any window of the game is the front window (it went missing after Alt+Tab), and Windows now tells FlameKit at once when the front window changes.
+- A watchdog checks 4 times a second that the overlay is shown and in front of the game; every failure is logged with the window that was in the way, and repaired.
+- FlameKit's own log (client): emf\mods\flamekit\logs\flamekit_<date>_<time>.log, one per game session, the newest 10 kept, up to 50 MB each. It has FlameKit's DLL, EMF's log (with the Lua part's lines), Windows and screen details, the game's memory and CPU use, the updater, the UI and the watchdog.
+- Debug level in emf\mods\flamekit\debug.txt: off, normal (the default) or full; changes while the game runs. Ctrl+Shift+F12 in the game steps through the levels. Errors and warnings are always logged. The level shows in the lower left corner when it is not normal.
+- The updater logs every check (up to date, failed and why), not only downloads.
+- The Lua part (client and server) logs at the debug level too: clicks from FlameKit's window, the junk list going to the server half, files written for the DLL.
+- A crash in one of FlameKit's own threads is logged with where it happened.
+- Tests: the debug level is read from debug.txt, and off writes only warnings and errors.
+
+0.15.15 Nov 13, 2026
+- Fix: the lines in the lower left corner (FlameKit label, update line, status line) were hidden behind the game (client); they now stay in front of it, as the minimap does.
+- The client log says when those lines show or hide, where and why.
+
+0.15.14 Nov 13, 2026
+- The lines in the lower left corner (client) are drawn by FlameKit itself, no longer by EMF: the status line on top, then the FlameKit label, then the update line.
+- The update line ("updated to v...: restart the game to finish") has its own line under the FlameKit label instead of being added to the end of it.
+- The client writes the label and the status line into ui_hud.dat for FlameKit's DLL.
+- Removed: the code that cleared a top-right line left by very old versions (it used EMF).
+- Tests: the lower-left lines are checked in ui_hud.dat, and no line may be drawn by EMF.
+
+0.15.13 Nov 13, 2026
+- FlameKit's own Auto Junk List window (F6, client): an item on your junk list is no longer shown under "In your bag"; it is only under "Your junk list", with how many you carry. The red frame is gone.
+- Hovering an item shows its name.
+- New buttons in that window: Auto (ON: junk is removed as you loot it), Dump Junk, and a Drop/Delete list. They change the same settings as the panel's buttons.
+- Long lists show in pages (< 1/3 >) instead of "+N more"; the window keeps one size.
+
+0.15.12 Nov 13, 2026
+- F6 opens the Auto Junk List in FlameKit's own window (client): "In your bag" and "Your junk list" as icons. Clicking an item in your bag puts it on your junk list or takes it off (red frame = on the list); clicking an item on your junk list takes it off.
+- Changes made in that window are the same as in the panel: saved to your list and sent to the server.
+- The window's content comes from the Lua part through ui_list.dat, and clicks go back through ui_actions.txt (client); ui_bag.dat is no longer written.
+- The client log no longer says the game did not get the front back after the window closed (it was checked too early).
+
+0.15.11 Nov 13, 2026
+- Test: F6 opens FlameKit's own window (client), drawn without EMF: the items in your bag as icons. F6 or Esc closes it.
+- Test: clicking an icon in that window writes the item to the game's log (client).
+- The client writes the bag into ui_bag.dat for FlameKit's own window.
+
+0.15.10 Nov 13, 2026
+- The game's log says "the native part of FlameKit" when FlameKit Native loads (it said "the minimap part").
+
+0.15.9 Nov 13, 2026
+- The native part is renamed from FlameKit Minimap (flamekit_map) to FlameKit Native (flamekit_native): minimap, item details, item icons and updates.
+- The old updater through the game server is removed: updates come only from FlameKit's page on GitHub.
+
+0.15.8 Nov 13, 2026
+- Updates now download straight from FlameKit's page on GitHub, in seconds.
+- The FlameKit label at the bottom left shows the download as it runs, and says when a restart finishes an update.
+
+0.15.7 Nov 13, 2026
+- The minimap hides while the FlameKit panel is open, so it no longer covers it.
+
+0.15.6 Nov 12, 2026
+- Updates download much faster: several pieces are fetched at once.
+
+0.15.5 Nov 12, 2026
+- The mod's log records how many item icons a play session uses, to see whether EMF's limit of 128 pictures is reached.
+
+0.15.4 Nov 12, 2026
+- Auto Junk List: your bag is shown as a grid of item icons, like the game's bag.
+- Auto Junk List: each icon sits on the color of the item's rarity.
+
+0.15.3 Nov 12, 2026
+- Auto Junk List: the list shows item names only. The quantity is in the tooltip.
+
+0.15.2 Nov 12, 2026
+- This window lists every earlier version now, not only the last five.
+
+0.15.1 Nov 12, 2026
+- Auto Junk List: everything in your backpack is listed and can be junked.
+- Auto Junk List: Runes and Legendary Runes can never be junked.
+- Auto Junk List: tooltips show item level, rarity and type, and names are colored by rarity.
+
+0.15.0 Nov 12, 2026
+- FlameKit now updates itself when you join the server. No more copying files.
+- After an update this window tells you what changed.
+
+0.14.2 Nov 12, 2026
+- Auto Junk List: the items in your backpack's extra row are listed now.
+- Minimap: nearby players have their names next to their dots.
+
+0.14.1 Nov 12, 2026
+- Enhanced Glider Mode works with a controller: pull the stick back to climb, press jump for another updraft.
