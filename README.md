@@ -6,7 +6,7 @@ FlameKit runs in your game and, for the features that change the world (PvP, fas
 
 ## Keys
 
-All keys can be changed in the FlameKit Menu (Settings tab).
+All keys can be changed in the FlameKit Menu (F4): F4 and the pointer key in the Settings tab, F5 to F7 in the Windows tab, the minimap's keys in the Minimap tab. Keys that act while you play (Dump Junk, minimap zoom) can only be F1 to F12 or numpad keys, so typing in chat never sets them off.
 
 | Key | What it does |
 |---|---|
@@ -16,7 +16,7 @@ All keys can be changed in the FlameKit Menu (Settings tab).
 | F7 | Party window |
 | F10 | Minimap on or off |
 | Numpad + / - | Minimap zoom |
-| Right Alt | The mouse pointer, to click, move, resize and hide FlameKit's windows (hold it, or press once if you switched that on in Settings, Windows) |
+| Right Alt | The mouse pointer, to click, move, resize and hide FlameKit's windows (hold it, or press once if you switched that on in the Windows tab) |
 | Esc | Closes the FlameKit Menu and the pop-up windows |
 
 ## Features

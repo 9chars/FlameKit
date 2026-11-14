@@ -44,12 +44,8 @@ local function clean(text)
   return (tostring(text or ""):gsub("[%c]", " "))
 end
 
-local function name_of(world, entity)
-  for _, how in ipairs({ "character_name", "name" }) do  -- the character name first, as in the party window (0.15.108)
-    local ok, name = pcall(world[how], world, entity)
-    if ok and type(name) == "string" and name ~= "" then return clean(name) end
-  end
-  return "Player"
+local function name_of(world, entity, fallback)
+  return players.name(world, entity, fallback)  -- core/players.lua: the character name first, as everywhere
 end
 
 local function entry(account, name)
@@ -119,7 +115,9 @@ local function died(world, p)
   victim_account = okv and victim_account or p.account
   if not victim_account then return end
   load_board()
-  local killer_name, victim_name = name_of(world, killer), clean(p.name ~= "" and p.name or name_of(world, p.player))
+  -- (0.15.112) both by the one name function: EMF's p.name is the connection (account) name, only a last resort
+  local reported = type(p.name) == "string" and p.name ~= "" and clean(p.name) or nil
+  local killer_name, victim_name = name_of(world, killer), name_of(world, p.player, reported)
   local k = entry(tostring(killer_account), killer_name)
   local v = entry(tostring(victim_account), victim_name)
   k.kills = k.kills + 1

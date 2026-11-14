@@ -197,12 +197,26 @@ function F.click(world, key)
   end
 end
 
+-- (0.15.112, owner) Keys that act in the game even while the player types in its chat: only F1-F12 or a numpad key, so
+-- typing never sets them off. Checked here when the key is chosen and where each one is used (F.key_allowed).
+local GAME_KEYS = { lf_dump_key = true, map_zoom_in_key = true, map_zoom_out_key = true }
+function F.key_allowed(name)
+  if type(name) ~= "string" then return false end
+  local f = tonumber(name:match("^[Ff](%d+)$"))
+  return (f ~= nil and f >= 1 and f <= 12) or name:match("^[Nn]umpad") ~= nil
+end
+
 -- A key pressed in FlameKit's window while a tab of rows is shown: the new key of the setting waiting for one.
 function F.key(world, name)
   if not capturing then return end
   local s = find(capturing)
   capturing = nil
-  if s and type(name) == "string" and name ~= "" then set(s, name) end
+  if not (s and type(name) == "string" and name ~= "") then return end
+  if GAME_KEYS[s.key] and not F.key_allowed(name) then
+    note = "Only F1-F12 or a numpad key can be used for this (other keys would also fire while you type in chat)."
+    return
+  end
+  set(s, name)
 end
 
 function F.setup(k)

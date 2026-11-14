@@ -66,7 +66,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", map_show = true, show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
@@ -98,6 +98,8 @@ local hud = setmetatable({}, { __index = function(_, key)
     for line in f:lines() do
       local n, rgb, text = line:match("^m (%d+) (%x%x%x%x%x%x) (.*)$")
       if n then t.status, t.status_colour, t.messages, t.newest = text, "#" .. rgb, t.messages + 1, tonumber(n) end
+      local pn, who, ptext = line:match("^p (%d+) ([^\t]*)\t(.*)$")  -- a player's chat line (0.15.112)
+      if pn then t.status, t.status_colour, t.messages, t.newest = ptext, "player:" .. who, t.messages + 1, tonumber(pn) end
     end
     f:close()
   end
@@ -259,6 +261,9 @@ emf = {
 
 do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","authors":["Tester"],"settings":['
   .. '{"key":"pointer_key","type":"select","default":"right_alt","label":"Pointer key","group":"FlameKit","options":[{"value":"right_alt","label":"Right Alt"},{"value":"right_ctrl","label":"Right Ctrl"}]},'
+  .. '{"key":"map_show","type":"bool","default":true,"label":"Minimap","group":"Minimap"},'
+  .. '{"key":"lf_enabled","type":"bool","default":true,"label":"Auto Junk List","group":"Auto Junk List"},'
+  .. '{"key":"lf_dump_key","type":"keybind","default":"","label":"Dump key","group":"Auto Junk List"},'
   .. '{"key":"map_toggle_key","type":"keybind","default":"F10","label":"Key that shows and hides the minimap","group":"Minimap"},'
   .. '{"key":"map_size","type":"slider","min":120,"max":480,"step":20,"default":300,"label":"Size","group":"Minimap"},'
   .. '{"key":"map_hide","type":"text","default":"-","label":"Hidden kinds","group":"Minimap"},'
@@ -888,9 +893,9 @@ do  -- the announcement and a player's chat line both reach the Messages window
   mt = mf and mf:read("a") or ""
   if mf then mf:close() end
   check(mt:find(": hello there", 1, true) ~= nil, "a player's chat line is copied into the Messages window")
-  local col, who = mt:match("m %d+ (%x+) ([^\n]-): hello there")
-  check(col and ("#" .. col) == require("features.chat").player_colour(who),
-    "in the player's own colour (the Party window's): " .. tostring(col) .. " for " .. tostring(who))
+  local who, said = mt:match("\np %d+ ([^\t\n]+)\t([^\n]-): hello there")
+  check(who ~= nil and who == said,
+    "with the player's name for the DLL to colour it like their Party symbol (0.15.112): " .. tostring(who))
 end
 check(comps.Velocity[PLAYER].velocity.y == 12 and comps.Velocity[PLAYER].velocity.z >= 10 and comps.Velocity[PLAYER].velocity.x == 0, "switch on, gliding, S held: the player climbs and keeps flying forward")
 comps.Velocity[PLAYER].velocity.y = -4.5
@@ -1185,6 +1190,31 @@ do  -- (0.15.108) chat lines carry the character name, not the account's connect
   if mf then mf:close() end
   check(mt:find("HeroChar: name check", 1, true) ~= nil and not mt:find("AccountName: name check", 1, true), "a chat line shows the character name")
   SW.name, SW.character_name = nil, nil
+end
+do  -- (0.15.112) the minimap has an on/off switch in the Settings tab's Features, with the Auto Junk List's
+  local rows = require("features.settings").panel(UI)
+  local seen_features, mm, lf = false, nil, nil
+  for _, r in ipairs(rows) do
+    if r.heading == "Features" then seen_features = true end
+    if seen_features and (r.button or ""):find("map_show", 1, true) then mm = r end
+    if seen_features and (r.button or ""):find("lf_enabled", 1, true) then lf = r end
+  end
+  check(mm ~= nil and lf ~= nil, "Features lists Minimap and Auto Junk List")
+end
+do  -- (0.15.112) keys that act in the game (dump, minimap zoom) only on F1-F12 or the numpad: typing in chat never fires them
+  local st = require("features.settings")
+  check(st.key_allowed("F5") and st.key_allowed("F12") and st.key_allowed("Numpad7") and st.key_allowed("NumpadAdd"),
+    "F-keys and numpad keys can be game keys")
+  check(not st.key_allowed("G") and not st.key_allowed("F13") and not st.key_allowed("Space") and not st.key_allowed(nil),
+    "letters, F13 and up and other keys cannot")
+  st.click(UI, "k:lf_dump_key:c")
+  local before = settings.lf_dump_key
+  st.key(UI, "G")
+  check(settings.lf_dump_key == before and st.capturing() == nil, "choosing G for the dump key is refused (and the wait ends)")
+  st.click(UI, "k:lf_dump_key:c")
+  st.key(UI, "F8")
+  check(settings.lf_dump_key == "F8", "F8 is taken")
+  settings.lf_dump_key = before
 end
 do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
   os.remove(TMP .. "\\ui_layout.txt")

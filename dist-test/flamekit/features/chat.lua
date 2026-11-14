@@ -16,21 +16,14 @@ local CHANNEL = "chat"
 local CHAT_COLOUR, ANNOUNCE_COLOUR = "#c8d2ec", "#ffd27a"
 local kit
 
--- A player's colour, the same as their symbol's in the Party window and on the minimap (0.15.82, owner): the DLL's
--- player_style, FNV-1a over the name's bytes, colour number (hash // 6) % 8 of these eight.
-local PLAYER_COLOURS = { "ffaa3c", "ffe65a", "ff78be", "64dcff", "be8cff", "aaf064", "ff6e5a", "f0f0f0" }
-local function player_colour(name)
-  local h = 2166136261
-  for i = 1, #name do h = ((h ~ name:byte(i)) * 16777619) & 0xffffffff end
-  return "#" .. PLAYER_COLOURS[(h // 6) % 8 + 1]
-end
-F.player_colour = player_colour
-
+-- A player's chat line goes to the Messages window with the player's name (kit.note's `who`): FlameKit's DLL draws it in
+-- that player's colour, the same as their symbol in the Party window and on the minimap (0.15.82, owner). The colour is
+-- worked out only in the DLL (player_style), since 0.15.112; before, this file had its own copy of it.
 local function show(msg)
   if type(msg) ~= "table" or type(msg.t) ~= "string" or msg.t == "" then return end
   local colour = msg.c == "a" and ANNOUNCE_COLOUR or CHAT_COLOUR
-  if msg.c ~= "a" and type(msg.n) == "string" and msg.n ~= "" then colour = player_colour(msg.n) end
-  kit.note(msg.t:sub(1, 400), colour, true)
+  local who = msg.c ~= "a" and type(msg.n) == "string" and msg.n ~= "" and msg.n or nil
+  kit.note(msg.t:sub(1, 400), colour, true, who)
 end
 
 -- To every player's game with FlameKit (the host's own: directly). Server world only.
@@ -53,10 +46,7 @@ local function to_all(world, msg)
 end
 
 local function name_of(world, entity)
-  local ok, name = pcall(world.character_name, world, entity)  -- the character name first (0.15.108)
-  if not ok or type(name) ~= "string" or name == "" then ok, name = pcall(world.name, world, entity) end
-  if not ok or type(name) ~= "string" or name == "" then name = "A player" end
-  return (name:gsub("[%c]", " "))
+  return players.name(world, entity, "A player")  -- core/players.lua: the character name first
 end
 
 -- An announcement from FlameKit to everyone with FlameKit (server world): see the top.

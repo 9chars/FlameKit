@@ -550,9 +550,7 @@ local function handle(world, account, entity, msg)
         refused[s[1]] = nil
         emf.log(string.format("experimental: player %s switched '%s' %s", tostring(entity), s[1], msg.on == true and "on" or "off"))  -- never the account in a log (a log may be shared)
         if s[4] then  -- everyone on the server is told (not for the glider: it changes nothing for others)
-          local okn, name = pcall(world.character_name, world, entity)  -- the character name first (0.15.108)
-          if not okn or type(name) ~= "string" or name == "" then okn, name = pcall(world.name, world, entity) end
-          if not okn or type(name) ~= "string" or name == "" then name = "a player" end
+          local name = require("core.players").name(world, entity, "a player")  -- the character name first, as everywhere
           local line = string.format("%s for %s %s.", s[4], name, msg.on == true and "ENABLED" or "DISABLED")
           -- (0.15.76, owner) to the Messages window of everyone with FlameKit (features/chat.lua), no longer the game's chat
           local sent, why = pcall(require("features.chat").announce, world, line)

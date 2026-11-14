@@ -1,3 +1,13 @@
+0.15.112 Nov 14, 2026
+- The PvP Leaderboard now really starts hidden for a new player (it was shown from the start: its "first time" check came too late).
+- Windows tab: the F5, F6 and F7 keys and "Press the pointer key once instead of holding it" can be changed at the bottom of the Windows tab (they were in no tab before).
+- Settings, Features: the Minimap has an on/off switch, like the Auto Junk List (it replaces "Show the minimap"; F10 still switches it while you play).
+- The Dump Junk key and the minimap's zoom keys can only be F1-F12 or numpad keys, so typing in the game's chat never sets them off.
+- Names: one rule everywhere (Party, minimap, chat, announcements, PvP Leaderboard): the character name, or the account name where the character name cannot be read (a server without FlameKit). The leaderboard no longer uses the account name of the player who died, and nearby players on the minimap keep their account names on a server without FlameKit.
+- Chat: Enter that does not open the game's chat (no pointer within a second) no longer keeps FlameKit's windows up over a menu opened next.
+- Removed a leftover from 0.15.90 that could make FlameKit's overlay flash if it ever fell behind the game.
+- Under the hood, nothing to see: one copy each of the player-colour formula (in the DLL), the list of windows that bring the pointer out, the "file changed" check and the word wrap.
+
 0.15.111 Nov 14, 2026
 - Minimap: it no longer appears over the bag or a game menu when you click another program (0.15.107 fixed that for the other windows only; the minimap had its own copy of the menu check). It also stays up while you type in the game's chat, like the other windows.
 

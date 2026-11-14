@@ -47,4 +47,16 @@ function M.ids(world)
   return ids
 end
 
+-- (0.15.112) The one way FlameKit names a player (party, minimap, chat, announcements, leaderboard): the character
+-- name (the game's Social tab) first; the connection (account) name while that is not known yet, or where it cannot be
+-- read (a player's own game: character names exist only where the world is hosted, so on a server without FlameKit
+-- you see account names); `fallback` (default "Player") when neither is there. Control characters become spaces.
+function M.name(world, id, fallback)
+  for _, how in ipairs({ "character_name", "name" }) do
+    local ok, name = pcall(world[how], world, id)
+    if ok and type(name) == "string" and name ~= "" then return (name:gsub("[%c]", " ")) end
+  end
+  return fallback or "Player"
+end
+
 return M

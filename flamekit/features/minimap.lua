@@ -4,13 +4,14 @@
 -- It reads its settings from this mod, so this tab only shows and changes those settings: nothing here runs on a
 -- server.
 
-local F = { id = "minimap", title = "Minimap" }
+-- (0.15.112, owner) map_show is the minimap's on/off switch in the Settings tab's Features: off, the minimap has no tab
+-- and is not drawn; the minimap key (F10) switches the same setting while you play
+local F = { id = "minimap", title = "Minimap", enabled_setting = "map_show" }
 
 local kit
 
 -- The switches of the tab: setting, what it says, and false for the ones that are off unless switched on.
 local SWITCHES = {
-  { "map_show", "Show the minimap", nil, "Shows or hides the whole minimap. The minimap key (F10 unless you changed it) does the same while you play." },
   { "map_labels", "Display map marker labels while zoomed in", nil, "Writes each marker's name under it: places, your own markers, named flame altars. Not at the two farthest zoom levels." },
   { "map_undiscovered", "Show undiscovered map locations", false, "Also shows places you have not found yet, in grey with a small question mark. A spoiler." },
   { "map_players", "Other players", nil, "Shows the other players as white dots with their names, at the minimap's edge when they are far away." },
@@ -104,12 +105,8 @@ function F.tick(world)
     if ok and account then
       local x, _, z = world:position(id)
       if x then
-        local okn, name = pcall(world.character_name, world, id)  -- the character name first (0.15.108)
-        if not okn or type(name) ~= "string" or name == "" then
-          okn, name = pcall(world.name, world, id)
-        end
-        if not okn or type(name) ~= "string" or name == "" then name = "Player" end
-        here[#here + 1] = { id = id, line = string.format("%.1f %.1f %s", x, z, (name:gsub("[%c]", " "))) }
+        local name = players.name(world, id)  -- core/players.lua: the character name first, as everywhere
+        here[#here + 1] = { id = id, line = string.format("%.1f %.1f %s", x, z, name) }
       end
     end
   end

@@ -90,13 +90,14 @@ local MOST_MESSAGES = 100  -- (0.15.105) the Messages window can be sized to sho
 -- comes, and with the last ones while the pointer key is held): what a feature just did ("Junk discarded: Twigs x3"),
 -- in `colour` ("#rrggbb"; orange without). Always shown (0.15.106, owner: the setting notify that switched them off is
 -- gone; `always` is kept for the callers). Also written to the log. emf\mods\flamekit\ui_messages.dat:
---   m <number> <rrggbb> <text>     (the last 20, oldest first)
+--   m <number> <rrggbb> <text>     (the last 100, oldest first)
+--   p <number> <player name>\t<text>   (a player's chat line: in that player's colour, worked out by the DLL)
 --   end                            (a file without it is half written: the DLL reads it again later)
-function kit.note(text, colour, always)
+function kit.note(text, colour, always, who)
   emf.log(tostring(text))
   message_n = message_n + 1
   messages[#messages + 1] = { n = message_n, colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060",
-    text = (tostring(text):gsub("[%c]", " ")) }
+    text = (tostring(text):gsub("[%c]", " ")), who = type(who) == "string" and who ~= "" and (who:gsub("[%c]", " ")) or nil }
   if #messages > MOST_MESSAGES then table.remove(messages, 1) end
   messages_dirty = true
 end
@@ -149,7 +150,13 @@ end
 local function write_messages()
   if not messages_dirty then return end
   local lines = {}
-  for _, m in ipairs(messages) do lines[#lines + 1] = string.format("m %d %s %s", m.n, m.colour, m.text) end
+  for _, m in ipairs(messages) do
+    if m.who then  -- a player's line (0.15.112): the DLL colours it like the player's symbol (player_style)
+      lines[#lines + 1] = string.format("p %d %s\t%s", m.n, m.who, m.text)
+    else
+      lines[#lines + 1] = string.format("m %d %s %s", m.n, m.colour, m.text)
+    end
+  end
   lines[#lines + 1] = "end"
   local f = io.open(emf.dir .. "\\ui_messages.dat", "w")
   if not f then

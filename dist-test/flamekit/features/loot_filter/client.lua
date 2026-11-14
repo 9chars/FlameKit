@@ -205,6 +205,8 @@ function C.setup(k, F, s)
   kit, items, bag, server = k, k.items, k.bag, s
   load_list()
   emf.on_key("lf_dump_key", kit.guard(F, function(world)
+    -- (0.15.112) only an F-key or a numpad key (set by hand in the ini otherwise): typing in chat never dumps junk
+    if not require("features.settings").key_allowed(tostring(kit.setting("lf_dump_key", ""))) then return end
     dump(world)
   end, "the dump key"))
 end

@@ -116,15 +116,7 @@ local function receive(world, text)
   write("source server\n" .. table.concat(lines, "\n") .. "\n")
 end
 
-local function player_name(world, id)
-  -- (0.15.108, owner) the character name first (the Social tab's), the connection (account) name only while it is not
-  -- known yet; the same order everywhere (minimap, chat, leaderboard): the same name, the same colour
-  for _, how in ipairs({ "character_name", "name" }) do
-    local ok, name = pcall(world[how], world, id)
-    if ok and type(name) == "string" and name ~= "" then return name end
-  end
-  return "Player"
-end
+local player_name = players.name  -- core/players.lua: the character name first, the same everywhere
 
 -- Where the world is hosted: everyone's numbers, sent to everyone.
 function F.tick(world)

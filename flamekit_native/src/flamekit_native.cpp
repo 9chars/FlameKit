@@ -57,8 +57,6 @@ struct Settings {
     bool show = true;
     bool hide_build = true;  // ui_hide_build: all of FlameKit's UI hides in build mode (switched in the Windows tab)
     int size = 300;          // the dial's width and height in pixels
-    int margin = 24;         // distance from the game window's edges in pixels
-    int corner = 1;          // 0 top right, 1 bottom right, 2 bottom left, 3 top left
     bool square = false;     // map_shape: the dial is a square instead of a circle (0.15.75)
     uint32_t toggle_vk = VK_F10;
     uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
@@ -109,10 +107,6 @@ void read_settings() {
     s.show = emf::setting_bool(kKit, "map_show", true);
     s.size = static_cast<int>(emf::setting_float(kKit, "map_size", 300.0));
     s.size = std::clamp(s.size, 100, 600);
-    // (0.15.101, owner) the Corner and "Distance from the screen edge" settings are gone: the lower right corner, 24 px
-    // in, until the player drags it somewhere (map_x, map_y)
-    s.margin = 24;
-    s.corner = 1;
     s.square = emf::setting_text(kKit, "map_shape", "circle") == "square";
     const std::string key = emf::setting_text(kKit, "map_toggle_key", "F10");
     s.toggle_vk = key.empty() ? 0 : emf::keys::parse_key(std::wstring(key.begin(), key.end()));
@@ -120,6 +114,11 @@ void read_settings() {
     s.zoom_in_vk = zin.empty() ? 0 : emf::keys::parse_key(std::wstring(zin.begin(), zin.end()));
     const std::string zout = emf::setting_text(kKit, "map_zoom_out_key", "NumpadSubtract");
     s.zoom_out_vk = zout.empty() ? 0 : emf::keys::parse_key(std::wstring(zout.begin(), zout.end()));
+    // (0.15.112, owner) the zoom keys act even while the player types in the game's chat: only F1-F12 and the numpad keys
+    // (features/settings.lua refuses others when they are chosen; a hand-edited ini gets none)
+    auto game_key = [](uint32_t vk) { return (vk >= VK_F1 && vk <= VK_F12) || (vk >= VK_NUMPAD0 && vk <= VK_DIVIDE) ? vk : 0u; };
+    s.zoom_in_vk = game_key(s.zoom_in_vk);
+    s.zoom_out_vk = game_key(s.zoom_out_vk);
     s.zoom = std::clamp(static_cast<int>(emf::setting_float(kKit, "map_zoom", 2.0) + 0.5), 0, kRangeCount - 1);
     const std::string wkey = emf::setting_text(kKit, "window_key", "F4");
     s.window_vk = wkey.empty() ? 0 : emf::keys::parse_key(std::wstring(wkey.begin(), wkey.end()));
@@ -344,10 +343,9 @@ struct FarPlayers {
             }
         }
         if (now - changed > 4000) return;  // no fresh list: only the players this game knows itself
-        // A joined game knows the players near it but not their names (the game keeps those where the world is
-        // hosted): a nameless one gets the name of the list's nearest player, when that one is close by.
+        // A joined game knows the players near it only by their connection (account) names: each one takes the name
+        // of the list's nearest player (the server's list has character names), when that one is close by.
         for (Other& near_one : players) {
-            if (!near_one.name.empty()) continue;
             float best = 30.0f * 30.0f;
             for (const Other& far_one : list) {
                 const float dx = near_one.x - far_one.x, dz = near_one.z - far_one.z;
@@ -842,10 +840,11 @@ void on_world_tick(emf::World w) {
                 const auto* ct = rt ? nullptr : w.get<gen::CurrentTransform>(id);
                 if (!rt && !ct) continue;
                 const auto& p = rt ? rt->transform.position : ct->transform.position;
-                // (0.15.108, owner) no name here: emf::player_name is the connection (account) name, and the character
-                // name can only be read where the world is hosted. FarPlayers gives each one the character name from
-                // the server's list (features/minimap.lua), the nearest within 30 m.
-                players.push_back({static_cast<float>(meters(p.x)), static_cast<float>(meters(p.z)), std::string()});
+                // The connection (account) name: the character name can only be read where the world is hosted. With a
+                // fresh list from the server's FlameKit, FarPlayers puts each one's character name in its place (the
+                // nearest within 30 m); on a server without FlameKit the account name stays (0.15.112, owner).
+                const auto name = emf::player_name(w, id);
+                players.push_back({static_cast<float>(meters(p.x)), static_cast<float>(meters(p.z)), name ? *name : std::string()});
             }
         }
         if (s.players) g_far_players.add_to(players, now);
@@ -1707,6 +1706,45 @@ std::wstring widen(const std::string& utf8) {
     return out;
 }
 
+// (0.15.112) The one "has this file changed?" check of the files the Lua part writes: its modification time and size in
+// one number (2: the file is missing; never 0, so a fresh 0 always reads the file once).
+uint64_t file_stamp(const std::wstring& file) {
+    WIN32_FILE_ATTRIBUTE_DATA info{};
+    if (!GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)) return 2;
+    return ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1;
+}
+
+// (0.15.112) The one word wrap of FlameKit's windows: the lines of `s` that fit in `width` pixels in `tp`'s letters,
+// words kept whole where they can be; each "\n" starts a new line (an empty paragraph is an empty line). `cont` goes in
+// front of every line after a paragraph's first (the About window's bullets).
+std::vector<std::wstring> wrap_words(TextPainter& tp, const std::wstring& s, int width, const std::wstring& cont = L"") {
+    std::vector<std::wstring> out;
+    size_t start = 0;
+    while (start <= s.size()) {
+        const size_t nl = s.find(L'\n', start);
+        const std::wstring para = s.substr(start, nl == std::wstring::npos ? std::wstring::npos : nl - start);
+        std::wstring line;
+        size_t at = 0;
+        while (at < para.size()) {
+            size_t sp = para.find(L' ', at);
+            if (sp == std::wstring::npos) sp = para.size();
+            const std::wstring word = para.substr(at, sp - at);
+            const std::wstring tryline = line.empty() ? word : line + L" " + word;
+            if (!line.empty() && tp.width(tryline) > width) {
+                out.push_back(line);
+                line = cont + word;
+            } else {
+                line = tryline;
+            }
+            at = sp + 1;
+        }
+        out.push_back(line);
+        if (nl == std::wstring::npos) break;
+        start = nl + 1;
+    }
+    return out;
+}
+
 // A player's symbol and colour: worked out from the player's name, so the same player gets the same pair on every
 // PC and in every session, on the minimap and in the party window alike. 6 shapes x 8 colours.
 struct PlayerStyle {
@@ -2259,6 +2297,9 @@ std::string window_info(HWND h) {
 // Moving it with the mouse: only while the "move" setting is on.
 bool g_pointer_mode = false;  // the pointer is out: FlameKit's window is open or Right Alt is held (UI thread)
 bool g_pointer_hold = false;  // Right Alt is held while the game's process is in front (UI thread)
+// (0.15.112) FlameKit's window (F4), the update window or the About window is open: the pointer is out and the backdrop
+// covers the game. The one list of them is in ui_thread_body (set once a round, before the layers' update).
+bool g_ui_modal = false;
 
 // A click for the Lua part, through FlameKit's window's ui_actions.txt (set when the window exists; 0.15.75, for the
 // minimap's waypoint clicks).
@@ -2304,7 +2345,7 @@ struct MinimapLayer : Layer {
         if (!loaded) load();
         Settings s = settings();
         // While the pointer is out (FlameKit's window open, or the pointer key held) the minimap can be dragged, like the
-        // pinned windows; let go, its place is kept (map_x, map_y). "Back to its corner" in the Minimap tab undoes it.
+        // pinned windows; let go, its place is kept (map_x, map_y). "Reset Default Position" in the Minimap tab undoes it.
         s.move = g_pointer_mode;
         if (!g_pointer_mode && dragging) {
             dragging = false;
@@ -2377,9 +2418,10 @@ struct MinimapLayer : Layer {
         }
         changed = true;
 
-        // where: the corner, or where the player put it, or where it is being dragged (the dial's corner, then the pad)
-        const bool right = s.corner == 0 || s.corner == 1, bottom = s.corner == 1 || s.corner == 2;
-        int x = right ? f.gw - dial_w - s.margin : s.margin, y = bottom ? f.gh - dial_h - s.margin : s.margin;
+        // where: the lower right corner, 24 px in (0.15.101, owner: no Corner or distance settings), or where the player put
+        // it, or where it is being dragged (the dial's corner, then the pad)
+        constexpr int kMargin = 24;
+        int x = f.gw - dial_w - kMargin, y = f.gh - dial_h - kMargin;
         const int free_x = std::max(1, f.gw - dial_w), free_y = std::max(1, f.gh - dial_h);
         if (has_drag) {
             x = std::clamp(static_cast<int>(drag_pos.x) + pad, 0, free_x);
@@ -2603,6 +2645,8 @@ struct PinnedLayer : Layer {
     bool def_center = false;
     int def_right_px = -1;
     bool fixed_height = false;  // (0.15.105) a height the player gave it is kept even when the content is shorter
+    bool default_hidden = false;  // (0.15.112) hidden until the player shows it: decided before its entry first exists
+    bool default_checked = false;
     static constexpr int kGrip = 14;
     int kHead = 28;          // the title bar's height (0 with headless)
     bool headless = false;   // no title bar (the Notices window): dragged anywhere in pointer mode, sized at its corner
@@ -2693,6 +2737,17 @@ struct PinnedLayer : Layer {
     }
 
     void update(const Frame& f) override {
+        if (default_hidden && !default_checked) {
+            // (0.15.112) Before lay(): lay() makes the entry, so a check after it always found one and the PvP
+            // Leaderboard was never hidden at the start (0.15.95 to 0.15.111).
+            default_checked = true;
+            if (!g_layout.loaded) g_layout.load();
+            if (!g_layout.entries.count(id)) {
+                lay().hidden = true;
+                g_layout.save();
+                FK_LOG(fklog::kInfo, "pinned: %s hidden until the player shows it (first time)", id.c_str());
+            }
+        }
         LayoutEntry& e = lay();
         if (refresh(f)) dirty = true;
         const bool want = !e.hidden && active(f) && f.gw > 0;
@@ -2907,11 +2962,8 @@ struct PartyLayer : PinnedLayer {
     }
 
     bool read_list() {
-        WIN32_FILE_ATTRIBUTE_DATA info{};
         const std::wstring file = g_flamekit_dir + L"ui_party.dat";
-        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
-                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
-                                : 2;
+        const uint64_t st = file_stamp(file);
         if (st == stamp) return false;
         FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
         if (!fp) return false;
@@ -3208,10 +3260,11 @@ struct PartyLayer : PinnedLayer {
 };
 
 // ---- the Messages window: what FlameKit's features just did ----
-// From the Lua part (kit.note in core/kit.lua) in emf\mods\flamekit\ui_messages.dat: "m <number> <rrggbb> <text>" lines,
-// the last 20, oldest first, then "end". On screen all the time in a world (owner, 0.15.41): the last 5 messages, the
-// last 10 while the pointer is out. Hidden with its x button, it stays hidden (FlameKit's window, tab Windows, shows it
-// again).
+// From the Lua part (kit.note in core/kit.lua) in emf\mods\flamekit\ui_messages.dat: "m <number> <rrggbb> <text>" lines
+// and "p <number> <player name>\t<text>" (a player's chat line, in the player's colour), the last 100, oldest first,
+// then "end". In a world, hidden in the game's menus (0.15.107): the last 5 messages, the last 10 while the pointer is
+// out, or all of them once the player sized it (0.15.105). Hidden with its x button, it stays hidden (the FlameKit
+// Menu's Windows tab shows it again).
 struct MessagesLayer : PinnedLayer {
     struct Msg {
         int n = 0;
@@ -3241,11 +3294,8 @@ struct MessagesLayer : PinnedLayer {
     bool active(const Frame& f) override { return f.in_world && !f.in_menu; }
 
     void read_file(uint64_t now) {
-        WIN32_FILE_ATTRIBUTE_DATA info{};
         const std::wstring file = g_flamekit_dir + L"ui_messages.dat";
-        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
-                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
-                                : 2;
+        const uint64_t st = file_stamp(file);
         if (st == stamp) return;
         FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
         if (!fp) return;
@@ -3264,6 +3314,16 @@ struct MessagesLayer : PinnedLayer {
             if (sscanf_s(line, "m %d %6x %n", &m.n, &rgb, &used) == 2 && used > 0) {
                 m.r = static_cast<uint8_t>(rgb >> 16), m.g = static_cast<uint8_t>(rgb >> 8), m.b = static_cast<uint8_t>(rgb);
                 m.text = widen(line + used);
+                list.push_back(std::move(m));
+            } else if (sscanf_s(line, "p %d %n", &m.n, &used) == 1 && used > 0) {
+                // (0.15.112) a player's chat line: "p <n> <name>\t<text>", in the player's colour (player_style, the one
+                // place the colour is worked out: the Party window's and the minimap's too)
+                const char* name = line + used;
+                const char* tab = std::strchr(name, '\t');
+                if (!tab) continue;
+                const PlayerStyle st = player_style(std::string(name, tab));
+                m.r = st.r, m.g = st.g, m.b = st.b;
+                m.text = widen(tab + 1);
                 list.push_back(std::move(m));
             }
         }
@@ -3310,25 +3370,8 @@ struct MessagesLayer : PinnedLayer {
 
     int content_height(int width) override {
         lines.clear();
-        for (size_t i : shown) {  // each message wrapped to the width, words kept whole where they can be
-            const std::wstring& t = all[i].text;
-            std::wstring cur;
-            size_t at = 0;
-            while (at <= t.size()) {
-                size_t sp = t.find(L' ', at);
-                if (sp == std::wstring::npos) sp = t.size();
-                const std::wstring word = t.substr(at, sp - at);
-                const std::wstring tryline = cur.empty() ? word : cur + L" " + word;
-                if (!cur.empty() && little.width(tryline) > width - 20) {
-                    lines.push_back({i, cur});
-                    cur = word;
-                } else {
-                    cur = tryline;
-                }
-                at = sp + 1;
-            }
-            lines.push_back({i, cur});
-        }
+        for (size_t i : shown)  // each message wrapped to the width, words kept whole where they can be
+            for (std::wstring& l : wrap_words(little, all[i].text, width - 20)) lines.push_back({i, std::move(l)});
         return std::max<int>(1, static_cast<int>(lines.size())) * kLine + static_cast<int>(shown.size()) * 2 + 4;
     }
 
@@ -3360,19 +3403,16 @@ struct BoardLayer : PinnedLayer {
         PlayerStyle style{};
     };
     std::vector<Row> rows;
-    bool from_server = false, known = false, first = true;
+    bool from_server = false, known = false;
     uint64_t stamp = 0, next_read = 0, next_ask = 0;
     static constexpr int kLine = 22;
 
-    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_right_px = 12; def_y_pm = 190; }  // right edge
+    BoardLayer() : PinnedLayer("board", L"PvP Leaderboard", 300) { hide_in_menus = true; def_right_px = 12; def_y_pm = 190; default_hidden = true; }  // right edge
     uint32_t hotkey() const override { return settings().board_vk; }
 
     bool read_file() {
-        WIN32_FILE_ATTRIBUTE_DATA info{};
         const std::wstring file = g_flamekit_dir + L"ui_board.dat";
-        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
-                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
-                                : 2;
+        const uint64_t st = file_stamp(file);
         if (st == stamp) return false;
         FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
         if (!fp) return false;
@@ -3407,16 +3447,7 @@ struct BoardLayer : PinnedLayer {
 
     bool refresh(const Frame& f) override {
         bool again = false;
-        if (first) {  // hidden until its key is pressed the first time
-            first = false;
-            if (!g_layout.loaded) g_layout.load();
-            if (!g_layout.entries.count(id)) {
-                lay().hidden = true;
-                g_layout.save();
-                FK_LOG(fklog::kInfo, "leaderboard: hidden until its key is pressed (first time)");
-            }
-        }
-        bool asked = false;  // (0.15.96) the Experimental window's "Show PvP Leaderboard" button (features/experimental.lua)
+        bool asked = false;  // (0.15.96) the Experimental window's "Leaderboard" button (features/experimental.lua)
         if (f.now >= next_ask) {
             next_ask = f.now + 100;
             const std::wstring req = g_flamekit_dir + L"ui_board_toggle.request";
@@ -3512,11 +3543,8 @@ struct NoticeLayer : PinnedLayer {
     bool refresh(const Frame& f) override {
         if (f.now < next_read) return false;
         next_read = f.now + 250;
-        WIN32_FILE_ATTRIBUTE_DATA info{};
         const std::wstring file = g_flamekit_dir + L"ui_notices.dat";
-        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
-                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
-                                : 2;
+        const uint64_t st = file_stamp(file);
         if (st == stamp) return false;
         std::vector<Note> list;
         bool complete = st == 2;  // no file: no notices
@@ -3551,23 +3579,8 @@ struct NoticeLayer : PinnedLayer {
     int content_height(int width) override {
         lines.clear();
         for (size_t i = 0; i < notes.size(); ++i) {  // each notice wrapped to the width, words kept whole
-            const std::wstring& t = notes[i].text;
-            std::wstring cur;
-            size_t at = 0;
-            while (at <= t.size()) {
-                size_t sp = t.find(L' ', at);
-                if (sp == std::wstring::npos) sp = t.size();
-                const std::wstring word = t.substr(at, sp - at);
-                const std::wstring tryline = cur.empty() ? word : cur + L" " + word;
-                if (!cur.empty() && text.width(tryline) > width - 24 - kBar) {
-                    lines.push_back({i, cur});
-                    cur = word;
-                } else {
-                    cur = tryline;
-                }
-                at = sp + 1;
-            }
-            if (!cur.empty()) lines.push_back({i, cur});
+            if (notes[i].text.empty()) continue;
+            for (std::wstring& l : wrap_words(text, notes[i].text, width - 24 - kBar)) lines.push_back({i, std::move(l)});
         }
         return static_cast<int>(lines.size()) * kLine + static_cast<int>(notes.empty() ? 0 : notes.size() - 1) * 8 + 4;
     }
@@ -3702,7 +3715,7 @@ struct WindowLayer : Layer {
         std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout, kWinKey, kWinToggle };
     struct Hit {
         RECT r;
         Kind kind;
@@ -3771,11 +3784,7 @@ struct WindowLayer : Layer {
         }
     }
 
-    static uint64_t stamp_of(const std::wstring& file) {
-        WIN32_FILE_ATTRIBUTE_DATA info{};
-        if (!GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)) return 2;
-        return ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1;
-    }
+    static uint64_t stamp_of(const std::wstring& file) { return file_stamp(file); }
 
     // Reads ui_list.dat. False (and nothing changed) while the file is missing or half written.
     bool read_list() {
@@ -4081,33 +4090,7 @@ struct WindowLayer : Layer {
     }
 
     // Lines of `s` that fit in `width` pixels (words kept whole where they can be).
-    std::vector<std::wstring> wrap(const std::wstring& s, int width) {
-        std::vector<std::wstring> out;
-        size_t start = 0;
-        while (start <= s.size()) {
-            const size_t nl = s.find(L'\n', start);
-            const std::wstring para = s.substr(start, nl == std::wstring::npos ? std::wstring::npos : nl - start);
-            std::wstring line;
-            size_t at = 0;
-            while (at < para.size()) {
-                size_t sp = para.find(L' ', at);
-                if (sp == std::wstring::npos) sp = para.size();
-                const std::wstring word = para.substr(at, sp - at);
-                const std::wstring tryline = line.empty() ? word : line + L" " + word;
-                if (!line.empty() && text.width(tryline) > width) {
-                    out.push_back(line);
-                    line = word;
-                } else {
-                    line = tryline;
-                }
-                at = sp + 1;
-            }
-            out.push_back(line);
-            if (nl == std::wstring::npos) break;
-            start = nl + 1;
-        }
-        return out;
-    }
+    std::vector<std::wstring> wrap(const std::wstring& s, int width) { return wrap_words(text, s, width); }
 
     // The rows of a generic tab: laid out top to bottom, buttons along a line while they fit (same_line), a new page
     // where the window ends. Draws the page shown.
@@ -4314,6 +4297,21 @@ struct WindowLayer : Layer {
     }
 
     // The Windows tab (this DLL's own): each pinned window with Show/Hide and Reset, and how to move them.
+    // (0.15.112) the key settings of the Windows tab: label and setting
+    struct WinKey {
+        const wchar_t* label;
+        const char* key;
+    };
+    static constexpr WinKey kWinKeys[3] = {{L"Key that shows and hides the PvP Leaderboard", "board_window_key"},
+                                           {L"Key that shows and hides the Experimental window", "exp_window_key"},
+                                           {L"Key that shows and hides the Party window", "party_window_key"}};
+    int capture_win = -1;  // the key setting of the Windows tab waiting for a key (-1: none)
+    void stop_capture() {  // the Lua part's Settings waits too: the same click again ends it there
+        if (capture_win < 0) return;
+        act("opt", std::string("k:") + kWinKeys[capture_win].key + ":c");
+        capture_win = -1;
+    }
+
     void draw_windows() {
         int y = kTop + 14;
         text.draw(canvas, kPad, y, L"Pinned windows", 255, 210, 122);
@@ -4337,6 +4335,24 @@ struct WindowLayer : Layer {
             text.draw(canvas, kPad, y + 5, L"In build mode", 230, 230, 235);
             button(kPad + 200, y, 270, on ? L"Hide all of FlameKit: ON" : L"Hide all of FlameKit: OFF", on, kHideBuild);
             hits.back().tip = &kTip;
+            y += 40;
+        }
+        {  // (0.15.112, owner) the settings of the "Windows" group: nowhere else in FlameKit's window before. Changed through
+            // the Lua part's Settings feature, the same way as in the Settings tab ("k:<key>:c" waits for a key, "b:" switches)
+            y += 6;
+            text.draw(canvas, kPad, y, L"Keys and pointer", 255, 210, 122);
+            y += 34;
+            const Settings st = settings();
+            const uint32_t vks[3] = {st.board_vk, st.exp_vk, st.party_vk};
+            for (int i = 0; i < 3; ++i) {
+                text.draw(canvas, kPad, y + 5, kWinKeys[i].label, 230, 230, 235);
+                const std::wstring k = key_label(vks[i]);
+                button(kPad + 430, y, 150, capture_win == i ? L"press a key" : k.empty() ? L"none" : k, capture_win == i, kWinKey,
+                       static_cast<size_t>(i));
+                y += 40;
+            }
+            text.draw(canvas, kPad, y + 5, L"Press the pointer key once instead of holding it", 230, 230, 235);
+            button(kPad + 430, y, 150, st.pointer_toggle ? L"ON" : L"OFF", st.pointer_toggle, kWinToggle);
             y += 40;
         }
         y += 10;
@@ -4559,6 +4575,7 @@ struct WindowLayer : Layer {
     }
 
     void close(const char* why) {
+        stop_capture();  // (0.15.112) a key setting of the Windows tab waiting for a key: not any more
         open = close_asked = drop_open = false;
         moved_junk.clear();
         moved_bag.clear();
@@ -4680,7 +4697,10 @@ struct WindowLayer : Layer {
             return;
         }
         // any other key: to the Lua part (a setting's Change takes it as the setting's key; else the shown tab's feature)
-        if (current == "windows") return;
+        if (current == "windows") {  // only a key setting waiting for a key takes it (0.15.112)
+            if (capture_win < 0) return;
+            capture_win = -1;  // the Lua part's Settings ends its own wait when it takes the key
+        }
         std::string name = emf::keys::detail::key_name(static_cast<uint32_t>(vk));
         if (name.rfind("key ", 0) == 0) name = name.substr(4);  // "key 0xba": the setting is written "0xba"
         act("key", name);
@@ -4737,6 +4757,7 @@ struct WindowLayer : Layer {
             switch (h.kind) {
             case kTab:
                 if (h.index < tabs.size() && tabs[h.index].id != current) {
+                    stop_capture();
                     current = tabs[h.index].id;
                     rows_page = 0;
                     rows_scroll = 0;
@@ -4773,6 +4794,16 @@ struct WindowLayer : Layer {
                 break;
             case kHideBuild:  // the setting is switched by the Lua part (features/settings.lua), like the Auto Junk List's options
                 act("opt", "b:ui_hide_build");
+                break;
+            case kWinKey:  // (0.15.112) wait for a key (the same click again: stop waiting)
+                if (h.index < 3) {
+                    const int i = static_cast<int>(h.index);
+                    act("opt", std::string("k:") + kWinKeys[i].key + ":c");
+                    capture_win = capture_win == i ? -1 : i;  // another one waiting: the Lua part switches to this one too
+                }
+                break;
+            case kWinToggle:
+                act("opt", "b:pointer_toggle");
                 break;
             case kScrollThumb:
                 thumb_drag = true;
@@ -4927,11 +4958,8 @@ struct ExperimentalLayer : PinnedLayer {
     }
 
     bool read_file() {
-        WIN32_FILE_ATTRIBUTE_DATA info{};
         const std::wstring file = g_flamekit_dir + L"ui_exp.dat";
-        const uint64_t st = GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &info)
-                                ? ((static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32 | info.ftLastWriteTime.dwLowDateTime) ^ info.nFileSizeLow) | 1
-                                : 2;
+        const uint64_t st = file_stamp(file);
         if (st == stamp) return false;
         FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
         if (!fp) return false;
@@ -5020,29 +5048,8 @@ struct ExperimentalLayer : PinnedLayer {
     }
 
     std::vector<std::wstring> wrap_text(const std::wstring& t, int width) {
-        std::vector<std::wstring> out;
-        std::wstring line, word;
-        auto flush_word = [&] {
-            if (word.empty()) return;
-            const std::wstring tryl = line.empty() ? word : line + L" " + word;
-            if (!line.empty() && text.width(tryl) > width) {
-                out.push_back(line);
-                line = word;
-            } else {
-                line = tryl;
-            }
-            word.clear();
-        };
-        for (wchar_t c : t) {
-            if (c == L' ') flush_word();
-            else if (c == L'\n') {
-                flush_word();
-                out.push_back(line);
-                line.clear();
-            } else word += c;
-        }
-        flush_word();
-        if (!line.empty() || out.empty()) out.push_back(line);
+        std::vector<std::wstring> out = wrap_words(text, t, width);
+        if (out.size() > 1 && out.back().empty()) out.pop_back();  // a text ending in "\n": no empty line after it (as before)
         return out;
     }
 
@@ -5209,24 +5216,7 @@ struct ExperimentalLayer : PinnedLayer {
             for (const Placed& p : placed) {
                 const Row& r = rows[p.row];
                 if (r.tip.empty() || !(r.kind == 'b' || r.kind == 'd' || r.kind == 'l') || !in(p.box, hover_x, hover_y)) continue;
-                std::vector<std::wstring> tl;
-                const int tw = width - 16 - 16;
-                std::wstring cur;
-                size_t at = 0;
-                while (at <= r.tip.size()) {
-                    size_t sp = r.tip.find(L' ', at);
-                    if (sp == std::wstring::npos) sp = r.tip.size();
-                    const std::wstring word = r.tip.substr(at, sp - at);
-                    const std::wstring tryl = cur.empty() ? word : cur + L" " + word;
-                    if (!cur.empty() && little.width(tryl) > tw) {
-                        tl.push_back(cur);
-                        cur = word;
-                    } else {
-                        cur = tryl;
-                    }
-                    at = sp + 1;
-                }
-                if (!cur.empty()) tl.push_back(cur);
+                const std::vector<std::wstring> tl = wrap_words(little, r.tip, width - 16 - 16);
                 const int lh = 17, h = static_cast<int>(tl.size()) * lh + 10;
                 int y0 = static_cast<int>(p.box.bottom) + top + 4;
                 if (y0 + h > canvas.h - 4) y0 = std::max(kHead + 2, static_cast<int>(p.box.top) + top - h - 4);
@@ -5391,23 +5381,8 @@ struct AboutDialog : Layer {
                 lines.push_back({L"", false});
                 continue;
             }
-            std::wstring cur;
-            size_t at = 0;
-            const std::wstring& t = src.text;
-            while (at <= t.size()) {
-                size_t sp = t.find(L' ', at);
-                if (sp == std::wstring::npos) sp = t.size();
-                const std::wstring word = t.substr(at, sp - at);
-                const std::wstring tryl = cur.empty() ? word : cur + L" " + word;
-                if (!cur.empty() && tp.width(tryl) > width) {
-                    lines.push_back({cur, src.head});
-                    cur = (src.text.rfind(L"• ", 0) == 0 ? L"  " : L"") + word;
-                } else {
-                    cur = tryl;
-                }
-                at = sp + 1;
-            }
-            lines.push_back({cur, src.head});
+            const bool bullet = src.text.rfind(L"\u2022 ", 0) == 0;  // its next lines start under the text, not the dot
+            for (std::wstring& l : wrap_words(tp, src.text, width, bullet ? L"  " : L"")) lines.push_back({std::move(l), src.head});
         }
     }
 
@@ -5748,11 +5723,8 @@ struct UpdateDialog : Layer {
 struct BackdropLayer : Layer {
     bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "backdrop"; }
-    const Layer* window = nullptr;
-    const Layer* dialog = nullptr;  // the update dialog: the pointer is out while it is open
-    const Layer* about = nullptr;   // the About window (0.15.103): the same
     void update(const Frame& f) override {
-        const bool want = ((window && window->visible) || (dialog && dialog->visible) || (about && about->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
+        const bool want = (g_ui_modal || g_pointer_hold) && f.gw > 0 && f.gh > 0;
         if (want != visible) {
             visible = want;
             changed = true;
@@ -5896,9 +5868,9 @@ struct HudLayer : Layer {
         if (f.now >= next_read) read_files(f.now);
         std::vector<Line> want;
         if (!in_world) {
-            // (0.15.89, owner) On the game's main screen, before any world: one line, "FlameKit vX Loaded", in the lower
-            // RIGHT corner (the lower left holds the game's copyright lines there). Off when the player switched the label
-            // off (ui_hud.dat from the last game). The version is the one running now.
+            // (0.15.89, owner) On the game's main screen, before any world: one line, "FlameKit vX", in the lower RIGHT
+            // corner (the lower left holds the game's copyright lines there), on a dark box. Off when the player switched
+            // the label off (ui_hud.dat from the last game). The version is the one running now.
             if (version.empty()) version = widen(version_in(g_flamekit_dir + L"mod.json"));
             if (!hud_file || !label.empty()) want.push_back({L"FlameKit v" + version, 235, 225, 205});  // (0.15.103, owner: no "Loaded")
         } else if (!status.empty()) want.push_back({status, static_cast<uint8_t>(status_rgb >> 16), static_cast<uint8_t>(status_rgb >> 8), static_cast<uint8_t>(status_rgb)});
@@ -6292,18 +6264,9 @@ struct Watchdog {
             g_presenter.show(true);
         }
         g_presenter.order(f.game, true, "watchdog repair");
-        std::string again = problem(g_presenter.win, f.game, f.origin, f.gw, f.gh);
-        if (!again.empty()) {
-            // (0.15.90) seen on the game's main screen after Alt+Tab: the plain repair does not take. Hide the overlay and
-            // show it again straight into the topmost band.
-            ShowWindow(g_presenter.win, SW_HIDE);
-            const BOOL ok = SetWindowPos(g_presenter.win, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-            const DWORD err = ok ? 0 : GetLastError();
-            g_presenter.topmost = true;
-            again = problem(g_presenter.win, f.game, f.origin, f.gw, f.gh);
-            FK_LOG(fklog::kWarn, "watchdog: hidden and shown again on top: %s (SetWindowPos %s, error %lu)", again.empty() ? "repaired" : again.c_str(),
-                   ok ? "ok" : "refused", err);
-        }
+        // (0.15.112) The hide-and-show-again repair of 0.15.90 is gone: it did not help, and the overlay has belonged to the
+        // game's window since 0.15.94 (owned windows stay in front of their owner), which fixed the main screen.
+        const std::string again = problem(g_presenter.win, f.game, f.origin, f.gw, f.gh);
         if (again.empty()) {
             ++repaired;
             FK_LOG(fklog::kWarn, "watchdog: repaired");
@@ -6341,7 +6304,6 @@ void ui_thread_body() {
     HudLayer hud;
     WindowLayer window;
     BackdropLayer backdrop;
-    backdrop.window = &window;
     PartyLayer party;
     MessagesLayer messages;
     NoticeLayer notices;
@@ -6349,9 +6311,7 @@ void ui_thread_body() {
     experimental.window = &window;
     BoardLayer board;
     UpdateDialog update_dialog;
-    backdrop.dialog = &update_dialog;
     AboutDialog about;
-    backdrop.about = &about;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
     g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &about, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
@@ -6452,7 +6412,8 @@ void ui_thread_body() {
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
         // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
         {
-            const bool mode = hold || window.open || update_dialog.open || about.open;
+            g_ui_modal = window.open || update_dialog.open || about.open;  // the one list (see g_ui_modal)
+            const bool mode = hold || g_ui_modal;
             if (mode && !g_pointer_mode) {
                 restore_rounds = 5;
             } else if (!mode && g_pointer_mode) {
@@ -6485,6 +6446,7 @@ void ui_thread_body() {
         // menu and hid FlameKit's windows. Enter pressed in the game with no menu open starts "chat"; the next Enter (sent)
         // or Esc ends it, and so does the pointer going away. While it lasts the pointer does not count as a menu.
         static bool chat_open = false, enter_was = false, esc_was_chat = false;
+        static uint64_t chat_at = 0;  // when Enter opened it
         {
             const bool enter = (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0, esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
             if (f.game_front && f.in_world && !g_pointer_mode) {
@@ -6494,6 +6456,7 @@ void ui_thread_body() {
                         FK_LOG(fklog::kDebug, "chat: closed (Enter)");
                     } else if (!menu_was) {
                         chat_open = true;
+                        chat_at = f.now;
                         FK_LOG(fklog::kDebug, "chat: opened (Enter): the game's pointer is not a menu now");
                     }
                 }
@@ -6514,7 +6477,12 @@ void ui_thread_body() {
             static bool chat_pointer_seen = false;
             if (!chat_open) chat_pointer_seen = false;
             else if (pointer) chat_pointer_seen = true;
-            if (chat_open && chat_pointer_seen && !pointer) {  // the chat closed some other way (the pointer gone for 0.5 s)
+            if (chat_open && !chat_pointer_seen && f.now - chat_at > 1000) {
+                // (0.15.112) Enter opened no chat (the game's pointer never came within a second): not chat after all,
+                // so a menu opened next hides FlameKit's windows again
+                chat_open = false;
+                FK_LOG(fklog::kDebug, "chat: none after Enter (no pointer within a second)");
+            } else if (chat_open && chat_pointer_seen && !pointer) {  // the chat closed some other way (the pointer gone for 0.5 s)
                 if (!pointer_gone_at) pointer_gone_at = f.now;
                 else if (f.now - pointer_gone_at > 500) {
                     chat_open = false;
