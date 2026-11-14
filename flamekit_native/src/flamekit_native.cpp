@@ -2310,13 +2310,10 @@ struct MinimapLayer : Layer {
             dragging = false;
             dropped = true;
         }
-        bool in_menu = false;  // the game shows its mouse pointer only in its menus (the big map, the bag, ...)
-        if (f.game_front && s.hide_menus && !g_pointer_mode) {  // (FlameKit's own pointer is not a game menu)
-            CURSORINFO ci{};
-            ci.cbSize = sizeof(ci);
-            // a pointer that is "showing" but has no picture is not on screen: the game hides its pointer that way too
-            in_menu = GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) != 0 && ci.hCursor != nullptr;
-        }
+        // (0.15.111) the one menu check of all of FlameKit's windows (Frame::in_menu, ui_thread): it keeps the menu while
+        // another program is in front and leaves the game's chat out. The minimap had its own copy of the check before,
+        // so it came up over the bag when the game lost the front.
+        const bool in_menu = s.hide_menus && f.in_menu;
         const bool want = s.show && f.in_world && !in_menu && !g_travelling.load() && f.game && f.gw > 0;
         if (want != visible) {
             visible = want;

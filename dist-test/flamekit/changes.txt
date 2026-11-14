@@ -1,3 +1,6 @@
+0.15.111 Nov 14, 2026
+- Minimap: it no longer appears over the bag or a game menu when you click another program (0.15.107 fixed that for the other windows only; the minimap had its own copy of the menu check). It also stays up while you type in the game's chat, like the other windows.
+
 0.15.110 Nov 14, 2026
 - Typing in the game's chat (Enter) no longer hides FlameKit's windows: the chat box shows the game's mouse pointer, which FlameKit took for a menu. Enter with no menu open now counts as chat until Enter or Esc closes it.
 
