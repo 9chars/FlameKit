@@ -4076,7 +4076,10 @@ struct BackdropLayer : Layer {
 };
 
 // The game's own mouse pointer, so FlameKit's windows look like the game's: taken from Windows while the game shows its
-// pointer (in its menus) the first time; until then (or if the game draws its pointer itself) Windows' arrow.
+// pointer (in its menus); until then (or if the game draws its pointer itself) Windows' arrow. Only an arrow-like colour
+// pointer is taken: the game's is 64x64 in colour with its tip at the top left. A black-and-white pointer, or one whose
+// hot spot is not in its top left quarter (resize and splitter pointers have it in the middle), is refused and looked
+// for again: 0.15.41 once took a 32x32 black-and-white column-resize pointer the game's window showed for a moment.
 HCURSOR g_game_cursor = nullptr;
 void look_for_game_cursor() {
     if (g_game_cursor) return;
@@ -4087,15 +4090,25 @@ void look_for_game_cursor() {
                                      IDC_SIZENS, IDC_SIZEALL, IDC_NO, IDC_HAND, IDC_APPSTARTING, IDC_HELP};
     for (LPCSTR id : kSystem)
         if (ci.hCursor == LoadCursorA(nullptr, id)) return;  // one of Windows' own: not the game's
-    g_game_cursor = static_cast<HCURSOR>(CopyIcon(ci.hCursor));
+    static HCURSOR refused = nullptr;  // the last one refused (not said again)
+    if (ci.hCursor == refused) return;
     ICONINFO ii{};
+    if (!GetIconInfo(ci.hCursor, &ii)) return;
     BITMAP bm{};
-    if (g_game_cursor && GetIconInfo(g_game_cursor, &ii)) {
-        GetObject(ii.hbmColor ? ii.hbmColor : ii.hbmMask, sizeof bm, &bm);
-        if (ii.hbmColor) DeleteObject(ii.hbmColor);
-        if (ii.hbmMask) DeleteObject(ii.hbmMask);
+    GetObject(ii.hbmColor ? ii.hbmColor : ii.hbmMask, sizeof bm, &bm);
+    const bool colour = ii.hbmColor != nullptr;
+    const LONG w = bm.bmWidth, h = colour ? bm.bmHeight : bm.bmHeight / 2;  // a black-and-white one: two masks stacked
+    const bool tip_top_left = static_cast<LONG>(ii.xHotspot) < std::max<LONG>(1, w / 4) && static_cast<LONG>(ii.yHotspot) < std::max<LONG>(1, h / 4);
+    if (ii.hbmColor) DeleteObject(ii.hbmColor);
+    if (ii.hbmMask) DeleteObject(ii.hbmMask);
+    if (!colour || !tip_top_left) {
+        refused = ci.hCursor;
+        FK_LOG(fklog::kInfo, "cursor: a pointer of %ldx%ld (%s, hot spot %lu,%lu) is not the game's arrow: not used", w, h,
+               colour ? "colour" : "black and white", ii.xHotspot, ii.yHotspot);
+        return;
     }
-    FK_LOG(fklog::kInfo, "cursor: the game's pointer is used for FlameKit's windows (%ldx%ld)", bm.bmWidth, bm.bmHeight);
+    g_game_cursor = static_cast<HCURSOR>(CopyIcon(ci.hCursor));
+    FK_LOG(fklog::kInfo, "cursor: the game's pointer is used for FlameKit's windows (%ldx%ld, hot spot %lu,%lu)", w, h, ii.xHotspot, ii.yHotspot);
 }
 
 // ---- the lower left corner: the status line, the FlameKit label, the update line, the debug level ----
