@@ -1,3 +1,6 @@
+0.15.87 Nov 14, 2026
+- A test update, to try the update window's Restart Game. Nothing else changed.
+
 0.15.86 Nov 14, 2026
 - Update window, Restart Game: the game now starts again properly. Before, Steam said the game was still running, because the part that waits for the game to close had been started by the game itself (Steam counts that as the game). It is now started by Windows on its own, and also waits until Steam has let go of the game.
 - Update window: back to taking the pointer and the keyboard when it appears, so OK, Restart Game and Esc work at once without the pointer key.
