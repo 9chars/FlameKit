@@ -353,10 +353,33 @@ local function bodies_tick(world)
         alive = world:position(id) ~= nil and (hp == nil or hp.health > 0)
       end)
     end
-    if not alive then
+    -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a
+    -- far place may not be streamed in yet.) So a body counts as gone only when it was missing three checks in a row.
+    if not alive then b.missing = (b.missing or 0) + 1 else b.missing = 0 end
+    if not alive and b.missing >= 3 and b.session == session then
       emf.log(string.format("experimental: the PvP test %s (entity %s) is gone", b.kind, tostring(id)))
       drop_body(world, id, false)
-    elseif b.kind == "duel" then
+    elseif not alive and b.session ~= session then
+      drop_body(world, id, false)
+    elseif not alive then
+      -- not seen this time: asked again in half a second
+    else
+      -- what its AI does, logged when it changes (for finding out why a body does not fight)
+      pcall(function()
+        local ai = world:get("DynamicEnemy01BehaviorState", id)
+        local st = world:get("SelectedTargets", id)
+        local t = st and st.targets[1].targetEntityId
+        if type(t) == "table" then t = t.id end
+        local line = string.format("AI state %s, target %s", ai and tostring(ai.state) or "-", tostring(t))
+        if line ~= b.last then  -- logged when the state or target changes, with the threat table at that moment
+          b.last = line
+          local okl, al = pcall(F._aggro_line, world, id)
+          emf.log(string.format("experimental: the PvP test %s (entity %s): %s, threat table [%s]", b.kind, tostring(id), line,
+            okl and al or ("? " .. tostring(al))))
+        end
+      end)
+    end
+    if alive and b.kind == "duel" then
       pcall(function()
         local f = world:get("Faction", id)
         if f and tonumber(tostring(f.faction)) ~= DUEL_FACTION then f.faction = DUEL_FACTION end
@@ -656,8 +679,92 @@ end
 -- (DynamicEnemy01BehaviorState), alive, of a faction that is not player side (7, 8, 11: players, companions, summons).
 local AGGRO_R, AGGRO_STEPS, AGGRO_THREAT = 20, 120, 100
 local aggro_broken = false
+local aggro_last = 0
+-- Measured (0.15.67 diagnostics): AddThreatTargetEvent alone does not do it. The duelist stayed Idle/Roaming with
+-- SelectedTargets target 0 while the player had PvP on, and went to Combat with target 1 within 6 s of PvP off. So
+-- the monsters near a PvP player also get the player written as their selected target every step (EMF ai.md: "or
+-- overwrite SelectedTargets.targets[0] after it runs").
+local hunters = {}   -- monster entity -> PvP player entity, rebuilt every AGGRO_STEPS
+local target_broken = false
+
+local function set_id(holder, field, value)
+  local v = holder[field]
+  if type(v) == "table" then
+    if v.id ~= value then v.id = value return true end
+  elseif v ~= value then
+    holder[field] = value
+    return true
+  end
+  return false
+end
+
+-- Measured next (02:18): with the target written, the duelist kept target 1 but stayed Idle/Roaming, never Combat.
+-- Its threat table (DynamicAggro, 6 slots of AggroTarget) keeps each candidate's faction (+80), state (Alarmed = 3)
+-- and aggro; the AI picks a fight from the Alarmed slots. So the PvP player is also put in a slot as Alarmed with
+-- faction 7 (Player, as the picker expects) and aggro 100.
+local ALARMED, AGGRO_VALUE = 3, 100
+
+local function eid(v)
+  if type(v) == "table" then return v.id end
+  return v
+end
+
+local function alarm(world, monster, player)
+  local ag = world:get("DynamicAggro", monster)
+  if not ag then return end
+  local slot
+  for i = 1, 6 do
+    if eid(ag.targets[i].entityId) == player then slot = ag.targets[i] break end
+  end
+  if not slot then
+    for i = 1, 6 do
+      if tonumber(tostring(ag.targets[i].state)) == 0 then slot = ag.targets[i] break end
+    end
+  end
+  if not slot then return end
+  set_id(slot, "entityId", player)
+  set_id(slot, "targetId", player)
+  if tonumber(tostring(slot.state)) ~= ALARMED then slot.state = ALARMED end
+  if tonumber(tostring(slot.faction)) ~= PLAYER_FACTION then slot.faction = PLAYER_FACTION end
+  if slot.aggro < AGGRO_VALUE then slot.aggro = AGGRO_VALUE end
+end
+
+-- A test body's threat table, for the log: "slot: state entity faction aggro" for the slots in use.
+local function aggro_line(world, id)
+  local ag = world:get("DynamicAggro", id)
+  if not ag then return "no threat table" end
+  local parts = {}
+  for i = 1, 6 do
+    local t = ag.targets[i]
+    local st = tonumber(tostring(t.state)) or -1
+    if st ~= 0 then parts[#parts + 1] = string.format("%d: %d e%s f%s a%.0f", i, st, tostring(eid(t.entityId)), tostring(t.faction), t.aggro or -1) end
+  end
+  return #parts > 0 and table.concat(parts, "; ") or "empty"
+end
+F._aggro_line = aggro_line
+
+local function hunt(world)
+  if target_broken or next(hunters) == nil then return end
+  local ok, err = pcall(function()
+    for monster, player in pairs(hunters) do
+      alarm(world, monster, player)
+      local st = world:get("SelectedTargets", monster)
+      if st then
+        local t = st.targets[1]
+        local a = set_id(t, "targetEntityId", player)
+        local b = set_id(t, "targetRootEntityId", player)
+        if a or b then t.changeCounter = (t.changeCounter + 1) & 0xffff end
+      end
+    end
+  end)
+  if not ok then
+    target_broken = true
+    emf.log("experimental: PvP: a monster's target cannot be set on this game version (" .. tostring(err) .. ")")
+  end
+end
 
 local function pvp_aggro(world, players)
+  hunters = {}
   if aggro_broken or #players == 0 then return end
   local sent = 0
   local ok, err = pcall(function()
@@ -671,6 +778,7 @@ local function pvp_aggro(world, players)
             for _, pl in ipairs(players) do
               local px, _, pz = world:position(pl)
               if px and (px - x) ^ 2 + (pz - z) ^ 2 < AGGRO_R * AGGRO_R then
+                hunters[e] = pl
                 local done = emf.emit("server", "AddThreatTargetEvent", { attackerId = e, targetId = pl, threatValue = AGGRO_THREAT })
                 if done == false then error("the game refused AddThreatTargetEvent") end
                 sent = sent + 1
@@ -684,8 +792,9 @@ local function pvp_aggro(world, players)
   if not ok then
     aggro_broken = true
     emf.log("experimental: PvP: monsters cannot be pointed at PvP players on this game version (" .. tostring(err) .. "): they ignore them")
-  elseif sent > 0 then
-    kit.debug("debug", "PvP: %d monster(s) told about PvP players near them", sent)
+  elseif sent ~= aggro_last then
+    aggro_last = sent
+    emf.log(string.format("experimental: PvP: %d monster(s) near PvP players told they are threatened by them", sent))
   end
 end
 
@@ -740,7 +849,10 @@ local function pvp(world)
     local players = {}
     for _, p in pairs(online) do if p.pvp then players[#players + 1] = p.entity end end
     pvp_aggro(world, players)
+  elseif not any then
+    hunters = {}
   end
+  if any then hunt(world) end
 end
 
 function F.tick(world)

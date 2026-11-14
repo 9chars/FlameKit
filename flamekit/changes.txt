@@ -1,3 +1,7 @@
+0.15.68 Nov 14, 2026
+- PvP: monsters now really fight a player with PvP on (tested with the duelist: it attacks within a second). The game's own threat event was not enough: each monster within 20 m of a PvP player also gets that player as its target and in its threat table, the way the game keeps a normal player there.
+- PvP test bodies: a body spawned right after a long move is no longer lost track of.
+
 0.15.67 Nov 14, 2026
 - PvP: monsters ignored a player with PvP on (the game's monsters only pick players as targets, and a PvP player no longer counts as one). Now every monster within 20 m of a PvP player is pointed at them every 2 seconds with the game's own threat event, so PvP never makes you safe from monsters.
 

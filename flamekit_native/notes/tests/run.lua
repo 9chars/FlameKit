@@ -29,6 +29,7 @@ local function reset_world()
     SlotSelection = { [PLAYER] = { actionbarEntityIds = { 202, 0 } } },
     PlayerInput = { [PLAYER] = { fromClientSettings = { flags = 0x1000 } } },
     Faction = { [PLAYER] = { faction = 7 } },  -- 7: Player
+    DynamicAggro = {}, SelectedTargets = {},
     -- the building cursor (zero outside build mode): kit.lua's build mode
     ClientPlayerInput = { [PLAYER] = { data = { mask = 0, cursorInput = { primaryTransform = { position = { x = 0, y = 0, z = 0 } } } } } },
     ItemState = { [900] = { itemRarityUi = 2, itemLevelUi = 12, baseDamageUi = 34, itemState = 0 },
@@ -641,6 +642,7 @@ step(2)
 check(comps.Faction[PLAYER].faction == 1, "a faction the game set back is written again")
 -- monsters ignore faction 1 players by themselves: each monster near a PvP player is told it is threatened by them
 comps.DynamicEnemy01BehaviorState = { [901] = {} }
+comps.SelectedTargets = { [901] = { targets = { { targetEntityId = 0, targetRootEntityId = 0, changeCounter = 3 } } } }
 comps.NetworkHealth = comps.NetworkHealth or {}
 comps.Faction[901] = { faction = 3 }  -- a Vukah
 local pos0 = SW.position
@@ -649,8 +651,11 @@ step(125)
 local th = emitted[#emitted] or { f = {} }
 check(th.kind == "server" and th.name == "AddThreatTargetEvent" and th.f.attackerId == 901 and th.f.targetId == PLAYER,
   "a monster near a PvP player is pointed at them (AddThreatTargetEvent)")
+step(2)
+local tg = comps.SelectedTargets[901].targets[1]
+check(tg.targetEntityId == PLAYER and tg.changeCounter == 4 and tg.targetRootEntityId == PLAYER, "and the PvP player is written as its selected target")
 SW.position = pos0
-comps.DynamicEnemy01BehaviorState, comps.Faction[901] = {}, nil
+comps.DynamicEnemy01BehaviorState, comps.Faction[901], comps.SelectedTargets = {}, nil, {}
 ef = io.open(TMP .. "\\experimental.json"); etext = ef:read("a"); ef:close()
 check(not etext:find("pvp", 1, true), "PvP is never saved: it is off again next time")
 click(find_row("PvP", "sw:pvp").button)
