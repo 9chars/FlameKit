@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.62.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.63.
 
 ## What FlameKit is
 
@@ -89,7 +89,7 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 - DLL only: `ui_layout.txt` (place and size of each window, 7 fields incl. height).
 
 **DLL UI** (`flamekit_native.cpp`, `ui_thread`): one overlay window, plain BGRA surface (keep the Vulkan presenter path open), layers in this order: hud, backdrop, minimap, party, messages, notices, window. Watchdog keeps it on top of the game 4×/s.
-- `WindowLayer` (F6, `window_key`): title bar, frame, move, resize (min 560×440); tabs wrap; sizes are members set by `lay_out()`. Tab order from `main.lua`, What's New first; it opens by itself on What's New after an update (or every game with `open_on_start`). Auto Junk List has its own icon view (pages); every other tab is rows from `ui_tabs.dat` with a scroll bar. Another program in front does not close it (`lost_front`).
+- `WindowLayer` (F4 by default since 0.15.63, owner: players know F4 from the old versions; F6 in 0.15.26-0.15.62; setting `window_key`): title bar, frame, move, resize (min 560×440); tabs wrap; sizes are members set by `lay_out()`. Tab order from `main.lua`, What's New first; it opens by itself on What's New after an update (or every game with `open_on_start`). Auto Junk List has its own icon view (pages); every other tab is rows from `ui_tabs.dat` with a scroll bar. Another program in front does not close it (`lost_front`).
 - **Build mode** (0.15.59, owner: declutter while building; setting `ui_hide_build`, group "Windows", switched in F6 → Windows since 0.15.62, default on): kit.lua reads the building cursor (`ClientPlayerInput.data.cursorInput`). **Open:** its position is zero before the first build mode but STAYS where it was after leaving (0.15.61 in the owner's game: FlameKit stayed hidden), so it is no signal; 0.15.62 logs every cursor field (`build probe:`) and hides nothing (`BUILD_HIDES = false` in kit.lua) until the right field is found and writes `build 1` into `ui_hud.dat`; the DLL (`g_build_hide`) hides every layer whose `stays_in_build()` is false. **Owner's rule (0.15.61): ALL FlameKit UI on screen hides in build mode**, the lower left lines too, and every new window does so by default; only `WindowLayer` and `BackdropLayer` (F6, opened on purpose) opt out, and a future feature made for build mode may opt out (`stays_in_build`). The compositor uses `Layer::shown()`, never `visible` alone.
 - `NoticeLayer` (0.15.54, owner: the Auto-Collect warning got lost in Messages): warnings that stay until the feature takes them back. A `PinnedLayer` with `headless` (no title bar, `kHead` 0): dragged anywhere and sized at its corner in pointer mode; shown only while there is a notice; hidden in menus. Rule: a warning about a state that lasts (a setting conflict) is a notice, not a message.
 - `PinnedLayer` (party, messages, notices): stay on screen while playing, collapse/hide, move, resize (height = maximum, content scrolls), `content_click`, `hide_in_menus` (party: on; messages: off). They take the mouse only in pointer mode.

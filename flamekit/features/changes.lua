@@ -1,4 +1,4 @@
--- features/changes.lua: the What's New tab of FlameKit's window (F6), and after an update a message that says so.
+-- features/changes.lua: the What's New tab of FlameKit's window (F4), and after an update a message that says so.
 --
 -- changes.txt lists the versions, newest first: a line with the version and its date ("0.15.0 Nov 12, 2026"), then
 -- its lines, then an empty line. The
@@ -72,7 +72,9 @@ function F.client_tick(world)
   if pending then
     pending = false
     kit.store.save("seen_version", { version = kit.version })
-    kit.note(string.format("%s was updated to v%s: see What's New in FlameKit's window (F6).", kit.name, kit.version), "#9fd2ff")
+    local key = kit.setting("window_key", "F4")
+    kit.note(string.format("%s was updated to v%s: see What's New in FlameKit's window (%s).", kit.name, kit.version,
+      key ~= "" and key or "its key is not set"), "#9fd2ff")
     open_window()
   elseif kit.setting("open_on_start", false) == true then
     open_window()

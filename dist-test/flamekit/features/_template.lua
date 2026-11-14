@@ -23,7 +23,7 @@ end
 function F.tick(world)
 end
 
--- Its tab in FlameKit's window (F6): rows as core/kit.lua describes them. Keys only need to be unique inside this feature.
+-- Its tab in FlameKit's window (F4): rows as core/kit.lua describes them. Keys only need to be unique inside this feature.
 function F.panel(world)
   return {
     { heading = "My Feature" },

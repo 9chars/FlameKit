@@ -2,7 +2,7 @@
 --
 -- A feature is a Lua file that returns a table:
 --   id               "loot_filter"  (letters, digits, _)
---   title            "Auto Junk List"  (its tab in FlameKit's window, F6)
+--   title            "Auto Junk List"  (its tab in FlameKit's window, F4)
 --   enabled_setting  the bool setting in mod.json that switches it on and off (optional)
 --   setup(kit)       once, while the mod loads: register events, keys and commands here (wrap them in kit.guard)
 --   tick(world)      every step of a world you host (the server world): gameplay changes go here

@@ -1,8 +1,8 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.62",
-  "description": "One toolkit, many features (F6 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
+  "version": "0.15.63",
+  "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
   ],
@@ -15,7 +15,7 @@
     {
       "key": "window_key",
       "type": "keybind",
-      "default": "F6",
+      "default": "F4",
       "label": "Key that opens FlameKit's window",
       "help": "FlameKit's own window: the Auto Junk List, the other features' tabs, Settings and What's New. The same key or Esc closes it.",
       "live": true,
@@ -270,7 +270,7 @@
       "type": "bool",
       "default": true,
       "label": "Hide all of FlameKit in build mode",
-      "help": "While you build, all of FlameKit on your screen is hidden so nothing is in the way: the minimap, the party window, Messages, Notices and the FlameKit lines in the lower left corner. FlameKit's window (F6) still opens.",
+      "help": "While you build, all of FlameKit on your screen is hidden so nothing is in the way: the minimap, the party window, Messages, Notices and the FlameKit lines in the lower left corner. FlameKit's window still opens.",
       "live": true,
       "group": "Windows"
     },

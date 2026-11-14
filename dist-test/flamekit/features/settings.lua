@@ -1,4 +1,4 @@
--- features/settings.lua: the Settings tab of FlameKit's window (F6), and the settings rows other tabs show.
+-- features/settings.lua: the Settings tab of FlameKit's window (F4), and the settings rows other tabs show.
 --
 -- The Settings tab has FlameKit's own settings only (groups "FlameKit" and "FlameKit label") and the switch that turns
 -- each feature on or off (a feature switched off has no tab). Every other setting belongs to its feature and is shown

@@ -57,7 +57,7 @@ struct Settings {
     int margin = 24;         // distance from the game window's edges in pixels
     int corner = 1;          // 0 top right, 1 bottom right, 2 bottom left, 3 top left
     uint32_t toggle_vk = VK_F10;
-    uint32_t window_vk = VK_F6;   // opens and closes FlameKit's window (setting window_key)
+    uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
     int zoom = 2;            // index into kRanges
@@ -111,7 +111,7 @@ void read_settings() {
     const std::string zout = emf::setting_text(kKit, "map_zoom_out_key", "NumpadSubtract");
     s.zoom_out_vk = zout.empty() ? 0 : emf::keys::parse_key(std::wstring(zout.begin(), zout.end()));
     s.zoom = std::clamp(static_cast<int>(emf::setting_float(kKit, "map_zoom", 2.0) + 0.5), 0, kRangeCount - 1);
-    const std::string wkey = emf::setting_text(kKit, "window_key", "F6");
+    const std::string wkey = emf::setting_text(kKit, "window_key", "F4");
     s.window_vk = wkey.empty() ? 0 : emf::keys::parse_key(std::wstring(wkey.begin(), wkey.end()));
     const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
     s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
@@ -467,7 +467,7 @@ struct ItemMeta {
 };
 std::mutex g_item_meta_lock;
 std::unordered_map<uint32_t, ItemMeta> g_item_meta;  // filled once, when the item details are written
-std::atomic<bool> g_ui_request{false};  // F6 was pressed: FlameKit's own UI (ui_thread)
+std::atomic<bool> g_ui_request{false};  // F4 (window_key) was pressed: FlameKit's own UI (ui_thread)
 
 void on_world_tick(emf::World w) {
     if (!w.is_client()) return;
@@ -2118,7 +2118,7 @@ struct Frame {  // what a layer gets to know about this moment
 // Build mode (0.15.59, owner: declutter the screen while building): the Lua part writes "build 1" into ui_hud.dat while
 // the player builds and ui_hide_build is on (HudLayer reads it, hidden or not). Every layer is then hidden unless it
 // says otherwise (Layer::stays_in_build). Owner, 0.15.61: ALL of FlameKit's UI on screen hides in build mode, the lower
-// left lines too; only FlameKit's window (F6, opened on purpose) stays, and a future build mode feature may opt out.
+// left lines too; only FlameKit's window (F4, opened on purpose) stays, and a future build mode feature may opt out.
 std::atomic<bool> g_build_hide{false};
 
 struct Layer {
@@ -2357,7 +2357,7 @@ struct MinimapLayer : Layer {
 // collapsed or hidden are kept in emf\mods\flamekit\ui_layout.txt (this DLL is its one writer):
 //   <window id> <x> <y> <width> <collapsed 0|1> <hidden 0|1> <height>   (x, y: its top left corner in the game window, -1:
 //   default; height: 0 as tall as the content, else at most this tall, the content then scrolls). "window" is FlameKit's
-//   own window (F6), which can be moved and resized the same way.
+//   own window (F4), which can be moved and resized the same way.
 
 struct LayoutEntry {
     int x = -1, y = -1, w = 0;
@@ -3302,7 +3302,7 @@ std::string read_text(const std::wstring& path, size_t max);
 //                 panel(world)): headings, texts, buttons, separators, drawn here by one general row drawer
 //   ui_list.dat   the Auto Junk List tab's own view: the bag and the junk list as icons, Auto, Dump Junk, Drop/Delete
 // EMF has no channel between a native mod and a Lua mod yet (EMF_REQUESTS.md, 8): when it has, only the read_* and
-// act functions change. F6 (while the game is in front) opens the window and it takes the keyboard and mouse; F6 or
+// act functions change. F4 (window_key, while the game is in front) opens the window and it takes the keyboard and mouse; F6 or
 // Esc closes it, and so does another window taking the front (Alt+Tab). Long tabs show in pages, never scroll.
 struct WindowLayer : Layer {
     bool stays_in_build() const override { return true; }  // see g_build_hide
@@ -3864,7 +3864,7 @@ struct WindowLayer : Layer {
         {  // (0.15.62, owner: it affects all of FlameKit's UI, so it belongs here; it was in the Minimap tab)
             static const std::wstring kTip = L"While you build, all of FlameKit on your screen is hidden so nothing is in the way: "
                                               L"the minimap, the party window, Messages, Notices and the lines in the lower left "
-                                              L"corner. This window (F6) still opens.";
+                                              L"corner. This window still opens.";
             const bool on = settings().hide_build;
             text.draw(canvas, kPad, y + 5, L"In build mode", 230, 230, 235);
             button(kPad + 200, y, 270, on ? L"Hide all of FlameKit: ON" : L"Hide all of FlameKit: OFF", on, kHideBuild);
@@ -4117,12 +4117,12 @@ struct WindowLayer : Layer {
                 if (version.empty()) version = version_in(g_flamekit_dir + L"mod.json");
                 list_stamp = tabs_stamp = 0;  // read at once
                 dirty = true;
-                FK_LOG(fklog::kInfo, "window: opened (F6), tab %s", current.c_str());
+                FK_LOG(fklog::kInfo, "window: opened (its key), tab %s", current.c_str());
             } else if (!open) {
-                FK_LOG(fklog::kInfo, "window: F6 ignored: the game's window is not the front window");
+                FK_LOG(fklog::kInfo, "window: its key ignored: the game's window is not the front window");
             }
         }
-        if (open && (close_asked || !f.in_world)) close(close_asked ? "F6, Esc or its x" : "the world ended");
+        if (open && (close_asked || !f.in_world)) close(close_asked ? "its key, Esc or its x" : "the world ended");
         if (!open) return;
         tell_view();
         const uint64_t ls = stamp_of(g_flamekit_dir + L"ui_list.dat"), ts = stamp_of(g_flamekit_dir + L"ui_tabs.dat");
@@ -4192,7 +4192,7 @@ struct WindowLayer : Layer {
         act("key", name);
     }
     // Another program took the front (a click on it, Alt+Tab): the window stays open (owner, 0.15.41), like the pinned
-    // windows; it no longer gets the keys until it is clicked again (WM_MOUSEACTIVATE gives it the front back). F6, Esc
+    // windows; it no longer gets the keys until it is clicked again (WM_MOUSEACTIVATE gives it the front back). F4, Esc
     // and its x close it.
     void lost_front() override {
         if (open) FK_LOG(fklog::kInfo, "window: another program took the front: the window stays open");
