@@ -1,3 +1,6 @@
+0.15.84 Nov 14, 2026
+- A test update, to show the new update window. Nothing else changed.
+
 0.15.83 Nov 14, 2026
 - When an update has downloaded, a small window in the middle of the screen says so (besides the green line in the lower left corner). OK, Enter or Esc close it. "Restart Game" closes the game the way Alt+F4 does and starts it again through Steam, with the new version.
 
