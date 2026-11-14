@@ -4,6 +4,21 @@ A mod suite for Enshrouded by Ninechars. FlameKit adds a minimap, a party window
 
 FlameKit runs in your game and, for the features that change the world (PvP, fast travel, the experimental options), on the server too. On a server without FlameKit you still get the minimap, the junk list and the windows; the lower left corner then says "Not Connected".
 
+## Keys
+
+All keys can be changed in the FlameKit Menu (Settings tab).
+
+| Key | What it does |
+|---|---|
+| F4 | FlameKit Menu |
+| F5 | PvP Leaderboard |
+| F6 | Experimental window |
+| F7 | Party window |
+| F10 | Minimap on or off |
+| Numpad + / - | Minimap zoom |
+| Right Alt | The mouse pointer, to click, move, resize and hide FlameKit's windows (hold it, or press once if you switched that on in Settings, Windows) |
+| Esc | Closes the FlameKit Menu and the pop-up windows |
+
 ## Features
 
 ### Minimap
@@ -33,7 +48,7 @@ FlameKit runs in your game and, for the features that change the world (PvP, fas
 - Test monsters: spawn a harmless level 100 dummy to try your PvP weapons on (PvP must be on to hit it), or a duelist, any monster in the game at the level you pick, that fights back.
 - Leaderboard button: shows or hides the PvP Leaderboard.
 
-### Personal options (FlameKit Menu, Experimental tab)
+### Experimental options (FlameKit Menu, Experimental tab)
 - No shroud damage, no fall damage, invincible mode, unlimited stamina and an enhanced glider (hold S to climb). Each player switches their own; everyone on the server is told when someone switches one.
 
 ### Messages and Notices
@@ -44,21 +59,6 @@ FlameKit runs in your game and, for the features that change the world (PvP, fas
 - FlameKit updates itself from this repository. When a new version has downloaded, a window says so; "Restart Game" closes the game and starts it again with the new version. "Check for updates" on the What's New tab looks right away.
 - Every update is signed with FlameKit's own key; your game refuses anything else.
 - The What's New tab lists every change, and the About button shows this page.
-
-## Keys
-
-All keys can be changed in the FlameKit Menu (Settings tab).
-
-| Key | What it does |
-|---|---|
-| F4 | FlameKit Menu |
-| F5 | PvP Leaderboard |
-| F6 | Experimental window |
-| F7 | Party window |
-| F10 | Minimap on or off |
-| Numpad + / - | Minimap zoom |
-| Right Alt | The mouse pointer, to click, move, resize and hide FlameKit's windows (hold it, or press once if you switched that on in Settings, Windows) |
-| Esc | Closes the FlameKit Menu and the pop-up windows |
 
 ## Installing
 
