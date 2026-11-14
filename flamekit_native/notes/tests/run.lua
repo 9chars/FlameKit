@@ -733,6 +733,33 @@ check(comps.Faction[PLAYER].faction == 7 and rule_count() == 0 and not find_row(
   "PvP off: faction 7 again and no rule left")
 check(casts[#casts] == "PvP for a player DISABLED.", "everyone is told it is off")
 casts[#casts], casts[#casts - 1] = nil, nil  -- the glider test below counts the shroud lines only
+do  -- (0.15.118, owner: no cheating in PvP) PvP holds every other option off, except the glider; they come back after
+  local casts_before = #casts
+  local function fall_rules() local n = 0; for _, x in pairs(hit_rules) do if x.kinds == "fall" then n = n + 1 end end; return n end
+  click(find_row("Fall Damage", "sw:fall").button)
+  step(3)
+  check(fall_rules() == 1 and find_row("Fall Damage", "sw:fall").selected, "No Fall Damage on before PvP")
+  click(find_row("PvP", "sw:pvp").button)
+  step(3)
+  local fr = find_row("Fall Damage", "sw:fall")
+  check(fall_rules() == 0 and not fr.selected and fr.disabled and fr.text:find("off in PvP", 1, true),
+    "PvP on: No Fall Damage is off, greyed out, and says so")
+  local gr = find_row("Glider", "sw:fly")
+  check(gr and not gr.disabled, "the Enhanced Glider stays usable in PvP")
+  click(fr.button)
+  step(3)
+  check(fall_rules() == 0, "a click on a held option does nothing")
+  local ef3 = io.open(TMP .. "\\experimental.json"); local et3 = ef3:read("a"); ef3:close()
+  check(et3:find('"fall":true', 1, true) ~= nil, "the player's choice stays saved")
+  click(find_row("PvP", "sw:pvp").button)
+  step(3)
+  check(fall_rules() == 1 and find_row("Fall Damage", "sw:fall").selected and not find_row("Fall Damage", "sw:fall").disabled,
+    "PvP off: No Fall Damage works again")
+  click(find_row("Fall Damage", "sw:fall").button)
+  step(3)
+  check(rule_count() == 0, "and off again for the tests below")
+  for i = #casts, casts_before + 1, -1 do casts[i] = nil end
+end
 -- PvP test bodies (0.15.66): the duelist gets faction 1, a rule against buildings and one per animal near it
 comps.NetworkHealth = { [951] = { health = 100 } }
 comps.Faction[951] = { faction = 3 }

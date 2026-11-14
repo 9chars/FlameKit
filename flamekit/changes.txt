@@ -1,3 +1,6 @@
+0.15.118 Nov 14, 2026
+- PvP: while your PvP is on, your experimental options (no shroud damage, no fall damage, invincible mode, unlimited stamina) are off and greyed out, so nobody can cheat in a fight. The enhanced glider stays. They come back when you switch PvP off.
+
 0.15.117 Nov 14, 2026
 - Messages window: "FlameKit connected to server!" (or "not supported by server!"), the server's FlameKit version, and "update downloaded!" are now lines here instead of notices.
 - After an update, the Messages line is just "FlameKit was updated to vX." (no pointer to the What's New tab).

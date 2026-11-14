@@ -44,6 +44,10 @@ local SESSION_ONLY = { pvp = true }
 -- The options that are on until a player switches them off (the others are off until switched on).
 local DEFAULT_ON = { fly = true }
 
+-- (0.15.118, owner: no cheating in PvP) while a player has PvP on, all their other options are off, except the
+-- glider; what they had switched on stays saved and works again once PvP is off.
+local PVP_KEEPS = { fly = true, pvp = true }
+
 -- What each option does, shown when the pointer rests on its button.
 local TIPS = {
   shroud = "Your shroud timer stays full and the red shroud cannot kill you. Stays on until you switch it off. Everyone on the server is told when you switch it.",
@@ -52,7 +56,7 @@ local TIPS = {
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
-    .. "on the server is told when you switch it.",
+    .. "on the server is told when you switch it. While PvP is on, your other options are off (all but the glider) and come back when you switch PvP off.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -80,11 +84,21 @@ local function load_saved()
   end
 end
 
-is_on = function(account, key)
+-- What the player switched, PvP or not.
+local function wants(account, key)
   if SESSION_ONLY[key] then return online[account] ~= nil and online[account][key] == true end
   local value = (saved[account] or {})[key]
   if value == nil then return DEFAULT_ON[key] == true end
   return value == true
+end
+
+-- Is this option held off by PvP for this player?
+local function held_by_pvp(account, key)
+  return not PVP_KEEPS[key] and wants(account, "pvp")
+end
+
+is_on = function(account, key)
+  return wants(account, key) and not held_by_pvp(account, key)
 end
 
 local function drop_rules(p)
@@ -146,6 +160,7 @@ local function view(account)
   local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
+    if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
     if refused[s[1]] then v[s[1] .. "_dead"] = true end
   end
   return v
@@ -537,6 +552,11 @@ local function handle(world, account, entity, msg)
   end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
+      if s[1] == msg.key and held_by_pvp(account, s[1]) then
+        local v = view(account)
+        v.note = "Off while you are in PvP."
+        return v
+      end
       if s[1] == msg.key then
         local set = saved[account] or {}
         if SESSION_ONLY[s[1]] then
@@ -1182,8 +1202,13 @@ local function panel_rows(world)
     if s[1] ~= "pvp" then
       local on = v[s[1]] == true
       local text = (on and "On    " or "Off   ") .. s[2]
-      if v[s[1] .. "_dead"] then text = text .. " (not working on this game version)" end
-      rows[#rows + 1] = { button = "sw:" .. s[1], text = text, selected = on, tooltip = TIPS[s[1]] }
+      if v[s[1] .. "_pvp"] then
+        rows[#rows + 1] = { button = "sw:" .. s[1], text = "Off   " .. s[2] .. " (off in PvP)", disabled = true,
+          tooltip = "Off while you are in PvP, so nobody can cheat in a fight. It comes back when you switch PvP off." }
+      else
+        if v[s[1] .. "_dead"] then text = text .. " (not working on this game version)" end
+        rows[#rows + 1] = { button = "sw:" .. s[1], text = text, selected = on, tooltip = TIPS[s[1]] }
+      end
     end
   end
   return debug_rows(world, rows)
@@ -1382,8 +1407,10 @@ function F.click(world, key)
     local account, player = me(world)
     if not account then return end
     load_saved()
+    if view(account)[name .. "_pvp"] then return end  -- held off by PvP
     handle(world, account, player, { op = "set", key = name, on = not view(account)[name] })
   elseif shown then
+    if shown[name .. "_pvp"] then return end  -- held off by PvP
     shown[name] = not shown[name]  -- at once on screen; the server's answer follows
     ask({ op = "set", key = name, on = shown[name] })
   end

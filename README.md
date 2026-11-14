@@ -37,6 +37,7 @@ All keys can be changed in the FlameKit Menu (F4): F4 and the pointer key in the
 
 ### PvP (Experimental window, F6)
 - Free-for-all PvP that each player switches on for themselves. Only players who both have PvP on can hurt each other (at 25% of normal damage). It switches off when you leave the server.
+- No cheating in a fight: while your PvP is on, your experimental options are off (all but the enhanced glider). They come back when you switch PvP off.
 - Monsters fight PvP players like any other player.
 
 ### PvP Leaderboard (F5)
