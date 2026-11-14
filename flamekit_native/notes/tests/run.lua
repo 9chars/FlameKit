@@ -1232,6 +1232,30 @@ do  -- (0.15.112) keys that act in the game (dump, minimap zoom) only on F1-F12 
   check(settings.lf_dump_key == "F8", "F8 is taken")
   settings.lf_dump_key = before
 end
+do  -- (0.15.116) the Debug section's test data for the PvP Leaderboard (this game only)
+  local function board_text()
+    local f = io.open(TMP .. "\\ui_board.dat", "r")
+    local t = f and f:read("a") or ""
+    if f then f:close() end
+    return t
+  end
+  local before = board_text()
+  local function fake_row()
+    for _, r in ipairs(require("features.experimental").panel(UI) or {}) do
+      if r.button == "dbg:fakeboard" then return r end
+    end
+  end
+  local row = fake_row()
+  check(row ~= nil and not row.selected, "the Debug section has a Test leaderboard data switch, off")
+  click("W:dbg:fakeboard")
+  local t = board_text()
+  local n = select(2, t:gsub("\nr\t", ""))
+  check(n >= 10 and t:find("Lady Ashenvale the Unyielding", 1, true) and t:find("\t1\tYou (test)", 1, true),
+    "on: a dozen made-up players, a long name, your own row marked")
+  check(fake_row().selected, "the switch is lit while it is on")
+  click("W:dbg:fakeboard")
+  check(board_text() == before or board_text():find("source", 1, true) == 1, "off: the real board again")
+end
 do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
   os.remove(TMP .. "\\ui_layout.txt")
   local function board_row() for _, r in ipairs(exp_rows()) do if r.button == "W:board" then return r end end end

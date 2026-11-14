@@ -1,3 +1,6 @@
+0.15.116 Nov 14, 2026
+- Experimental tab, Debug: "Test leaderboard data" fills your PvP Leaderboard with a dozen made-up players (long and short names, shared ranks, big numbers, your own row), to see how it looks. Only in your game; switch it off to see the real board again.
+
 0.15.115 Nov 14, 2026
 - About window: bigger (up to 1100 x 900, leaving 40 pixels of the game around it).
 - Scroll bars take the mouse: drag the handle, or click above or below it for a page. In the About window and in the pinned windows (Messages, Party, Experimental, PvP Leaderboard, Notices; hold the pointer key). The mouse wheel still works too.

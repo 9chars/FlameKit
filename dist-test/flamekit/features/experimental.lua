@@ -1138,6 +1138,11 @@ local function debug_rows(world, rows)
     if r.button then r.button = "dbg:test:" .. r.button end
     rows[#rows + 1] = r
   end
+  -- (0.15.116, owner) made-up players on the PvP Leaderboard, to see how it looks with data (this game only)
+  local fake = require("features.leaderboard").fake_on()
+  rows[#rows + 1] = { button = "dbg:fakeboard", text = (fake and "On    " or "Off   ") .. "Test leaderboard data", selected = fake,
+    tooltip = "Fills your PvP Leaderboard with made-up players (only in your game; the server's real board is not touched). "
+      .. "Switch it off to see the real board again." }
   local level = kit.debug_level(true)
   rows[#rows + 1] = { text = "FlameKit's log level (Ctrl+Shift+F12 in the game also switches it):" }
   for i, l in ipairs({ { "off", "Off", "Errors and warnings only" }, { "normal", "Normal", "Also what happens: windows, updates, clicks" },
@@ -1317,6 +1322,11 @@ function F.click(world, key)
     else
       ask(msg)
     end
+    return
+  end
+  if key == "dbg:fakeboard" then
+    local lb = require("features.leaderboard")
+    lb.set_fake(world, not lb.fake_on())
     return
   end
   if key == "dbg:openlogs" then  -- FlameKit's DLL opens Explorer on the logs when this file appears (HudLayer)

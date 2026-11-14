@@ -144,6 +144,8 @@ end
 local written = nil
 local heard = false
 local client_steps = 0
+local fake = false         -- (0.15.116) the Debug section's test data is shown instead of the server's board
+local real_text = nil      -- the server's last board, kept while the test data is shown
 
 local function write(text)
   if text == written then return end
@@ -157,14 +159,50 @@ local function write(text)
   written = text
 end
 
+-- (0.15.116, owner) Made-up players for seeing the board with data: a dozen, short and long names, ties (shared ranks),
+-- big numbers, your own row in the middle. Only in this game.
+local FAKE = {
+  { 1, 42, 3, 0, "Thornwick" }, { 2, 37, 9, 0, "Lady Ashenvale the Unyielding" }, { 3, 21, 4, 0, "Mo" },
+  { 4, 21, 7, 0, "Brakkus" }, { 5, 15, 15, 1, "You (test)" }, { 6, 12, 2, 0, "Sylvie" }, { 6, 12, 2, 0, "Fennick" },
+  { 8, 8, 20, 0, "Grimble Stonefoot" }, { 9, 3, 1, 0, "Quill" }, { 10, 1, 1234, 0, "Unlucky Larry" },
+  { 11, 0, 7, 0, "Pacifist Pete" }, { 12, 0, 99, 0, "Ve" },
+}
+local function fake_text()
+  local lines = {}
+  for _, r in ipairs(FAKE) do lines[#lines + 1] = table.concat({ "r", r[1], r[2], r[3], r[4], r[5] }, "\t") end
+  return table.concat(lines, "\n")
+end
+
 receive = function(world, text)
   if type(text) ~= "string" or #text > 12000 then return end
   heard = true
+  if text ~= fake_text() then
+    real_text = text  -- the server's board: kept, so switching the test data off shows it again at once
+    if fake then return end  -- it waits while the test data is shown
+  end
   local lines = {}
   for line in text:gmatch("[^\n]+") do
     if line:match("^r\t%d+\t%d+\t%d+\t[01]\t") then lines[#lines + 1] = line end
   end
   write("source server\n" .. (#lines > 0 and (table.concat(lines, "\n") .. "\n") or "") .. "end\n")
+end
+
+function F.fake_on() return fake end
+
+function F.set_fake(world, on)
+  if on == fake then return end
+  if on then
+    fake = true
+    receive(world, fake_text())
+  else
+    fake = false
+    if real_text then
+      receive(world, real_text)
+    else
+      write("source none\nend\n")  -- no board from the server yet
+    end
+  end
+  kit.debug("info", "leaderboard: test data %s", on and "on" or "off")
 end
 
 function F.client_tick(world)
