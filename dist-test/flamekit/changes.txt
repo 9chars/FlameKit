@@ -1,3 +1,6 @@
+0.15.43 Nov 13, 2026
+- Auto Junk List: Auto, Dump Junk and Drop / Delete (and the two choices under Drop) explain themselves when you hover them.
+
 0.15.42 Nov 13, 2026
 - FlameKit's windows use the game's mouse pointer again: a Windows resize pointer the game showed for a moment is no longer taken for it.
 

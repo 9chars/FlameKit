@@ -3634,14 +3634,28 @@ struct WindowLayer : Layer {
     }
 
     void draw_junk() {
+        // what the three buttons do, under the pointer
+        static const std::wstring kAutoTip = L"ON: junk is dropped or deleted (see Drop / Delete) as soon as you loot it.\n"
+                                              L"OFF: junk stays in your bag until you press Dump Junk or your Dump Key.";
+        static const std::wstring kDumpTip = L"Drops or deletes every stack of junk in your bag now (see Drop / Delete).\n"
+                                              L"Weapons, armour, rings, tools, summoning items and trophies are left alone unless Show All Bag Items "
+                                              L"is on; the action bar too while Exclude Action Bar is on.";
+        static const std::wstring kDropTip = L"What happens to junk. Drop: it lands on the ground at your feet, and you can pick it up again. "
+                                              L"Delete: it is destroyed for good.\nWith Drop, turn off the game's \"Auto-Collect Scattered Loot\" "
+                                              L"or the junk comes straight back into your bag.";
+        static const std::wstring kDropOnlyTip = L"Junk lands on the ground at your feet; you can pick it up again.";
+        static const std::wstring kDeleteTip = L"Junk is destroyed for good. It cannot be brought back.";
         const std::wstring drop_label = std::wstring(delete_junk ? L"Delete" : L"Drop") + L" ▾";
         const int drop_w = std::max(text.width(L"Delete ▾"), text.width(L"Drop ▾")) + 28;
         const int drop_x = kW - kPad - drop_w, by = kTop + 10;
         button(drop_x, by, drop_w, drop_label, false, kDrop);
+        hits.back().tip = &kDropTip;
         const int dump_w = text.width(L"Dump Junk") + 28, dump_x = drop_x - 8 - dump_w;
         button(dump_x, by, dump_w, L"Dump Junk", false, kDump);
+        hits.back().tip = &kDumpTip;
         const int auto_w = text.width(L"Auto: OFF") + 28;
         button(dump_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
+        hits.back().tip = &kAutoTip;
         int ox = kPad;  // the feature's other settings
         for (size_t i = 0; i < opts.size(); ++i) {
             const int w = text.width(opts[i].label) + 22;
@@ -3654,7 +3668,9 @@ struct WindowLayer : Layer {
         if (drop_open) {  // the drop-down's options, over what is below
             box(drop_x - 1, by + 29, drop_x + drop_w + 1, by + 30 + 2 * 30 + 1, 200, 200, 210, 1.0f);
             button(drop_x, by + 30, drop_w, L"Drop", !delete_junk, kDropOption, 0);
+            hits.back().tip = &kDropOnlyTip;
             button(drop_x, by + 60, drop_w, L"Delete", delete_junk, kDropOption, 1);
+            hits.back().tip = &kDeleteTip;
         }
     }
 
