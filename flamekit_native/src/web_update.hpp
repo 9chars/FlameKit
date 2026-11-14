@@ -409,6 +409,7 @@ struct Updater {
                 seen == last_seen && !asked ? 1 : 0);
             last_seen = seen;
             if (asked) status("ok|FlameKit is up to date (v" + have_lua + ")");
+            else if (last_status.rfind("failed|", 0) == 0) status("");  // an earlier failure or refusal is over
             return true;
         }
 

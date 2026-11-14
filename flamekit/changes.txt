@@ -1,3 +1,6 @@
+0.15.47 Nov 13, 2026
+- Updates: after a failed or refused update, the message at the bottom left goes away once a later check finds everything in order.
+
 0.15.46 Nov 13, 2026
 - Test release: the DLL is rebuilt with no feature change, to check that a second update in one game session replaces the first one that is still waiting.
 
