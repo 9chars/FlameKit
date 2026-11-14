@@ -26,6 +26,9 @@
 --                     tab <feature id> <title>
 --                     view <feature id> <generation>          (the rows below belong to this generation)
 --                     r <kind h|t|b|s|i> <same line 0|1> <selected 0|1> <disabled 0|1> <dim 0|1> <colour rrggbb|-> <button number|0> <text> <tooltip>
+--                       kind l: a label on a line of buttons; kind d (0.15.73): a drop-down, its text the entry
+--                       chosen, then one field per entry: <number>\31<h heading|o entry|s chosen>\31<rrggbb|->\31<label>
+--                       (a click on an entry comes back as a row button's number)
 --                       and for an item tile (kind i: a row with item = <id>, count = <n>, text = its name, tooltip =
 --                       what a click does): <item id hex> <count> <rarity> <item level> <type> <command name>
 --   ui_actions.txt  also: view <feature id>|- (the DLL shows that tab, or none) and tab <feature id>/<generation>/<button
@@ -120,7 +123,8 @@ local function write_tabs(world)
     if type(rows) == "table" then
       local body, map = {}, {}
       for _, r in ipairs(rows) do
-        local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or (r.button or r.slot) and "b" or "t"
+        local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or r.options and "d" or r.label and "l"
+          or (r.button or r.slot) and "b" or "t"
         local number = 0
         if (kind == "b" or kind == "i") and (r.button or r.slot) then
           map[#map + 1] = r.button or r.slot
@@ -129,7 +133,18 @@ local function write_tabs(world)
         local colour = type(r.color) == "string" and r.color:match("^#?(%x%x%x%x%x%x)$") or "-"
         local fields = { "r", kind, r.same_line and "1" or "0", r.selected and "1" or "0", r.disabled and "1" or "0",
           r.dim and "1" or "0", colour, tostring(number), clean(r.heading or r.text), clean(r.tooltip) }
-        if kind == "i" then  -- an item tile: its details for the tooltip (core/items.lua items.tip)
+        if kind == "d" then  -- a drop-down: its entries, each "<number>\31<h|o|s>\31<rrggbb|->\31<label>"
+          for _, o in ipairs(r.options) do
+            local n = 0
+            if o.key then
+              map[#map + 1] = o.key
+              n = #map
+            end
+            local c = type(o.color) == "string" and o.color:match("^#?(%x%x%x%x%x%x)$") or "-"
+            fields[#fields + 1] = table.concat({ tostring(n), o.heading and "h" or o.selected and "s" or "o", c,
+              (clean(o.text):gsub("\31", " ")) }, "\31")
+          end
+        elseif kind == "i" then  -- an item tile: its details for the tooltip (core/items.lua items.tip)
           local debug_name = kit.items.debug_name(r.item)
           local t = kit.items.tip(r.item, debug_name)
           for _, v in ipairs({ string.format("%x", r.item), tostring(r.count or 0), tostring(t.rarity), t.level, clean(t.type),

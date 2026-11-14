@@ -3324,8 +3324,14 @@ struct WindowLayer : Layer {
         bool lit = false;
         std::wstring label, tip;  // the tooltip: the setting's help from mod.json
     };
+    struct ListOpt {  // one entry of a drop-down's list (0.15.73)
+        int number = 0;   // what a click sends, as a row button's number; 0 for a heading
+        bool heading = false, selected = false, has_colour = false;
+        uint8_t r = 0, g = 0, b = 0;
+        std::wstring label;
+    };
     struct Row {
-        char kind = 't';  // h heading, t text, b button, s separator
+        char kind = 't';  // h heading, t text, b button, s separator, l a label on a line of buttons, d a drop-down
         bool same = false, selected = false, disabled = false, dim = false;
         bool has_colour = false;
         uint8_t r = 0, g = 0, b = 0;
@@ -3335,9 +3341,10 @@ struct WindowLayer : Layer {
         uint32_t item = 0;
         int count = 0, rarity = -1;
         std::wstring level, type, command;
+        std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt };
     struct Hit {
         RECT r;
         Kind kind;
@@ -3371,6 +3378,8 @@ struct WindowLayer : Layer {
     uint64_t generation = 0;
     std::vector<Row> rows;
     size_t rows_page = 0;
+    int list_open = -1, list_scroll = 0;  // the drop-down that is open (its row number), and how far its list is scrolled
+    RECT list_r{};                        // where the open list is
     int rows_scroll = 0, max_scroll = 0;  // a tab of rows: how far it is scrolled down (pixels), and how far it can be
     bool thumb_drag = false;
     int thumb_grab = 0;
@@ -3549,6 +3558,27 @@ struct WindowLayer : Layer {
                     row.command = widen(f[15]);
                 } else if (row.kind == 'i') {
                     row.kind = 't';
+                } else if (row.kind == 'd') {  // a drop-down: each entry "<number>\x1f<h|o|s>\x1f<rrggbb|->\x1f<label>"
+                    for (size_t k = 10; k < f.size(); ++k) {
+                        const std::string& e = f[k];
+                        const size_t a = e.find('\x1f'), b = a == std::string::npos ? a : e.find('\x1f', a + 1),
+                                     c = b == std::string::npos ? b : e.find('\x1f', b + 1);
+                        if (c == std::string::npos) continue;
+                        ListOpt o;
+                        o.number = std::atoi(e.substr(0, a).c_str());
+                        o.heading = e[a + 1] == 'h';
+                        o.selected = e[a + 1] == 's';
+                        const std::string col = e.substr(b + 1, c - b - 1);
+                        if (col.size() == 6) {
+                            const unsigned long rgb = std::strtoul(col.c_str(), nullptr, 16);
+                            o.has_colour = true;
+                            o.r = static_cast<uint8_t>(rgb >> 16);
+                            o.g = static_cast<uint8_t>(rgb >> 8);
+                            o.b = static_cast<uint8_t>(rgb);
+                        }
+                        o.label = unescape(e.substr(c + 1));
+                        row.list.push_back(std::move(o));
+                    }
                 }
                 r.push_back(std::move(row));
             }
@@ -3559,6 +3589,7 @@ struct WindowLayer : Layer {
         tabs.push_back({"windows", L"Windows"});  // this DLL's own tab: the pinned windows
         if (of != rows_of || gen != generation) rows_page = of == rows_of ? rows_page : 0;
         if (of != rows_of) rows_scroll = 0;
+        if (of != rows_of || list_open >= static_cast<int>(r.size()) || (list_open >= 0 && r[static_cast<size_t>(list_open)].kind != 'd')) list_open = -1;
         rows_of = of;
         generation = gen;
         rows = std::move(r);
@@ -3731,6 +3762,7 @@ struct WindowLayer : Layer {
         };
         std::vector<Placed> placed;
         int content_h = 0;
+        list_row = nullptr;
         auto layout = [&](int right) {  // y from 0; the content's height into content_h
             placed.clear();
             const int left = kPad;
@@ -3741,9 +3773,16 @@ struct WindowLayer : Layer {
                 line_h = 0;
             };
             for (const Row& r : rows) {
-                if (r.kind == 'b' || r.kind == 'i') {  // buttons and item tiles run along the line and wrap
+                if (r.kind == 'b' || r.kind == 'i' || r.kind == 'l' || r.kind == 'd') {  // run along the line and wrap
                     const bool tile_row = r.kind == 'i';
-                    const int w = tile_row ? kIcon : std::max(34, text.width(r.text) + 22), h = tile_row ? kIcon : 30;
+                    int w = tile_row ? kIcon : std::max(34, text.width(r.text) + 22);
+                    if (r.kind == 'l') w = text.width(r.text) + 8;
+                    if (r.kind == 'd') {  // as wide as its longest entry, within the window
+                        int widest = text.width(r.text);
+                        for (const ListOpt& o : r.list) widest = std::max(widest, text.width(o.label) + (o.heading ? 0 : 12));
+                        w = std::min(right - left, std::max(220, widest + 48));
+                    }
+                    const int h = tile_row ? kIcon : 30;
                     if (!(r.same && x > left && x + w <= right)) newline();
                     placed.push_back({&r, x, y, w, h, {}});
                     x += w + (tile_row ? kGap : 6);
@@ -3786,6 +3825,27 @@ struct WindowLayer : Layer {
                 if (r.selected) frame_box(p.x - 3, y - 3, p.x + kIcon + 3, y + kIcon + 3, 3, 255, 200, 60);
             } else if (r.kind == 'b') {
                 button(p.x, y, p.w, r.text, r.selected, kRowButton, static_cast<size_t>(r.number), r.disabled, &r);
+            } else if (r.kind == 'l') {  // a label among buttons
+                float cr = 220, cg = 220, cb = 225;
+                if (r.dim) cr = cg = cb = 150;
+                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                text.draw(canvas, p.x, y + 5, r.text, cr, cg, cb);
+            } else if (r.kind == 'd') {  // a drop-down, closed: the entry chosen and an arrow; a click opens its list
+                const RECT dr{p.x, y, p.x + p.w, y + 30};
+                const int index = static_cast<int>(&r - rows.data());
+                const bool is_open = list_open == index, over = inside(dr);
+                box(dr.left, dr.top, dr.right, dr.bottom, over || is_open ? 66.0f : 44.0f, over || is_open ? 66.0f : 44.0f, over || is_open ? 76.0f : 52.0f, 1.0f);
+                frame_box(dr.left, dr.top, dr.right, dr.bottom, 1, is_open ? 235 : 120, is_open ? 225 : 120, is_open ? 205 : 132);
+                float cr = 240, cg = 240, cb = 240;
+                if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
+                text.draw(canvas, p.x + 10, y + 5, r.text, cr, cg, cb);
+                const int ax = dr.right - 22, ay = y + 12;  // the arrow: a small triangle pointing down (up while open)
+                for (int k = 0; k < 6; ++k) {
+                    const int row_y = is_open ? ay + 5 - k : ay + k;
+                    box(ax + k, row_y, ax + 12 - k, row_y + 1, 220, 220, 225, 1.0f);
+                }
+                hits.push_back({dr, kListBox, static_cast<size_t>(index), r.tip.empty() ? nullptr : &r.tip});
+                if (is_open) list_row = &r;
             } else if (r.kind == 's') {
                 box(p.x, y, p.x + p.w, y + 1, 90, 90, 100, 1.0f);
             } else {
@@ -3800,6 +3860,7 @@ struct WindowLayer : Layer {
                 }
             }
         }
+        if (list_row) draw_list(*list_row);
         for (size_t i = first_hit; i < hits.size();) {  // a button half out of view takes clicks only on its visible part
             const RECT v{0, kViewTop, kW, kViewBottom};
             if (!IntersectRect(&hits[i].r, &hits[i].r, &v)) hits.erase(hits.begin() + static_cast<std::ptrdiff_t>(i));
@@ -3822,6 +3883,48 @@ struct WindowLayer : Layer {
         if (rows.empty()) text.draw(canvas, kPad, kViewTop + 14, rows_of == current ? L"Nothing here" : L"...", 150, 150, 160);
     }
 
+    // The open drop-down's list (0.15.73): under the drop-down (over it when there is no room below), up to 14 entries,
+    // scrolled with the mouse wheel; headings in gold take no click, the chosen entry is lit. A click on an entry sends
+    // it like a row button and closes the list; a click anywhere else only closes it.
+    const Row* list_row = nullptr;
+    static constexpr int kListLine = 26, kListMax = 14;
+    void draw_list(const Row& r) {
+        RECT dr{};  // where the open drop-down was drawn (its hit)
+        for (const Hit& h : hits)
+            if (h.kind == kListBox && static_cast<int>(h.index) == list_open) dr = h.r;
+        if (dr.right == 0) return;  // scrolled out of view: no list
+        const int n = static_cast<int>(r.list.size());
+        const int below = (kViewBottom - 4 - dr.bottom) / kListLine, above = (dr.top - kViewTop - 4) / kListLine;
+        const bool down = below >= std::min(n, 6) || below >= above;
+        const int shown = std::max(1, std::min({n, kListMax, down ? below : above}));
+        list_scroll = std::clamp(list_scroll, 0, std::max(0, n - shown));
+        const int top = down ? dr.bottom + 2 : dr.top - 2 - shown * kListLine;
+        list_r = {dr.left, top, dr.right, top + shown * kListLine};
+        box(list_r.left, list_r.top, list_r.right, list_r.bottom, 28, 30, 38, 1.0f);
+        hits.push_back({list_r, kListOpt, 0});  // first, so the entries (drawn later) are found before it: headings and the bar take the click and do nothing
+        frame_box(list_r.left, list_r.top, list_r.right, list_r.bottom, 1, 150, 150, 165);
+        for (int i = 0; i < shown; ++i) {
+            const ListOpt& o = r.list[static_cast<size_t>(list_scroll + i)];
+            const RECT er{list_r.left + 1, top + i * kListLine, list_r.right - 1, top + (i + 1) * kListLine};
+            if (o.heading) {
+                text.draw(canvas, er.left + 8, er.top + 3, o.label, 255, 210, 122);
+                continue;
+            }
+            const bool over = inside(er);
+            if (o.selected) box(er.left, er.top, er.right, er.bottom, 60, 120, 70, 1.0f);
+            else if (over) box(er.left, er.top, er.right, er.bottom, 70, 72, 84, 1.0f);
+            float cr = 235, cg = 235, cb = 240;
+            if (o.has_colour) cr = o.r, cg = o.g, cb = o.b;
+            text.draw(canvas, er.left + 20, er.top + 3, o.label, cr, cg, cb);
+            hits.push_back({er, kListOpt, static_cast<size_t>(o.number)});
+        }
+        if (n > shown) {  // a thin bar at the right: where the part shown is in the whole list
+            const int track = shown * kListLine, th = std::max(16, track * shown / n);
+            const int ty = top + (n > shown ? (track - th) * list_scroll / (n - shown) : 0);
+            box(list_r.right - 5, ty, list_r.right - 2, ty + th, 140, 140, 155, 1.0f);
+        }
+    }
+
     // Everything drawn above and below the scrolled view goes: the background is drawn there again.
     void clear_outside() {
         for (int y = 0; y < kH; ++y) {
@@ -3842,6 +3945,11 @@ struct WindowLayer : Layer {
 
     void wheel(int delta, int x, int y) override {
         if (current == "loot_filter" || current == "windows") return;
+        if (list_open >= 0 && x >= list_r.left && x < list_r.right && y >= list_r.top && y < list_r.bottom) {
+            list_scroll -= delta * 3 / WHEEL_DELTA;  // 3 entries a notch; draw_list keeps it in range
+            dirty = true;
+            return;
+        }
         scroll_to(rows_scroll - delta * 66 / WHEEL_DELTA);  // 3 lines a notch
     }
 
@@ -4234,6 +4342,8 @@ struct WindowLayer : Layer {
         if (msg != WM_LBUTTONDOWN) return;
         const bool was_open = drop_open;
         drop_open = false;
+        const int list_was = list_open;
+        list_open = -1;
         dirty = true;
         for (auto it = hits.rbegin(); it != hits.rend(); ++it) {  // the last drawn is on top (the drop-down's options)
             const Hit& h = *it;
@@ -4292,6 +4402,22 @@ struct WindowLayer : Layer {
             case kRowButton:
             case kRowItem:
                 if (h.kind == kRowItem && h.index == 0) break;  // an item tile without a click
+                act("tab", rows_of + "/" + std::to_string(generation) + "/" + std::to_string(h.index));
+                break;
+            case kListBox:  // open (or close) a drop-down; the list starts with the chosen entry near the top
+                if (list_was != static_cast<int>(h.index) && h.index < rows.size()) {
+                    list_open = static_cast<int>(h.index);
+                    list_scroll = 0;
+                    const std::vector<ListOpt>& l = rows[h.index].list;
+                    for (size_t k = 0; k < l.size(); ++k)
+                        if (l[k].selected) list_scroll = std::max(0, static_cast<int>(k) - 3);
+                }
+                break;
+            case kListOpt:
+                if (h.index == 0) {  // a heading or the bar: the list stays open
+                    list_open = list_was;
+                    break;
+                }
                 act("tab", rows_of + "/" + std::to_string(generation) + "/" + std::to_string(h.index));
                 break;
             case kRowPrev: if (rows_page > 0) --rows_page; break;

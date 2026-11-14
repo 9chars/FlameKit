@@ -104,7 +104,7 @@ local hud = setmetatable({}, { __index = function(_, key)
 end })
 local ROW_FIELDS = {}
 for _, f in ipairs({ "heading", "text", "button", "row", "slot", "bar", "separator", "value", "count", "tooltip", "color",
-  "same_line", "selected", "disabled", "dim", "empty", "locked", "image", "icon", "fps", "height", "key" }) do ROW_FIELDS[f] = true end
+  "same_line", "selected", "disabled", "dim", "empty", "locked", "image", "icon", "fps", "height", "key", "label", "options" }) do ROW_FIELDS[f] = true end
 local function check_def(def)
   assert(def.place == "right" or def.place == "left" or def.place == "centre")
   assert(#def.rows <= 256, "too many rows")
@@ -682,37 +682,41 @@ local real_position = SW.position
 local function near(self, id) if id == 951 or id == 900 or id == 901 then return 1, 0, 3 end return real_position(self, id) end
 SW.position = near
 local rb = rule_count()
-click(find_row("Spawn Vukah: Melee").button)
+click(find_row("^Spawn duelist$").button)
 step(40)
 check(#spawned == 1 and spawned[1].guid == "d5d05217-52dc-467a-9192-26b4f661d8d9" and spawned[1].z == 3, "the duelist is spawned 3 m in front of the player")
 check(comps.Faction[951].faction == 1, "and given faction 1 (HitAll)")
-check(rule_count() == rb + 2 and find_row("Spawn Vukah: Melee").selected, "one rule keeps it off buildings, one off the animal next to it")
+check(rule_count() == rb + 2 and find_row("^Spawn duelist$").selected, "one rule keeps it off buildings, one off the animal next to it")
 click(find_row("Remove").button)
 step(40)
-check(destroyed[1] == 951 and rule_count() == rb and not find_row("Spawn Vukah: Melee").selected, "Remove: the duelist and its rules are gone")
+check(destroyed[1] == 951 and rule_count() == rb and not find_row("^Spawn duelist$").selected, "Remove: the duelist and its rules are gone")
 -- the duelist's kind and level (0.15.70): picked in the tab, sent with the spawn
 comps.Level = { [952] = { dataStorage = { 1, 0 } } }
 comps.DynamicEnemyScaling = { [952] = { nextUpdateTime = { value = 99 } } }
 comps.NetworkHealth[952] = { health = 100 }
 comps.Faction[952] = { faction = 6 }
-click(find_row("^Beasts$").button)
-step(12)
-for _ = 1, 3 do
-  if find_row("^Wolf$") then break end
-  click(find_row("^Next >$").button)
-  step(12)
+local dd
+for _, r in ipairs(window.def.rows) do if r.options then dd = r end end
+check(dd ~= nil and dd.text == "Vukah: Melee", "the duelist is picked from one drop-down: " .. tostring(dd and dd.text))
+local heads, wolf = 0, nil
+for _, o in ipairs(dd.options) do
+  if o.heading then heads = heads + 1 end
+  if o.text == "Wolf" then wolf = o end
 end
-click(find_row("^Wolf$").button)
+check(heads == 7 and #dd.options == 189 + 7 and wolf ~= nil, "with every monster under 7 group headings")
+click(find_row("^25$").button:match("^(f%d+:)") .. wolf.key)  -- the harness prefixes keys with the tab
 step(12)
-click(find_row("^%+10$").button)
+click(find_row("^25$").button)
 step(12)
-click(find_row("^%+1$").button)
+click(find_row("^>$").button)
 step(12)
-check(find_row("Level 12") ~= nil and find_row("Spawn Beasts: Wolf %(level 12%)") ~= nil, "the tab shows the picked duelist and level")
-click(find_row("Spawn Beasts: Wolf").button)
+dd = nil
+for _, r in ipairs(window.def.rows) do if r.options then dd = r end end
+check(dd.text == "Beasts: Wolf" and find_row("^26$") ~= nil, "the drop-down shows the pick, the level line 26")
+click(find_row("^Spawn duelist$").button)
 step(40)
 check(#spawned == 2 and spawned[2].guid == "478381c5-585f-4264-b373-dbb1ea596eca", "the duelist is the picked creature")
-check(comps.Level[952].dataStorage[1] == 12 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
+check(comps.Level[952].dataStorage[1] == 26 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
 click(find_row("Remove").button)
 step(40)
 SW.position = real_position

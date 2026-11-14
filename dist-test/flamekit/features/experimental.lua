@@ -956,7 +956,6 @@ local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = DUEL_GUID, 1  -- the Debug section's duelist choice, this session (0.15.70)
-local duel_group, duel_page, PAGE = "Vukah", 1, 12
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
 -- The game's number for a map marker type: FNV-1a over the type's GUID, as the game keeps it in memory or as written.
@@ -1132,38 +1131,36 @@ local function panel_rows(world)
     tooltip = "Removes your test body." }
   rows[#rows + 1] = { text = "Duelist: it attacks everyone with full damage, PvP on or off. It never hurts animals, pets or "
     .. "buildings; villagers are fair game. Spawn it away from your base." }
-  for i, g in ipairs(MONSTER_GROUPS) do
-    rows[#rows + 1] = { button = "dbg:grp:" .. g, text = g, selected = duel_group == g, same_line = i > 1 }
+  -- (0.15.73, owner: the group buttons and pages were too confusing) One drop-down with every monster under its group's
+  -- heading, bosses in orange; the level with < > and five quick picks.
+  local pick = duelist(duel_what)
+  local options = {}
+  for _, g in ipairs(MONSTER_GROUPS) do
+    options[#options + 1] = { heading = true, text = g }
+    for _, m in ipairs(MONSTERS) do
+      if m[1] == g then
+        options[#options + 1] = { key = "dbg:what:" .. m[3], text = m[2] .. (m[4] and "  (boss)" or ""),
+          color = m[4] and "#ffb060" or nil, selected = m[3] == pick[3] }
+      end
+    end
   end
-  local list = {}
-  for _, m in ipairs(MONSTERS) do if m[1] == duel_group then list[#list + 1] = m end end
-  local pages = math.max(1, math.ceil(#list / PAGE))
-  duel_page = math.max(1, math.min(pages, duel_page))
-  for i = (duel_page - 1) * PAGE + 1, math.min(#list, duel_page * PAGE) do
-    local m = list[i]
-    rows[#rows + 1] = { button = "dbg:what:" .. m[3], text = m[2], selected = duel_what == m[3],
-      same_line = (i - 1) % 3 ~= 0, color = m[4] and "#ffb060" or nil,
-      tooltip = m[4] and "A boss: it has its own health bar." or nil }
-  end
-  if pages > 1 then
-    rows[#rows + 1] = { button = "dbg:page:-1", text = "< Previous", disabled = duel_page <= 1 }
-    rows[#rows + 1] = { text = "page " .. duel_page .. " of " .. pages, same_line = true, dim = true }
-    rows[#rows + 1] = { button = "dbg:page:1", text = "Next >", same_line = true, disabled = duel_page >= pages }
-  end
+  rows[#rows + 1] = { label = true, text = "Monster" }
+  rows[#rows + 1] = { options = options, text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil, same_line = true,
+    tooltip = "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
   local lvl_tip = duel_level > 50 and "Above the game's level 50 it gets very strong: a level 75 one beat a level 50 player."
     or "Its level: the game sets its health and damage from it (level 50: about 6700 health)."
-  rows[#rows + 1] = { text = "Level " .. duel_level .. (duel_level > 50 and "  (beyond the game's levels)" or ""),
-    color = duel_level > 50 and "#ff8060" or nil, tooltip = lvl_tip }
-  for i, step in ipairs({ -10, -1, 1, 10 }) do
-    rows[#rows + 1] = { button = "dbg:lvl:" .. step, text = (step > 0 and "+" or "") .. step, same_line = i > 1,
-      disabled = (step < 0 and duel_level <= 1) or (step > 0 and duel_level >= MAX_LEVEL), tooltip = lvl_tip }
-  end
+  rows[#rows + 1] = { label = true, text = "Level" }
+  rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = duel_level <= 1, tooltip = "One level lower" }
+  rows[#rows + 1] = { label = true, text = tostring(duel_level), same_line = true, color = duel_level > 50 and "#ff8060" or nil,
+    tooltip = lvl_tip }
+  rows[#rows + 1] = { button = "dbg:lvl:1", text = ">", same_line = true, disabled = duel_level >= MAX_LEVEL, tooltip = "One level higher" }
   for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
-    rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q }
+    rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q, tooltip = lvl_tip }
   end
-  local pick = duelist(duel_what)
-  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn " .. pick[1] .. ": " .. pick[2] .. " (level " .. duel_level .. ")",
-    selected = v.body == "duel", tooltip = "Replaces your test body." }
+  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel",
+    tooltip = "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It replaces your test body." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
+    tooltip = "Removes your test body." }
   return rows
 end
 
@@ -1175,10 +1172,6 @@ function F.click(world, key)
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
   local what = key:match("^dbg:what:([%x%-]+)$")
   if what then duel_what = duelist(what)[3] return end
-  local grp = key:match("^dbg:grp:(%a+)$")
-  if grp then duel_group, duel_page = grp, 1 return end
-  local turn = key:match("^dbg:page:(%-?%d)$")
-  if turn then duel_page = duel_page + tonumber(turn) return end
   local step = key:match("^dbg:lvl:(%-?%d+)$")
   if step then duel_level = math.max(1, math.min(MAX_LEVEL, duel_level + tonumber(step))) return end
   local set = key:match("^dbg:lvlset:(%d+)$")
