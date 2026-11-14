@@ -5038,9 +5038,8 @@ struct ExperimentalLayer : PinnedLayer {
 // ---- the update dialog (0.15.83, owner) ----
 // When the updater has a new version ready for the next start (update_status.txt "ready|Update vX is ready: ..."), a
 // small window in the middle of the game window says so, like a Windows dialog, besides the lower left line. Once per
-// version in a game session. It never takes the keyboard or the mouse by itself (0.15.85, owner: the player may be in a
-// fight): like the pinned windows its buttons are clicked with the pointer key out. Esc closes it (seen from the key's
-// state; the game gets the Esc too). OK closes it; Restart Game closes the game the way Alt+F4 does (WM_CLOSE: the
+// version in a game session. It takes the pointer and the keyboard while it is open (0.15.85 tried leaving them to the
+// game; the owner found having to use the pointer key to answer it too clumsy, 0.15.86). OK, Esc or Enter close it; Restart Game closes the game the way Alt+F4 does (WM_CLOSE: the
 // owner's restart helper does the same) and a hidden PowerShell starts it again through Steam once the game's process
 // has ended (the new version is put in place at that start). If the game is still running after 120 s (the close did
 // not happen), nothing is started.
@@ -5054,8 +5053,8 @@ struct UpdateDialog : Layer {
     TextPainter text, head;
     RECT ok_r{}, restart_r{};
     int mouse_x = -1, mouse_y = -1;
-    bool restarting = false, was_pointer = false, esc_was = true;
-    static constexpr int kW = 440, kH = 200, kHead = 32;
+    bool restarting = false;
+    static constexpr int kW = 440, kH = 176, kHead = 32;
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -5100,10 +5099,6 @@ struct UpdateDialog : Layer {
         text.draw(canvas, 20, kHead + 18, L"FlameKit v" + version + L" has been downloaded.", 90, 220, 110);
         text.draw(canvas, 20, kHead + 44, restarting ? L"Closing the game; it starts again by itself..." : L"Restart the game to load it!",
                   225, 225, 230);
-        if (!g_pointer_mode) {  // how to click it: the pointer key (Right Alt unless changed)
-            const std::wstring k = key_label(settings().pointer_vk);
-            little_hint(L"Use " + (k.empty() ? std::wstring(L"the pointer key") : k) + L" to click the buttons. Esc closes this.");
-        }
         const int bw = 130, bh = 32, by = kH - bh - 14;
         restart_r = {kW - 16 - bw, by, kW - 16, by + bh};
         ok_r = {restart_r.left - 12 - bw, by, restart_r.left - 12, by + bh};
@@ -5122,19 +5117,7 @@ struct UpdateDialog : Layer {
         changed = true;
     }
 
-    void little_hint(const std::wstring& t) { text.draw(canvas, 20, kHead + 76, t, 150, 155, 170); }
-
     void update(const Frame& f) override {
-        {  // Esc closes it while the game's process is in front (a new press only)
-            const bool esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
-            if (esc && !esc_was && open && f.ours_front) close("Esc");
-            esc_was = esc;
-        }
-        if (was_pointer != g_pointer_mode) {
-            was_pointer = g_pointer_mode;
-            dirty = true;
-            if (!g_pointer_mode) mouse_x = mouse_y = -1;
-        }
         if (!next_read) next_read = f.now + 5000;  // the updater clears the last session's line at its start first
         if (f.now >= next_read && !restarting) read_status(f.now);
         const bool want = open && f.gw > 0 && f.gh > 0;
@@ -5155,6 +5138,11 @@ struct UpdateDialog : Layer {
         FK_LOG(fklog::kInfo, "update dialog: closed (%s)", how);
     }
 
+    // (0.15.86) The waiting part must not be a child of the game: Steam counts the game's child processes as the game, so
+    // the first version (a PowerShell started by the game) made Steam say the game was still running. Now a short-lived
+    // PowerShell has Windows (WMI, Win32_Process.Create) start restart_game.ps1 on its own, and ends at once; that one
+    // waits for the game's process to end and for Steam to let go of it (no enshrouded.exe left, then 5 s more), then
+    // starts the game through Steam. It writes restart_game.log next to itself.
     void restart_game() {
         HWND g = game_window();
         if (!g) {
@@ -5162,33 +5150,74 @@ struct UpdateDialog : Layer {
             return;
         }
         const DWORD pid = GetCurrentProcessId();
-        // started first, so it is waiting before the game begins to close; it ends by itself either way
-        std::wstring cmd = L"\"";
+        const std::wstring script = g_flamekit_dir + L"restart_game.ps1";
+        static const char kScript[] =
+            "param([string]$Mode, [int]$GamePid)\r\n"
+            "$log = Join-Path $PSScriptRoot 'restart_game.log'\r\n"
+            "function Log($t) { Add-Content -Path $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' ' + $t) }\r\n"
+            "if ($Mode -eq 'launch') {\r\n"
+            "  Set-Content -Path $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' restart asked for the game process ' + $GamePid)\r\n"
+            "  $exe = Join-Path $PSHOME 'powershell.exe'\r\n"
+            "  $cmd = '\"' + $exe + '\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"' + $PSCommandPath + '\" wait ' + $GamePid\r\n"
+            "  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmd }\r\n"
+            "  Log ('waiter started by Windows: result ' + $r.ReturnValue + ', process ' + $r.ProcessId)\r\n"
+            "  if (-not $r -or $r.ReturnValue -ne 0) { exit 2 }\r\n"
+            "  exit 0\r\n"
+            "}\r\n"
+            "$p = Get-Process -Id $GamePid -ErrorAction SilentlyContinue\r\n"
+            "if ($p -and -not $p.WaitForExit(120000)) { Log 'the game is still running after 120 s: not started again'; exit 1 }\r\n"
+            "Log 'the game process ended'\r\n"
+            "for ($i = 0; $i -lt 60; $i++) { if (-not (Get-Process -Name 'enshrouded' -ErrorAction SilentlyContinue)) { break }; Start-Sleep -Seconds 1 }\r\n"
+            "Start-Sleep -Seconds 5\r\n"
+            "Log 'starting the game through Steam'\r\n"
+            "Start-Process 'steam://rungameid/1203620'\r\n";
+        bool wrote = false;
+        if (FILE* fp = _wfopen(script.c_str(), L"wb")) {
+            wrote = fwrite(kScript, 1, sizeof kScript - 1, fp) == sizeof kScript - 1;
+            fclose(fp);
+        }
+        if (!wrote) {
+            FK_LOG(fklog::kWarn, "update dialog: Restart Game: restart_game.ps1 could not be written: the game is left running");
+            return;
+        }
         wchar_t sys[MAX_PATH] = L"C:\\Windows";
         GetWindowsDirectoryW(sys, MAX_PATH);
+        std::wstring cmd = L"\"";
         cmd += sys;
-        cmd += L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -WindowStyle Hidden -Command \"";
-        cmd += L"$p = Get-Process -Id " + std::to_wstring(pid) + L" -ErrorAction SilentlyContinue; ";
-        cmd += L"if ($p -and -not $p.WaitForExit(120000)) { exit 1 }; Start-Sleep -Seconds 3; Start-Process 'steam://rungameid/1203620'\"";
+        cmd += L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"";
+        cmd += script + L"\" launch " + std::to_wstring(pid);
         STARTUPINFOW si{};
         si.cb = sizeof si;
         PROCESS_INFORMATION pi{};
         std::vector<wchar_t> line(cmd.begin(), cmd.end());
         line.push_back(0);
-        if (!CreateProcessW(nullptr, line.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, nullptr, nullptr, &si, &pi)) {
-            FK_LOG(fklog::kWarn, "update dialog: Restart Game: the restarter could not be started (error %lu): the game is left running",
-                   GetLastError());
+        if (!CreateProcessW(nullptr, line.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+            FK_LOG(fklog::kWarn, "update dialog: Restart Game: PowerShell could not be started (error %lu): the game is left running", GetLastError());
             return;
         }
         CloseHandle(pi.hThread);
+        // the launcher hands the wait to Windows and ends; only then is the game closed
+        const DWORD waited = WaitForSingleObject(pi.hProcess, 15000);
+        DWORD code = 1;
+        GetExitCodeProcess(pi.hProcess, &code);
         CloseHandle(pi.hProcess);
+        if (waited != WAIT_OBJECT_0 || code != 0) {
+            FK_LOG(fklog::kWarn, "update dialog: Restart Game: the launcher %s (exit %lu): the game is left running",
+                   waited == WAIT_OBJECT_0 ? "failed" : "did not finish in 15 s", code);
+            return;
+        }
         restarting = true;
         dirty = true;
-        FK_LOG(fklog::kInfo, "update dialog: Restart Game: closing the game (WM_CLOSE, like Alt+F4); it starts again through Steam");
+        FK_LOG(fklog::kInfo, "update dialog: Restart Game: closing the game (WM_CLOSE, like Alt+F4); it starts again through Steam (restart_game.log)");
         PostMessageW(g, WM_CLOSE, 0, 0);
     }
 
-    bool wants_mouse() const override { return open && g_pointer_mode; }
+    bool wants_mouse() const override { return open; }
+    bool wants_keys() const override { return open; }
+    void key(WPARAM vk) override {
+        if (vk == VK_ESCAPE) close("Esc");
+        else if (vk == VK_RETURN) close("Enter");
+    }
     void mouse_left() override {
         mouse_x = mouse_y = -1;
         dirty = true;
@@ -5213,8 +5242,9 @@ struct BackdropLayer : Layer {
     bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "backdrop"; }
     const Layer* window = nullptr;
+    const Layer* dialog = nullptr;  // the update dialog: the pointer is out while it is open
     void update(const Frame& f) override {
-        const bool want = ((window && window->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
+        const bool want = ((window && window->visible) || (dialog && dialog->visible) || g_pointer_hold) && f.gw > 0 && f.gh > 0;
         if (want != visible) {
             visible = want;
             changed = true;
@@ -5755,6 +5785,7 @@ void ui_thread_body() {
     ExperimentalLayer experimental;
     experimental.window = &window;
     UpdateDialog update_dialog;
+    backdrop.dialog = &update_dialog;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
     g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
@@ -5855,7 +5886,7 @@ void ui_thread_body() {
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
         // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
         {
-            const bool mode = hold || window.open;
+            const bool mode = hold || window.open || update_dialog.open;
             if (mode && !g_pointer_mode) {
                 restore_rounds = 5;
             } else if (!mode && g_pointer_mode) {
