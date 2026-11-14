@@ -107,9 +107,10 @@ void read_settings() {
     s.show = emf::setting_bool(kKit, "map_show", true);
     s.size = static_cast<int>(emf::setting_float(kKit, "map_size", 300.0));
     s.size = std::clamp(s.size, 100, 600);
-    s.margin = std::clamp(static_cast<int>(emf::setting_float(kKit, "map_margin", 24.0)), 0, 400);
-    const std::string corner = emf::setting_text(kKit, "map_corner", "bottom_right");
-    s.corner = corner == "top_right" ? 0 : corner == "bottom_left" ? 2 : corner == "top_left" ? 3 : 1;
+    // (0.15.101, owner) the Corner and "Distance from the screen edge" settings are gone: the lower right corner, 24 px
+    // in, until the player drags it somewhere (map_x, map_y)
+    s.margin = 24;
+    s.corner = 1;
     s.square = emf::setting_text(kKit, "map_shape", "circle") == "square";
     const std::string key = emf::setting_text(kKit, "map_toggle_key", "F10");
     s.toggle_vk = key.empty() ? 0 : emf::keys::parse_key(std::wstring(key.begin(), key.end()));
@@ -2086,25 +2087,29 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
         tp->draw(c, static_cast<int>(x0 + lead), static_cast<int>(y0) + 1 + (text.font_px - tp->font_px) / 2, t, 236, 228, 206);
     }
 
-    // ---- under that: the region, and the named place the player is in ----
-    if (s.where && text.ready(nullptr, letter_px(s, n))) {
+    // ---- under that: where the player is, on one line (0.15.101, owner): "Blackmire / Flame Altar" ----
+    if (s.where && text.ready(nullptr, letter_px(s, n)) && (!ov.region.empty() || !ov.place.empty())) {
         const int line = text.font_px * 4 / 3 + 8;
-        float y0 = static_cast<float>(n) + 3.0f + ((s.clock || s.altitude) ? static_cast<float>(line) : 0.0f);
-        auto put = [&](const std::string& words, float r, float g, float b) {
-            if (words.empty()) return;
-            std::wstring t = widen(words);
-            while (t.size() > 4 && text.width(t) > n - 24) {  // too long for the dial's width: shorten it
-                t.resize(t.size() - 2);
-                t.back() = L'\u2026';
-            }
-            const int tw = text.width(t), th = text.font_px + text.font_px / 3;
-            const float x0 = mid - static_cast<float>(tw) * 0.5f;
-            c.pill(x0 - 10.0f, y0, x0 + static_cast<float>(tw) + 10.0f, y0 + static_cast<float>(th) + 4.0f, 14, 17, 22, 0.72f);
-            text.draw(c, static_cast<int>(x0), static_cast<int>(y0) + 1, t, r, g, b);
-            y0 += static_cast<float>(line);
+        const float y0 = static_cast<float>(n) + 3.0f + ((s.clock || s.altitude) ? static_cast<float>(line) : 0.0f);
+        std::wstring region = widen(ov.region), place = widen(ov.place);
+        const std::wstring sep = (!region.empty() && !place.empty()) ? L" / " : L"";
+        const int room = c.w - 24;  // the line may reach past the dial (the picture is wider for that)
+        auto shorten = [&](std::wstring& t) {
+            t.resize(t.size() - 2);
+            t.back() = L'\u2026';
         };
-        put(ov.region, 250, 206, 110);
-        put(ov.place, 236, 228, 206);
+        while (text.width(region + sep + place) > room) {  // too long: the place first, then the region
+            if (place.size() > 4) shorten(place);
+            else if (region.size() > 4) shorten(region);
+            else break;
+        }
+        const int wr = text.width(region), ws = text.width(sep), wp = text.width(place), tw = wr + ws + wp;
+        const int th = text.font_px + text.font_px / 3;
+        const float x0 = mid - static_cast<float>(tw) * 0.5f;
+        c.pill(x0 - 10.0f, y0, x0 + static_cast<float>(tw) + 10.0f, y0 + static_cast<float>(th) + 4.0f, 14, 17, 22, 0.72f);
+        if (!region.empty()) text.draw(c, static_cast<int>(x0), static_cast<int>(y0) + 1, region, 250, 206, 110);
+        if (!sep.empty()) text.draw(c, static_cast<int>(x0) + wr, static_cast<int>(y0) + 1, sep, 170, 170, 180);
+        if (!place.empty()) text.draw(c, static_cast<int>(x0) + wr + ws, static_cast<int>(y0) + 1, place, 236, 228, 206);
     }
 }
 
@@ -2320,7 +2325,7 @@ struct MinimapLayer : Layer {
 
         const int line = letter_px(s, s.size) * 4 / 3 + 8;  // one line of text under the dial
         dial_w = s.size;
-        dial_h = s.size + 4 + ((s.clock || s.altitude) ? line : 0) + (s.where ? 2 * line : 0);
+        dial_h = s.size + 4 + ((s.clock || s.altitude) ? line : 0) + (s.where ? line : 0);
         pad = (s.clock || s.altitude) ? s.size / 4 : 0;  // room on each side for the clock's line
         resize(dial_w + 2 * pad, dial_h);
         canvas.dial = dial_w;
@@ -2399,6 +2404,14 @@ struct MinimapLayer : Layer {
     }
 
     bool wants_mouse() const override { return g_pointer_mode && visible; }
+    // (0.15.101, owner) the mouse wheel over the minimap zooms it: up closer, down farther (map_zoom, as the zoom keys)
+    void wheel(int delta, int x, int y) override {
+        const int now = settings().zoom;
+        const int next = std::clamp(now + (delta > 0 ? -1 : 1), 0, kRangeCount - 1);
+        if (next == now) return;
+        FK_LOG(fklog::kDebug, "minimap: zoom %d with the mouse wheel", next);
+        emf::run_on_world(EMF_WORLD_CLIENT, [next](emf::World) { emf::set_setting(kKit, "map_zoom", std::to_string(next)); });
+    }
     void mouse_left() override { hover_x = hover_y = -1; }
     // Pressed and let go on the same spot: a click (a marker's waypoint). Moved more than a few pixels: a drag.
     void mouse(UINT msg, int x, int y) override {

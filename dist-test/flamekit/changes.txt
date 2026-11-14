@@ -1,3 +1,8 @@
+0.15.101 Nov 14, 2026
+- Minimap: the Corner and "Distance from the screen edge" settings are gone. It sits in the lower right corner until you drag it somewhere else; "Reset Default Position" puts it back there.
+- Minimap: where you are is one line under the dial now, "Region / Place" (for example "Blackmire / Flame Altar").
+- Minimap: the mouse wheel over it zooms in and out (hold the pointer key, as for moving it).
+
 0.15.100 Nov 14, 2026
 - "Check for updates" while an update is already downloaded brings up the update window again, with its Restart Game button.
 

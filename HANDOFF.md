@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.100.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.101.
 
 ## What FlameKit is
 
@@ -124,6 +124,11 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## Minimap (0.15.101)
+map_corner and map_margin settings removed (owner: never asked for them): corner fixed lower right, margin 24, map_x/map_y
+still keep a dragged place. The location is one line "Region / Place" (region gold, place pale, the place shortened
+first). Mouse wheel over the minimap (pointer mode) changes map_zoom.
 
 ## Experimental window tooltips (0.15.97)
 ExperimentalLayer reads each row's tooltip (ui_exp.dat field 10) and draws it under (or above) the hovered button,

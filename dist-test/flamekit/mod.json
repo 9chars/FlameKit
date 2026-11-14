@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.100",
+  "version": "0.15.101",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -317,7 +317,7 @@
       "max": 1000,
       "step": 1,
       "default": -1,
-      "label": "Place across the screen (0 left to 1000 right; -1: use the corner below)",
+      "label": "Place across the screen (0 left to 1000 right; -1: the lower right corner)",
       "live": true,
       "group": "Minimap"
     },
@@ -328,7 +328,7 @@
       "max": 1000,
       "step": 1,
       "default": -1,
-      "label": "Place down the screen (0 top to 1000 bottom; -1: use the corner below)",
+      "label": "Place down the screen (0 top to 1000 bottom; -1: the lower right corner)",
       "live": true,
       "group": "Minimap"
     },
@@ -352,32 +352,6 @@
       ]
     },
     {
-      "key": "map_corner",
-      "type": "select",
-      "default": "bottom_right",
-      "label": "Corner",
-      "live": true,
-      "group": "Minimap",
-      "options": [
-        {
-          "value": "top_right",
-          "label": "Top right"
-        },
-        {
-          "value": "bottom_right",
-          "label": "Bottom right"
-        },
-        {
-          "value": "bottom_left",
-          "label": "Bottom left"
-        },
-        {
-          "value": "top_left",
-          "label": "Top left"
-        }
-      ]
-    },
-    {
       "key": "map_size",
       "type": "slider",
       "min": 120,
@@ -385,17 +359,6 @@
       "step": 20,
       "default": 300,
       "label": "Size (pixels)",
-      "live": true,
-      "group": "Minimap"
-    },
-    {
-      "key": "map_margin",
-      "type": "slider",
-      "min": 0,
-      "max": 300,
-      "step": 4,
-      "default": 24,
-      "label": "Distance from the screen edge (pixels)",
       "live": true,
       "group": "Minimap"
     },

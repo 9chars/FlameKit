@@ -149,8 +149,8 @@ function F.panel(world)
   rows[#rows + 1] = { heading = "Location" }
   local placed = (tonumber(kit.setting("map_x", -1)) or -1) >= 0
   rows[#rows + 1] = { button = "reset", text = "Reset Default Position", disabled = not placed,
-                      tooltip = "Puts the minimap back in its corner of the screen (the corner is below)." }
-  for _, r in ipairs(require("features.settings").rows({ "map_shape", "map_corner", "map_margin" })) do rows[#rows + 1] = r end
+                      tooltip = "Puts the minimap back in the lower right corner of the screen." }
+  for _, r in ipairs(require("features.settings").rows({ "map_shape" })) do rows[#rows + 1] = r end
   rows[#rows + 1] = { separator = true }
   rows[#rows + 1] = { heading = "Size" }
   local size = tonumber(kit.setting("map_size", 300)) or 300
@@ -162,7 +162,7 @@ function F.panel(world)
   rows[#rows + 1] = { heading = "Zoom" }
   local zoom = math.floor((tonumber(kit.setting("map_zoom", 2)) or 2) + 0.5)
   rows[#rows + 1] = { button = "zoom:in", text = "Zoom in", disabled = zoom <= 0,
-                      tooltip = "Shows a smaller piece of the world in more detail." }
+                      tooltip = "Shows a smaller piece of the world in more detail. The mouse wheel over the minimap zooms too (hold the pointer key)." }
   rows[#rows + 1] = { button = "zoom:out", text = "Zoom out", same_line = true, disabled = zoom >= ZOOM_STEPS - 1,
                       tooltip = "Shows a bigger piece of the world." }
   rows[#rows + 1] = { text = string.format("Zoom level %d of %d", ZOOM_STEPS - zoom, ZOOM_STEPS), same_line = true }
