@@ -1,3 +1,7 @@
+0.15.41 Nov 13, 2026
+- FlameKit's window (F6) stays open when you click another program or Alt+Tab; F6, Esc or its x close it.
+- The Messages window stays on screen all the time in a world: the last 5 messages, the last 10 while the pointer is out.
+
 0.15.40 Nov 13, 2026
 - Auto Junk List: the key button says Set Dump Key and comes last in its row.
 

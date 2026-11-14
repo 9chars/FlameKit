@@ -2878,9 +2878,9 @@ struct PartyLayer : PinnedLayer {
 
 // ---- the Messages window: what FlameKit's features just did ----
 // From the Lua part (kit.note in core/kit.lua) in emf\mods\flamekit\ui_messages.dat: "m <number> <rrggbb> <text>" lines,
-// the last 20, oldest first, then "end". A message with a number not seen before shows the window for 12 s (the new
-// ones, at most 5); while the pointer is out it shows the last 10. Hidden with its x button, it stays hidden (FlameKit's
-// window, tab Windows, shows it again).
+// the last 20, oldest first, then "end". On screen all the time in a world (owner, 0.15.41): the last 5 messages, the
+// last 10 while the pointer is out. Hidden with its x button, it stays hidden (FlameKit's window, tab Windows, shows it
+// again).
 struct MessagesLayer : PinnedLayer {
     struct Msg {
         int n = 0;
@@ -2898,7 +2898,7 @@ struct MessagesLayer : PinnedLayer {
 
     MessagesLayer() : PinnedLayer("messages", L"Messages", 440) { def_y_pm = 60; }
 
-    bool active(const Frame& f) override { return f.in_world && !shown.empty(); }
+    bool active(const Frame& f) override { return f.in_world; }
 
     void read_file(uint64_t now) {
         WIN32_FILE_ATTRIBUTE_DATA info{};
@@ -2953,14 +2953,9 @@ struct MessagesLayer : PinnedLayer {
             next_read = f.now + 250;
             read_file(f.now);
         }
-        std::vector<size_t> want;
-        if (g_pointer_mode) {
-            for (size_t i = all.size() > kAll ? all.size() - kAll : 0; i < all.size(); ++i) want.push_back(i);
-        } else {
-            for (size_t i = 0; i < all.size(); ++i)
-                if (all[i].at && f.now - all[i].at < kShowMs) want.push_back(i);
-            if (want.size() > kNew) want.erase(want.begin(), want.end() - kNew);
-        }
+        std::vector<size_t> want;  // the last 5, or 10 while the pointer is out
+        const size_t n = g_pointer_mode ? kAll : kNew;
+        for (size_t i = all.size() > n ? all.size() - n : 0; i < all.size(); ++i) want.push_back(i);
         if (want == shown) return false;
         shown = std::move(want);
         return true;
@@ -2992,6 +2987,7 @@ struct MessagesLayer : PinnedLayer {
 
     void draw_content(int top, int width) override {
         int y = top;
+        if (lines.empty()) little.draw(canvas, 10, y, L"No messages yet", 140, 145, 155);
         size_t last = static_cast<size_t>(-1);
         for (const auto& [i, l] : lines) {
             const Msg& m = all[i];
@@ -3838,7 +3834,7 @@ struct WindowLayer : Layer {
                 FK_LOG(fklog::kInfo, "window: F6 ignored: the game's window is not the front window");
             }
         }
-        if (open && (close_asked || !f.in_world)) close(close_asked ? "F6, Esc or another window took the front" : "the world ended");
+        if (open && (close_asked || !f.in_world)) close(close_asked ? "F6, Esc or its x" : "the world ended");
         if (!open) return;
         tell_view();
         const uint64_t ls = stamp_of(g_flamekit_dir + L"ui_list.dat"), ts = stamp_of(g_flamekit_dir + L"ui_tabs.dat");
@@ -3907,8 +3903,11 @@ struct WindowLayer : Layer {
         if (name.rfind("key ", 0) == 0) name = name.substr(4);  // "key 0xba": the setting is written "0xba"
         act("key", name);
     }
+    // Another program took the front (a click on it, Alt+Tab): the window stays open (owner, 0.15.41), like the pinned
+    // windows; it no longer gets the keys until it is clicked again (WM_MOUSEACTIVATE gives it the front back). F6, Esc
+    // and its x close it.
     void lost_front() override {
-        if (open) close_asked = true;
+        if (open) FK_LOG(fklog::kInfo, "window: another program took the front: the window stays open");
     }
     void mouse_left() override {
         mouse_x = mouse_y = -1;
