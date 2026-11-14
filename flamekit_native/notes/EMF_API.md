@@ -47,6 +47,12 @@ player's language), `on_player`, `net_*`, `hook_*`, `find_pattern`.
 - **Player events after a reload:** a reloaded Lua script is told about every player already there, as joined, at its
   first step (reference.md "v28"; measured on the owner's server, 0.15.48).
 - **Entity ids of players:** 1..0x3FF; a leaving player's id goes to the next player who joins.
+- **Connected is not in the world** (measured 2026-11-13): EMF's message link to a joining player is up (log "hello ...
+  welcome sent") about 15 s before EMF reports them joined; in between their messages arrive with `from.player == 0`
+  (only the account is known). FlameKit's loot_filter server keeps such a list and takes it at `on_player_joined`.
+- **A player's game settings** (e.g. "Auto-Collect Scattered Loot", `ClientPlayerSettings.flags` bit 12) are only in
+  `PlayerInput.fromClientSettings`, and `PlayerInput` is `server_only` (docs/components.txt). The client world's
+  `ClientPlayerInput` has no settings, so a player's own game cannot read them through EMF 0.6.6: ask the server.
 - **Buff icons are not in EMF.** They are in the game's data files: the buff registry (resource type `0x1be67cef`)
   lists every buff type with its icon's GUID (item_icons.hpp has the layout). The icons are plain RGBA, white symbols.
 - **`emf\commands.txt`:** EMF runs console commands written into that file about once a second while a world runs; the

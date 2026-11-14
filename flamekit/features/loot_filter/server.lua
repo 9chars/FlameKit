@@ -163,6 +163,25 @@ local function tell_auto_loot(world, st)
   send(world, st, { op = "autoloot", on = st.auto_loot }, text)
 end
 
+-- The player's auto loot setting, as their game sent it to the server (PlayerInput is on the server only): read when
+-- their list comes and once a second after; their game is told when it changed.
+local function check_auto_loot(world, st)
+  if st.entity == 0 then return end
+  local ok, input = pcall(world.get, world, "PlayerInput", st.entity)
+  local flags = ok and input and input.fromClientSettings and input.fromClientSettings.flags
+  if not flags then return end
+  local on = (flags >> AUTO_LOOT_BIT) & 1 == 1
+  if on ~= st.auto_loot then
+    st.auto_loot = on
+    emf.log("auto loot of player " .. tostring(st.entity) .. ": " .. (on and "on" or "off"))
+    tell_auto_loot(world, st)
+  end
+end
+
+-- Lists that came before their player was in the world (connected, entity 0: measured 2026-11-13, about 15 s after
+-- EMF's link is up): kept by account and taken the moment EMF says the player joined (0.15.57).
+local early = {}  -- account -> the latest "sync" message
+
 -- ---- removing ----
 
 local function removable(st, stack)
@@ -252,7 +271,12 @@ end
 -- A message from a player's game. `from` = {player = entity, account = text}: who it is comes from the server's own
 -- records, never from the message, so a player can only ever change their own list and their own bag. True when taken.
 function S.handle(world, from, msg)
-  if type(msg) ~= "table" or not from or not from.player or from.player == 0 then return false end
+  if type(msg) ~= "table" or not from then return false end
+  if (not from.player or from.player == 0) and type(from.account) == "string" and msg.op == "sync" then
+    early[from.account] = msg  -- connected, not in the world yet: taken when they join
+    return false
+  end
+  if not from.player or from.player == 0 then return false end
   local st = state(from.account)
   if not st then return false end  -- the world's saved data has not come yet: the sender tries again
   st.entity = from.player
@@ -264,7 +288,9 @@ function S.handle(world, from, msg)
     st.ids = nil
     save(st)
     send(world, st, { op = "synced" })  -- (0.15.57) the player's game stops resending once it has this
-    tell_auto_loot(world, st)  -- a game that just said hello learns it at once
+    st.auto_loot = nil
+    check_auto_loot(world, st)  -- read now, not at the next second: a game that just said hello learns it at once
+    tell_auto_loot(world, st)
   elseif msg.op == "dump" then
     local why = dump(world, st)
     if why then send(world, st, { op = "info", text = why }, why) end
@@ -301,18 +327,7 @@ function S.tick(world)
       st.sweep_at = nil
       sweep(world, st)
     end
-    if now % 60 == 0 and st.entity ~= 0 then  -- the player's auto loot setting, as their game sent it to the server
-      local ok, input = pcall(world.get, world, "PlayerInput", st.entity)
-      local flags = ok and input and input.fromClientSettings and input.fromClientSettings.flags
-      if flags then
-        local on = (flags >> AUTO_LOOT_BIT) & 1 == 1
-        if on ~= st.auto_loot then
-          st.auto_loot = on
-          emf.log("auto loot of player " .. tostring(st.entity) .. ": " .. (on and "on" or "off"))
-          tell_auto_loot(world, st)
-        end
-      end
-    end
+    if now % 60 == 0 then check_auto_loot(world, st) end
     pump(world, st)
   end
 end
@@ -399,7 +414,14 @@ function S.setup(k, F)
   emf.on_player_left(kit.guard(F, function(world, p)
     players[p.account] = nil  -- the list stays saved with the world; what was running for them stops
     by_entity[p.player] = nil
+    early[p.account] = nil
   end, "a player leaving"))
+  emf.on_player_joined(kit.guard(F, function(world, p)
+    local msg = p and p.account and early[p.account]
+    if not msg then return end
+    early[p.account] = nil
+    S.handle(world, { player = p.player, account = p.account }, msg)  -- their list came before they were in the world
+  end, "a player joining"))
   emf.command("junk", "<add|remove|list|dump|clear> <item>: your Auto Junk List",
     kit.guard(F, command, "the junk command"), { players = true })
 end

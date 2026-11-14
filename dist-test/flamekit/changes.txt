@@ -1,3 +1,7 @@
+0.15.58 Nov 13, 2026
+- Auto Junk List: on joining a server, your list and the Auto-Collect notice are there the moment you are in the world. The server received your list up to 15 s before that (connected, but not in the world yet) and threw it away; it now keeps it and takes it as soon as you join, and reads your Auto-Collect setting right then instead of at its next check.
+- Auto Junk List: 0.15.57's reading of the Auto-Collect setting in your own game is gone again: the game keeps that setting on the server only, so there was nothing to read.
+
 0.15.57 Nov 13, 2026
 - Auto Junk List: the Auto-Collect notice comes up as soon as the world runs: your game reads the "Auto-Collect Scattered Loot" setting itself instead of waiting for the server to report it.
 - Auto Junk List: on joining a server, your junk list no longer goes missing for about 2 minutes. The first message after joining was often lost (the link to the server drops messages while the game is still loading); now the server confirms each list and your game sends it again every 5 seconds until it does (6 times at most).

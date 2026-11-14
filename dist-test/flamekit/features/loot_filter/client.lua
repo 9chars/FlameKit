@@ -20,11 +20,9 @@ local resolved = false
 local dirty = true         -- the server half has not got the list and options as they are now
 local last_peer = nil      -- the joined server's channel version as last seen (0: it has no FlameKit)
 local since_sync = 0
-local client_steps = 0
 local acked = true         -- (0.15.57) the joined server confirmed the last list ("synced"); false: resend in 5 s
 local unacked = 0          -- lists sent without a confirmation (an older server never confirms: give up after 6)
 local ACK_STEPS = 300      -- about 5 s
-local own_read = nil       -- (0.15.57) what reading the auto loot setting in this game gave: true, false, nil (not yet)
 local auto_loot = nil      -- the game's auto loot setting as the server reports it (nil: not known yet)
 local warning_shown = false
 local for_host = {}        -- in a world this game hosts: requests made on the client world (FlameKit's window), handed to
@@ -221,38 +219,9 @@ function C.server_tick(world)
   for _, msg in ipairs(waiting) do request(world, msg) end
 end
 
--- This game's own auto loot setting ("Auto-Collect Scattered Loot"): the game keeps it in the player's PlayerInput
--- (fromClientSettings.flags, bit 12), which it sends to the server every step. Read here (0.15.57, owner: the notice
--- came up late), so the notice shows as soon as the world runs; the server half's "autoloot" message is the fallback.
-local AUTO_LOOT_BIT = 12
-local function read_own_auto_loot(world)
-  local me = emf.local_player()
-  if not me or me == 0 then return end
-  local ok, input = pcall(world.get, world, "PlayerInput", me)
-  local flags = ok and input and input.fromClientSettings and input.fromClientSettings.flags
-  if type(flags) ~= "number" then
-    if own_read == nil then
-      own_read = false
-      kit.debug("info", "junk list (client): the auto loot setting cannot be read in this game; the server half tells it")
-    end
-    return
-  end
-  local on = (flags >> AUTO_LOOT_BIT) & 1 == 1
-  if own_read ~= true then
-    own_read = true
-    kit.debug("info", "junk list (client): the auto loot setting is read in this game: %s", on and "on" or "off")
-  end
-  if on ~= auto_loot then
-    auto_loot = on
-    refresh_warning()
-  end
-end
-
 -- A step of your own screen's world. On a joined server: say hello with your list once the server has greeted this
 -- game, after every change, and now and then again; until the server confirms a list, again every 5 s.
 function C.client_tick(world)
-  if client_steps % 30 == 0 then read_own_auto_loot(world) end
-  client_steps = client_steps + 1
   if kit.is_host() then return end
   local ok, version = pcall(emf.net.peer, nil, 0, server.CHANNEL)
   version = ok and version or 0

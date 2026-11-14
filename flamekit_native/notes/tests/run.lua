@@ -555,6 +555,18 @@ if JOINED then  -- a list lost on the way (the server's link may drop the first 
   ui_action("keep", "Material_T1_Stone")
   step(SYNC + 20)
 end
+-- a list that comes while the player is connected but not in the world yet (EMF: entity 0) waits for their join
+do
+  side = "server"
+  channel.on_server(SW, { player = 0, account = ACCOUNT }, emf.json.encode({ op = "sync", items = { "Material_T1_Moss" },
+    opts = { auto = true, action = "drop" } }))
+  local before = (pdata[ACCOUNT] or ""):find("Material_T1_Moss", 1, true)
+  for _, fn in ipairs(joined_fns) do fn(SW, { player = PLAYER, account = ACCOUNT }) end
+  side = "client"
+  check(not before and (pdata[ACCOUNT] or ""):find("Material_T1_Moss", 1, true) ~= nil,
+    "a list sent before the player was in the world is taken the moment they join")
+  step(SYNC + 40)  -- the player's own list again
+end
 
 toggle_panel()  -- the other features' tabs (panel rows), as the tests drive them
 -- the Minimap tab's marker filters
