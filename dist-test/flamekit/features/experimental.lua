@@ -56,7 +56,7 @@ local TIPS = {
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
-    .. "on the server is told when you switch it. While PvP is on, your other options are off (all but the glider) and come back when you switch PvP off.",
+    .. "on the server is told when you switch it. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -507,6 +507,12 @@ local function handle(world, account, entity, msg)
     online[account].lift = msg.on == true and LIFT_STEPS or 0
     return nil
   end
+  if (msg.op == "home" or msg.op == "go" or msg.op == "wp") and wants(account, "pvp") then
+    -- (0.15.119, owner) no fast travel out of a fight
+    local v = view(account)
+    v.note = "Fast travel is off while you are in PvP."
+    return v
+  end
   if msg.op == "home" or msg.op == "go" or msg.op == "wp" then
     local ok, why
     if msg.op == "home" then ok, why = pcall(go_home, world, entity)
@@ -540,6 +546,12 @@ local function handle(world, account, entity, msg)
     v.note = not ok and "The waypoint could not be set on this game version." or nil
     return v
   end
+  if msg.op == "body" and (msg.kind == "dummy" or msg.kind == "duel") and wants(account, "pvp") then
+    -- (0.15.119, owner: a monster spawned in a fight could throw it) no test monsters while PvP is on; Remove still works
+    local v = view(account)
+    v.note = "Test monsters cannot be spawned while you are in PvP."
+    return v
+  end
   if msg.op == "body" then
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
@@ -568,6 +580,11 @@ local function handle(world, account, entity, msg)
         end
         saved[account] = next(set) and set or nil
         refused[s[1]] = nil
+        if s[1] == "pvp" and msg.on == true then  -- (0.15.119) a duelist spawned before goes (the harmless dummy stays)
+          for id, b in pairs(bodies) do
+            if b.owner == account and b.kind == "duel" then drop_body(world, id, true) end
+          end
+        end
         emf.log(string.format("experimental: player %s switched '%s' %s", tostring(entity), s[1], msg.on == true and "on" or "off"))  -- never the account in a log (a log may be shared)
         if s[4] then  -- everyone on the server is told (not for the glider: it changes nothing for others)
           local name = require("core.players").name(world, entity, "a player")  -- the character name first, as everywhere
@@ -1235,14 +1252,19 @@ function F.window_rows(world)
       or "This server does not run FlameKit (or not this version)." } }
   end
   local rows = {}
+  -- (0.15.119, owner) no fast travel out of a fight: greyed out while PvP is on (the server refuses it too)
+  local in_pvp = v.pvp == true
+  local function travel_tip(tip)
+    return in_pvp and "Off while you are in PvP, so nobody can escape a fight. It comes back when you switch PvP off." or tip
+  end
   rows[#rows + 1] = { heading = "Fast Travel" }
-  rows[#rows + 1] = { button = "home", text = "Flame Altar",
-    tooltip = "Takes you to the nearest flame altar at once. Works where the map's fast travel does not: inside the shroud, in lava, while stuck." }
-  rows[#rows + 1] = { button = "spire", text = "Ancient Spire", same_line = true,
-    tooltip = "Takes you to the nearest Ancient Spire on your map, unlocked or not. Works inside the shroud too." }
-  rows[#rows + 1] = { button = "waypoint", text = "Map Waypoint", same_line = true,
-    tooltip = "Takes you straight to the waypoint you set on your map, onto the ground there. Fall damage is off for 30 seconds "
-      .. "after the move, in case there is no ground right at the waypoint." }
+  rows[#rows + 1] = { button = "home", text = "Flame Altar", disabled = in_pvp or nil,
+    tooltip = travel_tip("Takes you to the nearest flame altar at once. Works where the map's fast travel does not: inside the shroud, in lava, while stuck.") }
+  rows[#rows + 1] = { button = "spire", text = "Ancient Spire", same_line = true, disabled = in_pvp or nil,
+    tooltip = travel_tip("Takes you to the nearest Ancient Spire on your map, unlocked or not. Works inside the shroud too.") }
+  rows[#rows + 1] = { button = "waypoint", text = "Map Waypoint", same_line = true, disabled = in_pvp or nil,
+    tooltip = travel_tip("Takes you straight to the waypoint you set on your map, onto the ground there. Fall damage is off for 30 seconds "
+      .. "after the move, in case there is no ground right at the waypoint.") }
   rows[#rows + 1] = { heading = "PvP" }
   local on = v.pvp == true
   rows[#rows + 1] = { button = "sw:pvp", text = (on and "On    " or "Off   ") .. "PvP (free-for-all)" .. (v.pvp_dead and " (not working)" or ""),
@@ -1271,12 +1293,14 @@ function F.window_rows(world)
     return options
   end
   -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level 100
+  local in_pvp = v.pvp == true  -- (0.15.119, owner) no spawning while PvP is on: it could throw a fight
+  local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil,
     tooltip = "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it." }
-  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy",
-    tooltip = "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
+  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
+    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
       .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test monster." }
@@ -1294,8 +1318,8 @@ function F.window_rows(world)
   for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q, tooltip = lvl_tip }
   end
-  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel",
-    tooltip = "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
+  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel", disabled = in_pvp or nil,
+    tooltip = in_pvp and no_spawn or "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
       .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
     tooltip = "Removes your test body." }

@@ -843,6 +843,32 @@ do
   click(find_row("Remove").button)
   step(40)
 end
+do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a duelist spawned before goes when PvP goes on
+  local casts_before = #casts
+  local nid = 950 + #spawned + 1
+  comps.Faction[nid] = { faction = 6 }
+  comps.NetworkHealth[nid] = { health = 100 }
+  click(find_row("^Spawn duelist$").button)
+  step(40)
+  check(#spawned == nid - 950 and find_row("^Spawn duelist$").selected, "a duelist before PvP")
+  local d0 = #destroyed
+  click(find_row("PvP", "sw:pvp").button)
+  step(3)
+  check(#destroyed == d0 + 1 and destroyed[#destroyed] == nid and not find_row("^Spawn duelist$").selected,
+    "PvP on: the player's duelist is removed")
+  check(find_row("^Spawn duelist$").disabled and find_row("^Spawn dummy$").disabled
+    and find_row("^Spawn dummy$").tooltip:find("Off while you are in PvP", 1, true), "both spawn buttons are greyed out and say why")
+  local n = #spawned
+  click(find_row("^Spawn duelist$").button)
+  step(40)
+  click(find_row("^Spawn dummy$").button)
+  step(40)
+  check(#spawned == n, "and the server spawns nothing while PvP is on")
+  click(find_row("PvP", "sw:pvp").button)
+  step(3)
+  check(not find_row("^Spawn duelist$").disabled, "PvP off: spawning is back")
+  for i = #casts, casts_before + 1, -1 do casts[i] = nil end
+end
 SW.position = real_position
 comps.Faction[900] = nil
 comps.Faction[PLAYER].faction = 1  -- left over from a crash: PvP is off, the faction is not
@@ -882,6 +908,23 @@ check(rule_count() == rules_before + 1, "and fall damage is off for them for a w
 clock = clock + 31
 step(2)
 check(rule_count() == rules_before, "30 s later the fall protection is gone again")
+do  -- (0.15.119, owner) no fast travel in PvP: the buttons are greyed out and the server refuses a move anyway
+  local casts_before = #casts
+  click(find_row("PvP", "sw:pvp").button)
+  step(3)
+  check(find_row("^Flame Altar$").disabled and find_row("^Ancient Spire$").disabled and find_row("Map Waypoint").disabled,
+    "PvP on: the three fast travel buttons are greyed out")
+  local n = #teleports
+  click(find_row("^Flame Altar$").button)  -- a click that gets through anyway
+  step(3)
+  click(find_row("Map Waypoint").button)
+  step(40)
+  check(#teleports == n, "and the server moves nobody while PvP is on")
+  click(find_row("PvP", "sw:pvp").button)
+  step(3)
+  check(not find_row("^Flame Altar$").disabled, "PvP off: fast travel is back")
+  for i = #casts, casts_before + 1, -1 do casts[i] = nil end
+end
 -- (0.15.75) a click on a minimap marker: the server writes the player's own waypoint there, a second click clears it
 require("features.experimental").minimap_waypoint(UI, "1234.5,2345.5")
 step(40)
