@@ -762,6 +762,25 @@ check(#spawned == 2 and spawned[2].guid == "478381c5-585f-4264-b373-dbb1ea596eca
 check(comps.Level[952].dataStorage[1] == 26 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
 click(find_row("Remove").button)
 step(40)
+-- (0.15.81) the dummy is picked the same way, from its own drop-down (the first one), and gets faction 7 (harmless)
+do
+  local ddum
+  for _, r in ipairs(exp_rows()) do if r.options and not ddum then ddum = r end end
+  check(ddum and ddum.text == "Dummy: Player-like dummy" and ddum.options[1].heading and ddum.options[1].text == "Dummy",
+    "the dummy has its own drop-down, the player-like body first")
+  local boar
+  for _, o in ipairs(ddum.options) do if o.text == "Boar" then boar = o end end
+  click("W:" .. boar.key)
+  step(12)
+  comps.Faction[953] = { faction = 6 }
+  comps.NetworkHealth[953] = { health = 100 }
+  click(find_row("^Spawn dummy$").button)
+  step(40)
+  check(spawned[3] and spawned[3].guid == boar.key:match("dbg:dwhat:(.+)$") and comps.Faction[953].faction == 7,
+    "the dummy is the picked monster, with faction 7 (its hits do no damage)")
+  click(find_row("Remove").button)
+  step(40)
+end
 SW.position = real_position
 comps.Faction[900] = nil
 comps.Faction[PLAYER].faction = 1  -- left over from a crash: PvP is off, the faction is not

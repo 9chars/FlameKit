@@ -61,6 +61,7 @@ struct Settings {
     uint32_t toggle_vk = VK_F10;
     uint32_t window_vk = VK_F4;   // opens and closes FlameKit's window (setting window_key)
     uint32_t exp_vk = VK_F6;      // shows and hides the Experimental window (setting exp_window_key, 0.15.74)
+    uint32_t party_vk = VK_F7;    // shows and hides the Party window (setting party_window_key, 0.15.81)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     bool pointer_toggle = false;  // pointer_toggle (0.15.79): one press shows the pointer, the next (or Esc) puts it away
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
@@ -120,6 +121,8 @@ void read_settings() {
     s.window_vk = wkey.empty() ? 0 : emf::keys::parse_key(std::wstring(wkey.begin(), wkey.end()));
     const std::string ekey = emf::setting_text(kKit, "exp_window_key", "F6");
     s.exp_vk = ekey.empty() ? 0 : emf::keys::parse_key(std::wstring(ekey.begin(), ekey.end()));
+    const std::string pwkey = emf::setting_text(kKit, "party_window_key", "F7");
+    s.party_vk = pwkey.empty() ? 0 : emf::keys::parse_key(std::wstring(pwkey.begin(), pwkey.end()));
     const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
     s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
     s.pointer_toggle = emf::setting_bool(kKit, "pointer_toggle", false);
@@ -477,6 +480,14 @@ std::mutex g_item_meta_lock;
 std::unordered_map<uint32_t, ItemMeta> g_item_meta;  // filled once, when the item details are written
 std::atomic<bool> g_ui_request{false};  // F4 (window_key) was pressed: FlameKit's own UI (ui_thread)
 std::atomic<bool> g_exp_toggle{false};  // the Experimental window's key was pressed (ui_thread shows or hides it)
+std::atomic<bool> g_party_toggle{false};  // the Party window's key (0.15.81)
+
+// A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
+std::wstring key_label(uint32_t vk) {
+    if (!vk) return L"";
+    const std::string n = emf::keys::detail::key_name(vk);
+    return std::wstring(n.begin(), n.end());
+}
 
 void on_world_tick(emf::World w) {
     if (!w.is_client()) return;
@@ -493,6 +504,8 @@ void on_world_tick(emf::World w) {
     if (ui_key.pressed(emf::keys::down(s.window_vk))) g_ui_request = true;
     static emf::keys::Edge exp_key;
     if (s.exp_vk && exp_key.pressed(emf::keys::down(s.exp_vk))) g_exp_toggle = true;
+    static emf::keys::Edge party_key;
+    if (s.party_vk && party_key.pressed(emf::keys::down(s.party_vk))) g_party_toggle = true;
     const auto* t = w.get<gen::CurrentTransform>(emf::local_player());
     if (!t) return;
     // Item details for FlameKit's panel (a Lua mod cannot read the game's item definitions): once per game start,
@@ -2583,6 +2596,7 @@ struct PinnedLayer : Layer {
     virtual bool refresh(const Frame& f) { return false; }      // read new data; true when the content changed
     virtual void content_click(int x, int y) {}                 // a click on the content (y from the content's top)
     virtual bool content_hover(int x, int y) { return false; }  // the pointer over the content (-1, -1: gone); true: draw again
+    virtual uint32_t hotkey() const { return 0; }                // the key that shows and hides it, for its title (0: none)
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -2628,7 +2642,10 @@ struct PinnedLayer : Layer {
             changed = true;
             return;
         }
-        text.draw(canvas, 8, 5, title, 235, 225, 205);
+        {  // the title, and the key that shows and hides the window: "Experimental [F6]" (0.15.81, owner)
+            const std::wstring k = key_label(hotkey());
+            text.draw(canvas, 8, 5, k.empty() ? title : title + L" [" + k + L"]", 235, 225, 205);
+        }
         // the buttons at the right of the title bar: "-" collapse (or "+" open), "x" hide
         hide_r = {w - 26, 3, w - 4, kHead - 3};
         collapse_r = {w - 52, 3, w - 30, kHead - 3};
@@ -2794,12 +2811,23 @@ struct PartyLayer : PinnedLayer {
     }
 
     PartyLayer() : PinnedLayer("party", L"Party", 300) { hide_in_menus = true; }
+    uint32_t hotkey() const override { return settings().party_vk; }
+    // its key (party_window_key, 0.15.81) shows and hides it, like the Experimental window's
+    bool party_key(const Frame& f) {
+        if (!g_party_toggle.exchange(false) || !f.in_world) return false;
+        LayoutEntry& e = lay();
+        e.hidden = !e.hidden;
+        g_layout.save();
+        FK_LOG(fklog::kInfo, "party window: %s (its key)", e.hidden ? "hidden" : "shown");
+        return true;
+    }
 
     bool refresh(const Frame& f) override {
-        if (f.now < next_read) return false;
+        const bool keyed = party_key(f);
+        if (f.now < next_read) return keyed;
         next_read = f.now + 250;
         const bool read = read_list();
-        return update_where() || read;
+        return update_where() || read || keyed;
     }
 
     // Each player's location line: the region (the one of the nearest Ancient Spire, as on the minimap), and for the
@@ -4232,7 +4260,12 @@ struct WindowLayer : Layer {
         }
         // the title bar: FlameKit and its version, the x that closes the window; dragged to move the window
         box(0, 0, kW, kTitle, 30, 34, 44, 0.95f);
-        text.draw(canvas, 12, 7, version.empty() ? std::wstring(L"FlameKit") : L"FlameKit v" + widen(version), 235, 225, 205);
+        {  // its title, and the key that opens and closes it (0.15.81, owner): "FlameKit v0.15.81 [F4]"
+            const std::wstring k = key_label(settings().window_vk);
+            std::wstring t = version.empty() ? std::wstring(L"FlameKit") : L"FlameKit v" + widen(version);
+            if (!k.empty()) t += L" [" + k + L"]";
+            text.draw(canvas, 12, 7, t, 235, 225, 205);
+        }
         close_r = {kW - 32, 5, kW - 8, kTitle - 5};
         {
             const bool over = inside(close_r);
@@ -4666,6 +4699,7 @@ struct ExperimentalLayer : PinnedLayer {
     int hover_x = -1, hover_y = -1;
     static constexpr int kLine = 26, kListMax = 12, kBtnH = 28;
 
+    uint32_t hotkey() const override { return settings().exp_vk; }
     ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 380) { def_x_pm = 700; def_y_pm = 120; hide_in_menus = true; max_w = 760; }
 
     static std::wstring unescape(const std::string& s) {

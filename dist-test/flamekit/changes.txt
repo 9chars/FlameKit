@@ -1,3 +1,8 @@
+0.15.81 Nov 14, 2026
+- Window titles show the key that opens and closes them: "FlameKit v0.15.81 [F4]", "Experimental [F6]", "Party [F7]".
+- New key: F7 shows and hides the Party window (a setting in the Windows group, like the Experimental window's F6).
+- Test monsters: the dummy is now picked from its own drop-down like the duelist (the player-like body first, then every monster). Whatever it is, it never hurts anyone (it gets the players' faction, whose hits do no damage) and it is level 100. A line now divides the dummy from the duelist.
+
 0.15.80 Nov 14, 2026
 - "Press the pointer key once": the second press now puts the pointer away. Before, the moment the game took the front back looked like a new press and switched it straight back on.
 

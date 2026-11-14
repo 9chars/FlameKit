@@ -264,8 +264,17 @@ end
 local function duelist(guid)
   return MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[DUEL_GUID] or { "Vukah", "Melee", DUEL_GUID, false }
 end
+-- (0.15.81, owner) The dummy can be any monster too: it gets faction 7 (Player), whose hits do no damage (EMF
+-- re_companions.md: a player-faction enemy body hits for 0), so it never hurts anyone. The first choice is the
+-- player-like body of before.
+local DUMMY_PLAIN = { "Dummy", "Player-like dummy", DUMMY_GUID, false }
+local function dummy_of(guid)
+  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
+  return MONSTER_BY_GUID[guid]
+end
 local MAX_LEVEL = 100  -- owner (0.15.78): a round top. The game's own is 105: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
 local DUEL_FACTION = 1                                      -- HitAll
+local DUMMY_FACTION = 7                                     -- Player: its hits do no damage (0.15.81)
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local body_steps = 0
@@ -359,17 +368,20 @@ local function spawn_body(world, account, player, kind, level, what)
     local len = math.sqrt(ax * ax + az * az)
     if len > 0.01 then fx, fz = ax / len, az / len end
   end)
-  local d = duelist(what)
-  local ok, id = pcall(emf.spawn, world, kind == "duel" and d[3] or DUMMY_GUID, x + fx * 3, y, z + fz * 3)
+  local d = kind == "duel" and duelist(what) or dummy_of(what)
+  local ok, id = pcall(emf.spawn, world, d[3], x + fx * 3, y, z + fz * 3)
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
-  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = kind == "duel" and d[2] or nil }
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
   bodies[id] = b
   if level then
     local okl, set = pcall(set_level, world, id, level)
     b.level = level
     emf.log(string.format("experimental: the PvP test %s (entity %s) set to level %d: %s", kind, tostring(id), level,
       okl and (set and "done" or "it has no Level") or tostring(set)))
+  end
+  if kind == "dummy" then
+    pcall(function() world:get("Faction", id).faction = DUMMY_FACTION end)  -- at once: its hits do no damage
   end
   if kind == "duel" then
     pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
@@ -429,6 +441,12 @@ local function bodies_tick(world)
           emf.log(string.format("experimental: the PvP test %s (entity %s): %s, threat table [%s]", b.kind, tostring(id), line,
             okl and al or ("? " .. tostring(al))))
         end
+      end)
+    end
+    if alive and b.kind == "dummy" then  -- the game may set a faction back: a dummy stays harmless
+      pcall(function()
+        local f = world:get("Faction", id)
+        if f and tonumber(tostring(f.faction)) ~= DUMMY_FACTION then f.faction = DUMMY_FACTION end
       end)
     end
     if alive and b.kind == "duel" then
@@ -981,6 +999,7 @@ local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = DUEL_GUID, 1  -- the Debug section's duelist choice, this session (0.15.70)
+local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
 -- The game's number for a map marker type: FNV-1a over the type's GUID, as the game keeps it in memory or as written.
@@ -1172,24 +1191,40 @@ function F.window_rows(world)
   rows[#rows + 1] = { button = "sw:pvp", text = (on and "On    " or "Off   ") .. "PvP (free-for-all)" .. (v.pvp_dead and " (not working)" or ""),
     selected = on, tooltip = TIPS.pvp }
   rows[#rows + 1] = { heading = "Test monsters" }
-  rows[#rows + 1] = { button = "dbg:body:dummy", text = "PvP dummy", selected = v.body == "dummy",
-    tooltip = "A player-like body (faction Player) at level 100, so it takes a long beating. With PvP on it swings at you but does no damage: hit it to see whether your weapons hurt a player." }
-  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
-    tooltip = "Removes your test body." }
-  -- (0.15.73, owner: the group buttons and pages were too confusing) One drop-down with every monster under its group's
-  -- heading, bosses in orange; the level with < > and five quick picks.
-  local pick = duelist(duel_what)
-  local options = {}
-  for _, g in ipairs(MONSTER_GROUPS) do
-    options[#options + 1] = { heading = true, text = g }
-    for _, m in ipairs(MONSTERS) do
-      if m[1] == g then
-        options[#options + 1] = { key = "dbg:what:" .. m[3], text = m[2] .. (m[4] and "  (boss)" or ""),
-          color = m[4] and "#ffb060" or nil, selected = m[3] == pick[3] }
+  -- every monster under its group's heading, bosses in orange (0.15.73); `first` is put on top under its own heading
+  local function monster_options(prefix, chosen, first)
+    local options = {}
+    if first then
+      options[#options + 1] = { heading = true, text = first[1] }
+      options[#options + 1] = { key = prefix .. first[3], text = first[2], selected = first[3] == chosen }
+    end
+    for _, g in ipairs(MONSTER_GROUPS) do
+      options[#options + 1] = { heading = true, text = g }
+      for _, m in ipairs(MONSTERS) do
+        if m[1] == g then
+          options[#options + 1] = { key = prefix .. m[3], text = m[2] .. (m[4] and "  (boss)" or ""),
+            color = m[4] and "#ffb060" or nil, selected = m[3] == chosen }
+        end
       end
     end
+    return options
   end
-  rows[#rows + 1] = { options = options, text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
+  -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level 100
+  local dpick = dummy_of(dummy_what)
+  rows[#rows + 1] = { dim = true, text = "Dummy: never hurts anyone, level 100. Beat on it as long as you like." }
+  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
+    color = dpick[4] and "#ffb060" or nil,
+    tooltip = "Click to choose what the dummy looks like: the player-like body or any monster. It never hurts anyone." }
+  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy",
+    tooltip = "Spawns " .. dpick[2] .. " at level 100 3 m in front of you. With PvP on it swings at you but does no damage: hit it to see "
+      .. "whether your weapons hurt a player. It replaces your test monster." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
+    tooltip = "Removes your test monster." }
+  rows[#rows + 1] = { separator = true }
+  -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
+  local pick = duelist(duel_what)
+  rows[#rows + 1] = { dim = true, text = "Duelist: fights everyone with full damage, PvP on or off; never animals, pets or buildings." }
+  rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3]), text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
     tooltip = "Click to choose from every monster in the game, in groups. Bosses are orange. Untried ones may stand still." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
@@ -1236,6 +1271,8 @@ function F.click(world, key)
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
   local what = key:match("^dbg:what:([%x%-]+)$")
   if what then duel_what = duelist(what)[3] return end
+  local dwhat = key:match("^dbg:dwhat:([%x%-]+)$")
+  if dwhat then dummy_what = dummy_of(dwhat)[3] return end
   local step = key:match("^dbg:lvl:(%-?%d+)$")
   if step then duel_level = math.max(1, math.min(MAX_LEVEL, duel_level + tonumber(step))) return end
   local set = key:match("^dbg:lvlset:(%d+)$")
@@ -1243,7 +1280,8 @@ function F.click(world, key)
   local kind = key:match("^dbg:body:(%a+)$")
   if kind then
     note = nil
-    local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or nil, level = kind == "duel" and duel_level or nil }
+    local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or kind == "dummy" and dummy_what or nil,
+      level = kind == "duel" and duel_level or nil }
     if hosting(world) then
       local account, player = me(world)
       if account then note = handle(world, account, player, msg).note end
