@@ -1,3 +1,7 @@
+0.15.61 Nov 14, 2026
+- Build mode now hides all of FlameKit on your screen, the FlameKit lines in the lower left corner too. Only FlameKit's window (F6) still opens.
+- Fix: a setting added by an update did not exist until the second game start after it (EMF reads FlameKit's settings before the update is put in place), so "Hide FlameKit's windows in build mode" (0.15.59) read as off and nothing was hidden. A few seconds after an update is put in place, FlameKit now makes EMF read its settings again.
+
 0.15.60 Nov 13, 2026
 - Experimental, Fast Travel: new button "Map Waypoint": takes you straight to the waypoint you set on your map, onto the ground there (the game's own ground search, within about 10 m). Fall damage is off for 30 seconds after the move, in case there is no ground right at the waypoint. Needs FlameKit on the server.
 

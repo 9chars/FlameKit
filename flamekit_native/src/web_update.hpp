@@ -233,10 +233,11 @@ inline std::wstring pending_dir(const std::wstring& mods) {
 
 // At the game start, before anything else: the held Lua part of a new version, checked file by file against
 // ready.txt and put in place (mod.json last). Anything that does not match is thrown away (it is downloaded again).
-inline void install_pending(const std::wstring& mods, void (*log)(const char*)) {
+// True when a new Lua part was put in place (EMF read the old mod.json already: see emf_mod_load).
+inline bool install_pending(const std::wstring& mods, void (*log)(const char*)) {
     const std::wstring hold = pending_dir(mods);
     std::vector<uint8_t> raw;
-    if (!read_file(hold + L"ready.txt", raw)) return;
+    if (!read_file(hold + L"ready.txt", raw)) return false;
     const std::string text(raw.begin(), raw.end());
     std::string version;
     struct Held {
@@ -299,6 +300,7 @@ inline void install_pending(const std::wstring& mods, void (*log)(const char*)) 
             for (auto it = dirs.rbegin(); it != dirs.rend(); ++it) RemoveDirectoryW(it->c_str());
         }
     }
+    return ok && good && !files.empty();
 }
 
 // The version held in emf\flamekit_update\ for the next start (ready.txt's first line); empty when none is held.

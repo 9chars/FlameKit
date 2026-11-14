@@ -176,8 +176,8 @@ end
 -- "FlameKit v1.2.3 by Name" label and the notice, written into emf\mods\flamekit\ui_hud.dat when they change:
 --   label <text>              ("" when the player switched the label off)
 --   notice <text>             (orange, under the label: this server does not run FlameKit, or an older one)
---   build 1                   (0.15.59: the player is in build mode and ui_hide_build is on: the DLL hides every
---                              window that does not opt out, all but these lines and FlameKit's window)
+--   build 1                   (0.15.59: the player is in build mode and ui_hide_build is on: the DLL hides all of
+--                              FlameKit's UI but FlameKit's window, these lines too since 0.15.61)
 --   end                       (a file without it is half written: the DLL reads it again later)
 -- The updater's line under the label comes from the DLL itself. ui_hud.dat is a runtime file: never deployed.
 -- Build mode (0.15.59): the game's building cursor, ClientPlayerInput.data.cursorInput.primaryTransform of your own

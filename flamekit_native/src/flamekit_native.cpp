@@ -2114,9 +2114,9 @@ struct Frame {  // what a layer gets to know about this moment
 };
 
 // Build mode (0.15.59, owner: declutter the screen while building): the Lua part writes "build 1" into ui_hud.dat while
-// the player builds and ui_hide_build is on (HudLayer reads it). Every layer is then hidden unless it says otherwise
-// (Layer::stays_in_build): only the lower left lines and FlameKit's window (opened on purpose) stay. New windows hide
-// in build mode without doing anything.
+// the player builds and ui_hide_build is on (HudLayer reads it, hidden or not). Every layer is then hidden unless it
+// says otherwise (Layer::stays_in_build). Owner, 0.15.61: ALL of FlameKit's UI on screen hides in build mode, the lower
+// left lines too; only FlameKit's window (F6, opened on purpose) stays, and a future build mode feature may opt out.
 std::atomic<bool> g_build_hide{false};
 
 struct Layer {
@@ -4393,7 +4393,6 @@ void look_for_game_cursor() {
 // update line from update_status.txt, which this DLL's own updater writes (green: ready for a restart); the debug level line only while the level
 // is not normal.
 struct HudLayer : Layer {
-    bool stays_in_build() const override { return true; }  // see g_build_hide
     const char* name() const override { return "lower left lines"; }
     struct Line {
         std::wstring text;
@@ -5177,9 +5176,28 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     g_flamekit_dir = g_game_dir + L"emf\\mods\\flamekit\\";
     fklog::open(g_flamekit_dir);  // FlameKit's own log (fk_log.hpp): first, so everything after is in it
     // a new version's Lua part, held since the last session: in place now, so the Lua part and this DLL switch together
-    web_update::install_pending(g_game_dir + L"emf\\mods\\", [](const char* text) {
+    const bool installed = web_update::install_pending(g_game_dir + L"emf\\mods\\", [](const char* text) {
         FK_LOG(std::strstr(text, "failed") || std::strstr(text, "does not match") ? fklog::kWarn : fklog::kInfo, "%s", text);
     });
+    if (installed) {
+        // EMF read FlameKit's mod.json (its settings) before this DLL loaded, so settings a new version adds would not
+        // exist until the next start (0.15.60: a new setting read as off). A few seconds later mod.json gets a new
+        // modification time, unchanged; EMF's file watcher then reads it again and reloads the Lua part.
+        std::thread([] {
+            Sleep(8000);
+            const std::wstring json = g_flamekit_dir + L"mod.json";
+            const HANDLE h = CreateFileW(json.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr);
+            bool done = false;
+            if (h != INVALID_HANDLE_VALUE) {
+                FILETIME now;
+                GetSystemTimeAsFileTime(&now);
+                done = SetFileTime(h, nullptr, nullptr, &now) != 0;
+                CloseHandle(h);
+            }
+            FK_LOG(done ? fklog::kInfo : fklog::kWarn, "update: flamekit\\mod.json %s, so EMF reads the new version's settings now",
+                   done ? "touched" : "could NOT be touched");
+        }).detach();
+    }
     if (!emf::init(api)) return false;
     if (!emf::has_v13()) {
         EMF_LOG(kMod, "needs EMF API v13 or newer");
