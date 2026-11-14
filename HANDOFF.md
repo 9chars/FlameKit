@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.109.
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.110.
 
 ## What FlameKit is
 
@@ -124,6 +124,11 @@ Since 0.15.20 it reads the newest commit from `github.com/9chars/FlameKit.git/in
 **Logging** (owner: for everything, long term, switchable): `fk_log.hpp`, logs in `emf\mods\flamekit\logs\` (10 sessions, 50 MB); `debug.txt` off/normal/full, Ctrl+Shift+F12 cycles; the monitor thread copies emf_core.log lines in. Privacy: other programs only by file name and class, never titles; the Windows user name becomes `<user>`.
 
 **Known risk:** the minimap reads position and item data through layouts compiled into the DLL (EMF SDK from game build 1283531); a game update can break them until a rebuild. EMF allows 128 pictures per session (`item icons: N in use` in the log).
+
+## Menus vs chat (0.15.107, 0.15.110)
+Frame::in_menu = the game shows its pointer (game in front). Kept as menu_was while another program is in front.
+Chat: Enter with no menu open sets chat_open (pointer then not a menu) until Enter, Esc, leaving the world, or the
+pointer gone 0.5 s after it was seen.
 
 ## PvP in the party list (0.15.109)
 party.lua (server tick) asks experimental.pvp_of(account) and adds a "v\tpvp" line after the player's p and b lines;

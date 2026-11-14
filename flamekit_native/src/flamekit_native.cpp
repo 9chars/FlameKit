@@ -6484,10 +6484,49 @@ void ui_thread_body() {
         // menu was open made FlameKit's windows appear over the game's menu (the menu check only works with the game in
         // front).
         static bool menu_was = false;
+        // (0.15.110, owner) The game's chat is not a menu: Enter opens it and shows the game's pointer, which looked like a
+        // menu and hid FlameKit's windows. Enter pressed in the game with no menu open starts "chat"; the next Enter (sent)
+        // or Esc ends it, and so does the pointer going away. While it lasts the pointer does not count as a menu.
+        static bool chat_open = false, enter_was = false, esc_was_chat = false;
+        {
+            const bool enter = (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0, esc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+            if (f.game_front && f.in_world && !g_pointer_mode) {
+                if (enter && !enter_was) {
+                    if (chat_open) {
+                        chat_open = false;
+                        FK_LOG(fklog::kDebug, "chat: closed (Enter)");
+                    } else if (!menu_was) {
+                        chat_open = true;
+                        FK_LOG(fklog::kDebug, "chat: opened (Enter): the game's pointer is not a menu now");
+                    }
+                }
+                if (esc && !esc_was_chat && chat_open) {
+                    chat_open = false;
+                    FK_LOG(fklog::kDebug, "chat: closed (Esc)");
+                }
+            }
+            if (!f.in_world) chat_open = false;
+            enter_was = enter;
+            esc_was_chat = esc;
+        }
         if (f.game_front && !g_pointer_mode) {
             CURSORINFO ci{};
             ci.cbSize = sizeof(ci);
-            f.in_menu = GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) != 0 && ci.hCursor != nullptr;
+            const bool pointer = GetCursorInfo(&ci) && (ci.flags & CURSOR_SHOWING) != 0 && ci.hCursor != nullptr;
+            static uint64_t pointer_gone_at = 0;
+            static bool chat_pointer_seen = false;
+            if (!chat_open) chat_pointer_seen = false;
+            else if (pointer) chat_pointer_seen = true;
+            if (chat_open && chat_pointer_seen && !pointer) {  // the chat closed some other way (the pointer gone for 0.5 s)
+                if (!pointer_gone_at) pointer_gone_at = f.now;
+                else if (f.now - pointer_gone_at > 500) {
+                    chat_open = false;
+                    FK_LOG(fklog::kDebug, "chat: closed (the game's pointer went away)");
+                }
+            } else {
+                pointer_gone_at = 0;
+            }
+            f.in_menu = pointer && !chat_open;
             menu_was = f.in_menu;
         } else if (!f.ours_front) {
             f.in_menu = menu_was;

@@ -1,3 +1,6 @@
+0.15.110 Nov 14, 2026
+- Typing in the game's chat (Enter) no longer hides FlameKit's windows: the chat box shows the game's mouse pointer, which FlameKit took for a menu. Enter with no menu open now counts as chat until Enter or Esc closes it.
+
 0.15.109 Nov 14, 2026
 - Party window: a player with PvP on has a red "PvP" tag on their name line, so everyone can see who is up for a fight. The server needs this version too.
 
