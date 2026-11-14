@@ -28,6 +28,7 @@ local function reset_world()
     InventorySetup = { [PLAYER] = { linksEntities = { 201, 202, 203, 0 }, linksCategories = { 4, 4, 2, 0 } } },
     SlotSelection = { [PLAYER] = { actionbarEntityIds = { 202, 0 } } },
     PlayerInput = { [PLAYER] = { fromClientSettings = { flags = 0x1000 } } },
+    Faction = { [PLAYER] = { faction = 7 } },  -- 7: Player
     -- the building cursor (zero outside build mode): kit.lua's build mode
     ClientPlayerInput = { [PLAYER] = { data = { mask = 0, cursorInput = { primaryTransform = { position = { x = 0, y = 0, z = 0 } } } } } },
     ItemState = { [900] = { itemRarityUi = 2, itemLevelUi = 12, baseDamageUi = 34, itemState = 0 },
@@ -621,6 +622,29 @@ check(rule_count() == 1, "the rule stays while the player is here")
 click(find_row("Shroud Damage", "sw:shroud").button)
 step(3)
 check(rule_count() == 0 and not find_row("Shroud Damage", "sw:shroud").selected, "switched off: the rule is gone")
+-- PvP (0.15.65): faction 1 (HitAll) while on, 7 again when off; one rule scales player-on-player hits
+local pv = find_row("PvP", "sw:pvp")
+check(pv ~= nil and not pv.selected and comps.Faction[PLAYER].faction == 7, "the PvP switch is listed, off, and the player is faction 7")
+click(pv.button)
+step(3)
+r = select(2, next(hit_rules)) or {}
+check(find_row("PvP", "sw:pvp").selected == true and comps.Faction[PLAYER].faction == 1, "PvP on: the player has faction 1 (HitAll)")
+check(rule_count() == 1 and r.from == "players" and r.to == "players" and r.scale == 0.25, "and one rule scales player-on-player hits to 25%")
+check(casts[#casts] == "PvP for a player ENABLED.", "everyone is told: " .. tostring(casts[#casts]))
+comps.Faction[PLAYER].faction = 7  -- the game sets it back (a death, say)
+step(2)
+check(comps.Faction[PLAYER].faction == 1, "a faction the game set back is written again")
+ef = io.open(TMP .. "\\experimental.json"); etext = ef:read("a"); ef:close()
+check(not etext:find("pvp", 1, true), "PvP is never saved: it is off again next time")
+click(find_row("PvP", "sw:pvp").button)
+step(3)
+check(comps.Faction[PLAYER].faction == 7 and rule_count() == 0 and not find_row("PvP", "sw:pvp").selected,
+  "PvP off: faction 7 again and no rule left")
+check(casts[#casts] == "PvP for a player DISABLED.", "everyone is told it is off")
+casts[#casts], casts[#casts - 1] = nil, nil  -- the glider test below counts the shroud lines only
+comps.Faction[PLAYER].faction = 1  -- left over from a crash: PvP is off, the faction is not
+step(65)
+check(comps.Faction[PLAYER].faction == 7, "a player without PvP found with faction 1 gets faction 7 back within a second")
 comps.CurrentTransform = {}
 comps.PlayerSpawnPoint = { [900] = { target = 1 }, [901] = { target = 2 } }
 click(find_row("Nearest Flame Altar").button)

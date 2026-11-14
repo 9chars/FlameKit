@@ -1,3 +1,6 @@
+0.15.65 Nov 14, 2026
+- New in Experimental: "PvP (free-for-all)". Players who switch it on can hurt each other with their normal weapons, arrows and spells, at 25% of the damage. Players without it cannot hurt them or be hurt by them. Everyone on the server is told who switched it on. It goes off again when you leave the server. Careful: while it is on, your hits can also hurt your own summons, pets and villagers. Not yet tried with two players.
+
 0.15.64 Nov 14, 2026
 - Build mode works: while the building tool is out, all of FlameKit on your screen is hidden, and it comes back as soon as you put the tool away (F4, tab Windows, "Hide all of FlameKit" switches it). FlameKit now reads the game's own sign of an active building cursor, measured in game.
 

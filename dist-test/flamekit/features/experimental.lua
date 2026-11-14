@@ -35,7 +35,11 @@ local SWITCHES = {
   { "immortal", "Invincible Mode", { kinds = "all", cancel = true }, "Invincible Mode" },
   { "stamina", "Unlimited Stamina", nil, "Unlimited Stamina" },  -- no hit rule: topped up every server step
   { "fly", "Enhanced Glider Mode" },  -- on by default; see lift()
+  { "pvp", "PvP (free-for-all)", nil, "PvP" },  -- no hit rule of its own: see pvp() (0.15.65)
 }
+
+-- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
+local SESSION_ONLY = { pvp = true }
 
 -- The options that are on until a player switches them off (the others are off until switched on).
 local DEFAULT_ON = { fly = true }
@@ -46,6 +50,10 @@ local TIPS = {
   fall = "Falling never hurts you, from any height. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   immortal = "Nothing can hurt or kill you: enemies, lava, the shroud, falling. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
+  pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
+    .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Careful: your hits "
+    .. "can also hurt your own summons, pets and villagers while it is on. Off again when you leave the server. Everyone "
+    .. "on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -74,6 +82,7 @@ local function load_saved()
 end
 
 is_on = function(account, key)
+  if SESSION_ONLY[key] then return online[account] ~= nil and online[account][key] == true end
   local value = (saved[account] or {})[key]
   if value == nil then return DEFAULT_ON[key] == true end
   return value == true
@@ -250,7 +259,9 @@ local function handle(world, account, entity, msg)
     for _, s in ipairs(SWITCHES) do
       if s[1] == msg.key then
         local set = saved[account] or {}
-        if DEFAULT_ON[s[1]] then
+        if SESSION_ONLY[s[1]] then
+          online[account][s[1]] = msg.on == true or nil  -- never saved
+        elseif DEFAULT_ON[s[1]] then
           if msg.on == true then set[s[1]] = nil else set[s[1]] = false end  -- only "off" is worth keeping
         else
           set[s[1]] = msg.on == true or nil            -- only "on" is worth keeping
@@ -437,6 +448,106 @@ local function keep_stamina_full(world)
   end
 end
 
+-- Free-for-all PvP (0.15.65). The game decides who can hurt whom by each creature's Faction (one byte; players are 7,
+-- Player) in isEnemyFaction, before any damage (EMF docs, engine_parts/combat.md 1.2): two player-side factions are
+-- never enemies, but an attacker of faction 1 (HitAll) is the enemy of everything, HitAll included, and anything that
+-- is not player side is the players' enemy. So a player with PvP on gets faction 1 (written again every step: the game
+-- may set it back, after a death for example), and the game's own weapons, arrows and spells hit them and let them hit.
+-- EMF hit rules keep it between PvP players: while anyone has PvP on, each player without it gets two rules (no damage
+-- from players, no damage to players), and one rule scales every player-on-player hit to PVP_SCALE. Heals are never
+-- matched by a rule (EMF: damage hits only), so a friend's heal still works.
+-- The faction is saved with the world, so it is put back to 7 when PvP goes off, and any player without PvP who is
+-- found with faction 1 (left over from a crash, a reload or a leave) is put back within a second.
+local HIT_ALL, PLAYER_FACTION = 1, 7
+local PVP_SCALE = 0.25
+local pvp_steps = 0
+local pvp_scale_rule = nil
+
+local function faction(world, id)
+  local f = world:get("Faction", id)
+  return f, f and tonumber(tostring(f.faction))
+end
+
+local function pvp_rule(p, key, rule)
+  if p.rules[key] then return true end
+  local ok, id = pcall(emf.hit_rule, rule)
+  if ok and id then p.rules[key] = id return true end
+  return false, tostring(id)
+end
+
+local function pvp_unrule(p, key)
+  if p.rules[key] then pcall(emf.hit_rule_remove, p.rules[key]) end
+  p.rules[key] = nil
+end
+
+-- Something did not work: PvP goes off for everyone, every player has their own faction again and every PvP rule is
+-- taken away. The tab says "(not working on this game version)" until a player switches it on again (one new try).
+local function pvp_off_everywhere(world, why)
+  refused.pvp = true
+  for _, p in pairs(online) do
+    p.pvp = nil
+    pvp_unrule(p, "pvp_in")
+    pvp_unrule(p, "pvp_out")
+    pcall(function()
+      local f, now = faction(world, p.entity)
+      if f and now == HIT_ALL then f.faction = (p.pvp_was and p.pvp_was ~= HIT_ALL) and p.pvp_was or PLAYER_FACTION end
+    end)
+    p.pvp_was, p.pvp_logged = nil, nil
+  end
+  if pvp_scale_rule then pcall(emf.hit_rule_remove, pvp_scale_rule) end
+  pvp_scale_rule = nil
+  emf.log("experimental: PvP is off for everyone: " .. why)
+end
+
+local function pvp(world)
+  pvp_steps = pvp_steps + 1
+  local any = false
+  for _, p in pairs(online) do if p.pvp then any = true end end
+  local ok, err = pcall(function()
+    for _, p in pairs(online) do
+      if p.pvp then
+        pvp_unrule(p, "pvp_in")
+        pvp_unrule(p, "pvp_out")
+        local f, now = faction(world, p.entity)
+        if f and now ~= HIT_ALL then
+          if not p.pvp_was then p.pvp_was = now end
+          f.faction = HIT_ALL
+          if not p.pvp_logged then
+            p.pvp_logged = true
+            emf.log(string.format("experimental: PvP: player %s now has faction %d (was %s)", tostring(p.entity), HIT_ALL, tostring(now)))
+          end
+        end
+      else
+        if p.pvp_was or pvp_steps % 60 == 1 then
+          local f, now = faction(world, p.entity)
+          if f and now == HIT_ALL then
+            local back = (p.pvp_was and p.pvp_was ~= HIT_ALL) and p.pvp_was or PLAYER_FACTION
+            f.faction = back
+            emf.log(string.format("experimental: PvP: player %s has faction %d again", tostring(p.entity), back))
+          end
+          p.pvp_was, p.pvp_logged = nil, nil
+        end
+        if any then
+          local a, why = pvp_rule(p, "pvp_in", { from = "players", to = p.entity, cancel = true })
+          local b, why2 = pvp_rule(p, "pvp_out", { from = p.entity, to = "players", cancel = true })
+          if not (a and b) then error("the protection of players without PvP was refused (" .. tostring(why or why2) .. ")") end
+        else
+          pvp_unrule(p, "pvp_in")
+          pvp_unrule(p, "pvp_out")
+        end
+      end
+    end
+    if any and not pvp_scale_rule then
+      local okr, id = pcall(emf.hit_rule, { from = "players", to = "players", scale = PVP_SCALE })
+      if okr and id then pvp_scale_rule = id end
+    elseif not any and pvp_scale_rule then
+      pcall(emf.hit_rule_remove, pvp_scale_rule)
+      pvp_scale_rule = nil
+    end
+  end)
+  if not ok then pvp_off_everywhere(world, tostring(err)) end
+end
+
 function F.tick(world)
   load_saved()
   if not looked then find_players(world) end
@@ -455,6 +566,7 @@ function F.tick(world)
     host_burst_down = down
   end
   lift(world)
+  pvp(world)
   for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
     if os.time() >= g.till then
       pcall(emf.hit_rule_remove, g.rule)
@@ -705,6 +817,12 @@ function F.setup(k)
     if not (p and p.account) then return end
     local account = tostring(p.account)
     if online[account] then
+      if online[account].pvp then
+        pcall(function()
+          local f, now = faction(world, online[account].entity)
+          if f and now == HIT_ALL then f.faction = PLAYER_FACTION end
+        end)
+      end
       drop_rules(online[account])
       online[account] = nil
     end
