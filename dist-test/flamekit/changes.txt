@@ -1,3 +1,6 @@
+0.15.132 Nov 14, 2026
+- PvP: pets and farm animals (birds, livestock) near a player with PvP on no longer take damage from players. Wild animals can still be hunted.
+
 0.15.131 Nov 14, 2026
 - Updates: FlameKit now looks for a new version every minute on Stable too (it was every 10 minutes), so fixes reach you sooner.
 

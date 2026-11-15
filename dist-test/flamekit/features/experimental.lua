@@ -918,6 +918,7 @@ end
 
 -- Something did not work: PvP goes off for everyone, every player has their own faction again and every PvP rule is
 -- taken away. The tab says "(not working on this game version)" until a player switches it on again (one new try).
+local pet_rules = {}  -- (0.15.132) pet or farm animal entity -> its rule (guard_pets, below)
 local function pvp_off_everywhere(world, why)
   refused.pvp = true
   for _, p in pairs(online) do
@@ -933,6 +934,8 @@ local function pvp_off_everywhere(world, why)
   end
   if pvp_scale_rule then pcall(emf.hit_rule_remove, pvp_scale_rule) end
   pvp_scale_rule = nil
+  for _, r in pairs(pet_rules) do pcall(emf.hit_rule_remove, r) end
+  pet_rules = {}
   emf.log("experimental: PvP is off for everyone: " .. why)
 end
 
@@ -1067,6 +1070,67 @@ local function pvp_aggro(world, players)
   end
 end
 
+-- (0.15.132, owner: pets and farm animals such as birds took damage from PvP) A PvP player has faction 1 (HitAll), so
+-- their hits land on pets and farm animals too. While anyone has PvP on, every pet (IsTame), farm animal (faction 12)
+-- and player ally that is not a villager (faction 11 without NpcState) within PET_R m of a PvP player gets a rule:
+-- no damage from players. Looked for every PET_STEPS steps; at most PET_MAX rules (EMF has 64 for all of FlameKit).
+-- Wild animals stay huntable. Villagers already took no hits from a HitAll player (0.15.70).
+local PET_R, PET_MAX, PET_STEPS = 40, 24, 120
+local pets_full_said = false
+
+local function pet_like(world, id)
+  if has(world, "IsTame", id) then return true end
+  local ok, f = pcall(world.get, world, "Faction", id)
+  local n = ok and f and tonumber(tostring(f.faction))
+  return n == 12 or (n == 11 and not has(world, "NpcState", id))
+end
+
+local function guard_pets(world, any)
+  if not any then
+    for e, r in pairs(pet_rules) do pcall(emf.hit_rule_remove, r) end
+    pet_rules = {}
+    return
+  end
+  local centres = {}
+  for _, p in pairs(online) do
+    if p.pvp then
+      local x, _, z = where(world, p.entity)
+      if x then centres[#centres + 1] = { x, z } end
+    end
+  end
+  local keep, n = {}, 0
+  for _ in pairs(pet_rules) do n = n + 1 end
+  for _, e in ipairs(world:entities()) do
+    local okp, ex, _, ez = pcall(world.position, world, e)
+    if okp and ex then
+      local near = false
+      for _, c in ipairs(centres) do
+        if (ex - c[1]) ^ 2 + (ez - c[2]) ^ 2 < PET_R * PET_R then near = true break end
+      end
+      if near then
+        local oka, account = pcall(world.account, world, e)
+        if not (oka and account) and not bodies[e] and pet_like(world, e) then
+          keep[e] = true
+          if not pet_rules[e] and n < PET_MAX then
+            local okr, r = pcall(emf.hit_rule, { from = "players", to = e, cancel = true })
+            if okr and r then pet_rules[e], n = r, n + 1 end
+          end
+        end
+      end
+    end
+  end
+  for e, r in pairs(pet_rules) do
+    if not keep[e] then
+      pcall(emf.hit_rule_remove, r)
+      pet_rules[e] = nil
+    end
+  end
+  if n >= PET_MAX and not pets_full_said then
+    pets_full_said = true
+    emf.log(string.format("experimental: PvP: only %d pets and farm animals near PvP players are protected (more are around)", PET_MAX))
+  end
+end
+
 local function pvp(world)
   pvp_steps = pvp_steps + 1
   local any = false
@@ -1126,6 +1190,10 @@ local function pvp(world)
     hunters = {}
   end
   if any then hunt(world) end
+  if pvp_steps % PET_STEPS == 1 or (not any and next(pet_rules)) then
+    local okg, errg = pcall(guard_pets, world, any)
+    if not okg then emf.log("experimental: PvP: protecting pets failed: " .. tostring(errg)) end
+  end
 end
 
 function F.tick(world)

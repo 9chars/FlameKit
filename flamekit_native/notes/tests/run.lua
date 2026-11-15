@@ -687,6 +687,21 @@ check(find_row("PvP", "sw:pvp").selected == true and comps.Faction[PLAYER].facti
 check(rule_count() == 1 and r.from == PLAYER and r.to == "objects" and r.cancel == true,
   "and one rule: the PvP player's hits never damage buildings (0.15.130); no damage scaling (0.15.128)")
 check(casts[#casts] == "a player joined PvP!", "everyone is told: " .. tostring(casts[#casts]))
+do  -- (0.15.132, owner) pets and farm animals near a PvP player take no damage from players
+  comps.IsTame = { [900] = {} }
+  local pos_pet = SW.position
+  SW.position = function(self, id) if id == 900 then return 3, 0, 4 end return pos_pet(self, id) end
+  step(125)
+  local found
+  for _, x in pairs(hit_rules) do if x.to == 900 and x.from == "players" and x.cancel then found = true end end
+  check(found, "a pet near a PvP player: a rule, no damage from players")
+  SW.position = pos_pet
+  step(125)
+  found = false
+  for _, x in pairs(hit_rules) do if x.to == 900 then found = true end end
+  check(not found, "the pet is no longer near: its rule is gone")
+  comps.IsTame = nil
+end
 do  -- (0.15.121, owner) in orange in the Messages window
   local mf = io.open(TMP .. "\\ui_messages.dat", "r")
   local mt = mf and mf:read("a") or ""
