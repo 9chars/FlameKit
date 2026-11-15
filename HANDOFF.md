@@ -23,6 +23,7 @@ It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Fea
 6. **The change log lists everything.** `flamekit/changes.txt` gets a line for every change in every version. Nothing is trimmed, merged or hidden. Format: a line `0.15.8 Nov 13, 2026`, then `- ` lines, then an empty line; newest first.
 7. **Test the way production works.** Nothing is copied onto the owner's client by hand. New versions reach the client only through the updater.
 8. **NEVER push to Stable without the owner's explicit approval of that exact version** (owner, 2026-11-14, after 0.15.131 was released unasked). Ask, and wait for a clear yes for that version; a complaint, a question or "fix that for stable" is not a yes. `dist` (the players' channel, Stable) gets a new version only then; every other version goes to `dist-test` only. First release: 0.15.124 (2026-11-14, owner).
+8a. **Compatibility check before every publish** (owner, 2026-11-14): for each change, ask "does an older server still work with the new game, and an older game with the new server?" and say the answer in the summary to the owner. A change that breaks the older side raises `kit.MIN_SERVER` or `kit.MIN_GAME` (core/kit.lua), gets a line in "Compatibility" below, and is rolled out server first, then games; the owner hears about it before anything is published. Add new message fields so the older side can ignore them; never change an existing channel's format or `version` without that.
 9. **Do not modify game data.** Read only. Prefer few frameworks. When a game update breaks something, fall back to a generic label or icon; disable a feature only if needed to prevent a crash.
 10. **Short labels, short chat lines, no explanatory text in the panel.** Always say "client" or "server" explicitly.
 11. **Keep replies short** and lead with the result.
@@ -258,3 +259,19 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
 - `git revert` takes no `-q`: check that the push really happened (`git log --oneline -1`) before waiting on the client.
 
 More detail: `flamekit_native/notes/STATUS.md` (to-do list), `memory_layouts.md`, `EMF_REQUESTS.md`.
+
+
+## Compatibility
+The server and the players' games are updated separately (the server by hand, games through their channel), so they
+often run different versions. They work together as long as each is at least the other's minimum: `kit.MIN_SERVER`
+(checked in each game) and `kit.MIN_GAME` (sent by the server on channel `ver` as "min <version>", since 0.15.138). A
+player whose game is too old sees "This server needs FlameKit vX or newer..."; one whose server is too old sees "Server
+runs FlameKit vX, too old for this game...". An older server that is still compatible gives only the white
+"Server runs FlameKit vX." line (before 0.15.138: an orange "older" line for any older server).
+
+| Version | Side | Needs the other side? |
+|---|---|---|
+| 0.15.124 | both | first Stable release: MIN_SERVER = MIN_GAME = 0.15.124 |
+| 0.15.125-0.15.136 | mixed | no: every change is optional for the other side (new fields ignored by older ones) |
+| 0.15.137 | server | no (production server test only) |
+| 0.15.138 | game: min check, "Server updated to" line, tooltips | no |

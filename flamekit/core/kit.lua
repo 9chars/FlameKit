@@ -31,6 +31,12 @@ function kit.is_host()
   return os.time() - server_seen <= 2
 end
 
+-- (0.15.138, owner: keep track of compatibility) The oldest FlameKit on the other side this one still works with.
+-- Raise one of them only when a change breaks the older side (HANDOFF "Compatibility"): MIN_SERVER is checked in a
+-- player's game against the server's version, MIN_GAME is sent by the server and checked in each player's game.
+kit.MIN_SERVER = "0.15.124"  -- the first Stable release
+kit.MIN_GAME = "0.15.124"
+
 -- True when version text `a` ("0.15.2") is newer than `b`.
 function kit.newer(a, b)
   local x, y = {}, {}
@@ -241,8 +247,14 @@ local function server_messages(world, connected)
     end
     local v = kit.server_version and kit.server_version()
     if v and v ~= conn.told then
+      -- (0.15.137, owner) the first time in a session: which version the server runs; later, when it changes while you
+      -- play (a hot-fix upload): that the server was updated
+      if conn.told == nil then
+        kit.note(string.format("Server runs FlameKit v%s.", v), "#ffffff", true)
+      else
+        kit.note(string.format("Server updated to FlameKit v%s.", v), "#ffffff", true)
+      end
       conn.told = v
-      kit.note(string.format("Server runs FlameKit v%s.", v), "#ffffff", true)
     end
     local note = kit.server_note and kit.server_note(world)
     if note and note ~= conn.older then

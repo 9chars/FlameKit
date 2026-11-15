@@ -1392,8 +1392,20 @@ if JOINED then
   channels.ver.on_player(CW, {}, "0.15.30")
   step(2)
   check(messages_text():find("ffffff Server runs FlameKit v0.15.30.", 1, true) ~= nil, "then the server's version")
-  check(messages_text():find("ff9632 Server runs older FlameKit v0.15.30!", 1, true) ~= nil,
-    "an older FlameKit on the server: an orange line")
+  check(messages_text():find("ff9632 Server runs FlameKit v0.15.30, too old for this game", 1, true) ~= nil,
+    "a server older than this game's minimum (0.15.138): an orange line")
+  channels.ver.on_player(CW, {}, "0.15.31")  -- (0.15.137, owner) the server was updated while you play
+  step(2)
+  check(messages_text():find("ffffff Server updated to FlameKit v0.15.31.", 1, true) ~= nil and select(2, messages_text():gsub("ffffff Server runs FlameKit", "")) == 1,
+    "the server updated meanwhile: \"Server updated to FlameKit v0.15.31.\", the join line not again")
+  -- (0.15.138, owner) the server says the oldest game it works with: a game older than that is told to update
+  channels.ver.on_player(CW, {}, "min 99.0.0")
+  step(2)
+  check(messages_text():find("ff9632 This server needs FlameKit v99.0.0 or newer", 1, true) ~= nil, "a game too old for the server: told to update")
+  channels.ver.on_player(CW, {}, "min 0.15.124")
+  channels.ver.on_player(CW, {}, "0.15.130")  -- a newer, still compatible server: only the white line
+  step(2)
+  check(messages_text():find("ffffff Server updated to FlameKit v0.15.130.", 1, true) ~= nil, "a compatible server: only the white line")
   local hf = io.open(TMP .. "\\ui_hud.dat", "r")
   local hud_text = hf and hf:read("a") or ""
   if hf then hf:close() end
