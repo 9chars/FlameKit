@@ -225,7 +225,7 @@ emf = {
       return true
     end,
   },
-  teleport = function(w, id, x, y, z, opts) teleports[#teleports + 1] = opts.spawn_point or 'ground'; last_tp = { x = x, y = y, z = z, opts = opts }; return true end,
+  teleport = function(w, id, x, y, z, opts, fn) teleports[#teleports + 1] = opts.spawn_point or 'ground'; last_tp = { x = x, y = y, z = z, opts = opts, fn = fn, w = w }; return true end,
   key_down = function(k) return held_key == k end,
   hit_rule = function(r) next_rule = next_rule + 1; hit_rules[next_rule] = r; return next_rule end,
   hit_rule_remove = function(id) local had = hit_rules[id] ~= nil; hit_rules[id] = nil; return had end,
@@ -943,6 +943,44 @@ check(wpc.enabled == true and wpc.waypointPosition.x == math.floor(1234.5 * 2 ^ 
 require("features.experimental").minimap_waypoint(UI, "clear")
 step(40)
 check(wpc.enabled == false, "and the clear click takes it away")
+do  -- (0.15.125, production log) a minimap waypoint has the marker's height; a far move goes straight there, no ground search
+  local X = require("features.experimental")
+  X.minimap_waypoint(UI, "1234.5,80.0,2345.5")
+  step(40)
+  check(wpc.enabled and wpc.waypointPosition.y == math.floor(80 * 2 ^ 32), "a marker click with a height: the waypoint has the marker's height")
+  local n = #teleports
+  click(find_row("Map Waypoint").button)
+  step(40)
+  check(#teleports == n + 1 and last_tp.opts.ground == false and last_tp.y == 81.5 and last_tp.x == 1234.5,
+    "far away: straight there, 1.5 m above the marker, without the game's ground search")
+  click(find_row("Map Waypoint").button)
+  step(40)
+  check(#teleports == n + 1 and find_row("one move at a time") ~= nil, "a second click meanwhile: told, not sent again")
+  last_tp.fn(true, 1234.5, 80, 2345.5, { status = "moved" }, last_tp.w)
+  -- near (within 64 m): the ground search; when it gives up, once more straight there
+  X.minimap_waypoint(UI, "20.0,5.0,30.0")
+  step(40)
+  click(find_row("Map Waypoint").button)
+  step(40)
+  check(#teleports == n + 2 and last_tp.opts.ground == true, "near: the ground search, as before")
+  last_tp.fn(false, 0, 0, 0, { status = "failed" }, last_tp.w)
+  step(35)
+  check(#teleports == n + 3 and last_tp.opts.ground == false and last_tp.y == 6.5, "the ground search gave up: once more, straight there")
+  last_tp.fn(true, 20, 5, 30, { status = "moved" }, last_tp.w)
+  -- a waypoint without a known height (set in the game's map) whose ground search gives up: the player is told
+  X.minimap_waypoint(UI, "clear")
+  step(40)
+  comps.PlayerWaypoint[PLAYER] = { enabled = true, waypointPosition = { x = 3000 * 2 ^ 32, y = 0, z = 3000 * 2 ^ 32 } }
+  wpc = comps.PlayerWaypoint[PLAYER]
+  click(find_row("Map Waypoint").button)
+  step(40)
+  check(#teleports == n + 4 and last_tp.opts.ground == true, "a height not known: the ground search")
+  last_tp.fn(false, 0, 0, 0, { status = "failed" }, last_tp.w)
+  step(40)
+  check(#teleports == n + 4 and find_row("could not find ground") ~= nil, "it gave up: the player is told what to do")
+  for k, r in pairs(hit_rules) do if r.kinds == "fall" then hit_rules[k] = nil end end  -- the moves' fall protection
+  wpc.enabled = false
+end
 comps.DynamicLocomotion = { [PLAYER] = { state = 4, flags = 0 } }
 local function slot() return { impulse = { x = 0, y = 0, z = 0 }, type = 0, startTime = 0, endTime = 0, keepAliveMask = 0 } end
 comps.Impulse = { [PLAYER] = { impulses = { slot(), slot(), slot(), slot() } } }

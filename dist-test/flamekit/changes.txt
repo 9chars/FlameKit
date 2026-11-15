@@ -1,3 +1,7 @@
+0.15.125 Nov 14, 2026
+- Map Waypoint: fixed moves that failed on a dedicated server ("The game refused the move"). A waypoint set by clicking a marker on the minimap now has the marker's height, and a far move goes straight there. If the game cannot find ground in time, FlameKit tries once more and otherwise tells you what to do.
+- A second click on a travel button while you are still on the way is answered ("one move at a time") instead of failing.
+
 0.15.124 Nov 14, 2026
 - Experimental tab, Debug: "Updates: Stable / Development". Stable (the default) gets the released versions; Development gets the very latest versions as soon as they are made, which may have bugs. FlameKit looks for an update right away when you switch.
 

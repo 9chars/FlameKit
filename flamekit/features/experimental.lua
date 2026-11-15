@@ -175,6 +175,9 @@ end
 
 -- The rescue button: moves the player to the nearest flame altar, the way a respawn lands there. The game's own
 -- fast travel is refused inside the shroud; this is not. Returns nil, or why it could not be done.
+-- EMF refused a move at once (its log says why: most often one still under way for that player)
+local REFUSED = "The move could not start: wait a moment and try again."
+
 local function go_home(world, player)
   local px, py, pz = where(world, player)
   local best, best_d = nil, nil
@@ -188,7 +191,7 @@ local function go_home(world, player)
   end
   if not best then return "There is no flame altar in this world to go to." end
   if not emf.teleport(world, player, nil, nil, nil, { spawn_point = best }) then
-    return "The game refused the move (see the server's emf_core.log)."
+    return REFUSED
   end
   emf.log(string.format("experimental: player %s sent to the flame altar %s", tostring(player), tostring(best)))
 end
@@ -215,35 +218,94 @@ local function go_near(world, player, msg)
   else
     queued = emf.teleport(world, player, x, y, z, { ground = true })
   end
-  if not queued then return "The game refused the move (see the server's emf_core.log)." end
+  if not queued then return REFUSED end
   emf.log(string.format("experimental: player %s sent to %.0f %.0f %.0f (pad %s)", tostring(player), x, y, z, tostring(best)))
 end
 
 -- Fast travel to the waypoint on the player's map (0.15.60). Their own game sends the waypoint's place (PlayerWaypoint
--- of their player, in their game's world). The game's ground search lands them on the nearest walkable spot within
--- about 10 m (EMF reference "v20"); where there is none they stand exactly there: in the air they fall, inside the
--- terrain the game sends them to their spawn point. So fall damage is off for that player for 30 s after the move
--- (an EMF hit rule, removed again by F.tick). Every move is logged with the waypoint's height and where they landed.
+-- of their player, in their game's world). So fall damage is off for that player for 30 s after the move (an EMF hit
+-- rule, removed again by F.tick). Every move is logged with the waypoint's height and where they landed.
+-- (0.15.125, production server log 2026-11-14) The game's ground search (`ground = true`) never finished for moves of
+-- some hundred metres on the dedicated server: EMF gave up after 10 s ("still has a Teleport 10 s after EMF's push"),
+-- the player stood frozen meanwhile, and a click in that time was refused. The ground search needs the destination's
+-- path grid, which a dedicated server has only near players. And a minimap waypoint had the player's own height, not
+-- the marker's. Now: a minimap click sends the marker's height too (wp_known); a move farther than NEAR_M to a waypoint
+-- whose height is known goes straight there, 1.5 m above it, without the ground search (fall damage is off anyway);
+-- a ground search that gives up is tried again once that way when the height is known; otherwise the player is told.
+-- One move per player at a time (moving[]): a second click while one is under way is answered, not refused.
 local fall_guard = {}  -- player entity -> { rule = hit rule id, till = os.time() when it goes }
-local function go_waypoint(world, player, msg)
-  local x, y, z = tonumber(msg.x), tonumber(msg.y), tonumber(msg.z)
-  if not (x and y and z) or x ~= x or z ~= z or x < 0 or z < 0 or x > 10240 or z > 10240 or y < -1000 or y > 5000 then
-    return "That waypoint is not on the map."
-  end
-  local _, py = where(world, player)
-  local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
+local wp_known = {}    -- player entity -> { x, y, z }: the last minimap waypoint, with the marker's own height
+local moving = {}      -- player entity -> os.time() when its waypoint move started (cleared by the answer, or after 15 s)
+local retry = {}       -- player entity -> { x, y, z, account, steps }: a raw move to try once the given-up one is gone
+local NEAR_M = 64      -- closer than this: the ground search (its area is loaded around the player)
+
+local function guard_falls(player)
   local okr, rule = pcall(emf.hit_rule, { kinds = "fall", to = player, cancel = true })
   if okr and rule then
     if fall_guard[player] then pcall(emf.hit_rule_remove, fall_guard[player].rule) end
     fall_guard[player] = { rule = rule, till = os.time() + 30 }
   end
-  local queued = emf.teleport(world, player, x, ty, z, { ground = true }, function(moved, mx, my, mz, info)
-    emf.log(string.format("experimental: waypoint travel of player %s: %s at %.0f %.0f %.0f (waypoint height %.0f, %s)",
-      tostring(player), tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
-      info and info.raw_target and "no ground found: stood exactly there" or "on the ground"))
+end
+
+-- A line for one player's FlameKit window (the note under the buttons), from a callback: no reply to send it with.
+local tell_player  -- set below, once `view` and the channel are known
+
+local function waypoint_move(world, player, account, x, y, z, ground, why)
+  guard_falls(player)
+  moving[player] = os.time()
+  local ty = ground and y or y + 1.5
+  local queued = emf.teleport(world, player, x, ty, z, { ground = ground }, function(moved, mx, my, mz, info)
+    moving[player] = nil
+    emf.log(string.format("experimental: waypoint travel of player %s (%s): %s at %.0f %.0f %.0f (waypoint height %.0f%s)",
+      tostring(player), why, tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
+      not ground and ", straight there" or info and info.raw_target and ", no ground found: stood exactly there" or ", on the ground"))
+    if moved then return end
+    local k = wp_known[player]
+    if ground and k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3 then
+      retry[player] = { x = x, y = k.y, z = z, account = account, steps = 30 }  -- once EMF's watchdog took its Teleport away
+    elseif tell_player then
+      tell_player(world, player, account, "The game could not find ground at the waypoint in time. Set the waypoint by "
+        .. "clicking a marker on the minimap, then try again.")
+    end
   end)
-  if not queued then return "The game refused the move (see the server's emf_core.log)." end
-  emf.log(string.format("experimental: player %s sent to the waypoint %.0f %.0f %.0f (asked height %.0f)", tostring(player), x, y, z, ty))
+  if not queued then moving[player] = nil end
+  return queued
+end
+
+local function go_waypoint(world, player, msg, account)
+  local x, y, z = tonumber(msg.x), tonumber(msg.y), tonumber(msg.z)
+  if not (x and y and z) or x ~= x or z ~= z or x < 0 or z < 0 or x > 10240 or z > 10240 or y < -1000 or y > 5000 then
+    return "That waypoint is not on the map."
+  end
+  if moving[player] and os.time() - moving[player] < 15 then return "Still on the way: one move at a time." end
+  local px, py, pz = where(world, player)
+  local k = wp_known[player]
+  local known = k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3
+  if known then y = k.y end
+  local far = not px or (px - x) ^ 2 + (pz - z) ^ 2 > NEAR_M * NEAR_M
+  local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
+  local raw = known and far
+  if not waypoint_move(world, player, account, x, ty, z, not raw, raw and "far, marker height" or "ground search") then
+    return REFUSED
+  end
+  emf.log(string.format("experimental: player %s sent to the waypoint %.0f %.0f %.0f (%s)", tostring(player), x, ty, z,
+    raw and "straight there" or "ground search"))
+end
+
+-- once a step (server world): the raw retry of a given-up ground search
+local function retry_tick(world)
+  for player, r in pairs(retry) do
+    r.steps = r.steps - 1
+    if r.steps <= 0 then
+      retry[player] = nil
+      if not waypoint_move(world, player, r.account, r.x, r.y, r.z, false, "again, straight there") and tell_player then
+        tell_player(world, player, r.account, "The move to the waypoint did not work: try again.")
+      end
+    end
+  end
+  for player, t in pairs(moving) do
+    if os.time() - t >= 15 then moving[player] = nil end  -- no answer came (a reload): not stuck for ever
+  end
 end
 
 -- ---- PvP test bodies (Debug section, 0.15.66) ----
@@ -516,7 +578,7 @@ local function handle(world, account, entity, msg)
   if msg.op == "home" or msg.op == "go" or msg.op == "wp" then
     local ok, why
     if msg.op == "home" then ok, why = pcall(go_home, world, entity)
-    elseif msg.op == "wp" then ok, why = pcall(go_waypoint, world, entity, msg)
+    elseif msg.op == "wp" then ok, why = pcall(go_waypoint, world, entity, msg, account)
     else ok, why = pcall(go_near, world, entity, msg) end
     local v = view(account)
     v.note = not ok and "The move failed on this game version." or why
@@ -528,15 +590,19 @@ local function handle(world, account, entity, msg)
       local w = world:get("PlayerWaypoint", entity)
       if not w then error("the player has no waypoint component") end
       if msg.op == "clearwp" then
+        wp_known[entity] = nil
         w.enabled = false
         emf.log(string.format("experimental: waypoint of player %s cleared from the minimap", tostring(entity)))
         return
       end
       local x, z = tonumber(msg.x), tonumber(msg.z)
       if not x or not z or x ~= x or z ~= z or x < -1000 or z < -1000 or x > 20000 or z > 20000 then error("not a place on the map") end
-      local _, py = world:position(entity)  -- the marker's height is not known here: the player's (Map Waypoint looks for ground)
+      local _, py = world:position(entity)
+      local my = tonumber(msg.y)  -- (0.15.125) the marker's own height, from the minimap; else the player's
+      if my and (my ~= my or my < -1000 or my > 5000) then my = nil end
+      wp_known[entity] = my and { x = x, y = my, z = z } or nil
       w.waypointPosition.x = math.floor(x * 2 ^ 32)
-      w.waypointPosition.y = math.floor((py or 0) * 2 ^ 32)
+      w.waypointPosition.y = math.floor((my or py or 0) * 2 ^ 32)
       w.waypointPosition.z = math.floor(z * 2 ^ 32)
       w.enabled = true
       emf.log(string.format("experimental: waypoint of player %s set from the minimap at %.0f %.0f", tostring(entity), x, z))
@@ -1027,6 +1093,7 @@ function F.tick(world)
   lift(world)
   pvp(world)
   bodies_tick(world)
+  retry_tick(world)
   for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
     if os.time() >= g.till then
       pcall(emf.hit_rule_remove, g.rule)
@@ -1168,6 +1235,18 @@ end
 
 local function hosting(world)
   return kit.is_host() or world:is_server()
+end
+
+-- (0.15.125) a line under the buttons of one player's Experimental window, from a teleport's answer (server world)
+tell_player = function(world, player, account, text)
+  local mine = kit.is_host() and emf.local_player() == player
+  if mine then
+    note = text
+    return
+  end
+  local v = view(tostring(account))
+  v.note = text
+  pcall(emf.net.send_to, world, player, CHANNEL, emf.json.encode(v))
 end
 
 -- The Debug section at the bottom of the tab: the test players (features/party.lua) and FlameKit's log level
@@ -1361,9 +1440,13 @@ function F.minimap_waypoint(world, arg)
   if arg == "clear" then
     msg = { op = "clearwp" }
   else
-    local x, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+)$")
-    if not x then return end
-    msg = { op = "setwp", x = tonumber(x), z = tonumber(z) }
+    -- "x,z", or "x,y,z" with the marker's height (0.15.125)
+    local x, y, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+),(%-?[%d%.]+)$")
+    if not x then
+      x, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+)$")
+      if not x then return end
+    end
+    msg = { op = "setwp", x = tonumber(x), y = y and tonumber(y) or nil, z = tonumber(z) }
   end
   if hosting(world) then
     local account, player = me(world)

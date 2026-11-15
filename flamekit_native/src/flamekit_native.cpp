@@ -167,10 +167,12 @@ double meters(int64_t fixed) { return static_cast<double>(fixed) / 4294967296.0;
 
 // What is drawn on top of the ground. kind: the marker's row in kStyles. state: the game's visibility (2 visible,
 // 3 completed).
+constexpr float kNoHeight = -1.0e9f;
 struct Marker {
     float x, z;
     uint8_t kind, state;
     std::string name;  // the name a player gave it, when the game has one
+    float y = kNoHeight;  // (0.15.125) its height, for the waypoint a click sets (kNoHeight: not known)
 };
 struct Other {  // another player
     float x, z;
@@ -771,7 +773,8 @@ void on_world_tick(emf::World w) {
             }
             markers.push_back({static_cast<float>(meters(p.x)), static_cast<float>(meters(p.z)),
                                static_cast<uint8_t>(quest ? kQuestStyle : kind),
-                               static_cast<uint8_t>(quest ? 2 : state < 0 ? 2 : state), std::move(name)});
+                               static_cast<uint8_t>(quest ? 2 : state < 0 ? 2 : state), std::move(name),
+                               static_cast<float>(meters(p.y))});
         });
         for (Marker& k : markers) {  // flame altars take the name of the named altar that stands where they are
             if (!k.name.empty() || kStyles[k.kind].shape != kAltar) continue;
@@ -800,10 +803,11 @@ void on_world_tick(emf::World w) {
                 std::string kinds;  // for the log: the kinds of marker the list holds (said when it changes)
                 std::unordered_map<uint32_t, int> tally;
                 for (int count = 0; node && count < 512 && peek(node, n, sizeof n); ++count) {
-                    int64_t x, z;
+                    int64_t x, y, z;  // (0.15.125) the height between them, at +0x08 (checked below: else not known)
                     uint32_t type;
                     uint64_t length, next;
                     std::memcpy(&x, n + 0x00, 8);
+                    std::memcpy(&y, n + 0x08, 8);
                     std::memcpy(&z, n + 0x10, 8);
                     std::memcpy(&type, n + 0x1c, 4);
                     std::memcpy(&length, n + 0xa0, 8);
@@ -816,9 +820,11 @@ void on_world_tick(emf::World w) {
                     for (int i = 0; i < kStyleCount; ++i)
                         if (kStyles[i].id == type) {
                             if (s.hidden[i]) break;
+                            const double my = meters(y);
                             markers.push_back({static_cast<float>(mx), static_cast<float>(mz), static_cast<uint8_t>(i), 2,
                                                kStyles[i].custom ? std::string(reinterpret_cast<const char*>(n + 0x20), static_cast<size_t>(length))
-                                                                 : std::string()});
+                                                                 : std::string(),
+                                               my > -1000 && my < 5000 && my != 0 ? static_cast<float>(my) : kNoHeight});
                             break;
                         }
                     node = next;
@@ -2563,9 +2569,11 @@ struct MinimapLayer : Layer {
             FK_LOG(fklog::kInfo, "minimap: click on the waypoint's marker (%.0f %.0f): waypoint cleared", wx, wz);
             g_act("wp", "clear");
         } else {
-            char arg[64];
-            snprintf(arg, sizeof arg, "%.1f,%.1f", best->x, best->z);
-            FK_LOG(fklog::kInfo, "minimap: click on a marker (kind %d) at %.0f %.0f: waypoint set there", best->kind, best->x, best->z);
+            char arg[96];  // (0.15.125) "x,y,z" with the marker's height when known: Map Waypoint goes straight there
+            if (best->y != kNoHeight) snprintf(arg, sizeof arg, "%.1f,%.1f,%.1f", best->x, best->y, best->z);
+            else snprintf(arg, sizeof arg, "%.1f,%.1f", best->x, best->z);
+            FK_LOG(fklog::kInfo, "minimap: click on a marker (kind %d) at %.0f %.0f, height %s: waypoint set there", best->kind, best->x,
+                   best->z, best->y != kNoHeight ? std::to_string(static_cast<int>(best->y)).c_str() : "not known");
             g_act("wp", arg);
         }
     }
