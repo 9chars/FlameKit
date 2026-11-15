@@ -260,9 +260,8 @@ local function waypoint_move(world, player, account, x, y, z, ground, why)
       tostring(player), why, tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
       not ground and ", straight there" or info and info.raw_target and ", no ground found: stood exactly there" or ", on the ground"))
     if moved then return end
-    local k = wp_known[player]
-    if ground and k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3 then
-      retry[player] = { x = x, y = k.y, z = z, account = account, steps = 30 }  -- once EMF's watchdog took its Teleport away
+    if ground and y ~= 0 then
+      retry[player] = { x = x, y = y, z = z, account = account, steps = 30 }  -- once EMF's watchdog took its Teleport away
     elseif tell_player then
       tell_player(world, player, account, "The game could not find ground at the waypoint in time. Set the waypoint by "
         .. "clicking a marker on the minimap, then try again.")
@@ -282,6 +281,9 @@ local function go_waypoint(world, player, msg, account)
   local k = wp_known[player]
   local known = k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3
   if known then y = k.y end
+  -- (0.15.133, production log: a waypoint set on the game's own map had a real height, 808, the player stood at 945)
+  -- a waypoint from the game's map is as good: any real height counts
+  if not known and y ~= 0 then known = true end
   local far = not px or (px - x) ^ 2 + (pz - z) ^ 2 > NEAR_M * NEAR_M
   local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
   local raw = known and far

@@ -954,8 +954,9 @@ comps.PlayerWaypoint[PLAYER] = { enabled = true, waypointPosition = { x = 5000 *
 local rules_before = rule_count()
 click(find_row("Map Waypoint").button)
 step(40)
-check(#teleports == 3 and last_tp.x == 5000 and last_tp.y == 120 and last_tp.z == 6000 and last_tp.opts.ground == true,
-  "a waypoint is set: the player is moved there, onto the ground (the game's ground search)")
+check(#teleports == 3 and last_tp.x == 5000 and last_tp.y == 121.5 and last_tp.z == 6000 and last_tp.opts.ground == false,
+  "a waypoint set on the game's map, far away: straight there, 1.5 m above its height (0.15.133)")
+last_tp.fn(true, 5000, 120, 6000, { status = "moved" }, last_tp.w)
 check(rule_count() == rules_before + 1, "and fall damage is off for them for a while")
 clock = clock + 31
 step(2)

@@ -1,3 +1,6 @@
+0.15.133 Nov 14, 2026
+- Map Waypoint: also works for far waypoints set on the game's own map, not only ones set on the minimap.
+
 0.15.132 Nov 14, 2026
 - PvP: pets and farm animals (birds, livestock) near a player with PvP on no longer take damage from players. Wild animals can still be hunted.
 
