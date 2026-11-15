@@ -662,8 +662,14 @@ check(sw.selected == true and rule_count() == 1 and r.kinds == "shroud" and r.to
   "switched on: one rule cancels shroud damage for this player only")
 local ef = io.open(TMP .. "\\experimental.json"); local etext = ef:read("a"); ef:close()
 check(etext:find('"shroud":true', 1, true) ~= nil, "experimental.json keeps it")
-check(#casts == 1 and casts[1] == "No Shroud Damage for a player ENABLED.", "everyone is told in the chat when a player switches an option on: " .. tostring(casts[1]))
-step(JOINED and 700 or 5)
+check(#casts == 1 and casts[1] == "a player turned ON no shroud damage.", "everyone is told in the chat when a player switches an option on: " .. tostring(casts[1]))
+step(JOINED and SYNC + 5 or 5)
+do  -- (0.15.139, owner) also in everyone's Notices window, orange, about 10 seconds
+  local nf = io.open(TMP .. "\\ui_notices.dat", "r"); local nt = nf and nf:read("a") or ""; if nf then nf:close() end
+  check(nt:find("n announce_%d+ ff9632 a player turned ON no shroud damage%.") ~= nil,
+    "and orange in the Notices window (0.15.139, owner): " .. nt:gsub("\n", "|"))
+end
+step(JOINED and 700 - SYNC - 5 or 0)
 check(rule_count() == 1, "the rule stays while the player is here")
 click(find_row("Shroud Damage", "sw:shroud").button)
 step(3)
@@ -846,7 +852,11 @@ SW.position = near
 local rb = rule_count()
 click(find_row("^Spawn Monsters$").button)
 step(40)
-check(#spawned == 1 and spawned[1].guid == "d5d05217-52dc-467a-9192-26b4f661d8d9" and spawned[1].z == 3, "the duelist is spawned 3 m in front of the player")
+local function non_boss(g)
+  for _, m in ipairs(require("core.monsters")) do if m[3] == g then return not m[4] end end
+  return false
+end
+check(#spawned == 1 and non_boss(spawned[1].guid) and spawned[1].z == 3, "the duelist (Random, the default: 0.15.139) is a non-boss monster, 3 m in front of the player")
 check(comps.Faction[951].faction == 1, "and given faction 1 (HitAll)")
 check(rule_count() == rb and find_row("^Spawn Monsters$").selected, "no protection rules for test monsters (0.15.137, owner)")
 click(find_row("Remove").button)
@@ -859,13 +869,14 @@ comps.NetworkHealth[952] = { health = 100 }
 comps.Faction[952] = { faction = 6 }
 local dd
 for _, r in ipairs(exp_rows()) do if r.options then dd = r end end
-check(dd ~= nil and dd.text == "Vukah: Melee", "the duelist is picked from one drop-down: " .. tostring(dd and dd.text))
+check(dd ~= nil and dd.text == "Random" and not dd.options[1].heading and dd.options[1].text == "Random" and dd.options[1].selected
+  and dd.options[1].key == "dbg:what:random", "the duelist drop-down: Random on top, chosen by default (0.15.139): " .. tostring(dd and dd.text))
 local heads, wolf = 0, nil
 for _, o in ipairs(dd.options) do
   if o.heading then heads = heads + 1 end
   if o.text == "Wolf" then wolf = o end
 end
-check(heads == 7 and #dd.options == 189 + 7 and wolf ~= nil, "with every monster under 7 group headings")
+check(heads == 7 and #dd.options == 189 + 7 + 1 and wolf ~= nil, "with every monster under 7 group headings")
 click("W:" .. wolf.key)
 step(12)
 click(find_row("^25$").button)
@@ -901,6 +912,13 @@ do
   local harmless
   for _, x in pairs(hit_rules) do if x.from == 953 and x.cancel and x.to == nil then harmless = true end end
   check(harmless, "and a rule cancels all of its own hits: it never hurts anyone")
+  -- (0.15.139, owner: it must not attack back) its threat table and target are emptied every step
+  comps.DynamicAggro[953] = { targets = { { state = 3, entityId = 100, targetId = 100, faction = 7, aggro = 90 },
+    { state = 0 }, { state = 0 }, { state = 0 }, { state = 0 }, { state = 0 } } }
+  comps.SelectedTargets[953] = { targets = { { targetEntityId = { id = 100 } } } }
+  step(2)
+  check(comps.DynamicAggro[953].targets[1].state == 0 and comps.SelectedTargets[953].targets[1].targetEntityId.id == 0,
+    "the dummy never picks anyone to fight: its threat table and target are emptied")
   click(find_row("Remove").button)
   step(40)
   -- (0.15.97) "Player-like" spawns a random human-looking body, never the Vukah fake player
@@ -1006,6 +1024,22 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   check(after_one <= 40 and #spawned - n1 == 50, "50 monsters: a few at a time, all 50 in the end (" .. after_one .. " at first)")
   click(find_row("Remove").button)
   step(40)
+  -- (0.15.139, owner) Random: a different monster each, no bosses
+  click("W:dbg:what:random")
+  click("W:dbg:cnt:50")
+  local n2 = #spawned
+  click(find_row("^Spawn Monsters$").button)
+  step(SYNC + 5)
+  local kinds, bosses = {}, 0
+  for i = n2 + 1, #spawned do
+    kinds[spawned[i].guid] = true
+    if not non_boss(spawned[i].guid) then bosses = bosses + 1 end
+  end
+  local nk = 0
+  for _ in pairs(kinds) do nk = nk + 1 end
+  check(#spawned - n2 == 50 and nk >= 10 and bosses == 0, "Random x50: 50 monsters, " .. nk .. " kinds, no bosses")
+  click(find_row("Remove").button)
+  step(40)
   click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
@@ -1065,6 +1099,16 @@ do  -- (0.15.119, owner) no fast travel in PvP: the buttons are greyed out and t
   step(3)
   check(not find_row("^Flame Altar$").disabled, "PvP off: fast travel is back")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
+end
+do  -- (0.15.139, owner) the Minimap tab has no Location section any more: its Reset is in the Windows tab
+  local okp, rows = pcall(require("features.minimap").panel, UI)
+  local loc, reset, size = false, false, false
+  for _, r in ipairs(okp and rows or {}) do
+    if r.heading == "Location" then loc = true end
+    if r.heading == "Size" then size = true end
+    if r.button == "reset" or r.text == "Reset Default Position" then reset = true end
+  end
+  check(okp and size and not loc and not reset, "the Minimap tab: no Location section, no Reset Default Position (" .. tostring(okp and "" or rows) .. ")")
 end
 -- (0.15.75) a click on a minimap marker: the server writes the player's own waypoint there, a second click clears it
 require("features.experimental").minimap_waypoint(UI, "1234.5,2345.5")
@@ -1135,13 +1179,13 @@ local gtext = io.open(TMP .. "\\experimental.json"); local gsaved = gtext:read("
 check(gsaved:find('"fly":false', 1, true) ~= nil, "and that it is off is kept")
 click(find_row("Enhanced Glider Mode").button)
 step(70)
-check(#casts == 2 and casts[2] == "No Shroud Damage for a player DISABLED.", "and when they switch it off; nobody is told about the glider option")
+check(#casts == 2 and casts[2] == "a player turned OFF no shroud damage.", "and when they switch it off; nobody is told about the glider option")
 check(broadcasts == 0, "FlameKit's announcements are never chat lines")
 do  -- the announcement and a player's chat line both reach the Messages window
   local mf = io.open(TMP .. "\\ui_messages.dat")
   local mt = mf and mf:read("a") or ""
   if mf then mf:close() end
-  check(mt:find("No Shroud Damage for a player DISABLED.", 1, true) ~= nil, "an announcement is in the Messages window")
+  check(mt:find("a player turned OFF no shroud damage.", 1, true) ~= nil, "an announcement is in the Messages window")
   check(type(chat_fn) == "function", "FlameKit reads the players' chat (emf.on_chat)")
   chat_fn(SW, ACCOUNT, PLAYER, "hello there")
   step(SYNC + 5)

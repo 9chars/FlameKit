@@ -355,7 +355,15 @@ for _, m in ipairs(MONSTERS) do
     if not known then MONSTER_GROUPS[#MONSTER_GROUPS + 1] = m[1] end
   end
 end
+-- (0.15.139, owner) "Random", the default: each monster of a spawn is a different random one from the list, bosses
+-- left out (26 of the 189: a spawn of 1000 would bring about 140 bosses). An older server does not know the key and
+-- spawns its default (Vukah Melee).
+local RANDOM_KEY = "random"
+local RANDOM_PICK = { "Random", "Random", RANDOM_KEY, false }
+local RANDOM_POOL = {}
+for _, m in ipairs(MONSTERS) do if not m[4] then RANDOM_POOL[#RANDOM_POOL + 1] = m end end
 local function duelist(guid)
+  if guid == RANDOM_KEY then return RANDOM_PICK end
   return MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[DUEL_GUID] or { "Vukah", "Melee", DUEL_GUID, false }
 end
 -- (0.15.81, owner) The dummy can be any monster too: it gets faction 7 (Player), whose hits do no damage (EMF
@@ -386,8 +394,11 @@ local DUEL_FACTION = 1                                      -- HitAll
 local DUMMY_FACTION = 3
 local OLD_DUMMY_FACTION = 7  -- dead dummies left before 0.15.134 (is_test_monster)
 local SHIELD_STEPS = 180  -- how often the duelists' building rule is checked
-local MAX_DUELISTS = 200  -- (0.15.134, owner: how many to spawn; 0.15.135: up to 50, the shield is shared; 0.15.136: 200)
-local DUEL_COUNTS = { 1, 15, 50, 100, 200 }
+-- (0.15.134, owner: how many to spawn) MAX_DUELISTS: the most one request may ask for (the server refuses more, so a
+-- bug or a modified game cannot ask for 100,000); owner, 0.15.139: 1000. Measured on the production server
+-- (2026-11-14): 200 level-1 monsters fighting one player put the game server at its limit per step (~17 ms of 16.7).
+local MAX_DUELISTS = 1000
+local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local CORPSE_S = 8
 local body_steps = 0
@@ -497,6 +508,44 @@ local function set_level(world, id, level)
 end
 
 local SPAWN_PER_STEP = 20
+-- (0.15.139, owner: "I don't want the dummy to attack me back") Since 0.15.134 the dummy has the monsters' faction so
+-- anyone can hit it, and so its AI goes for players: it swung but did no damage. Before (faction 7) it stood still.
+-- Now its threat table (DynamicAggro) and its target (SelectedTargets) are emptied every server step: with no Alarmed
+-- slot the game's AI has nobody to fight (HANDOFF: the AI picks a fight only from the Alarmed slots). One dummy per
+-- player, so it costs next to nothing.
+local function set_id(holder, field, value)
+  local v = holder[field]
+  if type(v) == "table" then
+    if v.id ~= value then v.id = value return true end
+  elseif v ~= value then
+    holder[field] = value
+    return true
+  end
+  return false
+end
+local calm = {}  -- dummy entity -> true
+local function calm_tick(world)
+  for id in pairs(calm) do
+    local b = bodies[id]
+    if not b or b.kind ~= "dummy" then
+      calm[id] = nil
+    else
+      pcall(function()
+        local ag = world:get("DynamicAggro", id)
+        if ag then
+          for i = 1, 6 do
+            local t = ag.targets[i]
+            if t and tonumber(tostring(t.state)) ~= 0 then t.state = 0; t.aggro = 0 end
+          end
+        end
+      end)
+      pcall(function()
+        local st = world:get("SelectedTargets", id)
+        if st and st.targets and st.targets[1] then set_id(st.targets[1], "targetEntityId", 0) end
+      end)
+    end
+  end
+end
 local spawn_queue = {}  -- { account, fn }: each spawns one queued test monster (spawn_tick)
 
 local function spawn_body(world, account, player, kind, level, what, count)
@@ -523,11 +572,14 @@ local function spawn_body(world, account, player, kind, level, what, count)
   count = kind == "duel" and math.max(1, math.min(MAX_DUELISTS, math.floor(tonumber(count) or 1))) or 1
   local jobs = {}
   for i = 1, count do
-    local per_row = math.min(count, 10)
-    local col, row = (i - 1) % 10, math.floor((i - 1) / 10)
+    -- rows of 10; a big spawn in a square block instead (1000: 32 x 32, about 64 m), not a column 200 m long
+    local width = math.max(10, math.ceil(math.sqrt(count)))
+    local per_row = math.min(count, width)
+    local col, row = (i - 1) % width, math.floor((i - 1) / width)
     local side, ahead = (col - (per_row - 1) / 2) * 2, row * 2
     jobs[i] = (function(world)
   local d = d0
+  if d[3] == RANDOM_KEY then d = RANDOM_POOL[math.random(#RANDOM_POOL)] end  -- a different one each time
   local guid = d[3]
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
   local sx, sz = x + fx * (3 + ahead) - fz * side, z + fz * (3 + ahead) + fx * side
@@ -548,6 +600,7 @@ local function spawn_body(world, account, player, kind, level, what, count)
   if kind == "dummy" then
     pcall(function() world:get("Faction", id).faction = DUMMY_FACTION end)  -- at once
     local okr, r = pcall(emf.hit_rule, { from = id, cancel = true })  -- its own hits never land (0.15.134)
+    calm[id] = true  -- (0.15.139) and it never goes for anyone
     if okr and r then b.rules.harmless = r else emf.log("experimental: the dummy's rule against its own hits was refused (" .. tostring(r) .. ")") end
   end
   if kind == "duel" then
@@ -568,7 +621,8 @@ local function spawn_body(world, account, player, kind, level, what, count)
   end
   for i = first + 1, count do spawn_queue[#spawn_queue + 1] = { account = account, fn = jobs[i] } end
   if count > 1 then
-    emf.log(string.format("experimental: %d PvP test %ss (%s%s) for player %s%s", count, kind == "duel" and "duelist" or "dumm", d0[1] .. ": " .. d0[2],
+    emf.log(string.format("experimental: %d PvP test %ss (%s%s) for player %s%s", count, kind == "duel" and "duelist" or "dumm",
+      d0[3] == RANDOM_KEY and "random monsters" or (d0[1] .. ": " .. d0[2]),
       level and (", level " .. level) or "", tostring(player), count > first and string.format(" (%d now, the rest over the next steps)", first) or ""))
   end
   if kind == "duel" then guard_duelists(world) end  -- buildings and animals near them, at once
@@ -797,13 +851,15 @@ local function handle(world, account, entity, msg)
         emf.log(string.format("experimental: player %s switched '%s' %s", tostring(entity), s[1], msg.on == true and "on" or "off"))  -- never the account in a log (a log may be shared)
         if s[4] then  -- everyone on the server is told (not for the glider: it changes nothing for others)
           local name = require("core.players").name(world, entity, "a player")  -- the character name first, as everywhere
-          local line = string.format("%s for %s %s.", s[4], name, msg.on == true and "ENABLED" or "DISABLED")
+          -- (0.15.139, owner) "Ninechars turned ON no shroud damage." / "... turned OFF ..."
+          local line = string.format("%s turned %s %s.", name, msg.on == true and "ON" or "OFF", s[4]:lower())
           local colour = nil
           if s[1] == "pvp" then  -- (0.15.121, 0.15.122, owner) both in orange
             line, colour = name .. (msg.on == true and " joined PvP!" or " has left PvP."), "#ff9632"
           end
           -- (0.15.76, owner) to the Messages window of everyone with FlameKit (features/chat.lua), no longer the game's chat
-          local sent, why = pcall(require("features.chat").announce, world, line, colour)
+          -- (0.15.139, owner) and in everyone's Notices window, orange, for about 10 seconds (PvP lines too)
+          local sent, why = pcall(require("features.chat").announce, world, line, colour, { colour = "#ff9632", seconds = 10 })
           if not sent then emf.log("experimental: the announcement was not sent (" .. tostring(why) .. ")") end
         end
         save_all()
@@ -1048,16 +1104,6 @@ local aggro_last = 0
 local hunters = {}   -- monster entity -> { PvP player entity -> distance in m }, rebuilt every AGGRO_STEPS
 local target_broken = false
 
-local function set_id(holder, field, value)
-  local v = holder[field]
-  if type(v) == "table" then
-    if v.id ~= value then v.id = value return true end
-  elseif v ~= value then
-    holder[field] = value
-    return true
-  end
-  return false
-end
 
 -- Measured next (02:18): with the target written, the duelist kept target 1 but stayed Idle/Roaming, never Combat.
 -- Its threat table (DynamicAggro, 6 slots of AggroTarget) keeps each candidate's faction (+80), state (Alarmed = 3)
@@ -1332,6 +1378,7 @@ function F.tick(world)
   lift(world)
   pvp(world)
   spawn_tick(world)
+  calm_tick(world)
   bodies_tick(world)
   retry_tick(world)
   for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
@@ -1356,7 +1403,7 @@ local ASK_STEPS = 300   -- say hello every 5 seconds: the server keeps your rule
 local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
-local duel_what, duel_level = DUEL_GUID, 1  -- the Debug section's duelist choice, this session (0.15.70)
+local duel_what, duel_level = RANDOM_KEY, 1  -- (0.15.139) Random is the default  -- the Debug section's duelist choice, this session (0.15.70)
 local duel_count = 1  -- (0.15.134, owner) how many duelists one Spawn makes
 local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
@@ -1644,7 +1691,7 @@ function F.window_rows(world)
   local function monster_options(prefix, chosen, first)
     local options = {}
     if first then
-      options[#options + 1] = { heading = true, text = first[1] }
+      if first[1] ~= first[2] then options[#options + 1] = { heading = true, text = first[1] } end  -- not "Random" twice
       options[#options + 1] = { key = prefix .. first[3], text = first[2], selected = first[3] == chosen }
     end
     for _, g in ipairs(MONSTER_GROUPS) do
@@ -1666,14 +1713,15 @@ function F.window_rows(world)
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Anyone can hit it, PvP on or off." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn Dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. Anyone can hit it, PvP on or off. It swings at you "
-      .. "but never does damage. It replaces your test monster." }
+    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. Anyone can hit it, PvP on or off. It stands "
+      .. "still and never fights back. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
     tooltip = "Removes all your test monsters, wherever they are in the world, and any test monster nobody keeps any more." }
   rows[#rows + 1] = { separator = true }
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
-  rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3]), text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
+  rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3], RANDOM_PICK),
+    text = pick[3] == RANDOM_KEY and "Random" or (pick[1] .. ": " .. pick[2]), color = pick[4] and "#ffb060" or nil,
     disabled = in_pvp or nil, tooltip = in_pvp and no_spawn or "The monsters fight everyone and everything with full damage, PvP on or off: players, pets, animals, villagers and buildings. Spawn them away from bases." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
@@ -1682,7 +1730,7 @@ function F.window_rows(world)
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q,
       disabled = in_pvp or nil, tooltip = lvl_tip }
   end
-  rows[#rows + 1] = { label = true, text = "Quantity" }  -- (0.15.134, owner; 0.15.136: "Quantity", 1, 15, 50, 100, 200)
+  rows[#rows + 1] = { label = true, text = "Quantity" }  -- (0.15.134, owner; 0.15.136: "Quantity", 1-200; 0.15.139: 500, 1000)
   for _, c in ipairs(DUEL_COUNTS) do
     rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
       disabled = in_pvp or nil, tooltip = "How many monsters one Spawn makes, in rows of up to 10." }
@@ -1730,6 +1778,7 @@ end
 
 function F.click(world, key)
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
+  if key == "dbg:what:" .. RANDOM_KEY then duel_what = RANDOM_KEY return end
   local what = key:match("^dbg:what:([%x%-]+)$")
   if what then duel_what = duelist(what)[3] return end
   local dwhat = key:match("^dbg:dwhat:([%x%-]+)$")

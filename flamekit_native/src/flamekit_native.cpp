@@ -2358,7 +2358,7 @@ struct MinimapLayer : Layer {
         if (!loaded) load();
         Settings s = settings();
         // While the pointer is out (FlameKit's window open, or the pointer key held) the minimap can be dragged, like the
-        // pinned windows; let go, its place is kept (map_x, map_y). "Reset Default Position" in the Minimap tab undoes it.
+        // pinned windows; let go, its place is kept (map_x, map_y). "Reset place" in the Windows tab undoes it (0.15.139).
         s.move = g_pointer_mode;
         if (!g_pointer_mode && dragging) {
             dragging = false;
@@ -3859,7 +3859,7 @@ struct WindowLayer : Layer {
         std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout, kWinKey, kWinToggle };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll };
     struct Hit {
         RECT r;
         Kind kind;
@@ -4470,9 +4470,23 @@ struct WindowLayer : Layer {
             button(kPad + 320, y, 150, L"Reset place", false, kPinReset, i);
             y += 40;
         }
+        {  // (0.15.139, owner) the minimap here too; its Location section in the Minimap tab is gone
+            const bool shown = settings().show;
+            text.draw(canvas, kPad, y + 5, L"Minimap", 230, 230, 235);
+            button(kPad + 200, y, 110, shown ? L"Hide" : L"Show", shown, kMapShow);
+            button(kPad + 320, y, 150, L"Reset place", false, kMapReset);
+            y += 40;
+        }
         text.draw(canvas, kPad, y + 5, L"FlameKit Menu", 230, 230, 235);
         button(kPad + 320, y, 150, L"Reset place", false, kPinReset, g_pinned.size());  // its place and size
         y += 40;
+        {  // (0.15.139, owner) every window above back at its default place (and size), at once
+            static const std::wstring kTip = L"Puts every window above back at its default place and size: the pinned "
+                                              L"windows, the minimap and this menu. Shown or hidden stays as it is.";
+            button(kPad + 320, y, 150, L"Reset All", false, kResetAll);
+            hits.back().tip = &kTip;
+            y += 46;
+        }
         {  // (0.15.62, owner: it affects all of FlameKit's UI, so it belongs here; it was in the Minimap tab)
             static const std::wstring kTip = L"While you build, all of FlameKit on your screen is hidden so nothing is in the way: "
                                               L"the minimap, the party window, Messages, Notices and the lines in the lower left "
@@ -4932,6 +4946,27 @@ struct WindowLayer : Layer {
                     g_layout.save();
                     FK_LOG(fklog::kInfo, "window: pinned window %s back to its default place", g_pinned[h.index]->id.c_str());
                 }
+                break;
+            case kMapShow:  // (0.15.139) switched by the Lua part's Settings, like "Hide all of FlameKit"
+                act("opt", "b:map_show");
+                break;
+            case kMapReset:
+                emf::set_setting(kKit, "map_x", "-1");
+                emf::set_setting(kKit, "map_y", "-1");
+                FK_LOG(fklog::kInfo, "window: the minimap back to its default place");
+                break;
+            case kResetAll:  // (0.15.139, owner) every pinned window, the minimap and this menu
+                for (PinnedLayer* p : g_pinned) {
+                    const bool hidden = p->lay().hidden;  // shown or hidden stays as it is
+                    p->lay() = LayoutEntry{};
+                    p->lay().hidden = hidden;
+                    p->dirty = true;
+                }
+                g_layout.get("window") = LayoutEntry{};
+                g_layout.save();
+                emf::set_setting(kKit, "map_x", "-1");
+                emf::set_setting(kKit, "map_y", "-1");
+                FK_LOG(fklog::kInfo, "window: every window back to its default place");
                 break;
             case kClose:
                 close_asked = true;

@@ -143,13 +143,10 @@ local ZOOM_STEPS = 7  -- the setting map_zoom: 0 closest .. 6 farthest
 
 function F.panel(world)
   local rows = {}
-  rows[#rows + 1] = { heading = "Location" }
-  local placed = (tonumber(kit.setting("map_x", -1)) or -1) >= 0
-  rows[#rows + 1] = { button = "reset", text = "Reset Default Position", disabled = not placed,
-                      tooltip = "Puts the minimap back in the lower right corner of the screen." }
-  for _, r in ipairs(require("features.settings").rows({ "map_shape" })) do rows[#rows + 1] = r end
-  rows[#rows + 1] = { separator = true }
+  -- (0.15.139, owner) the Location section is gone: Show/Hide and "Reset place" are in the Windows tab; the shape
+  -- setting that was in it is now under Size
   rows[#rows + 1] = { heading = "Size" }
+  for _, r in ipairs(require("features.settings").rows({ "map_shape" })) do rows[#rows + 1] = r end
   local size = tonumber(kit.setting("map_size", 300)) or 300
   for i, z in ipairs(SIZES) do
     rows[#rows + 1] = { button = "size:" .. z[1], text = z[2], same_line = i > 1, selected = size == z[1],
