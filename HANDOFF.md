@@ -15,6 +15,15 @@ rewrite the step if any answer is no:
 4. Would the step make sense if it were the only step he read?
 5. Does the last step say what to tell Claude when done, and what Claude does then?
 
+## Rule 0b: code design (owner, 2026-11-15)
+
+Features never build on other features. Code two features both need goes into a shared module in `core/` (as
+`core/bag.lua`, `core/items.lua`, the planned `core/spawner.lua` and item database), and each feature uses that module
+on its own: no feature calls into or reads another feature's code or data (for example, loot-to-ground uses
+`core/bag.lua`'s inventory reading, never the Auto Junk List's `features/loot_filter`). A change to one feature must not
+be able to change how another works. Keep the code clean, reusable and well factored, without dependencies between
+systems.
+
 ## What FlameKit is
 
 One mod suite for Enshrouded by Ninechars, one version number for the whole product. Two parts:
