@@ -279,4 +279,5 @@ runs FlameKit vX, too old for this game...". An older server that is still compa
 | 0.15.137 | server | no (production server test only) |
 | 0.15.138 | game: min check, "Server updated to" line, tooltips | no |
 | 0.15.139 | both: Random, cap 1000, calm dummy, option notices, Windows tab minimap row and Reset All | no: an older server spawns Vukah Melee for Random and caps lower; an older game never sends Random |
+- **Instructions to the owner (2026-11-15, owner: "you've failed one of your directives again"):** numbered steps, every folder as its full path (`C:\enshrouded mod shit\...`) in every step, never "that folder", "back in there" or "the one above"; say which button to click and what Windows will ask.
 | 0.15.140 | server: scatter, ground snap, cap 5000, budgeted checks, summary logs; game: 5000 button | no: an older server caps the 5000 request at its own cap |
