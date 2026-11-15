@@ -35,6 +35,17 @@ on its own: no feature calls into or reads another feature's code or data (for e
 be able to change how another works. Keep the code clean, reusable and well factored, without dependencies between
 systems.
 
+## Open: Loot Drop for the game's own monsters (2026-11-15, 0.15.143)
+
+Built as "read the body after the death, move its loot to the ground": does NOT work for normal monsters. The game
+fills a body only when it is first opened (ecs program `random_loot_on_interaction`, EMF docs ecs_programs.md and
+re_content.md: "fills a container when it is first opened"); FlameKit saw every body empty (some with no inventory).
+This was in EMF's docs and should have been checked before building. features/loot_drop.lua stays harmless (it only
+removes a body after moving loot out of it). Possible route, untested: trigger the game's own loot-all
+(`LootInteractionEvent {guest, host = body, lootAll 1, bypassInteraction 1}`, as farming does, re_villages.md) right
+after the death, then drop what arrives. Proven parts kept: core/ground_loot.lua (a ground item keeps quality and
+level), the test monsters' legendary loot, the Server tab.
+
 ## What FlameKit is
 
 One mod suite for Enshrouded by Ninechars, one version number for the whole product. Two parts:
