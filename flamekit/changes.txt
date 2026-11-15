@@ -1,3 +1,7 @@
+0.15.138 Nov 14, 2026
+- Messages: when the server is updated while you play, it says "Server updated to FlameKit vX."
+- Messages: a clear warning when your game and the server's FlameKit are too far apart to work together (and what to do). A server that is a little older but still works with your game no longer gets an orange warning.
+
 0.15.137 Nov 14, 2026
 - Server: spawning a lot of test monsters no longer stops FlameKit on the server (it did with 100: the Party list and everything else stopped until a restart). Big spawns now come 20 at a time, and every scan over the world is kept short.
 - Test monsters no longer protect pets, animals or buildings near them: they are monsters. Spawn them away from bases.
