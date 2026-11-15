@@ -83,13 +83,35 @@ local function spawn_chest(world, x, y, z)
   return id
 end
 
+-- (0.15.164, owner: "make sure it doesnt put a new chest on top of the previously spawned chests") a new chest's spot:
+-- the first of rings of spots around the loot's place (1.5 m, then 3, 4.5, 6 m out, 8 spots each) that is at least
+-- APART m from every chest FlameKit knows. FlameKit knows only its own chests, not what players built there.
+local APART = 2.5
+local function free_spot(x, z)
+  for r = 1, 4 do
+    local dist = 1.5 * r
+    for k = 0, 7 do
+      local a = k * math.pi / 4
+      local sx, sz = x + math.cos(a) * dist, z + math.sin(a) * dist
+      local ok = true
+      for _, c in pairs(chests) do
+        if (c.x - sx) ^ 2 + (c.z - sz) ^ 2 < APART * APART then ok = false break end
+      end
+      if ok then return sx, sz end
+    end
+  end
+  return x + 7.5, z  -- every spot taken: beyond the last ring
+end
+
 local function chest_for(world, x, y, z)
   local best, bd = nil, M.NEAR_M * M.NEAR_M
   for id, c in pairs(chests) do
     local d = (c.x - x) ^ 2 + (c.z - z) ^ 2
     if not c.full and d <= bd then best, bd = id, d end
   end
-  return best or spawn_chest(world, x + 1.5, y, z)
+  if best then return best end
+  local sx, sz = free_spot(x, z)
+  return spawn_chest(world, sx, y, sz)
 end
 
 local into  -- below

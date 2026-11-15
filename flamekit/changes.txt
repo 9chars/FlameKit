@@ -1,3 +1,6 @@
+0.15.164 Nov 15, 2026
+- Loot chests: a new chest is never put on top of another of FlameKit's chests; it takes the first free spot (at least 2.5 m from every chest) in rings around the body. Server only: no game update.
+
 0.15.163 Nov 15, 2026
 - Test monsters: a killed one's body is removed in the same moment its kill is seen (2 of 15 bodies stayed with 0.15.162, which waited for the next check). Server only: no game update.
 
