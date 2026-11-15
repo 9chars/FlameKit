@@ -41,10 +41,31 @@ Built as "read the body after the death, move its loot to the ground": does NOT 
 fills a body only when it is first opened (ecs program `random_loot_on_interaction`, EMF docs ecs_programs.md and
 re_content.md: "fills a container when it is first opened"); FlameKit saw every body empty (some with no inventory).
 This was in EMF's docs and should have been checked before building. features/loot_drop.lua stays harmless (it only
-removes a body after moving loot out of it). Possible route, untested: trigger the game's own loot-all
-(`LootInteractionEvent {guest, host = body, lootAll 1, bypassInteraction 1}`, as farming does, re_villages.md) right
-after the death, then drop what arrives. Proven parts kept: core/ground_loot.lua (a ground item keeps quality and
+removes a body after moving loot out of it). Next route (owner, 2026-11-15 14:14: "can't you just call the same process that pressing 'E' calls"): send
+the game's own `LootInteractionEvent {guestId, hostId = body, offerId 0, lootAll 1, bypassInteraction 1}` right after
+the death (emf.emits / emf.emit in Lua; EMF's runtime test harvested a plant into a chest with it: the game created
+the loot and moved it in the same step, real items). The guest needs an inventory, so the owner must choose first:
+(1) guest = the killer: the loot goes straight into their bag as if they pressed E (simplest), or (2) loot into a
+hidden temporary container, then drop it on the ground with core/ground_loot.lua (needs a container FlameKit can
+spawn: untested). Before building: test that the event works for a monster body; explain the test first (Rule 0).
+Feature 1 is NOT dead: only the first way of building it was. Proven parts kept: core/ground_loot.lua (a ground item keeps quality and
 level), the test monsters' legendary loot, the Server tab.
+
+## Where things stand (end of the conversation of 2026-11-13..15; the owner starts a new one)
+
+- Versions: 0.15.143 on Development and the local server; production (G-Portal): 0.15.141; Stable: 0.15.140.
+- `C:\enshrouded mod shit\outbox` still holds the 0.15.142 Lua files (from before the owner stopped the G-Portal
+  upload): never upload them unless the owner asks for G-Portal; replace them with the right files when he does.
+- The Server tab's "Monsters drop their loot on the ground" is ON on the local server (server_settings.json); with
+  the current loot_drop.lua it does nothing harmful (bodies are empty when looked at, so none is removed).
+- Not yet tried in the game: the test monsters' legendary loot (0.15.142: runes, legendary runes, one legendary
+  item). The ground drop itself was proven in game (a legendary sword level 10 came out as given).
+- Nightly log fetch (restart helper, 3:55 AM, logs only) first runs on 2026-11-16: check
+  `<work folder>\production_stable_logs\emf_core_2026-11-16.log` and a "nightly:" line in restart.log.
+- Lessons the owner insisted on (all in the rules above): check the docs and everything checkable before building or
+  asking for a test; explain a test before asking for it; full paths in every step; never G-Portal or Stable without
+  his word for that version; Development and the local server always together; features never depend on each other;
+  stage every file version under a new path and verify md5 on the PC; say plainly what is and is not tested.
 
 ## What FlameKit is
 
