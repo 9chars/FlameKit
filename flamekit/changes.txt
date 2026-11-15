@@ -1,3 +1,6 @@
+0.15.152 Nov 15, 2026
+- Test monsters: the legendary item they drop is a plain item on the ground again, with the game's grave flame effect on its spot; the flame goes away when the item is picked up (or after 10 minutes).
+
 0.15.151 Nov 15, 2026
 - Test monsters: the legendary item they drop uses the game's pickup with its model and an effect (Base_LootPickup_Model_VFX) instead of the one that showed only a bright orb.
 

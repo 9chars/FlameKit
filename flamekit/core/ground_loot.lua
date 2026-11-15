@@ -34,7 +34,7 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread, templat
   count = math.floor(tonumber(count) or 1)
   rarity = RARITY[rarity] or tonumber(rarity) or 0
   spread = spread or 2
-  local made = 0
+  local made, last = 0, nil
   while count > 0 do
     local n = math.min(count, ground.MAX_AMOUNT)
     local ang = math.random() * 2 * math.pi
@@ -44,10 +44,10 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread, templat
     local ok, id = false, nil
     if template and template ~= ground.PICKUP then ok, id = pcall(emf.spawn, world, template, px, py, pz, parts) end
     if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, ground.PICKUP, px, py, pz, parts) end
-    if ok and id and id ~= 0 then made = made + 1 else break end
+    if ok and id and id ~= 0 then made, last = made + 1, id else break end
     count = count - n
   end
-  return made
+  return made, last  -- (0.15.152) also the last pickup's entity id, for a caller that marks it
 end
 
 return ground
