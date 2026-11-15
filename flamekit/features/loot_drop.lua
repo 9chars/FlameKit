@@ -11,6 +11,7 @@
 local bag = require("core.bag")
 local ground = require("core.ground_loot")
 local server = require("core.server_settings")
+local test_tag = require("core.test_tag")
 
 local F = { id = "loot_drop", title = "Loot Drop" }
 local kit
@@ -51,6 +52,7 @@ local function died(world, e)
     return  -- this body is the test's: the normal Loot Drop leaves it alone
   end
   if not server.get("loot_to_ground") then return end
+  if test_tag.is(world, id) then return end  -- (0.15.156, owner) FlameKit's test monsters: their loot goes into chests
   queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1 }
 end
 

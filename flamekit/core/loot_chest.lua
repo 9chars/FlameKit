@@ -73,10 +73,10 @@ function M.put(world, key, x, y, z, item, n, level, rarity, done)
   into(chest_for(world, x, y, z), n, true)
 end
 
--- Removes chests that were filled and are empty again (looked at every 10 s). Call from a feature's server tick.
+-- Removes chests that were filled and are empty again (looked at every 2 s). Call from a feature's server tick.
 function M.tick(world, bag)
   steps = steps + 1
-  if count == 0 or steps % 600 ~= 0 then return end
+  if count == 0 or steps % 120 ~= 0 then return end  -- (0.15.156) every 2 s (was 10 s)
   for id, c in pairs(chests) do
     local gone = not pcall(world.position, world, id) or world:position(id) == nil
     if gone or (c.filled and #bag.entity_stacks(world, id) == 0) then

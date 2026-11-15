@@ -1,3 +1,7 @@
+0.15.156 Nov 15, 2026
+- Test monsters: the game's own loot in their bodies goes into the loot chest too (looked for 3 and 6 s after the death), and the server's Loot Drop no longer puts their loot on the ground.
+- An emptied loot chest goes within 2 s (was 10 s). Server only: no game update.
+
 0.15.155 Nov 15, 2026
 - Test monsters' loot chests: the legendary item goes into the nearest of FlameKit's chests that is not full, from any player's kills, within 50 m of the body; if there is none, a new chest is put beside the body. Server only: no game update.
 
