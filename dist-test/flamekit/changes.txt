@@ -1,3 +1,6 @@
+0.15.147 Nov 15, 2026
+- Monsters drop their loot on the ground: a body is no longer skipped at the later looks (3 and 6 s after the death) when it has stopped counting as a creature; the game fills it with loot about then, and the loot stayed in the body.
+
 0.15.146 Nov 15, 2026
 - Server test "flamekit.loottest watch": watches the next monster that dies for 6 s without sending the loot event and logs its items at 0.5, 1.5, 3 and 6 s (also when the body is gone), to see whether the game fills a body by itself.
 

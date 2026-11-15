@@ -56,9 +56,14 @@ end
 
 local diag = 0  -- the first bodies of a run are described in the log (what FlameKit could read of them)
 local function handle(world, id, look)
-  if get(world, "PlayerState", id) or not get(world, "Faction", id) then return "skip" end  -- players, and no creatures
+  -- players never; a creature is known by its Faction at the first look only (0.15.147: the body loses it about when
+  -- the game fills it with loot, 1.5-3 s after the death, and later looks skipped the body with its loot in it)
+  if get(world, "PlayerState", id) or (look == 1 and not get(world, "Faction", id)) then return "skip" end
   local x, y, z = world:position(id)
-  if not x then return "gone" end
+  if not x then
+    if diag < 10 then diag = diag + 1 emf.log(string.format("loot drop: body %s, look %d: gone", tostring(id), look)) end
+    return "gone"
+  end
   local keep = false
   local stacks = bag.entity_stacks(world, id)
   if diag < 10 then
