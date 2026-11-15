@@ -15,14 +15,17 @@ local server = require("core.server_settings")
 local F = { id = "loot_drop", title = "Loot Drop" }
 local kit
 
-local LOOT_WAIT_STEPS = 30     -- the game fills a body just after the death: look 0.5 s later
+-- the game fills a body some time after the death (0.15.143: a bird's body was still empty 0.5 s after it, and was
+-- then removed with its loot): look at 0.5, 1.5, 3 and 6 s; a body is removed only once loot came out of it or it
+-- was seen empty at every look (a body whose loot FlameKit cannot read is left to the game)
+local LOOKS = { 30, 90, 180, 360 }
 local BODY_S, BOSS_BODY_S = 8, 45
 local PER_STEP = 20            -- bodies handled per step (a big fight stays within EMF's time per step)
 
-local queue, head = {}, 1      -- deaths waiting: { id, at }
+local queue, head = {}, 1      -- deaths waiting: { id, at, look }
 local bodies = {}              -- body id -> step to remove it at
 local steps = 0
-local tally = { bodies = 0, items = 0, kept = 0 }  -- summed, logged once a minute (no line per monster)
+local tally = { bodies = 0, items = 0, kept = 0, empty = 0 }  -- summed, logged once a minute (no line per monster)
 
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
@@ -36,15 +39,24 @@ local function died(world, e)
   if type(id) == "table" then id = id.id end
   id = tonumber(id)
   if not id or id == 0 then return end
-  queue[#queue + 1] = { id = id, at = steps + LOOT_WAIT_STEPS }
+  queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1 }
 end
 
-local function handle(world, id)
-  if get(world, "PlayerState", id) or not get(world, "Faction", id) then return end  -- players, and things that are no creature
+local diag = 0  -- the first bodies of a run are described in the log (what FlameKit could read of them)
+local function handle(world, id, look)
+  if get(world, "PlayerState", id) or not get(world, "Faction", id) then return "skip" end  -- players, and no creatures
   local x, y, z = world:position(id)
-  if not x then return end
+  if not x then return "gone" end
   local keep = false
-  for _, st in ipairs(bag.entity_stacks(world, id)) do
+  local stacks = bag.entity_stacks(world, id)
+  if diag < 10 then
+    diag = diag + 1
+    local setup = get(world, "InventorySetup", id)
+    emf.log(string.format("loot drop: body %s, look %d: %d stack(s); InventorySetup %s, own Inventory %s", tostring(id),
+      look, #stacks, tostring(setup ~= nil), tostring(get(world, "Inventory", id) ~= nil)))
+  end
+  if #stacks == 0 then return "empty" end
+  for _, st in ipairs(stacks) do
     if st.gem then
       keep = true  -- a socketed gem would be lost on the ground: this piece stays in the body
       tally.kept = tally.kept + 1
@@ -63,6 +75,7 @@ local function handle(world, id)
   end
   tally.bodies = tally.bodies + 1
   if not keep then bodies[id] = steps + 60 * (get(world, "Boss", id) and BOSS_BODY_S or BODY_S) end
+  return "done"
 end
 
 function F.tick(world)
@@ -72,8 +85,16 @@ function F.tick(world)
     local d = queue[head]
     if d.at > steps then break end
     head, n = head + 1, n + 1
-    local ok, err = pcall(handle, world, d.id)
-    if not ok then kit.debug("warn", "loot drop: body %s: %s", tostring(d.id), tostring(err)) end
+    local ok, r = pcall(handle, world, d.id, d.look)
+    if not ok then
+      kit.debug("warn", "loot drop: body %s: %s", tostring(d.id), tostring(r))
+    elseif r == "empty" then
+      if d.look < #LOOKS then
+        queue[#queue + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1 }
+      else
+        tally.empty = tally.empty + 1  -- empty at every look: nothing to drop, and the body is left to the game
+      end
+    end
   end
   if head > #queue then queue, head = {}, 1 end
   if steps % 30 == 0 then
@@ -84,10 +105,10 @@ function F.tick(world)
       end
     end
   end
-  if steps % 3600 == 0 and tally.bodies > 0 then
-    emf.log(string.format("loot drop: last minute: %d bodies, %d stacks on the ground, %d kept in a body (socketed gem)",
-      tally.bodies, tally.items, tally.kept))
-    tally = { bodies = 0, items = 0, kept = 0 }
+  if steps % 3600 == 0 and tally.bodies + tally.empty > 0 then
+    emf.log(string.format("loot drop: last minute: %d bodies, %d stacks on the ground, %d kept in a body (socketed gem), %d empty",
+      tally.bodies, tally.items, tally.kept, tally.empty))
+    tally = { bodies = 0, items = 0, kept = 0, empty = 0 }
   end
 end
 

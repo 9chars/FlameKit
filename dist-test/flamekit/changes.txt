@@ -1,3 +1,6 @@
+0.15.143 Nov 15, 2026
+- Monsters drop their loot on the ground: a body is looked into again a few times after the death (the game fills it a moment later), and a body is only removed once its loot is on the ground. Before, a body could be removed with its loot still in it.
+
 0.15.142 Nov 15, 2026
 - New Server tab (F4): settings for the whole server and every player on it, with a warning at the top. Anyone can change them for now.
 - Server setting "Monsters drop their loot on the ground" (off by default): every monster that dies drops its loot on the ground beside it (same items, quality and level), so nobody has to press E. Bodies go after 8 s, a boss's after 45 s. A weapon with a socketed gem stays in the body. The server needs one restart after this update.

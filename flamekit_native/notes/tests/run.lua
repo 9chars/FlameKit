@@ -1757,6 +1757,30 @@ do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the 
   local gone = false
   for i = d0 + 1, #destroyed do if destroyed[i] == BODY then gone = true end end
   check(gone, "Loot Drop: the body is removed 8 s after the death")
+  -- (0.15.143, local server: a bird's body was empty 0.5 s after its death and was removed with its loot) a body
+  -- filled later is looked at again; an empty one is never removed
+  local B2, B3 = 7002, 7003
+  for _, b in ipairs({ B2, B3 }) do
+    comps.Faction[b] = { faction = 6 }
+    comps.InventorySetup[b] = { linksEntities = { b, 0 }, linksCategories = { 4, 0 } }
+    comps.Inventory[b] = inv({})
+  end
+  SW.position = function(self, id) if id == B2 or id == B3 then return 6, 0, 6 end return pos_before(self, id) end
+  local n1, d1b = #spawned, #destroyed
+  events["EntityDiedEvent"](SW, { deadEntityId = B2 })
+  events["EntityDiedEvent"](SW, { deadEntityId = B3 })
+  step(40)
+  comps.Inventory[B2].slots[1] = stack(0x22, 3)  -- the game fills B2 a little later; B3 stays empty
+  step(70)
+  local found = false
+  for i = n1 + 1, #spawned do local p = spawned[i].c and spawned[i].c.PickupItem; if p and p.itemId == 0x22 and p.pickupAmount == 3 then found = true end end
+  check(found, "Loot Drop: a body filled after the first look still has its loot put on the ground")
+  step(400)
+  clock = clock + 20
+  step(8 * 60 + 40)
+  local b3_gone = false
+  for i = d1b + 1, #destroyed do if destroyed[i] == B3 then b3_gone = true end end
+  check(not b3_gone, "Loot Drop: a body that stays empty is never removed (left to the game)")
   SW.position = pos_before
 end
 print("ALL PASSED (" .. MODE .. ")")
