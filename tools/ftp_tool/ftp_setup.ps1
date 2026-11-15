@@ -29,7 +29,7 @@ Set-Content -Path (Join-Path $here 'ftp_password.dat') -Encoding ASCII -Value (C
 # a quick look: list the FlameKit folder
 try {
     $r = [System.Net.FtpWebRequest]::Create("ftp://${h}:$p/" + $m.TrimStart('/'))
-    $r.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectory
+    $r.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectoryDetails  # LIST: G-Portal's FTP has no NLST (502)
     $r.Credentials = New-Object System.Net.NetworkCredential($u, $pw)
     $r.EnableSsl = $t -eq 'yes'
     $r.UsePassive = $true
