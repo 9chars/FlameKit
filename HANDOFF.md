@@ -26,6 +26,13 @@ Every time Claude needs a new test, it says so. Never ask the owner to do anythi
 recap: what Claude needs, what Claude will do, what the owner will do. Short: a few lines, no long explanations
 (owner: "all you have to say is you need to do another test"). Without that recap the owner refuses.
 
+## Rule 0d: no game client updates for server-only changes (owner, 2026-11-15 15:24)
+
+"Updating game client versions for no reason": a change that only touches what runs on the server (server-side Lua) goes
+to the local server only: no DLL build, no dist-test list, no Development channel push, no client update. The server's
+`flamekit/mod.json` still gets the next version number and changes.txt its line (rule 5). The Development channel gets a
+version only when something the game client runs changed (client Lua, the DLL, or a feature both sides need).
+
 ## Rule 0c: copying files to the PC (found 2026-11-15)
 
 device_commit_files can send an OLD copy when the same staged path is committed again after the file changed (seen
