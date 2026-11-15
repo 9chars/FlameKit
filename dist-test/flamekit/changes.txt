@@ -1,3 +1,6 @@
+0.15.128 Nov 14, 2026
+- PvP: players now do full damage to each other (it was 25% before).
+
 0.15.127 Nov 14, 2026
 - Minimap: a waypoint can no longer be set on a place you have not discovered yet (the "?" marks). Messages tells you why.
 

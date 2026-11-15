@@ -55,7 +55,7 @@ local TIPS = {
   immortal = "Nothing can hurt or kill you: enemies, lava, the shroud, falling. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
-    .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
+    .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
@@ -889,12 +889,12 @@ end
 -- is not player side is the players' enemy. So a player with PvP on gets faction 1 (written again every step: the game
 -- may set it back, after a death for example), and the game's own weapons, arrows and spells hit them and let them hit.
 -- EMF hit rules keep it between PvP players: while anyone has PvP on, each player without it gets two rules (no damage
--- from players, no damage to players), and one rule scales every player-on-player hit to PVP_SCALE. Heals are never
+-- from players, no damage to players). (0.15.128, owner: too little damage) Player-on-player hits are full damage now:
+-- the rule that scaled them to 25% (0.15.65 to 0.15.127) is gone. Heals are never
 -- matched by a rule (EMF: damage hits only), so a friend's heal still works.
 -- The faction is saved with the world, so it is put back to 7 when PvP goes off, and any player without PvP who is
 -- found with faction 1 (left over from a crash, a reload or a leave) is put back within a second.
 local HIT_ALL, PLAYER_FACTION = 1, 7
-local PVP_SCALE = 0.25
 local pvp_steps = 0
 local pvp_scale_rule = nil
 
@@ -1103,10 +1103,7 @@ local function pvp(world)
         end
       end
     end
-    if any and not pvp_scale_rule then
-      local okr, id = pcall(emf.hit_rule, { from = "players", to = "players", scale = PVP_SCALE })
-      if okr and id then pvp_scale_rule = id end
-    elseif not any and pvp_scale_rule then
+    if pvp_scale_rule then  -- (0.15.128) full damage: one left from before a reload goes
       pcall(emf.hit_rule_remove, pvp_scale_rule)
       pvp_scale_rule = nil
     end

@@ -37,7 +37,7 @@ All keys can be changed in the FlameKit Menu (F4): F4 and the pointer key in the
 - Every player on the server: health, mana, level, buffs and debuffs with the game's own icons, and where they are (region, distance and direction from you).
 
 ### PvP (Experimental window, F6)
-- Free-for-all PvP that each player switches on for themselves. Only players who both have PvP on can hurt each other (at 25% of normal damage). It switches off when you leave the server.
+- Free-for-all PvP that each player switches on for themselves. Only players who both have PvP on can hurt each other, at full damage. It switches off when you leave the server.
 - No cheating in a fight: while your PvP is on, fast travel, spawning test monsters and your experimental options are off (all but the enhanced glider). Switching PvP on also removes your duelist (the harmless dummy stays, so spawn it first if you want to test your weapons). All of it comes back when you switch PvP off.
 - Monsters fight PvP players like any other player.
 
