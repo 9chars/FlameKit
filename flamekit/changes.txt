@@ -1,3 +1,6 @@
+0.15.174 Nov 15, 2026
+- Experiment: for every item Loot Drop puts on the ground, the server sends the game's "turned to loot" event, which makes a player's game put the sparkle on a dead body, in case it sparkles the item too. Needs one server restart. Server only: no game update.
+
 0.15.173 Nov 15, 2026
 - Items Loot Drop puts on the ground have no mark for now (0.15.172's was the loot pile, not the sparkle). The server's log shows the effect components of the first 3 looted bodies, to find the sparkle the game puts on a dead body. Server only: no game update.
 

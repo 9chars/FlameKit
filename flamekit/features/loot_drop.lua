@@ -118,7 +118,7 @@ local function handle(world, id, look)
         if taken and taken > 0 then
           local made, pid = ground.drop(w, st.item, taken, x, y, z, level, rarity, 2.5)
           if made > 0 then
-            if pid then ground.mark(w, pid) end  -- (0.15.171) fireflies on it
+            if pid then ground.mark(w, pid) ground.sparkle(w, pid) end  -- (0.15.174) the body's sparkle on it (experiment)
             tally.items = tally.items + 1
           else
             emf.put(w, id, st.item, taken, nil, { level = level, rarity = rarity })  -- not dropped: back, nothing is lost
@@ -207,7 +207,7 @@ local function from_spot(world, d, again)
           emf.take(w, st.owner, st.item, st.count, function(w2, taken)
             if taken and taken > 0 then
               local made, pid = ground.drop(w2, st.item, taken, x, y, z, level, rarity, 2.5)
-              if made > 0 then tally.items = tally.items + 1 if pid then ground.mark(w2, pid) end
+              if made > 0 then tally.items = tally.items + 1 if pid then ground.mark(w2, pid) ground.sparkle(w2, pid) end
               else emf.put(w2, cid, st.item, taken, nil, { level = level, rarity = rarity }) end
             end
           end, { slot = st.slot, exact = true })
@@ -274,6 +274,7 @@ end
 function F.setup(k)
   kit = k
   local ok = pcall(emf.on_event, "EntityDiedEvent", kit.guard(F, died, "a death"), "server")
+  ground.emits()  -- (0.15.174) the sparkle event for dropped items (named here: EMF wants it in the first run)
   if not ok then emf.log("loot drop: no death events: monsters keep their loot in their bodies") end
   local oke, said = pcall(emf.emits, { "LootInteractionEvent" }, "server")
   if not oke or said == false then emf.log("loot drop: LootInteractionEvent cannot be sent (" .. tostring(said) .. ")") end

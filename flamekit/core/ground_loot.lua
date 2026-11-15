@@ -65,6 +65,23 @@ ground.MARK_S = 600
 ground.MARK_MAX = 300
 local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
 
+-- (0.15.174, owner: the sparkle on a dead body; experiment) that sparkle is put on by the player's game itself
+-- (client_transformed_to_loot) when the server sends TransformedToLootEvent {entityId, useVfxDefaultParameters} for the
+-- body. The same event for a dropped item, in case the game sparkles it too. Untested; EMF lets a script send it only
+-- when it named it at the server start (ground.emits in a feature's setup), so it needs one server restart.
+ground.SPARKLE = true
+local sparkle_ok = nil  -- nil: not asked yet; false: the event cannot be sent
+function ground.emits()
+  local ok, said = pcall(emf.emits, { "TransformedToLootEvent" }, "server")
+  sparkle_ok = ok and said ~= false
+  if not sparkle_ok then emf.log("ground loot: TransformedToLootEvent cannot be sent (" .. tostring(said) .. "): no sparkle on dropped items") end
+end
+function ground.sparkle(world, pickup)
+  if not ground.SPARKLE or not sparkle_ok or not pickup then return false end
+  local ok, done = pcall(emf.emit, "server", "TransformedToLootEvent", { entityId = pickup, useVfxDefaultParameters = true })
+  return ok and done ~= false
+end
+
 function ground.mark(world, pickup)
   if not ground.MARK_FX then return "off" end
   if marks_n >= ground.MARK_MAX then return "too many" end
