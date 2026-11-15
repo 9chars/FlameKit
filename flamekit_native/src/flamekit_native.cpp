@@ -2568,6 +2568,9 @@ struct MinimapLayer : Layer {
         if (is_wp) {
             FK_LOG(fklog::kInfo, "minimap: click on the waypoint's marker (%.0f %.0f): waypoint cleared", wx, wz);
             g_act("wp", "clear");
+        } else if (best->state < 2) {  // (0.15.127, owner) no waypoint on a place not discovered yet (the "?" ones)
+            FK_LOG(fklog::kInfo, "minimap: click on an undiscovered marker (kind %d) at %.0f %.0f: no waypoint", best->kind, best->x, best->z);
+            g_act("wp", "undiscovered");
         } else {
             char arg[96];  // (0.15.125) "x,y,z" with the marker's height when known: Map Waypoint goes straight there
             if (best->y != kNoHeight) snprintf(arg, sizeof arg, "%.1f,%.1f,%.1f", best->x, best->y, best->z);

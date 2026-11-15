@@ -968,6 +968,13 @@ check(wpc.enabled == true and wpc.waypointPosition.x == math.floor(1234.5 * 2 ^ 
 require("features.experimental").minimap_waypoint(UI, "clear")
 step(40)
 check(wpc.enabled == false, "and the clear click takes it away")
+do  -- (0.15.127, owner) a click on an undiscovered place: no waypoint, and the player is told why
+  require("features.experimental").minimap_waypoint(UI, "undiscovered")
+  step(40)
+  local mf = io.open(TMP .. "\\ui_messages.dat", "r"); local mt = mf and mf:read("a") or ""; if mf then mf:close() end
+  check(wpc.enabled == false and mt:find("only be set on places you have discovered", 1, true) ~= nil,
+    "an undiscovered place: no waypoint, and Messages says why")
+end
 do  -- (0.15.125, production log) a minimap waypoint has the marker's height; a far move goes straight there, no ground search
   local X = require("features.experimental")
   X.minimap_waypoint(UI, "1234.5,80.0,2345.5")

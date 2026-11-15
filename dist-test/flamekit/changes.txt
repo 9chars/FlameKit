@@ -1,3 +1,6 @@
+0.15.127 Nov 14, 2026
+- Minimap: a waypoint can no longer be set on a place you have not discovered yet (the "?" marks). Messages tells you why.
+
 0.15.126 Nov 14, 2026
 - Test monsters: a killed dummy or duelist no longer leaves a body behind that cannot be looted or removed: it goes 8 seconds after the kill.
 - Remove (Experimental window, test monsters) is always there now: it also clears any dead test monster's body near you, including ones left by earlier versions.

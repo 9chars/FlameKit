@@ -1486,6 +1486,10 @@ end
 -- writes the player's PlayerWaypoint (the game's own waypoint: its map and compass show it, Map Waypoint goes there).
 function F.minimap_waypoint(world, arg)
   local msg
+  if arg == "undiscovered" then  -- (0.15.127, owner) a "?" place on the minimap: no waypoint there
+    kit.note("Waypoints can only be set on places you have discovered.", "#ff9632", true)
+    return
+  end
   if arg == "clear" then
     msg = { op = "clearwp" }
   else
