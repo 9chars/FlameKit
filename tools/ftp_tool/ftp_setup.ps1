@@ -1,5 +1,6 @@
-# ftp_setup.ps1: tells FlameKit's restart helper how to reach the production server by FTP (requests upload and
-# serverlog). Run ftp_setup.cmd once, and again when the server's FTP details change. The password is typed here and
+# ftp_setup.ps1 (FlameKit FTP tool): how upload.cmd reaches the production server by FTP (it uploads Claude's outbox and
+# fetches the server's log). Run ftp_setup.cmd once, and again when the server's FTP details change. The password is
+# typed here and
 # kept in ftp_password.dat, encrypted for this Windows user (Windows DPAPI): only this user on this PC can read it, and
 # it is never shown, logged or sent anywhere but to the FTP server. ftp.txt keeps the rest (no password) and can be
 # edited by hand. Neither file is ever put in the repository.
@@ -21,8 +22,9 @@ $u = Ask 'user' 'User name' ''
 $t = Ask 'tls' 'Use FTPS (encrypted)? yes or no' 'no'
 $m = Ask 'mod_dir' "Path of the server's FlameKit folder, from the FTP login (for example /emf/mods/flamekit)" '/emf/mods/flamekit'
 $g = Ask 'log_path' "Path of the server's emf_core.log, from the FTP login" '/emf/emf_core.log'
+$o = Ask 'outbox' 'The outbox folder on this PC where Claude leaves the files' 'C:\enshrouded mod shit\outbox'
 $pw = Read-Host 'Password (not shown)' -AsSecureString
-Set-Content -Path $conf -Encoding ASCII -Value @("host = $h", "port = $p", "user = $u", "tls = $t", "mod_dir = $m", "log_path = $g")
+Set-Content -Path $conf -Encoding ASCII -Value @("host = $h", "port = $p", "user = $u", "tls = $t", "mod_dir = $m", "log_path = $g", "outbox = $o")
 Set-Content -Path (Join-Path $here 'ftp_password.dat') -Encoding ASCII -Value (ConvertFrom-SecureString $pw)
 # a quick look: list the FlameKit folder
 try {
