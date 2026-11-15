@@ -770,7 +770,12 @@ local function bodies_tick(world)
         local hp = world:get("NetworkHealth", id)
         local placed = world:position(id) ~= nil
         alive = placed and (hp == nil or hp.health > 0)
-        b.why = not placed and "no longer in the world (removed by the game)" or (hp and hp.health <= 0 and "killed") or nil
+        if alive then b.seen_alive = true end
+        -- (0.15.141, production log: the first 20 of every big spawn "killed" 0.3 s after the spawn, and their
+        -- bodies removed 8 s later) a creature reads as dead until the game sets its health (EMF docs): it counts
+        -- as killed only once it was seen alive
+        if placed and hp and hp.health <= 0 and not b.seen_alive then alive = true end
+        b.why = not placed and "no longer in the world (removed by the game)" or (hp and hp.health <= 0 and b.seen_alive and "killed") or nil
       end)
     end
     -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a

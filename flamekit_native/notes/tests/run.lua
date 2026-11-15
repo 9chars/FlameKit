@@ -985,6 +985,24 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   clock = clock + 9
   step(35)
   check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
+  -- (0.15.141, production log) a fresh monster reads as dead until the game sets its health: not killed, kept
+  local fid = 950 + #spawned + 1
+  SW.position = function(self, id) if id == fid then return 2, 0, 2 end return pos_before(self, id) end
+  comps.Faction[fid] = { faction = 6 }
+  comps.NetworkHealth[fid] = { health = 0 }
+  local d2 = #destroyed
+  click(find_row("^Spawn Monsters$").button)
+  step(65)
+  clock = clock + 9
+  step(35)
+  check(#destroyed == d2 and find_row("^Spawn Monsters$").selected, "a just-spawned monster whose health is not set yet is not taken for dead")
+  comps.NetworkHealth[fid].health = 100
+  step(35)
+  comps.NetworkHealth[fid].health = 0
+  step(35)
+  clock = clock + 9
+  step(35)
+  check(destroyed[#destroyed] == fid, "once it was alive, a kill counts again")
   SW.position = pos_before
   comps.NetworkHealth[901] = { health = 0 }
   local f901 = comps.Faction[901]
