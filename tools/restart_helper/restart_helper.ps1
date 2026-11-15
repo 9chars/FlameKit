@@ -17,6 +17,11 @@
 #           installtest\game (a fake dedicated server folder: an empty enshrouded_server.exe, so no save backup is made)
 #           gets installtest\old\install.ps1 (the old FlameKit package) or installtest\new\install.ps1 (the new one),
 #           -NoDesktopShortcut; the output goes to installtest\old.log or installtest\new.log
+#   upload  (0.15.132, owner) copy the files in upload\ to the production server by FTP, into the server's FlameKit
+#           folder (mod.json last, so EMF reloads FlameKit once everything is there); then deletes upload\. The server's
+#           address, user and folders are in ftp.txt, its password in ftp_password.dat: both made by ftp_setup.cmd, which
+#           the owner runs (the password is typed there and kept encrypted for this Windows user; Claude never sees it)
+#   serverlog  download the production server's emf_core.log (ftp.txt log_path) to server_logs\emf_core.log
 #   stop    stop this helper
 # Whenever a file chime.request appears, it plays a chime: Claude is done and waits for the owner.
 #
@@ -246,6 +251,79 @@ function Install-Test([string]$which) {
     return $code -eq 0
 }
 
+# ---- FTP to the production server (upload, serverlog) ----
+function Ftp-Settings {
+    $conf = Join-Path $here 'ftp.txt'
+    $pass = Join-Path $here 'ftp_password.dat'
+    if (-not (Test-Path $conf) -or -not (Test-Path $pass)) { Log 'ftp: FAILED: run ftp_setup.cmd first (ftp.txt or ftp_password.dat is missing)'; return $null }
+    $s = @{ port = '21'; tls = 'no' }
+    foreach ($line in Get-Content $conf) {
+        if ($line -match '^\s*([a-z_]+)\s*=\s*(.*?)\s*$') { $s[$Matches[1]] = $Matches[2] }
+    }
+    foreach ($k in 'host', 'user', 'mod_dir') { if (-not $s[$k]) { Log "ftp: FAILED: ftp.txt has no $k"; return $null } }
+    $s.password = (Get-Content $pass -Raw).Trim() | ConvertTo-SecureString
+    return $s
+}
+
+function Ftp-Request($s, [string]$path, [string]$method) {
+    $uri = "ftp://$($s.host):$($s.port)/" + ($path.TrimStart('/') -replace '\\', '/')
+    $r = [System.Net.FtpWebRequest]::Create($uri)
+    $r.Method = $method
+    $r.Credentials = New-Object System.Net.NetworkCredential($s.user, $s.password)
+    $r.EnableSsl = $s.tls -eq 'yes'
+    $r.UsePassive = $true
+    $r.UseBinary = $true
+    $r.KeepAlive = $false
+    $r.Timeout = 30000
+    return $r
+}
+
+function Ftp-Upload {
+    $s = Ftp-Settings
+    if (-not $s) { return $false }
+    $src = Join-Path $here 'upload'
+    if (-not (Test-Path $src)) { Log 'upload: FAILED: there is no upload folder'; return $false }
+    $files = @(Get-ChildItem $src -Recurse -File | Sort-Object { $_.Name -ieq 'mod.json' -and $_.DirectoryName -ieq $src })
+    if (-not $files.Count) { Log 'upload: FAILED: the upload folder is empty'; return $false }
+    $made = @{}
+    foreach ($f in $files) {
+        $rel = $f.FullName.Substring($src.Length).TrimStart('\') -replace '\\', '/'
+        $dir = Split-Path $rel -Parent
+        if ($dir -and -not $made[$dir]) {  # the folders first (an existing one answers with an error, which is fine)
+            $acc = $s.mod_dir.TrimEnd('/')
+            foreach ($part in ($dir -replace '\\', '/').Split('/')) {
+                $acc = "$acc/$part"
+                try { (Ftp-Request $s $acc ([System.Net.WebRequestMethods+Ftp]::MakeDirectory)).GetResponse().Close() } catch { }
+            }
+            $made[$dir] = $true
+        }
+        $r = Ftp-Request $s ($s.mod_dir.TrimEnd('/') + '/' + $rel) ([System.Net.WebRequestMethods+Ftp]::UploadFile)
+        $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+        $r.ContentLength = $bytes.Length
+        $st = $r.GetRequestStream(); $st.Write($bytes, 0, $bytes.Length); $st.Close()
+        $r.GetResponse().Close()
+        Log "upload: $rel ($($bytes.Length) bytes)"
+    }
+    Remove-Item $src -Recurse -Force
+    Log "upload: $($files.Count) file(s) on the production server"
+    return $true
+}
+
+function Ftp-ServerLog {
+    $s = Ftp-Settings
+    if (-not $s) { return $false }
+    if (-not $s.log_path) { Log 'serverlog: FAILED: ftp.txt has no log_path'; return $false }
+    $out = Join-Path $here 'server_logs'
+    if (-not (Test-Path $out)) { New-Item -ItemType Directory -Path $out | Out-Null }
+    $r = Ftp-Request $s $s.log_path ([System.Net.WebRequestMethods+Ftp]::DownloadFile)
+    $resp = $r.GetResponse()
+    $fs = [System.IO.File]::Create((Join-Path $out 'emf_core.log'))
+    $resp.GetResponseStream().CopyTo($fs)
+    $fs.Close(); $resp.Close()
+    Log "serverlog: emf_core.log downloaded ($((Get-Item (Join-Path $out 'emf_core.log')).Length) bytes)"
+    return $true
+}
+
 function Finish([bool]$ok, [string]$text) {
     Set-Content -Path $doneFile -Value ("{0} {1}" -f $(if ($ok) { 'ok' } else { 'failed' }), $text) -Encoding UTF8
     Log "done: $(if ($ok) { 'ok' } else { 'FAILED' }): $text"
@@ -275,8 +353,10 @@ while ($true) {
                 'sign' { $ok = Sign; Finish $ok 'sign' }
                 'installold' { $ok = Install-Test 'old'; Finish $ok 'installold' }
                 'installnew' { $ok = Install-Test 'new'; Finish $ok 'installnew' }
+                'upload' { $ok = Ftp-Upload; Finish $ok 'upload' }
+                'serverlog' { $ok = Ftp-ServerLog; Finish $ok 'serverlog' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, upload, serverlog, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"

@@ -22,3 +22,8 @@ EMF-*.zip
 release/
 test mods/
 g-portal backup data/
+
+# FTP details and password of the production server (restart helper; never in the repository)
+ftp.txt
+ftp_password.dat
+server_logs/
