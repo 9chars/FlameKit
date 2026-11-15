@@ -83,9 +83,8 @@ local function handle(world, id, look)
       local level, rarity = st.level or 0, st.rarity or 0
       emf.take(world, st.owner, st.item, st.count, function(w, taken)
         if taken and taken > 0 then
-          local made, pid = ground.drop(w, st.item, taken, x, y, z, level, rarity, 2.5)
+          local made = ground.drop(w, st.item, taken, x, y, z, level, rarity, 2.5)
           if made > 0 then
-            if pid then ground.mark(w, pid) end  -- (0.15.153, owner) the flame on every dropped item
             tally.items = tally.items + 1
           else
             emf.put(w, id, st.item, taken, nil, { level = level, rarity = rarity })  -- not dropped: back, nothing is lost
@@ -155,7 +154,6 @@ end
 
 function F.tick(world)
   steps = steps + 1
-  if steps % 30 == 0 then pcall(ground.fx_tick, world) end  -- (0.15.153) flames off picked-up loot
   local okt, why = pcall(test_tick, world)
   if not okt then emf.log("loottest: error: " .. tostring(why)) test.id = nil end
   local n = 0

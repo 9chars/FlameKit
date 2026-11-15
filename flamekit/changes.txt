@@ -1,3 +1,6 @@
+0.15.158 Nov 15, 2026
+- No more flame effect on items put on the ground. Server only: no game update.
+
 0.15.157 Nov 15, 2026
 - Test monsters' loot chests are the game's treasure chest instead of a base storage chest.
 - Loot chests carry an invisible tag, so FlameKit finds them again after an update or reload; before, those chests were forgotten and never removed. A chest is still only removed once it is emptied. Server only: no game update.

@@ -50,37 +50,7 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread, templat
   return made, last  -- (0.15.152) also the last pickup's entity id, for a caller that marks it
 end
 
--- (0.15.152, owner: "put a sparkle particle effect on them"; 0.15.153: on all dropped loot) the game's grave flame on a
--- dropped item's spot, removed once the item is gone (picked up) or after MARK_S. At most MARK_MAX at once (a big fight
--- must not fill the world with effects). Not saved: after a FlameKit reload a flame still burning is no longer tracked.
--- Each feature that marks calls ground.fx_tick now and then (twice in one step does no harm).
-ground.MARK_FX = "2c2c4511-0173-40ee-85a3-2f9383d14b72"  -- VFX_SubEntity_Player_LootCorpse_Tombstone_Flame
-ground.MARK_S = 600
-ground.MARK_MAX = 300
-local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
-
-function ground.mark(world, pickup)
-  if marks_n >= ground.MARK_MAX then return "too many" end
-  local ok, x, y, z = pcall(world.position, world, pickup)
-  if not ok or not x then return "item not found" end
-  local oks, id = pcall(emf.spawn, world, ground.MARK_FX, x, y, z)
-  if not oks or not id or id == 0 then return "refused (" .. tostring(id) .. ")" end
-  marks[id], marks_n = { item = pickup, at = os.time() }, marks_n + 1
-  return "placed (entity " .. tostring(id) .. ")"
-end
-
-function ground.fx_tick(world)
-  if marks_n == 0 then return end
-  local now, n = os.time(), 0
-  for id, m in pairs(marks) do
-    local ok, x = pcall(world.position, world, m.item)
-    if not ok or not x or now - m.at >= ground.MARK_S then
-      marks[id], marks_n = nil, marks_n - 1
-      pcall(emf.destroy, world, id)
-      n = n + 1
-    end
-  end
-  if n > 0 and n <= 5 then emf.log(string.format("ground loot: %d flame(s) removed (item picked up or %d s)", n, ground.MARK_S)) end
-end
+-- (0.15.152-0.15.157) the game's grave flame (VFX_SubEntity_Player_LootCorpse_Tombstone_Flame, 2c2c4511-...) was put on
+-- dropped items; removed in 0.15.158 (owner: "lets get rid of that now").
 
 return ground

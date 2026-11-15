@@ -1530,7 +1530,6 @@ end
 function F.tick(world)
   fx_steps = fx_steps + 1
   if world:is_server() then pcall(body_loot_tick, world) end  -- (0.15.156) test monsters' own loot into the chest
-  if fx_steps % 30 == 0 and world:is_server() then pcall(ground.fx_tick, world) end  -- (0.15.152) flames on picked-up loot
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
