@@ -12,6 +12,7 @@ local bag = require("core.bag")
 local ground = require("core.ground_loot")
 local server = require("core.server_settings")
 local test_tag = require("core.test_tag")
+local spots = require("core.loot_spots")  -- (0.15.170) a creature's separate loot spot
 
 local F = { id = "loot_drop", title = "Loot Drop" }
 local kit
@@ -23,7 +24,8 @@ local LOOKS = { 30, 90, 180, 360 }
 local BODY_S, BOSS_BODY_S = 8, 45
 local PER_STEP = 20            -- bodies handled per step (a big fight stays within EMF's time per step)
 
-local queue, head = {}, 1      -- deaths waiting: { id, at, look }
+local queue, head = {}, 1      -- deaths waiting: { id, at, look, x, y, z, t }
+local retry = {}               -- (0.15.170) loot spots to look at again: { d, at }
 local bodies = {}              -- body id -> step to remove it at
 local steps = 0
 local tally = { bodies = 0, items = 0, kept = 0, empty = 0 }  -- summed, logged once a minute (no line per monster)
@@ -59,8 +61,11 @@ local function died(world, e)
   end
   if not server.get("loot_to_ground") then return end
   if test_tag.is(world, id) then return end  -- (0.15.156, owner) FlameKit's test monsters: their loot goes into chests
-  note("body %s died: queued", tostring(id))
-  queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1 }
+  local okp, x, y, z = pcall(world.position, world, id)
+  local t = spots.death_time(e)
+  note("body %s died: queued (time %s)", tostring(id), tostring(t))
+  queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1, x = okp and x or nil, y = okp and y or nil,
+                        z = okp and z or nil, t = t }
 end
 
 local function handle(world, id, look)
@@ -155,8 +160,51 @@ local function test_tick(world)
   end
 end
 
+-- (0.15.170) the body is gone, or stayed empty: its loot is in a separate loot spot (core/loot_spots.lua). Its items go
+-- on the ground at the spot (same quality and level), then the empty spot is removed.
+local function from_spot(world, d, again)
+  local asked = spots.find(d.id, d.x, d.z, d.t, function(w, ids)
+    if #ids == 0 then note("body %s: no loot spot found", tostring(d.id)) tally.empty = tally.empty + 1 return end
+    for _, cid in ipairs(ids) do
+      local stacks = bag.entity_stacks(w, cid)
+      if #stacks == 0 and not again then  -- not filled yet: once more, a second later
+        note("body %s: loot spot %s still empty, looking again", tostring(d.id), tostring(cid))
+        retry[#retry + 1] = { d = d, at = steps + 60 }
+        return
+      end
+      local okp, x, y, z = pcall(w.position, w, cid)
+      if not okp or not x then x, y, z = d.x, d.y, d.z end
+      local moved = 0
+      for _, st in ipairs(stacks) do
+        if not st.gem then
+          local level, rarity = st.level or 0, st.rarity or 0
+          emf.take(w, st.owner, st.item, st.count, function(w2, taken)
+            if taken and taken > 0 then
+              if ground.drop(w2, st.item, taken, x, y, z, level, rarity, 2.5) > 0 then tally.items = tally.items + 1
+              else emf.put(w2, cid, st.item, taken, nil, { level = level, rarity = rarity }) end
+            end
+          end, { slot = st.slot, exact = true })
+          moved = moved + 1
+        end
+      end
+      note("body %s: loot spot %s, %d stack(s) to the ground", tostring(d.id), tostring(cid), moved)
+      tally.bodies = tally.bodies + 1
+      if moved == #stacks then bodies[cid] = steps + 60 end  -- the emptied spot goes a second later
+    end
+  end)
+  if not asked then note("body %s: gone, and its death has no time or place: its loot spot cannot be told", tostring(d.id)) end
+end
+
 function F.tick(world)
   steps = steps + 1
+  pcall(spots.tick, world)
+  if #retry > 0 then
+    local keep = {}
+    for _, r in ipairs(retry) do
+      if r.at <= steps then pcall(from_spot, world, r.d, true) else keep[#keep + 1] = r end
+    end
+    retry = keep
+  end
   local okt, why = pcall(test_tick, world)
   if not okt then emf.log("loottest: error: " .. tostring(why)) test.id = nil end
   local n = 0
@@ -169,10 +217,13 @@ function F.tick(world)
       kit.debug("warn", "loot drop: body %s: %s", tostring(d.id), tostring(r))
     elseif r == "empty" then
       if d.look < #LOOKS then
-        queue[#queue + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1 }
+        queue[#queue + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1,
+                              x = d.x, y = d.y, z = d.z, t = d.t }
       else
-        tally.empty = tally.empty + 1  -- empty at every look: nothing to drop, and the body is left to the game
+        pcall(from_spot, world, d)  -- (0.15.170) empty at every look: its loot may be in a separate spot
       end
+    elseif r == "gone" then
+      pcall(from_spot, world, d)  -- (0.15.170) the body went (it faded): its loot is in a separate spot
     end
   end
   if head > #queue then queue, head = {}, 1 end
