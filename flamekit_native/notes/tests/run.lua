@@ -1002,7 +1002,7 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     for i = #spawned, math.max(1, #spawned - 20), -1 do
       local sp = spawned[i]
       local p = sp.c and sp.c.PickupItem
-      if (sp.guid == "a56d2777-daf1-4164-90d4-b7b12749c723" or sp.guid == "1b22afc5-be0e-47ad-852a-fbc564bea121") and p then  -- (0.15.150) the item with an effect
+      if (sp.guid == "a56d2777-daf1-4164-90d4-b7b12749c723" or sp.guid == "c799a6d4-88ef-4bdf-ba38-9faf23592b6e") and p then  -- (0.15.150) the item with an effect
         if p.itemId == emf.item("Material_T1_Token_WeaponUpgrade_Rune01") then runes = runes or p
         elseif p.itemId == emf.item("Material_T2_Token_WeaponUpgrade_Rune02") then lruns = lruns or p
         elseif p.rarity == 4 then item = item or p end

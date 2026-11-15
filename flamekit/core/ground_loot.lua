@@ -17,7 +17,8 @@ ground.MAX_AMOUNT = 65535  -- PickupItem.pickupAmount is a u16
 ground.LIFT = 0.25
 -- (0.15.150, owner: "put a sparkle particle effect on them") the game's pickup with an effect of its own (template
 -- list from the game's files); untested which effect it shows. A caller picks it with `template`; the default stays plain.
-ground.PICKUP_VFX = "1b22afc5-be0e-47ad-852a-fbc564bea121"  -- Base_LootPickup_VFX
+-- 0.15.150 Base_LootPickup_VFX (1b22afc5-...) showed only "a very bright orb" (owner); 0.15.151 tries the one with a model
+ground.PICKUP_VFX = "c799a6d4-88ef-4bdf-ba38-9faf23592b6e"  -- Base_LootPickup_Model_VFX
 
 local RARITY = { common = 0, uncommon = 1, rare = 2, epic = 3, legendary = 4 }
 

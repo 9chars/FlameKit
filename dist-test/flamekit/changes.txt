@@ -1,3 +1,6 @@
+0.15.151 Nov 15, 2026
+- Test monsters: the legendary item they drop uses the game's pickup with its model and an effect (Base_LootPickup_Model_VFX) instead of the one that showed only a bright orb.
+
 0.15.150 Nov 15, 2026
 - Test monsters: the legendary item they drop uses the game's own pickup with an effect (Base_LootPickup_VFX), to make it stand out on the ground. Runes and the server's Loot Drop are unchanged.
 
