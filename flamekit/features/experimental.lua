@@ -834,14 +834,18 @@ local function bodies_tick(world)
         killed = killed + 1
         if b.kind == "duel" then  -- (0.15.142, owner) its loot on the ground
           local okd, what = pcall(drop_test_loot, world, id, b)
-          -- (0.15.162, owner: "we dont want the corpse") the body goes at the next check, not CORPSE_S later
-          b.dead_at = os.time() - CORPSE_S
+          -- (0.15.162, owner: "we dont want the corpse") (0.15.163: at the next check, 2 of 15 bodies stayed: the game
+          -- changes a body soon after the death and it no longer read as killed) the body goes at once, in this check
+          drop_body(world, id, true)
+          gone = gone + 1
           if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
         end
-        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end
+        local when = b.kind == "duel" and "its body removed" or string.format("its body goes in %d s", CORPSE_S)  -- (0.15.163)
+        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: %s", b.kind, tostring(id), when)) end
         local o = online[b.owner]
         if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many
-          tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
+          tell_player(world, o.entity, b.owner, b.kind == "duel" and "Your test monster was killed."
+            or string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
         end
       elseif os.time() - b.dead_at >= CORPSE_S then
         gone = gone + 1
