@@ -14,6 +14,11 @@ rewrite the step if any answer is no:
 3. Does it name the exact file, button or menu item to click, and what Windows will show or ask?
 4. Would the step make sense if it were the only step he read?
 5. Does the last step say what to tell Claude when done, and what Claude does then?
+6. For a test: does the message say, BEFORE the steps, what the test does exactly (what is created, read or changed,
+   with which values), what it never touches, and what each possible result means? (owner, 2026-11-15: "left me
+   guessing about your test")
+7. Did Claude first check everything it can check itself (the file on the PC, what the code will do, a read-only dry
+   run in the log) so the owner is not the one finding Claude's mistakes?
 
 ## Rule 0c: copying files to the PC (found 2026-11-15)
 
