@@ -250,11 +250,14 @@ function Install-Test([string]$which) {
 # FTP tool's own upload.ps1 (<work folder>\release\FlameKit FTP tool): it uploads the outbox to the production server's
 # FlameKit folder, mod.json last, and fetches the server's logs into outbox\server_log. The password stays encrypted in
 # that folder (DPAPI, this Windows user): this helper only starts the script and logs what it prints, never the password.
-function Upload([switch]$List) {
+function Upload([switch]$List, [switch]$LogsOnly) {
     $tool = Join-Path (Split-Path -Parent $here) 'release\FlameKit FTP tool\upload.ps1'
     if (-not (Test-Path $tool)) { Log "upload: FAILED: $tool not found"; return $false }
     Log 'upload: starting the FTP tool'
-    $out = if ($List) { & powershell -NoProfile -ExecutionPolicy Bypass -File $tool -List 2>&1 } else { & powershell -NoProfile -ExecutionPolicy Bypass -File $tool 2>&1 }
+    $args2 = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $tool)
+    if ($List) { $args2 += '-List' }
+    if ($LogsOnly) { $args2 += '-LogsOnly' }
+    $out = & powershell @args2 2>&1
     $code = $LASTEXITCODE
     foreach ($line in $out) { Log "upload: $line" }
     if ($code -ne 0) { Log "upload: FAILED (exit code $code)"; return $false }
@@ -267,7 +270,16 @@ function Finish([bool]$ok, [string]$text) {
 }
 
 Log "restart helper started; server folder: $(if ($serverDir) { if (Test-Path $serverExe) { 'found' } else { 'enshrouded_server.exe NOT found' } } else { 'not set' }); game app id $appId; chime: $(if (Test-Path $chimeSound) { Split-Path $chimeSound -Leaf } else { 'Windows exclamation sound' })"
+# (owner, 2026-11-15) every night at 3:55 (this PC's time; G-Portal restarts the production server at about 4:10, and
+# emf_core.log starts anew then) the production logs are fetched, nothing uploaded. Needs this PC on and this window open.
+$nightlyDone = ''
 while ($true) {
+    $now = Get-Date
+    if ($now.Hour -eq 3 -and $now.Minute -ge 55 -and $nightlyDone -ne $now.ToString('yyyy-MM-dd')) {
+        $nightlyDone = $now.ToString('yyyy-MM-dd')
+        Log 'nightly: fetching the production logs before the server restart'
+        try { $null = Upload -LogsOnly } catch { Log "nightly: error: $($_.Exception.Message)" }
+    }
     if (Test-Path $chimeRequest) {
         Remove-Item $chimeRequest
         Log 'chime: Claude waits for you'

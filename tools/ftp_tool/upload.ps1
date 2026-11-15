@@ -3,7 +3,7 @@
 # 2026-11-15) Claude through the restart helper's 'upload' request. The password stays encrypted for the owner's Windows
 # user (ftp_password.dat, DPAPI): it is never shown or logged, and Claude never opens that file. It only ever writes into the
 # server's FlameKit folder (ftp.txt mod_dir), mod.json last, and reads the log (log_path). It never deletes on the server.
-param([switch]$List)  # (2026-11-15) -List: also writes what is on the FTP (names, sizes, dates) to production_stable_logs\ftp_list.txt
+param([switch]$List, [switch]$LogsOnly)  # -LogsOnly (nightly fetch): uploads nothing, only fetches the logs  # (2026-11-15) -List: also writes what is on the FTP (names, sizes, dates) to production_stable_logs\ftp_list.txt
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $conf = Join-Path $here 'ftp.txt'
@@ -27,7 +27,7 @@ $logRoot = if ($s.logs) { $s.logs } else { Join-Path (Split-Path -Parent $out) '
 $files = @()
 if (Test-Path $out) { $files = @(Get-ChildItem $out -Recurse -File | Where-Object { $_.FullName -notlike (Join-Path $out 'server_log\*') } |
     Sort-Object { $_.Name -ieq 'mod.json' -and $_.DirectoryName -ieq $out }) }
-if (-not $files.Count) { Write-Host 'The outbox is empty: nothing to upload.' }
+if ($LogsOnly) { $files = @() } elseif (-not $files.Count) { Write-Host 'The outbox is empty: nothing to upload.' }
 foreach ($f in $files) {
     $rel = $f.FullName.Substring($out.Length).TrimStart('\') -replace '\\', '/'
     $dir = ($rel -replace '/[^/]*$', '')
@@ -155,4 +155,14 @@ if ($List) {
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     Set-Content -Path (Join-Path $logDir 'ftp_list.txt') -Value $lines -Encoding UTF8
     Write-Host "FTP list written: $($lines.Count) lines (production_stable_logs\ftp_list.txt)."
+}
+
+# (owner, 2026-11-15) the nightly fetch keeps a dated copy of emf_core.log: the server starts a new one at its restart
+if ($LogsOnly) {
+    $src = Join-Path $logRoot 'emf_core.log'
+    if (Test-Path $src) {
+        $dst = Join-Path $logRoot ('emf_core_' + (Get-Date -Format 'yyyy-MM-dd') + '.log')
+        Copy-Item $src $dst -Force
+        Write-Host "kept a copy: $(Split-Path $dst -Leaf)"
+    }
 }
