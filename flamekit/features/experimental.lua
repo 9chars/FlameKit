@@ -630,6 +630,20 @@ end
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
 local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
 local fx_steps = 0    -- server steps (F.tick)
+local body_clear = {}  -- (0.15.161) test monster bodies to empty: { id, at }
+local function body_clear_tick(world)
+  if #body_clear == 0 then return end
+  local keep = {}
+  for _, d in ipairs(body_clear) do
+    if d.at > fx_steps then keep[#keep + 1] = d
+    else
+      for _, st in ipairs(bag.entity_stacks(world, d.id)) do
+        pcall(emf.take, world, st.owner, st.item, st.count, function() end, { slot = st.slot, exact = true })
+      end
+    end
+  end
+  body_clear = keep
+end
 
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
@@ -658,8 +672,10 @@ local function drop_test_loot(world, id, b)
   local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
   local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
   if name then loot_chest.put(world, key, x, y, z, name, 1, level, "legendary") end
-  -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear") their
-  -- own game loot stays in the body, which goes CORPSE_S after the death (0.15.156 put it into the chest)
+  -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear";
+  -- 0.15.161: "it leaves the corpse with junk in it no one wants") the game's own loot in the body (it comes 1.5-3 s
+  -- after the death) is taken out and thrown away at 2, 3 and 5 s; the body goes at CORPSE_S (8 s)
+  for _, t in ipairs({ 120, 180, 300 }) do body_clear[#body_clear + 1] = { id = id, at = fx_steps + t } end
   -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
   return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
     killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
@@ -1511,6 +1527,7 @@ end
 
 function F.tick(world)
   fx_steps = fx_steps + 1
+  if world:is_server() then pcall(body_clear_tick, world) end  -- (0.15.161) test monster bodies emptied
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end

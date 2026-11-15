@@ -1,3 +1,6 @@
+0.15.161 Nov 15, 2026
+- Test monsters: the game's own loot in their bodies is taken out and thrown away (2, 3 and 5 s after the death), so a body never holds anything; they give only their runes and their legendary item. Server only: no game update.
+
 0.15.160 Nov 15, 2026
 - Test monsters give only their runes (into the killer's bag) and their one legendary item (into the loot chest); the game's own loot in their bodies is no longer put into the chest (it goes with the body).
 - Loot chests: a new chest is given half a second before items go into it (it refused them at once, and FlameKit then put a second chest beside it), and no hidden tag any more (a chest spawned with it refused every item). FlameKit remembers its chests in loot_chests.dat, so an update does not make it forget them. Server only: no game update.
