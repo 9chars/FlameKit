@@ -628,7 +628,7 @@ end
 -- all legendary: regular runes (10 or 15) and legendary runes (5 or 10), a boss twice as many; and one more item with
 -- equal chances of a cosmetic, a weapon, an armour piece, a ring or a gem, the gear of the tier for the monster's level
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
-local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
+local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }  -- (0.15.162, owner: "we want cosmetics too")
 local fx_steps = 0    -- server steps (F.tick)
 local body_clear = {}  -- (0.15.161) test monster bodies to empty: { id, at }
 local function body_clear_tick(world)
@@ -834,6 +834,8 @@ local function bodies_tick(world)
         killed = killed + 1
         if b.kind == "duel" then  -- (0.15.142, owner) its loot on the ground
           local okd, what = pcall(drop_test_loot, world, id, b)
+          -- (0.15.162, owner: "we dont want the corpse") the body goes at the next check, not CORPSE_S later
+          b.dead_at = os.time() - CORPSE_S
           if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
         end
         if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end

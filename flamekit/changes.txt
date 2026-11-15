@@ -1,3 +1,6 @@
+0.15.162 Nov 15, 2026
+- Test monsters: no body is left behind (it is removed right after the kill instead of 8 s later). Server only: no game update.
+
 0.15.161 Nov 15, 2026
 - Test monsters: the game's own loot in their bodies is taken out and thrown away (2, 3 and 5 s after the death), so a body never holds anything; they give only their runes and their legendary item. Server only: no game update.
 

@@ -1000,11 +1000,9 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   comps.NetworkHealth[kid].health = 0
   step(65)
   emf.put = put_before
-  local d1 = #destroyed
-  check(not find_row("^Spawn Monsters$").selected and destroyed[#destroyed] ~= kid, "killed: no longer your duelist, its body stays a moment")
-  clock = clock + 9
-  step(35)
-  check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
+  local gone = false
+  for _, d in ipairs(destroyed) do if d == kid then gone = true end end
+  check(not find_row("^Spawn Monsters$").selected and gone, "(0.15.162, owner: no corpse) killed: its body is destroyed at the next check")
   do  -- (0.15.154, owner) runes into the killer's bag (here: the spawner), the legendary item into a spawned chest
     local runes, lruns, item, chest = nil, nil, nil, nil
     for _, sp in ipairs(spawned) do if sp.guid == "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec" then chest = true end end
