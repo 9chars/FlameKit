@@ -1,3 +1,6 @@
+0.15.172 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the game's glowing loot-spot sparkle (the one on a dead body) instead of fireflies. Server only: no game update.
+
 0.15.171 Nov 15, 2026
 - Loot Drop: a monster's separate loot spot is also found when the game gives its death no time (it gives 0): any monster loot spot within 4 m of the death counts.
 - Items Loot Drop puts on the ground get the game's fireflies made for loot pickups, until they are picked up. Server only: no game update.

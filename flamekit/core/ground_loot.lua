@@ -54,7 +54,11 @@ end
 -- items: removed in 0.15.158 (owner: too strong). (0.15.171, owner: "I wish we could find the right sparkle ... that would
 -- really help find the item on the ground") the game's fireflies made for loot pickups, on a dropped item's spot until
 -- it is picked up (or MARK_S), at most MARK_MAX at once. Not saved: after a FlameKit reload a mark is not tracked.
-ground.MARK_FX = "c2091afd-f631-4160-ac79-574b951f5a4a"  -- Lootpickup_Scatter_VFX_Bait_T1_Fire_Fly_Above
+-- (0.15.172, owner: "the same sparkle effect that appears on a body when it dies") the game's glowing loot spot's base
+-- template (a loot container with no model: EMF re_content.md 4.1), as a mark only; untested. core/loot_spots.lua never
+-- takes these marks for a monster's loot (ground.is_mark). 0.15.171 had the fireflies (Lootpickup_Scatter_VFX_Bait_T1_
+-- Fire_Fly_Above, c2091afd-...).
+ground.MARK_FX = "4d7d3bec-6dd4-4373-aa9b-fd0eb5085e83"  -- Base_LootContainer_Enemy_VFX
 ground.MARK_S = 600
 ground.MARK_MAX = 300
 local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
@@ -68,6 +72,9 @@ function ground.mark(world, pickup)
   marks[id], marks_n = { item = pickup, at = os.time() }, marks_n + 1
   return "placed"
 end
+
+-- True for one of these marks (so nothing takes a mark for a monster's loot spot).
+function ground.is_mark(id) return marks[id] ~= nil end
 
 -- Removes the marks of items that were picked up. Call now and then from a feature's server tick.
 function ground.fx_tick(world)

@@ -15,6 +15,7 @@
 -- Shared core code (HANDOFF rule 0b): any feature may use it; it uses no feature.
 
 local M = {}
+local ground = require("core.ground_loot")  -- (0.15.172) its loot marks look like loot spots: never taken
 
 M.RADIUS = 4
 local PER_STEP = 3000
@@ -69,7 +70,7 @@ function M.tick(world)
   local stop = math.min(#walk.list, walk.i + PER_STEP - 1)
   for k = walk.i, stop do
     local id = walk.list[k]
-    if get(world, "InteractionOfferRuntime", id) then  -- most entities: one look
+    if get(world, "InteractionOfferRuntime", id) and not ground.is_mark(id) then  -- most entities: one look
       local okp, x, _, z = pcall(world.position, world, id)
       if okp and x then
         for did, w in pairs(walk.asked) do
