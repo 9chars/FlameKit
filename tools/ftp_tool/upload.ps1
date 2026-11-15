@@ -46,3 +46,21 @@ if ($s.log_path) {
     $last = Select-String -Path (Join-Path $logDir 'emf_core.log') -Pattern 'Lua mod flamekit reloaded' | Select-Object -Last 1
     Write-Host "Server log fetched. Last reload: $(if ($last) { $last.Line } else { 'none found (restart the server once)' })"
 }
+# (owner, 2026-11-14) also the game server's own log (its step times and "Bad Performance" lines): ftp.txt game_log_path,
+# else the usual places are tried; the one that worked is said
+$tries = @()
+if ($s.game_log_path) { $tries += $s.game_log_path }
+$tries += '/logs/enshrouded_server.log', '/enshrouded_server.log', '/log/enshrouded_server.log'
+$got = $false
+foreach ($p in $tries) {
+    try {
+        $resp = (Req $p ([System.Net.WebRequestMethods+Ftp]::DownloadFile)).GetResponse()
+        $logDir = Join-Path $out 'server_log'
+        New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+        $fs = [System.IO.File]::Create((Join-Path $logDir 'enshrouded_server.log')); $resp.GetResponseStream().CopyTo($fs); $fs.Close(); $resp.Close()
+        Write-Host "Game server log fetched ($p)."
+        $got = $true
+        break
+    } catch { }
+}
+if (-not $got) { Write-Host 'The game server log (enshrouded_server.log) was not found: tell Claude where it is on the FTP.' }
