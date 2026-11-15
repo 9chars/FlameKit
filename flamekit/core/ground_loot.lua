@@ -15,12 +15,16 @@ ground.MAX_AMOUNT = 65535  -- PickupItem.pickupAmount is a u16
 -- (0.15.149, owner: a legendary helmet floated in the air) a pickup does not fall: it stays where it is spawned, so it is
 -- made just above the given height (a body's position is at its feet), not 1 m above it as before
 ground.LIFT = 0.25
+-- (0.15.150, owner: "put a sparkle particle effect on them") the game's pickup with an effect of its own (template
+-- list from the game's files); untested which effect it shows. A caller picks it with `template`; the default stays plain.
+ground.PICKUP_VFX = "1b22afc5-be0e-47ad-852a-fbc564bea121"  -- Base_LootPickup_VFX
 
 local RARITY = { common = 0, uncommon = 1, rare = 2, epic = 3, legendary = 4 }
 
 -- Drops `count` of `item` (an id or a debug name) at x, y, z, `spread` m to a random side (default 2), with
 -- `level` (0: the game's default) and `rarity` (0-4 or a name; default 0). Returns the number of pickups made.
-function ground.drop(world, item, count, x, y, z, level, rarity, spread)
+-- `template` (optional): another pickup template (ground.PICKUP_VFX); if the game refuses it, the plain one is used.
+function ground.drop(world, item, count, x, y, z, level, rarity, spread, template)
   if type(item) == "string" then
     local ok, id = pcall(emf.item, item)
     item = ok and id or nil
@@ -34,8 +38,11 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread)
     local n = math.min(count, ground.MAX_AMOUNT)
     local ang = math.random() * 2 * math.pi
     local d = spread * (0.6 + 0.4 * math.random())
-    local ok, id = pcall(emf.spawn, world, ground.PICKUP, x + math.cos(ang) * d, y + ground.LIFT, z + math.sin(ang) * d,
-      { PickupItem = { itemId = item, level = math.floor(tonumber(level) or 0), rarity = rarity, pickupAmount = n } })
+    local px, py, pz = x + math.cos(ang) * d, y + ground.LIFT, z + math.sin(ang) * d
+    local parts = { PickupItem = { itemId = item, level = math.floor(tonumber(level) or 0), rarity = rarity, pickupAmount = n } }
+    local ok, id = false, nil
+    if template and template ~= ground.PICKUP then ok, id = pcall(emf.spawn, world, template, px, py, pz, parts) end
+    if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, ground.PICKUP, px, py, pz, parts) end
     if ok and id and id ~= 0 then made = made + 1 else break end
     count = count - n
   end

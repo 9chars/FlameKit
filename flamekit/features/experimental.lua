@@ -637,7 +637,7 @@ local function drop_test_loot(world, id, b)
   local r2 = ground.drop(world, item_db.LEGENDARY_RUNE, lrunes, x, y, z, 0, 0, 2)  -- no quality of their own
   local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
   local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
-  local r3 = name and ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) or 0
+  local r3 = name and ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5, ground.PICKUP_VFX) or 0  -- (0.15.150) with an effect
   -- (0.15.148) one line per kill, so the drop can be checked in the log (summed when there are many: see the caller)
   return string.format("%d runes (%s), %d legendary runes (%s), %s %s level %d legendary (%s)", runes, r1 > 0 and "ok" or "FAILED",
     lrunes, r2 > 0 and "ok" or "FAILED", kind, tostring(name), level, r3 > 0 and "ok" or "FAILED")
