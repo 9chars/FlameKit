@@ -23,9 +23,11 @@ $t = Ask 'tls' 'Use FTPS (encrypted)? yes or no' 'no'
 $m = Ask 'mod_dir' "Path of the server's FlameKit folder, from the FTP login (for example /emf/mods/flamekit)" '/emf/mods/flamekit'
 $g = Ask 'log_path' "Path of the server's emf_core.log, from the FTP login" '/emf/emf_core.log'
 $o = Ask 'outbox' 'The outbox folder on this PC where Claude leaves the files' 'C:\enshrouded mod shit\outbox'
-$pw = Read-Host 'Password (not shown)' -AsSecureString
+$passFile = Join-Path $here 'ftp_password.dat'
+$pw = Read-Host $(if (Test-Path $passFile) { 'Password (not shown; press Enter to keep the saved one)' } else { 'Password (not shown)' }) -AsSecureString
+if ($pw.Length -eq 0 -and (Test-Path $passFile)) { $pw = (Get-Content $passFile -Raw).Trim() | ConvertTo-SecureString }  # keep the saved one
 Set-Content -Path $conf -Encoding ASCII -Value @("host = $h", "port = $p", "user = $u", "tls = $t", "mod_dir = $m", "log_path = $g", "outbox = $o")
-Set-Content -Path (Join-Path $here 'ftp_password.dat') -Encoding ASCII -Value (ConvertFrom-SecureString $pw)
+Set-Content -Path $passFile -Encoding ASCII -Value (ConvertFrom-SecureString $pw)
 # a quick look: list the FlameKit folder
 try {
     $r = [System.Net.FtpWebRequest]::Create("ftp://${h}:$p/" + $m.TrimStart('/'))
