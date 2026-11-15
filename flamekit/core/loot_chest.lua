@@ -24,7 +24,9 @@ local RETRIES = 3    -- a refused put into a chest under 5 s old is tried again 
 local FILE = "loot_chests.dat"
 -- (0.15.166, owner: "make the chests glow ... to make them stand out") an effect on each chest's spot, removed with it;
 -- untested what it looks like
-M.GLOW = "04f1fbc2-adea-4808-ae8a-1c3caebd289d"  -- VFX_SubEntity_Prop_Light_Source_Glow
+-- (0.15.168, owner: the chest was "not glowing": VFX_SubEntity_Prop_Light_Source_Glow, 04f1fbc2-..., shows nothing on
+-- its own) the game's grave flame, seen working on loot in 0.15.152
+M.GLOW = "2c2c4511-0173-40ee-85a3-2f9383d14b72"  -- VFX_SubEntity_Player_LootCorpse_Tombstone_Flame
 
 local chests = {}   -- chest id -> { x, y, z, born = os.time(), step, filled = true once items were in it, full = true }
 local count = 0
@@ -159,7 +161,7 @@ into = function(world, p)
     local cc = chests[chest]
     if added > 0 and cc and not cc.filled then cc.filled = true save() end
     if added >= p.n then
-      if p.done then p.done(p.got + added) end
+      if p.done then p.done(p.got + added, chest) end
       return
     end
     p.got, p.n = p.got + added, p.n - added
@@ -172,7 +174,7 @@ into = function(world, p)
       into(w, p)
     else
       emf.log(string.format("loot chest: %d of item %s did not fit anywhere (lost)", p.n, tostring(p.item)))
-      if p.done then p.done(p.got) end
+      if p.done then p.done(p.got, chest) end
     end
   end, p.opts)
   if not ok then
@@ -182,7 +184,7 @@ into = function(world, p)
 end
 
 -- Puts `n` of `item` (id or name) into the nearest chest near x, y, z (`key` is no longer used), with `level` and
--- `rarity` for gear. `done(added)` (optional) after the game answered.
+-- `rarity` for gear. `done(added, chest)` (optional) after the game answered.
 function M.put(world, key, x, y, z, item, n, level, rarity, done)
   if not loaded then load(world) end
   item = item_id(item)
@@ -234,6 +236,22 @@ function M.tick(world, bag)
     end
   end
   if changed then save() end
+end
+
+-- (0.15.167) what every loot chest holds, for the log (console "flamekit.chests": item, count, rarity, level)
+function M.describe(world, bag)
+  local lines = {}
+  for id, c in pairs(chests) do
+    local parts = {}
+    for _, st in ipairs(bag.entity_stacks(world, id)) do
+      local okn, name = pcall(emf.item_name, st.item)
+      parts[#parts + 1] = string.format("%s x%d rarity %s level %s", okn and name or tostring(st.item), st.count or 0,
+        tostring(st.rarity), tostring(st.level))
+    end
+    lines[#lines + 1] = string.format("chest %s (glow %s): %d stack(s): %s", tostring(id), tostring(c.fx), #parts, table.concat(parts, "; "))
+  end
+  if #lines == 0 then lines[1] = "no loot chests" end
+  return lines
 end
 
 return M

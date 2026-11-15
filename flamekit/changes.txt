@@ -1,3 +1,10 @@
+0.15.168 Nov 15, 2026
+- Test monsters: rings and gems come only from the ones that are legendary by type (5 rings, 5 gems: the others keep a lower rarity whatever FlameKit gives them); weapons and armour as before. As a safety, an item that shows up below legendary in the chest is taken out again and another one picked.
+- Loot chests carry the grave flame effect (the glow effect showed nothing). Server only: no game update.
+
+0.15.167 Nov 15, 2026
+- Server console "flamekit.chests": writes what every loot chest holds (item, count, rarity, level) into the server's log. Server only: no game update.
+
 0.15.166 Nov 15, 2026
 - Loot chests glow (the game's light glow effect on each new chest), removed with the chest. Server only: no game update.
 

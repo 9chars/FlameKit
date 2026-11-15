@@ -645,6 +645,33 @@ local function body_clear_tick(world)
   body_clear = keep
 end
 
+local not_legendary = {}  -- (0.15.168) debug names that came out of the chest below legendary
+local PICK_TRIES = 5
+local give_legendary
+give_legendary = function(world, key, x, y, z, name, level, tries)
+  loot_chest.put(world, key, x, y, z, name, 1, level, "legendary", function(added, chest)
+    if not added or added < 1 or not chest then return end
+    local okn, iid = pcall(emf.item, name)
+    for _, st in ipairs(bag.entity_stacks(world, chest)) do
+      if okn and st.item == iid and st.rarity ~= nil and st.rarity < 4 then
+        not_legendary[name] = true
+        emf.log(string.format("experimental: test loot %s came out rarity %s, not legendary: taken back, another one picked", name, tostring(st.rarity)))
+        pcall(emf.take, world, st.owner, st.item, 1, function() end, { slot = st.slot, exact = true })
+        if tries > 1 then
+          local nxt
+          for _ = 1, 20 do
+            local k = LOOT_KINDS[math.random(#LOOT_KINDS)]
+            nxt = k == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(k, level)
+            if nxt and not not_legendary[nxt] then break end
+          end
+          if nxt then give_legendary(world, key, x, y, z, nxt, level, tries - 1) end
+        end
+        return
+      end
+    end
+  end)
+end
+
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
   if not ok or not x then return "no position" end
@@ -669,9 +696,16 @@ local function drop_test_loot(world, id, b)
   end
   to_bag(item_db.RUNE, runes)
   to_bag(item_db.LEGENDARY_RUNE, lrunes)
-  local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
-  local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
-  if name then loot_chest.put(world, key, x, y, z, name, 1, level, "legendary") end
+  -- (0.15.168, owner: "it also dropped uncommon gems and rings") some items keep a rarity of their own whatever is
+  -- asked: the item is read back from the chest; not legendary: taken out again, remembered (not_legendary) and another
+  -- one picked, at most PICK_TRIES times
+  local kind, name
+  for _ = 1, 20 do
+    kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
+    name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
+    if name and not not_legendary[name] then break end
+  end
+  if name then give_legendary(world, key, x, y, z, name, level, PICK_TRIES) end
   -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear";
   -- 0.15.161: "it leaves the corpse with junk in it no one wants") the game's own loot in the body (it comes 1.5-3 s
   -- after the death) is taken out and thrown away at 2, 3 and 5 s; the body goes at CORPSE_S (8 s)
@@ -2085,6 +2119,12 @@ function F.setup(k)
       local why = spawn_body(world, tostring(account), player, "duel", level, args[3])
       emf.reply("duelist: " .. (why or "spawned"))
     end, "the duelist command"))
+  pcall(emf.command, "chests", "what every loot chest holds (item, count, rarity, level), in emf_core.log",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      for _, line in ipairs(loot_chest.describe(world, bag)) do emf.log("loot chest: " .. line) end
+      emf.reply("chests: see emf_core.log")
+    end, "the chests command"))
   pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end

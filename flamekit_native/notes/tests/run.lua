@@ -1720,8 +1720,9 @@ do  -- (0.15.142, owner) core/item_db.lua: the gear tier for a monster's level, 
   check(db.tier_for_level(1) == 1 and db.tier_for_level(25) == 4 and db.tier_for_level(45) == 7 and db.tier_for_level(80) == 7,
     "item database: the tier for a monster level")
   local w = db.pick("weapon", 25, function(n) return 1 end)
-  check(w and w:match("^Weapon_T4_") and db.pick("gem", 1):match("^T1_Gem_") and db.pick_cosmetic():match("^Vanity_"),
-    "item database: a level-25 weapon is tier 4; gems and cosmetics: " .. tostring(w))
+  -- (0.15.168) gems only from the legendary-by-type ones: a level-1 monster gets the nearest, a tier 4 gem
+  check(w and w:match("^Weapon_T4_") and db.pick("gem", 1):match("^T4_Gem_") and db.pick_cosmetic():match("^Vanity_"),
+    "item database: a level-25 weapon is tier 4; a level-1 gem is the nearest legendary one; cosmetics: " .. tostring(w))
 end
 do  -- (0.15.142, owner) the Server tab: a warning, and its setting changed (where you host: at once; joined: a message)
   local st = require("features.server_tab")

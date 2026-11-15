@@ -1094,9 +1094,20 @@ end
 
 -- A random debug name of `kind` ("weapon", "armor", "ring", "gem") for a monster of `level`: from its tier, else the
 -- nearest tier below, else above. `random(n)` gives 1..n (math.random by default).
+-- (0.15.168, owner: "it also dropped uncommon gems and rings") rings and gems keep the rarity of their item type,
+-- whatever rarity they are given (no item entity of their own); weapons and armour take the one given. These are the
+-- rings and gems that are legendary by type (the game's item details, item_details.dat, joined with the item list,
+-- 2026-11-15, build 1287369); test monsters drop only these.
+db.LEGENDARY_BY_TYPE = {
+  ring = { [1] = { "Ring_T1_ministory_05" }, [3] = { "Ring_T3_Ring_of_Light" }, [4] = { "Ring_T4_Ring_of_The_Ancients" },
+           [5] = { "Ring_T5_Ring_of_Frost" }, [6] = { "Ring_T6_Ring_of_Shock" } },
+  gem = { [4] = { "T4_Gem_GemOfFocusedLight" }, [5] = { "T5_Gem_GemOfColdComposure" }, [6] = { "T6_Gem_GemOfLycanthropy" },
+          [7] = { "T7_Gem_GemOfArmoring", "T7_Gem_GemOfHyperSpecialization" } },
+}
+
 function db.pick(kind, level, random)
   random = random or math.random
-  local by_tier = db.GEAR[kind]
+  local by_tier = db.LEGENDARY_BY_TYPE[kind] or db.GEAR[kind]
   if not by_tier then return nil end
   local t = db.tier_for_level(level)
   for d = 0, 6 do
