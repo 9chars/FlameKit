@@ -1,3 +1,8 @@
+0.15.142 Nov 15, 2026
+- New Server tab (F4): settings for the whole server and every player on it, with a warning at the top. Anyone can change them for now.
+- Server setting "Monsters drop their loot on the ground" (off by default): every monster that dies drops its loot on the ground beside it (same items, quality and level), so nobody has to press E. Bodies go after 8 s, a boss's after 45 s. A weapon with a socketed gem stays in the body. The server needs one restart after this update.
+- Test monsters drop loot on the ground: 10 or 15 runes, 5 or 10 legendary runes (twice for a boss) and one legendary item (cosmetic, weapon, armour, ring or gem) of the tier for their level.
+
 0.15.141 Nov 15, 2026
 - Test monsters: Quantity goes up to 1000 again (no 5000 button: 5000 brought the server to a crawl).
 - Test monsters: a spawn stands on a hexagonal grid around you, each monster 2 m from its neighbours (1000 within about 33 m).

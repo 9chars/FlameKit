@@ -105,4 +105,40 @@ function bag.stacks(world, player)
   return out, true
 end
 
+-- (0.15.142) Every non-empty stack in any entity's inventories (a monster's body, a chest): {item, count, gear,
+-- rarity (0-4), level, gem, slot (the InventorySlotId emf.take wants), owner (the entity)}. Every inventory its
+-- InventorySetup links, of any category, and its own Inventory when it has one (a body's loot sits in the body itself).
+function bag.entity_stacks(world, entity)
+  local out = {}
+  if not entity or entity == 0 then return out end
+  local ids, seen = {}, {}
+  local function add(id) if id and id ~= 0 and not seen[id] then seen[id] = true ids[#ids + 1] = id end end
+  local setup = get(world, "InventorySetup", entity)
+  for i = 1, #((setup and setup.linksEntities) or {}) do add(setup.linksEntities[i]) end
+  if get(world, "Inventory", entity) then add(entity) end
+  for _, inv_id in ipairs(ids) do
+    local inv = get(world, "Inventory", inv_id)
+    for s = 1, #((inv and inv.slots) or {}) do
+      local stack = inv.slots[s]
+      local item, count = stack.id, stack.data and stack.data.count or 0
+      if item ~= 0 and count > 0 then
+        local pide = stack.data.pide or 0
+        local rarity, level, gem = nil, nil, nil
+        if pide ~= 0 then
+          local state = get(world, "ItemState", pide)
+          if state then
+            rarity = state.itemRarityUi
+            if state.itemLevelUi and state.itemLevelUi > 0 then level = state.itemLevelUi end
+          end
+          local gs = get(world, "WeaponGemSlot", pide)
+          if gs and gs.weaponGem and gs.weaponGem.id ~= 0 then gem = gs.weaponGem.id end
+        end
+        out[#out + 1] = { item = item, count = count, gear = pide ~= 0, rarity = rarity, level = level, gem = gem,
+          slot = inv_id | ((s - 1) << 32), owner = entity }
+      end
+    end
+  end
+  return out
+end
+
 return bag
