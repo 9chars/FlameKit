@@ -33,7 +33,7 @@ local tally = { bodies = 0, items = 0, kept = 0, empty = 0 }  -- summed, logged 
 -- its items are only logged at 0.5, 1.5 and 3 s. Nothing is taken, dropped or removed; the normal Loot Drop skips that
 -- body. "flamekit.loottest off" disarms it. EMF delivers an event only to scripts that named it in their first run, so
 -- this needs one server restart after the update (emf.emits in F.setup).
-local test = { armed = false, id = nil, step = 0, looks = { 1, 30, 90, 180 }, n = 0 }
+local test = { armed = false, id = nil, step = 0, sent = nil, looks = { 1, 30, 90, 180 } }
 
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
@@ -47,7 +47,7 @@ local function died(world, e)
   id = tonumber(id)
   if not id or id == 0 then return end
   if test.armed and not test.id and not get(world, "PlayerState", id) and get(world, "Faction", id) then
-    test.armed, test.id, test.step, test.n = false, id, steps, 0
+    test.armed, test.id, test.step, test.sent = false, id, steps, nil
     return  -- this body is the test's: the normal Loot Drop leaves it alone
   end
   if not server.get("loot_to_ground") then return end
@@ -101,21 +101,34 @@ local function describe(world, id, what)
     #stacks, table.concat(parts, "; "), tostring(get(world, "InventorySetup", id) ~= nil), tostring(get(world, "Inventory", id) ~= nil)))
 end
 
+-- 0.15.145: lootAll and bypassInteraction are Lua booleans (EMF lua.md: 1 was dropped, "needs true or false"), and the
+-- event waits for the body's inventory (0.15.144 measured: none at the death, there between 0.5 and 1.5 s after it)
+local WAIT_MAX = 180  -- steps: send at the latest 3 s after the death
 local function test_tick(world)
   if not test.id then return end
   local age = steps - test.step
-  if age == test.looks[1] then
-    describe(world, test.id, "before the event")
-    local ok, done = pcall(emf.emit, "server", "LootInteractionEvent",
-      { guestId = test.id, hostId = test.id, offerId = 0, lootAll = 1, bypassInteraction = 1 })
-    emf.log(string.format("loottest: body %s: LootInteractionEvent guest = host = body sent: ok %s, answer %s",
-      tostring(test.id), tostring(ok), tostring(done)))
-  else
-    for i = 2, #test.looks do
-      if age == test.looks[i] then
-        describe(world, test.id, string.format("%.1f s after the death", test.looks[i] / 60))
-        if i == #test.looks then emf.log("loottest: done (nothing was taken, dropped or removed)") test.id = nil end
-      end
+  if not test.sent then
+    local has_inv = get(world, "InventorySetup", test.id) ~= nil or get(world, "Inventory", test.id) ~= nil
+    if age == 1 then
+      emf.log(string.format("loottest: body %s at the death: DefaultInventory %s, InteractionOfferRuntime %s",
+        tostring(test.id), tostring(get(world, "DefaultInventory", test.id) ~= nil),
+        tostring(get(world, "InteractionOfferRuntime", test.id) ~= nil)))
+    end
+    if has_inv or age >= WAIT_MAX then
+      describe(world, test.id, string.format("%.2f s after the death, before the event", age / 60))
+      local ok, done = pcall(emf.emit, "server", "LootInteractionEvent",
+        { guestId = test.id, hostId = test.id, offerId = 0, lootAll = true, bypassInteraction = true })
+      emf.log(string.format("loottest: body %s: LootInteractionEvent guest = host = body sent (lootAll true, bypassInteraction true): ok %s, answer %s",
+        tostring(test.id), tostring(ok), tostring(done)))
+      test.sent = steps
+    end
+    return
+  end
+  local since = steps - test.sent
+  for i = 2, #test.looks do
+    if since == test.looks[i] then
+      describe(world, test.id, string.format("%.1f s after the event", test.looks[i] / 60))
+      if i == #test.looks then emf.log("loottest: done (nothing was taken, dropped or removed)") test.id = nil end
     end
   end
 end
@@ -165,7 +178,7 @@ function F.setup(k)
   pcall(emf.command, "loottest", "on|off: the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
-      test.armed, test.id = args[1] ~= "off", nil
+      test.armed, test.id, test.sent = args[1] ~= "off", nil, nil
       emf.log("loottest: " .. (test.armed and "armed: kill one monster" or "off"))
       emf.reply("loottest: " .. (test.armed and "armed" or "off"))
     end, "the loottest command"))

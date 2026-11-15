@@ -1,3 +1,6 @@
+0.15.145 Nov 15, 2026
+- Server test "flamekit.loottest": the loot event now goes out with "take everything" and "skip the interaction" switched on (0.15.144 sent them in a form the framework dropped), and only once the dead body has an inventory (at most 3 s after the death). The body's items are logged 0.5, 1.5 and 3 s after the event, and whether the body has a loot table and can be looted at the moment of death.
+
 0.15.144 Nov 15, 2026
 - Server test (console, local server): "flamekit.loottest on" makes the next monster that dies get the game's own loot event (as if E were pressed) with its own body as the receiver, and logs the body's items before and 0.5, 1.5 and 3 s after. Nothing is taken, dropped or removed; the normal Loot Drop leaves that body alone. "flamekit.loottest off" cancels it. Needs one server restart.
 
