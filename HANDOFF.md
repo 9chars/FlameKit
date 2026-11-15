@@ -22,7 +22,7 @@ It runs on EMF 0.6.6 (the Enshrouded Modding Framework) with EMF's Lua host. Fea
 5. **One version per round of work.** Every time anything changes, the version goes up; one version can hold many changes. Never leave changed code under an old number.
 6. **The change log lists everything.** `flamekit/changes.txt` gets a line for every change in every version. Nothing is trimmed, merged or hidden. Format: a line `0.15.8 Nov 13, 2026`, then `- ` lines, then an empty line; newest first.
 7. **Test the way production works.** Nothing is copied onto the owner's client by hand. New versions reach the client only through the updater.
-8. **Releases only when told.** `dist` (the players' channel, Stable) gets a new version only when the owner says to release one; every other version goes to `dist-test` only. First release: 0.15.124 (2026-11-14, owner).
+8. **NEVER push to Stable without the owner's explicit approval of that exact version** (owner, 2026-11-14, after 0.15.131 was released unasked). Ask, and wait for a clear yes for that version; a complaint, a question or "fix that for stable" is not a yes. `dist` (the players' channel, Stable) gets a new version only then; every other version goes to `dist-test` only. First release: 0.15.124 (2026-11-14, owner).
 9. **Do not modify game data.** Read only. Prefer few frameworks. When a game update breaks something, fall back to a generic label or icon; disable a feature only if needed to prevent a crash.
 10. **Short labels, short chat lines, no explanatory text in the panel.** Always say "client" or "server" explicitly.
 11. **Keep replies short** and lead with the result.
