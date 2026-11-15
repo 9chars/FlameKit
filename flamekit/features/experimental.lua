@@ -346,6 +346,8 @@ local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 -- the game's own data (189 of them, in groups). The client sends the template GUID; the server spawns only GUIDs on that
 -- list. Before 0.15.72 there were seven, taken from EMF's own mods (all seven fought, 2026-11-14).
 local MONSTERS = require("core.monsters")
+local item_db = require("core.item_db")      -- (0.15.142) the items test monsters drop
+local ground = require("core.ground_loot")
 local MONSTER_BY_GUID, MONSTER_GROUPS = {}, {}
 for _, m in ipairs(MONSTERS) do
   MONSTER_BY_GUID[m[3]] = m
@@ -620,6 +622,23 @@ scatter = function(count)
   return spots
 end
 
+-- (0.15.142, owner) What a killed test monster (Spawn Monsters, not the dummy) drops on the ground beside its body,
+-- all legendary: regular runes (10 or 15) and legendary runes (5 or 10), a boss twice as many; and one more item with
+-- equal chances of a cosmetic, a weapon, an armour piece, a ring or a gem, the gear of the tier for the monster's level
+-- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
+local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
+local function drop_test_loot(world, id, b)
+  local ok, x, y, z = pcall(world.position, world, id)
+  if not ok or not x then return end
+  local twice = b.boss and 2 or 1
+  local level = tonumber(b.level) or 1
+  ground.drop(world, item_db.RUNE, (math.random(2) == 1 and 10 or 15) * twice, x, y, z, 0, 0, 2)  -- runes are materials:
+  ground.drop(world, item_db.LEGENDARY_RUNE, (math.random(2) == 1 and 5 or 10) * twice, x, y, z, 0, 0, 2)  -- no quality of their own
+  local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
+  local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
+  if name then ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) end
+end
+
 local function spawn_body(world, account, player, kind, level, what, count)
   if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
   spawn_queue = {}  -- a new spawn or Remove also stops a spawn under way
@@ -649,14 +668,15 @@ local function spawn_body(world, account, player, kind, level, what, count)
     jobs[i] = (function(world)
   local d = d0
   if d[3] == RANDOM_KEY then d = RANDOM_POOL[math.random(#RANDOM_POOL)] end  -- a different one each time
-  local guid = d[3]
+  local guid, boss = d[3], d[4] == true
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
   local sx, sz = x + fx * (3 + ahead) - fz * side, z + fz * (3 + ahead) + fx * side
   local ok, id = pcall(emf.spawn, world, guid, sx, y, sz, { ScaleComponent = { uniformScale = TAG_SCALE } })  -- the tag
   if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, guid, sx, y, sz) end  -- without it
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
-  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2],
+              level = level, boss = boss }
   bodies[id] = b
   to_ground(id, sx, y, sz)  -- (0.15.140) put on the ground a moment later
   if level then
@@ -770,6 +790,7 @@ local function bodies_tick(world)
       if not b.dead_at then
         b.dead_at = os.time()
         killed = killed + 1
+        if b.kind == "duel" then drop_test_loot(world, id, b) end  -- (0.15.142, owner) its loot on the ground
         if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end
         local o = online[b.owner]
         if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many

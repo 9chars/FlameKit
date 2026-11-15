@@ -71,6 +71,7 @@ local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = fa
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
 local teleports = {}
+local srv_up = {}  -- (0.15.142) Server tab messages a joined game sent
 local bodies_tp = {}  -- (0.15.140) teleports of test monsters onto the ground
 left_fns = {}
 died_fns = {}  -- the leaderboard's emf.on_player_died
@@ -175,13 +176,23 @@ emf = {
   sender = function() return sender end,
   local_player = function() return (JOINED and side == "server") and 0 or PLAYER end,
   session = function() return 1 end,
-  spawn = function(w, guid, x, y, z) spawned[#spawned + 1] = { guid = guid, x = x, y = y, z = z }; return 950 + #spawned end,
+  spawn = function(w, guid, x, y, z, c) spawned[#spawned + 1] = { guid = guid, x = x, y = y, z = z, c = c }; return 950 + #spawned end,
   destroy = function(w, id) destroyed[#destroyed + 1] = id; return true end,
   emits = function(names, kind) assert(type(names) == "table", "emf.emits takes a list"); return true end,
   emit = function(kind, name, fields) emitted[#emitted + 1] = { kind = kind, name = name, f = fields }; return true end,
   setting = function(k) assert(settings[k] ~= nil, "unknown setting " .. k); return settings[k] end,
   set_setting = function(k, v) assert(settings[k] ~= nil); settings[k] = v end,
-  item = function(n) return ITEMS[n] end,
+  item = function(n)
+    if ITEMS[n] then return ITEMS[n] end
+    -- (0.15.142) the loot items (core/item_db.lua): a made-up id each
+    if type(n) == "string" and (n:match("^Material_T%d_Token_WeaponUpgrade_Rune") or n:match("^Weapon_T") or n:match("^Armor_T")
+        or n:match("^Ring_T") or n:match("^Vanity_T") or n:match("^T%d_Gem_")) then
+      local h = 0
+      for i = 1, #n do h = (h * 31 + n:byte(i)) % 0x7fffffff end
+      return 0x10000000 + h % 0x0fffffff
+    end
+    return nil
+  end,
   item_info = function(id) return NAMES[id] and { id = id, name = NAMES[id] } or nil end,
   item_name = function(x)
     local n = type(x) == "number" and NAMES[x] or (ITEMS[x] and x)
@@ -202,7 +213,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" or name == "chat" or name == "board" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd") and def.to == "both") end
+      if name == "map" or name == "party" or name == "chat" or name == "board" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -212,6 +223,7 @@ emf = {
       assert(JOINED and side == "client", "emf.net.send is for a joined game here")
       assert(#data <= 16384)
       if name == "exp" then exp_up[#exp_up + 1] = data; return true end
+      if name == "srv" then srv_up[#srv_up + 1] = data; return true end
       if name == "party_test" then ptest_up[#ptest_up + 1] = data; last_ask = data; return true end
       if name == "ver" then ver_asks = (ver_asks or 0) + 1; return true end
       to_server[#to_server + 1] = data
@@ -238,7 +250,7 @@ emf = {
   broadcast = function(t, opts) assert(type(t) == "string" and (opts == nil or type(opts) == "table"), "emf.broadcast takes (text [, opts])"); casts[#casts + 1] = t; return true end,
   take = function(w, entity, item, count, fn, opts)
     assert(w:is_server(), "emf.take needs the server world")
-    assert(entity == PLAYER and opts and opts.exact and opts.slot)
+    assert((entity == PLAYER or entity >= 7000) and opts and opts.exact and opts.slot)  -- the player, or a test body (0.15.142)
     pending[#pending + 1] = function()
       local inv_id, s = opts.slot & 0xFFFFFFFF, (opts.slot >> 32) + 1
       local st = comps.Inventory[inv_id].slots[s]
@@ -301,7 +313,7 @@ local function step(n)
     local asks = ptest_up
     ptest_up = {}
     for _, data in ipairs(asks) do channels.party_test.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
-    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW); require("features.leaderboard").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
+    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW); require("features.leaderboard").tick(SW); require("features.loot_drop").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
     side = "client"
     msgs = to_client
     to_client = {}
@@ -985,6 +997,21 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   clock = clock + 9
   step(35)
   check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
+  do  -- (0.15.142, owner) a killed test monster's loot on the ground: runes, legendary runes, one legendary item
+    local runes, lruns, item = nil, nil, nil
+    for i = #spawned, math.max(1, #spawned - 20), -1 do
+      local sp = spawned[i]
+      local p = sp.c and sp.c.PickupItem
+      if sp.guid == "a56d2777-daf1-4164-90d4-b7b12749c723" and p then
+        if p.itemId == emf.item("Material_T1_Token_WeaponUpgrade_Rune01") then runes = runes or p
+        elseif p.itemId == emf.item("Material_T2_Token_WeaponUpgrade_Rune02") then lruns = lruns or p
+        elseif p.rarity == 4 then item = item or p end
+      end
+    end
+    check(runes and (runes.pickupAmount == 10 or runes.pickupAmount == 15) and lruns
+      and (lruns.pickupAmount == 5 or lruns.pickupAmount == 10) and item and item.pickupAmount == 1,
+      "a killed test monster drops 10 or 15 runes, 5 or 10 legendary runes and one legendary item on the ground")
+  end
   -- (0.15.141, production log) a fresh monster reads as dead until the game sets its health: not killed, kept
   local fid = 950 + #spawned + 1
   SW.position = function(self, id) if id == fid then return 2, 0, 2 end return pos_before(self, id) end
@@ -1682,5 +1709,54 @@ do  -- (0.15.96) the Experimental window's button for the PvP Leaderboard window
   check(rf ~= nil, "a click asks the DLL to show or hide it (ui_board_toggle.request)")
   if rf then rf:close() end
   os.remove(TMP .. "\\ui_layout.txt")
+end
+do  -- (0.15.142, owner) core/item_db.lua: the gear tier for a monster's level, and a pick from it
+  local db = require("core.item_db")
+  check(db.tier_for_level(1) == 1 and db.tier_for_level(25) == 4 and db.tier_for_level(45) == 7 and db.tier_for_level(80) == 7,
+    "item database: the tier for a monster level")
+  local w = db.pick("weapon", 25, function(n) return 1 end)
+  check(w and w:match("^Weapon_T4_") and db.pick("gem", 1):match("^T1_Gem_") and db.pick_cosmetic():match("^Vanity_"),
+    "item database: a level-25 weapon is tier 4; gems and cosmetics: " .. tostring(w))
+end
+do  -- (0.15.142, owner) the Server tab: a warning, and its setting changed (where you host: at once; joined: a message)
+  local st = require("features.server_tab")
+  local server = require("core.server_settings")
+  local rows = st.panel(UI)
+  check(rows[1].text:find("server wide", 1, true) and rows[1].color, "the Server tab starts with the server-wide warning")
+  if not JOINED then
+    local on
+    for _, r in ipairs(rows) do if r.button == "on:loot_to_ground" then on = r end end
+    check(on and not on.selected and server.get("loot_to_ground") == false, "loot to the ground: off by default")
+    st.click(UI, "on:loot_to_ground")
+    check(server.get("loot_to_ground") == true, "a click on On switches it on for the whole server")
+  else
+    local n = #srv_up
+    st.click(UI, "on:loot_to_ground")
+    check(#srv_up == n + 1 and srv_up[#srv_up]:find('"set"', 1, true), "a joined game sends the change to the server")
+    server.set("loot_to_ground", true)
+  end
+end
+do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the ground (same quality and level),
+    -- its body removed 8 s later; a piece with a socketed gem stays in the body (and the body with it)
+  local BODY = 7001
+  comps.Faction[BODY] = { faction = 6 }
+  comps.InventorySetup[BODY] = { linksEntities = { BODY, 0 }, linksCategories = { 4, 0 } }
+  comps.ItemState[7500] = { itemRarityUi = 3, itemLevelUi = 22, baseDamageUi = 1, itemState = 0 }
+  comps.Inventory[BODY] = inv({ stack(0x11, 4), stack(0x33, 1, 7500) })
+  local pos_before = SW.position
+  SW.position = function(self, id) if id == BODY then return 5, 0, 5 end return pos_before(self, id) end
+  local n0, d0 = #spawned, #destroyed
+  events["EntityDiedEvent"](SW, { deadEntityId = BODY })
+  step(35)
+  local got = {}
+  for i = n0 + 1, #spawned do local p = spawned[i].c and spawned[i].c.PickupItem; if p then got[p.itemId] = p end end
+  check(got[0x11] and got[0x11].pickupAmount == 4 and got[0x33] and got[0x33].rarity == 3 and got[0x33].level == 22
+    and comps.Inventory[BODY].slots[1].id == 0, "Loot Drop: the body's loot is on the ground, the gear piece epic level 22 as it was")
+  clock = clock + 9
+  step(8 * 60 + 40)
+  local gone = false
+  for i = d0 + 1, #destroyed do if destroyed[i] == BODY then gone = true end end
+  check(gone, "Loot Drop: the body is removed 8 s after the death")
+  SW.position = pos_before
 end
 print("ALL PASSED (" .. MODE .. ")")

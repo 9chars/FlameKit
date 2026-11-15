@@ -14,11 +14,13 @@ kit.start({
   "features.minimap",
   "features.experimental",  -- its Debug section has the party's test players
   "features.settings",
+  "features.server_tab",     -- (0.15.142) the Server tab: settings for the whole server
   "features.party",         -- no tab of its own
   "features.native_ui",
   "features.server_save",
   "features.server_version",  -- the notice when the server's FlameKit is older
   "features.chat",            -- chat copied into the Messages window, FlameKit's announcements there
   "features.leaderboard",     -- the PvP Leaderboard (kills and deaths between players)
+  "features.loot_drop",       -- (0.15.142) monsters drop their loot on the ground (a Server tab setting)
   -- "features.my_next_feature",
 })
