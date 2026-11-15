@@ -47,7 +47,7 @@ All keys can be changed in the FlameKit Menu (F4): F4 and the pointer key in the
 
 ### Experimental window (F6)
 - Fast Travel: to the nearest Flame Altar, the nearest Ancient Spire, or your map waypoint, even from inside the shroud.
-- Test monsters: spawn a harmless level 100 dummy to try your PvP weapons on (PvP must be on to hit it), or a duelist, any monster in the game at the level you pick, that fights back.
+- Test monsters: spawn a harmless level 50 dummy to try your PvP weapons on (PvP must be on to hit it), or a duelist, any monster in the game at the level you pick, that fights back.
 - Leaderboard button: shows or hides the PvP Leaderboard.
 
 ### Experimental options (FlameKit Menu, Experimental tab)

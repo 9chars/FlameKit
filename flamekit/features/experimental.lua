@@ -363,6 +363,7 @@ local function dummy_of(guid)
   if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
   return MONSTER_BY_GUID[guid]
 end
+local DUMMY_LEVEL = 50  -- (0.15.129, owner: 100 was too high) about 6700 health
 local MAX_LEVEL = 100  -- owner (0.15.78): a round top. The game's own is 105: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
 local DUEL_FACTION = 1                                      -- HitAll
 local DUMMY_FACTION = 7                                     -- Player: its hits do no damage (0.15.81)
@@ -481,7 +482,7 @@ local function spawn_body(world, account, player, kind, level, what)
     local n = sweep_corpses(world, player)
     return n > 0 and string.format("Removed %d dead test monster%s near you.", n, n == 1 and "" or "s") or nil
   end
-  if kind == "dummy" then level = MAX_LEVEL end  -- (0.15.79, owner) it never hurts anyone: lots of health to beat on
+  if kind == "dummy" then level = DUMMY_LEVEL end  -- (0.15.79, owner) it never hurts anyone; (0.15.129, owner) level 50
   local x, y, z = where(world, player)
   if not x then return "Your position is not known." end
   local fx, fz = 0, 1
@@ -1439,15 +1440,15 @@ function F.window_rows(world)
     end
     return options
   end
-  -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level 100
+  -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level DUMMY_LEVEL
   local in_pvp = v.pvp == true  -- (0.15.119, owner) no spawning while PvP is on: it could throw a fight
   local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it." }
+    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Switch PvP on to hit it." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
+    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. You must have PvP on to hit it. It swings at you "
       .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
     tooltip = "Removes your test monster, and any dead test monster's body near you." }

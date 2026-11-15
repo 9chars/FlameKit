@@ -1,3 +1,6 @@
+0.15.129 Nov 14, 2026
+- Test monsters: the dummy is level 50 now (it was 100: too much health).
+
 0.15.128 Nov 14, 2026
 - PvP: players now do full damage to each other (it was 25% before).
 

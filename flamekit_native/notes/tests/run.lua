@@ -824,8 +824,10 @@ do
   step(12)
   comps.Faction[953] = { faction = 6 }
   comps.NetworkHealth[953] = { health = 100 }
+  comps.Level[953] = { dataStorage = { 1, 0 } }
   click(find_row("^Spawn dummy$").button)
   step(40)
+  check(comps.Level[953].dataStorage[1] == 50, "the dummy is level 50 (0.15.129, owner: 100 was too high)")
   check(spawned[3] and spawned[3].guid == boar.key:match("dbg:dwhat:(.+)$") and comps.Faction[953].faction == 7,
     "the dummy is the picked monster, with faction 7 (its hits do no damage)")
   click(find_row("Remove").button)
