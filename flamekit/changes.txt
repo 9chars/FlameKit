@@ -1,3 +1,8 @@
+0.15.141 Nov 15, 2026
+- Test monsters: Quantity goes up to 1000 again (no 5000 button: 5000 brought the server to a crawl).
+- Test monsters: a spawn stands on a hexagonal grid around you, each monster 2 m from its neighbours (1000 within about 33 m).
+- Test monsters: the first ones of a big spawn are no longer taken for dead and removed a few seconds after they appear.
+
 0.15.140 Nov 15, 2026
 - Test monsters: Quantity goes up to 5000 (new 5000 button).
 - Test monsters: a spawn is scattered at random in a circle around you (up to 200 m for 5000), never within 3 m of you or of each other, instead of a tight grid.
