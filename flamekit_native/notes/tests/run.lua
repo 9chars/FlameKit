@@ -1040,7 +1040,9 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   check(not find_row("Remove").disabled, "Remove is there without a test monster of your own")
   click(find_row("Remove").button)
   step(40)
-  check(destroyed[#destroyed] == 901 and find_row("Removed 1 test monster") ~= nil,
+  local got901 = false  -- (0.15.166) a loot chest (and its glow) may be cleaned up in the same steps
+  for k = math.max(1, #destroyed - 4), #destroyed do if destroyed[k] == 901 then got901 = true end end
+  check(got901 and find_row("Removed 1 test monster") ~= nil,
     "Remove clears a dead test monster's body left behind (one from before 0.15.126)")
   -- (0.15.136, owner) Remove reaches every test monster in the world: a live duelist nobody keeps, far away
   comps.NetworkHealth[901] = { health = 500 }

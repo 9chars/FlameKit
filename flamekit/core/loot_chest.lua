@@ -22,6 +22,9 @@ M.MAX_CHESTS = 100  -- all owners together
 local PUT_WAIT = 30  -- steps (0.5 s) between a chest's spawn and the first put into it
 local RETRIES = 3    -- a refused put into a chest under 5 s old is tried again this often before the chest counts as full
 local FILE = "loot_chests.dat"
+-- (0.15.166, owner: "make the chests glow ... to make them stand out") an effect on each chest's spot, removed with it;
+-- untested what it looks like
+M.GLOW = "04f1fbc2-adea-4808-ae8a-1c3caebd289d"  -- VFX_SubEntity_Prop_Light_Source_Glow
 
 local chests = {}   -- chest id -> { x, y, z, born = os.time(), step, filled = true once items were in it, full = true }
 local count = 0
@@ -52,7 +55,7 @@ local function save()
   if not f then return end
   f:write("session ", tostring(emf.session()), "\n")
   for id, c in pairs(chests) do
-    f:write(string.format("%d %.2f %.2f %.2f %d %d\n", id, c.x, c.y, c.z, c.filled and 1 or 0, c.born or 0))
+    f:write(string.format("%d %.2f %.2f %.2f %d %d %d\n", id, c.x, c.y, c.z, c.filled and 1 or 0, c.born or 0, c.fx or 0))
   end
   f:close()
 end
@@ -65,12 +68,13 @@ local function load(world)
   if first ~= "session " .. tostring(emf.session()) then f:close() return end  -- another server run: those are gone
   local n = 0
   for line in f:lines() do
-    local id, x, y, z, filled, born = line:match("^(%d+) (%S+) (%S+) (%S+) (%d) (%d+)")
+    local id, x, y, z, filled, born, fx = line:match("^(%d+) (%S+) (%S+) (%S+) (%d) (%d+) ?(%d*)")
     id = tonumber(id)
     if id and not chests[id] then
       local okp, px = pcall(world.position, world, id)
       if okp and px then
-        chests[id] = { x = tonumber(x), y = tonumber(y), z = tonumber(z), filled = filled == "1", born = tonumber(born) }
+        chests[id] = { x = tonumber(x), y = tonumber(y), z = tonumber(z), filled = filled == "1", born = tonumber(born),
+                       fx = tonumber(fx) ~= 0 and tonumber(fx) or nil }
         count, n = count + 1, n + 1
         guard(id)  -- a reload took the script's hit rules away
       end
@@ -97,6 +101,8 @@ local function spawn_chest(world, x, y, z)
   end
   chests[id], count = { x = x, y = y, z = z, born = os.time(), step = steps }, count + 1
   guard(id)
+  local okf, fx = pcall(emf.spawn, world, M.GLOW, x, y + 0.5, z)
+  if okf and fx and fx ~= 0 then chests[id].fx = fx else emf.log("loot chest: the glow was refused (" .. tostring(fx) .. ")") end
   save()
   return id
 end
@@ -215,6 +221,7 @@ function M.tick(world, bag)
     local never = not c.filled and now - (c.born or now) >= 30
     if gone or (c.filled and n == 0) or never then
       unguard(c)
+      if c.fx then pcall(emf.destroy, world, c.fx) end  -- (0.15.166) its glow goes with it
       chests[id], count, changed = nil, count - 1, true
       if not gone then
         local okd, r = pcall(emf.destroy, world, id)

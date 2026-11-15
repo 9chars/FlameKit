@@ -1,3 +1,6 @@
+0.15.166 Nov 15, 2026
+- Loot chests glow (the game's light glow effect on each new chest), removed with the chest. Server only: no game update.
+
 0.15.165 Nov 15, 2026
 - Loot chests cannot be damaged: every hit on them is cancelled (up to 24 chests at once). Server only: no game update.
 
