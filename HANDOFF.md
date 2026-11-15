@@ -2,6 +2,19 @@
 
 Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.140 on Development and Stable (owner, 2026-11-15 01:52: all channels).
 
+## Rule 0: instructions to the owner (read before every message that tells him to do something)
+
+The owner has asked many times for specific instructions and Claude has failed it many times (last: 2026-11-15, "back in
+that folder"). Before sending any message that asks the owner to do something, check every step against this list and
+rewrite the step if any answer is no:
+
+1. Is it a numbered step that does exactly one thing?
+2. Does it give the full path (`C:\enshrouded mod shit\...`) of every folder or file it mentions, even if the step
+   before named it? No "that folder", "there", "back in", "the same", "the one above".
+3. Does it name the exact file, button or menu item to click, and what Windows will show or ask?
+4. Would the step make sense if it were the only step he read?
+5. Does the last step say what to tell Claude when done, and what Claude does then?
+
 ## What FlameKit is
 
 One mod suite for Enshrouded by Ninechars, one version number for the whole product. Two parts:
