@@ -31,6 +31,22 @@ local loaded = false
 
 local function path() return emf.dir .. "\\" .. FILE end
 
+-- (0.15.165, owner: "those chests took damage during the fight ... set not to take damage") an EMF hit rule per chest
+-- cancels every hit on it (lua.md "Hits": `to` = an entity id). EMF allows 64 rules for the whole script (PvP and the
+-- test monsters use some), so at most GUARD_MAX chests are protected at once; the rule goes with the chest.
+local GUARD_MAX = 24
+local guarded = 0
+local function guard(id)
+  local c = chests[id]
+  if not c or c.rule or guarded >= GUARD_MAX then return end
+  local ok, r = pcall(emf.hit_rule, { to = id, cancel = true })
+  if ok and r then c.rule, guarded = r, guarded + 1
+  else emf.log("loot chest: no hit rule for chest " .. tostring(id) .. " (" .. tostring(r) .. "): it can be damaged") end
+end
+local function unguard(c)
+  if c and c.rule then pcall(emf.hit_rule_remove, c.rule) c.rule, guarded = nil, guarded - 1 end
+end
+
 local function save()
   local f = io.open(path(), "w")
   if not f then return end
@@ -56,6 +72,7 @@ local function load(world)
       if okp and px then
         chests[id] = { x = tonumber(x), y = tonumber(y), z = tonumber(z), filled = filled == "1", born = tonumber(born) }
         count, n = count + 1, n + 1
+        guard(id)  -- a reload took the script's hit rules away
       end
     end
   end
@@ -79,6 +96,7 @@ local function spawn_chest(world, x, y, z)
     return nil
   end
   chests[id], count = { x = x, y = y, z = z, born = os.time(), step = steps }, count + 1
+  guard(id)
   save()
   return id
 end
@@ -196,6 +214,7 @@ function M.tick(world, bag)
     if n > 0 and not c.filled then c.filled, changed = true, true end
     local never = not c.filled and now - (c.born or now) >= 30
     if gone or (c.filled and n == 0) or never then
+      unguard(c)
       chests[id], count, changed = nil, count - 1, true
       if not gone then
         local okd, r = pcall(emf.destroy, world, id)
