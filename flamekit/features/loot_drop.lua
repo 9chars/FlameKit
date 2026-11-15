@@ -186,16 +186,27 @@ local function test_tick(world)
   end
 end
 
+-- (0.15.176, owner: "the loot didnt drop out") some bodies and loot spots are filled only when someone opens them (EMF
+-- ecs_programs random_loot_on_interaction): the game's own loot event, as pressing E does, with the body or spot as
+-- both giver and receiver (0.15.145: a body had its loot 0.5 s after it), then it is looked at again.
+local function poke(world, id)
+  local ok, done = pcall(emf.emit, "server", "LootInteractionEvent",
+    { guestId = id, hostId = id, offerId = 0, lootAll = true, bypassInteraction = true })
+  note("%s: still empty: loot event sent (%s)", tostring(id), (ok and done ~= false) and "ok" or "refused")
+  return ok and done ~= false
+end
+
 -- (0.15.170) the body is gone, or stayed empty: its loot is in a separate loot spot (core/loot_spots.lua). Its items go
 -- on the ground at the spot (same quality and level), then the empty spot is removed.
+local body_again  -- below (it uses handle)
 local function from_spot(world, d, again)
   local asked = spots.find(d.id, d.x, d.z, d.t, function(w, ids)
     if #ids == 0 then note("body %s: no loot spot found", tostring(d.id)) tally.empty = tally.empty + 1 return end
     for _, cid in ipairs(ids) do
       local stacks = bag.entity_stacks(w, cid)
-      if #stacks == 0 and not again then  -- not filled yet: once more, a second later
-        note("body %s: loot spot %s still empty, looking again", tostring(d.id), tostring(cid))
-        retry[#retry + 1] = { d = d, at = steps + 60 }
+      if #stacks == 0 and (again or 0) < 2 then  -- not filled yet: once more, a second later (the 2nd time: poked)
+        if again == 1 then poke(w, cid) else note("body %s: loot spot %s still empty, looking again", tostring(d.id), tostring(cid)) end
+        retry[#retry + 1] = { d = d, at = steps + 60, again = (again or 0) + 1 }
         return
       end
       local okp, x, y, z = pcall(w.position, w, cid)
@@ -222,6 +233,13 @@ local function from_spot(world, d, again)
   if not asked then note("body %s: gone, and its death has no time or place: its loot spot cannot be told", tostring(d.id)) end
 end
 
+body_again = function(world, r)
+  local d = r.d
+  local okh, res = pcall(handle, world, d.id, #LOOKS)
+  if okh and res == "empty" then pcall(from_spot, world, d)
+  elseif okh and res == "gone" then pcall(from_spot, world, d) end
+end
+
 function F.tick(world)
   steps = steps + 1
   pcall(spots.tick, world)
@@ -229,7 +247,9 @@ function F.tick(world)
   if #retry > 0 then
     local keep = {}
     for _, r in ipairs(retry) do
-      if r.at <= steps then pcall(from_spot, world, r.d, true) else keep[#keep + 1] = r end
+      if r.at <= steps then
+        if r.body then pcall(body_again, world, r) else pcall(from_spot, world, r.d, r.again) end
+      else keep[#keep + 1] = r end
     end
     retry = keep
   end
@@ -247,6 +267,11 @@ function F.tick(world)
       if d.look < #LOOKS then
         queue[#queue + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1,
                               x = d.x, y = d.y, z = d.z, t = d.t }
+      elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
+        -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
+        d.poked = true
+        poke(world, d.id)
+        retry[#retry + 1] = { body = true, d = d, at = steps + 30 }
       else
         pcall(from_spot, world, d)  -- (0.15.170) empty at every look: its loot may be in a separate spot
       end
