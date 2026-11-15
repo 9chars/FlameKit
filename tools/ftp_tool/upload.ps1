@@ -3,7 +3,7 @@
 # 2026-11-15) Claude through the restart helper's 'upload' request. The password stays encrypted for the owner's Windows
 # user (ftp_password.dat, DPAPI): it is never shown or logged, and Claude never opens that file. It only ever writes into the
 # server's FlameKit folder (ftp.txt mod_dir), mod.json last, and reads the log (log_path). It never deletes on the server.
-param([switch]$List)  # (2026-11-15) -List: also writes what is on the FTP (names, sizes, dates) to outbox\server_log\ftp_list.txt
+param([switch]$List)  # (2026-11-15) -List: also writes what is on the FTP (names, sizes, dates) to production_stable_logs\ftp_list.txt
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $conf = Join-Path $here 'ftp.txt'
@@ -21,6 +21,9 @@ function Req([string]$path, [string]$method) {
     return $r
 }
 $out = $s.outbox
+# (owner, 2026-11-15) the production server's logs go to <work folder>\production_stable_logs, beside the outbox (not in it,
+# so they can never be uploaded); ftp.txt logs = <folder> changes it
+$logRoot = if ($s.logs) { $s.logs } else { Join-Path (Split-Path -Parent $out) 'production_stable_logs' }
 $files = @()
 if (Test-Path $out) { $files = @(Get-ChildItem $out -Recurse -File | Where-Object { $_.FullName -notlike (Join-Path $out 'server_log\*') } |
     Sort-Object { $_.Name -ieq 'mod.json' -and $_.DirectoryName -ieq $out }) }
@@ -41,7 +44,7 @@ foreach ($f in $files) {
 }
 if ($files.Count) { Write-Host "Done: $($files.Count) file(s) on the server. Waiting 15 s for EMF to reload FlameKit..."; Start-Sleep -Seconds 15 }
 if ($s.log_path) {
-    $logDir = Join-Path $out 'server_log'
+    $logDir = $logRoot
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     $resp = (Req $s.log_path ([System.Net.WebRequestMethods+Ftp]::DownloadFile)).GetResponse()
     $fs = [System.IO.File]::Create((Join-Path $logDir 'emf_core.log')); $resp.GetResponseStream().CopyTo($fs); $fs.Close(); $resp.Close()
@@ -57,7 +60,7 @@ $got = $false
 foreach ($p in $tries) {
     try {
         $resp = (Req $p ([System.Net.WebRequestMethods+Ftp]::DownloadFile)).GetResponse()
-        $logDir = Join-Path $out 'server_log'
+        $logDir = $logRoot
         New-Item -ItemType Directory -Force -Path $logDir | Out-Null
         $fs = [System.IO.File]::Create((Join-Path $logDir 'enshrouded_server.log')); $resp.GetResponseStream().CopyTo($fs); $fs.Close(); $resp.Close()
         Write-Host "Game server log fetched ($p)."
@@ -96,7 +99,7 @@ function List-Dir([string]$dir) {
     return $items
 }
 function Fetch([string]$remote, [string]$local, [int64]$size = -1) {
-    $logDir = Join-Path $out 'server_log'
+    $logDir = $logRoot
     $path = Join-Path $logDir $local
     if ($size -ge 0 -and (Test-Path $path) -and (Get-Item $path).Length -eq $size) { return }  # already here, unchanged
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
@@ -123,7 +126,7 @@ if ($dump) {
 
 # (owner, 2026-11-15: "make sure the upload script is downloading all the relevant logs") -List: every folder and file
 # on the FTP (names, sizes, dates only; nothing is downloaded or changed), at most 5 folders deep and 4000 lines, into
-# outbox\server_log\ftp_list.txt, so Claude can see which logs exist
+# production_stable_logs\ftp_list.txt, so Claude can see which logs exist
 if ($List) {
     $lines = New-Object System.Collections.Generic.List[string]
     function Walk([string]$dir, [int]$depth) {
@@ -148,8 +151,8 @@ if ($List) {
         }
     }
     Walk '/' 0
-    $logDir = Join-Path $out 'server_log'
+    $logDir = $logRoot
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     Set-Content -Path (Join-Path $logDir 'ftp_list.txt') -Value $lines -Encoding UTF8
-    Write-Host "FTP list written: $($lines.Count) lines (server_log\ftp_list.txt)."
+    Write-Host "FTP list written: $($lines.Count) lines (production_stable_logs\ftp_list.txt)."
 }
