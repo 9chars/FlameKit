@@ -1,3 +1,6 @@
+0.15.179 Nov 15, 2026
+- Loot Drop: a body whose loot the game makes only when it is opened (pressing E on one gave loot) is opened by FlameKit as the nearest player would, then its loot goes on the ground. Needs one server restart. Server only: no game update.
+
 0.15.178 Nov 15, 2026
 - Loot Drop: a body or loot spot that holds only a loot table (the game rolls it when someone opens it) is opened with the game's own loot event into a small chest hidden under the ground, and that chest's items go on the ground at the body; the chest is then removed. 0.15.176 opened it into itself, which did nothing. Server only: no game update.
 

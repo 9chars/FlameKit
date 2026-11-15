@@ -13,6 +13,7 @@ local ground = require("core.ground_loot")
 local server = require("core.server_settings")
 local test_tag = require("core.test_tag")
 local spots = require("core.loot_spots")  -- (0.15.170) a creature's separate loot spot
+local players = require("core.players")   -- (0.15.179) the nearest player opens a body that fills only when opened
 
 local F = { id = "loot_drop", title = "Loot Drop" }
 local kit
@@ -194,6 +195,31 @@ end
 -- half a second after that the chest's items go on the ground at the body and the chest is removed.
 local TEMP_CHEST = "669facd1-dc9a-41ab-8fa5-6b9f98c6a382"  -- Prop_Decoration_T0_Storage_16
 local pulls = {}  -- { host, chest, x, y, z, at, stage, label }
+-- (0.15.179, owner pressed E on such a body: "it gave me some junk") the loot event moves only what is already in a
+-- body; the game rolls these bodies' loot on InteractionAcceptedEvent (random_loot_on_interaction, which reads the
+-- opener's PlayerInput: the opener must be a player). So first that event, with the nearest player as the opener; the
+-- body is then looked at again and its loot goes on the ground as usual. Needs one server restart (emf.emits).
+local opened = {}  -- body id -> true once opened this way
+local function open_as_player(world, id, label)
+  if opened[id] then return false end
+  local okp, x, _, z = pcall(world.position, world, id)
+  if not okp or not x then return false end
+  local best, bd = nil, nil
+  local ok, ids = pcall(players.ids, world)
+  for _, pid in ipairs(ok and ids or {}) do
+    local okq, px, _, pz = pcall(world.position, world, pid)
+    if okq and px then
+      local d = (px - x) ^ 2 + (pz - z) ^ 2
+      if not bd or d < bd then best, bd = pid, d end
+    end
+  end
+  if not best then note("%s: no player to open it", tostring(label)) return false end
+  local oke, done = pcall(emf.emit, "server", "InteractionAcceptedEvent", { guestEntityId = best, hostEntityId = id, offerId = 0 })
+  opened[id] = true
+  note("%s: opened as player %s (%s)", tostring(label), tostring(best), (oke and done ~= false) and "ok" or "refused")
+  return oke and done ~= false
+end
+
 local function poke(world, id, x, y, z, label)
   if not x then
     local okp, px, py, pz = pcall(world.position, world, id)
@@ -247,8 +273,12 @@ local function from_spot(world, d, again)
     for _, cid in ipairs(ids) do
       local stacks = bag.entity_stacks(w, cid)
       if #stacks == 0 and (again or 0) < 2 then  -- not filled yet: once more, a second later (the 2nd time: poked)
-        if again == 1 then  -- (0.15.178) still empty: opened into a receiving chest
-          poke(w, cid, nil, nil, nil, "loot spot " .. tostring(cid))
+        if again == 1 then  -- (0.15.179) still empty: opened as a player, then looked at once more
+          if open_as_player(w, cid, "loot spot " .. tostring(cid)) then
+            retry[#retry + 1] = { d = d, at = steps + 30, again = 2 }
+          else
+            poke(w, cid, nil, nil, nil, "loot spot " .. tostring(cid))  -- (0.15.178) into a receiving chest
+          end
           return
         end
         note("body %s: loot spot %s still empty, looking again", tostring(d.id), tostring(cid))
@@ -317,7 +347,11 @@ function F.tick(world)
       elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
         -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
         d.poked = true
-        if not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id)) then pcall(from_spot, world, d) end
+        if open_as_player(world, d.id, "body " .. tostring(d.id)) then
+          retry[#retry + 1] = { body = true, d = d, at = steps + 30 }  -- looked at again: its loot to the ground
+        elseif not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id)) then
+          pcall(from_spot, world, d)
+        end
       else
         pcall(from_spot, world, d)  -- (0.15.170) empty at every look: its loot may be in a separate spot
       end
@@ -347,7 +381,7 @@ function F.setup(k)
   local ok = pcall(emf.on_event, "EntityDiedEvent", kit.guard(F, died, "a death"), "server")
   ground.emits()  -- (0.15.174) the sparkle event for dropped items (named here: EMF wants it in the first run)
   if not ok then emf.log("loot drop: no death events: monsters keep their loot in their bodies") end
-  local oke, said = pcall(emf.emits, { "LootInteractionEvent" }, "server")
+  local oke, said = pcall(emf.emits, { "LootInteractionEvent", "InteractionAcceptedEvent" }, "server")  -- (0.15.179)
   if not oke or said == false then emf.log("loot drop: LootInteractionEvent cannot be sent (" .. tostring(said) .. ")") end
   pcall(emf.command, "loottest", "on|watch|off: (watch: only logs, no event) the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
     kit.guard(F, function(world, args)
