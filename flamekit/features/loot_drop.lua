@@ -91,8 +91,9 @@ local function handle(world, id, look)
       local level, rarity = st.level or 0, st.rarity or 0
       emf.take(world, st.owner, st.item, st.count, function(w, taken)
         if taken and taken > 0 then
-          local made = ground.drop(w, st.item, taken, x, y, z, level, rarity, 2.5)
+          local made, pid = ground.drop(w, st.item, taken, x, y, z, level, rarity, 2.5)
           if made > 0 then
+            if pid then ground.mark(w, pid) end  -- (0.15.171) fireflies on it
             tally.items = tally.items + 1
           else
             emf.put(w, id, st.item, taken, nil, { level = level, rarity = rarity })  -- not dropped: back, nothing is lost
@@ -180,7 +181,8 @@ local function from_spot(world, d, again)
           local level, rarity = st.level or 0, st.rarity or 0
           emf.take(w, st.owner, st.item, st.count, function(w2, taken)
             if taken and taken > 0 then
-              if ground.drop(w2, st.item, taken, x, y, z, level, rarity, 2.5) > 0 then tally.items = tally.items + 1
+              local made, pid = ground.drop(w2, st.item, taken, x, y, z, level, rarity, 2.5)
+              if made > 0 then tally.items = tally.items + 1 if pid then ground.mark(w2, pid) end
               else emf.put(w2, cid, st.item, taken, nil, { level = level, rarity = rarity }) end
             end
           end, { slot = st.slot, exact = true })
@@ -198,6 +200,7 @@ end
 function F.tick(world)
   steps = steps + 1
   pcall(spots.tick, world)
+  if steps % 30 == 0 then pcall(ground.fx_tick, world) end  -- (0.15.171) fireflies off picked-up items
   if #retry > 0 then
     local keep = {}
     for _, r in ipairs(retry) do

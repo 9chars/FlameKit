@@ -50,7 +50,36 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread, templat
   return made, last  -- (0.15.152) also the last pickup's entity id, for a caller that marks it
 end
 
--- (0.15.152-0.15.157) the game's grave flame (VFX_SubEntity_Player_LootCorpse_Tombstone_Flame, 2c2c4511-...) was put on
--- dropped items; removed in 0.15.158 (owner: "lets get rid of that now").
+-- (0.15.152-0.15.157) the game's grave flame (VFX_SubEntity_Player_LootCorpse_Tombstone_Flame) was put on dropped
+-- items: removed in 0.15.158 (owner: too strong). (0.15.171, owner: "I wish we could find the right sparkle ... that would
+-- really help find the item on the ground") the game's fireflies made for loot pickups, on a dropped item's spot until
+-- it is picked up (or MARK_S), at most MARK_MAX at once. Not saved: after a FlameKit reload a mark is not tracked.
+ground.MARK_FX = "c2091afd-f631-4160-ac79-574b951f5a4a"  -- Lootpickup_Scatter_VFX_Bait_T1_Fire_Fly_Above
+ground.MARK_S = 600
+ground.MARK_MAX = 300
+local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
+
+function ground.mark(world, pickup)
+  if marks_n >= ground.MARK_MAX then return "too many" end
+  local ok, x, y, z = pcall(world.position, world, pickup)
+  if not ok or not x then return "item not found" end
+  local oks, id = pcall(emf.spawn, world, ground.MARK_FX, x, y, z)
+  if not oks or not id or id == 0 then return "refused (" .. tostring(id) .. ")" end
+  marks[id], marks_n = { item = pickup, at = os.time() }, marks_n + 1
+  return "placed"
+end
+
+-- Removes the marks of items that were picked up. Call now and then from a feature's server tick.
+function ground.fx_tick(world)
+  if marks_n == 0 then return end
+  local now = os.time()
+  for id, m in pairs(marks) do
+    local ok, x = pcall(world.position, world, m.item)
+    if not ok or not x or now - m.at >= ground.MARK_S then
+      marks[id], marks_n = nil, marks_n - 1
+      pcall(emf.destroy, world, id)
+    end
+  end
+end
 
 return ground

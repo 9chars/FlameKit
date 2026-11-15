@@ -6,6 +6,11 @@
 -- magnet_glue.h is_loot_container): not a player's grave (CreateItemLoot, ForceSave), not a loose pickup (PickupItem),
 -- not a player or creature (Health, PlayerState). Its loot = a container within RADIUS m of the death that appeared at
 -- or after it, by the game's clock (the container's SpawnTime against the death event's timeStamp).
+-- (0.15.171: the death event's timeStamp is 0 on this build) without a time, every monster loot spot within RADIUS m
+-- counts: those spots only ever hold monster loot (DoNotSave, DestroyOnLoot, a loot table; never a chest or a grave),
+-- so taking a neighbour's puts monster loot on the ground too, which is what Loot Drop is for. (Noting the spots there
+-- at the death, as Loot Magnet does without a clock, takes a Lua walk of several steps: the new spot would already be
+-- there and be taken for an old one.)
 -- The world is walked in parts of PER_STEP entities a step (EMF's 250 ms rule), one walk for all deaths waiting.
 -- Shared core code (HANDOFF rule 0b): any feature may use it; it uses no feature.
 
@@ -46,10 +51,10 @@ function M.death_time(e)
 end
 
 -- Asks for the loot spots of death `id` at x, z (died at time `t`, ns); `fn(world, ids)` runs once the next walk is
--- done (ids may be empty). Without a time nothing is found (a loot spot already there must not be taken).
+-- done (ids may be empty). Without a time (0 or nil) every loot spot within RADIUS m counts.
 function M.find(id, x, z, t, fn)
-  if not (x and z and t) then return false end
-  wanted[id] = { x = x, z = z, t = t, fn = fn }
+  if not (x and z) then return false end
+  wanted[id] = { x = x, z = z, t = (t and t > 0) and t or nil, fn = fn }
   return true
 end
 
@@ -69,8 +74,8 @@ function M.tick(world)
       if okp and x then
         for did, w in pairs(walk.asked) do
           if (x - w.x) ^ 2 + (z - w.z) ^ 2 <= M.RADIUS * M.RADIUS and is_loot_container(world, id) then
-            local s = spawn_time(world, id)
-            if s and s >= w.t - SLACK_NS then
+            local st = w.t and spawn_time(world, id)
+            if (not w.t) or (st and st >= w.t - SLACK_NS) then
               walk.found[did] = walk.found[did] or {}
               table.insert(walk.found[did], id)
             end

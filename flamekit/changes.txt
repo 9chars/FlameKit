@@ -1,3 +1,7 @@
+0.15.171 Nov 15, 2026
+- Loot Drop: a monster's separate loot spot is also found when the game gives its death no time (it gives 0): any monster loot spot within 4 m of the death counts.
+- Items Loot Drop puts on the ground get the game's fireflies made for loot pickups, until they are picked up. Server only: no game update.
+
 0.15.170 Nov 15, 2026
 - Monsters drop their loot on the ground: also the many monsters (Scavengers and others) whose loot is not in their body but in a separate loot spot the game puts where they died (their body fades). FlameKit finds that spot (near the death, appeared at or after it, as EMF's Loot Magnet does), puts its items on the ground and removes the empty spot. Server only: no game update.
 
