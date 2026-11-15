@@ -397,8 +397,8 @@ local SHIELD_STEPS = 180  -- how often the duelists' building rule is checked
 -- (0.15.134, owner: how many to spawn) MAX_DUELISTS: the most one request may ask for (the server refuses more, so a
 -- bug or a modified game cannot ask for 100,000); owner, 0.15.139: 1000. Measured on the production server
 -- (2026-11-14): 200 level-1 monsters fighting one player put the game server at its limit per step (~17 ms of 16.7).
-local MAX_DUELISTS = 5000  -- (0.15.140, owner) 5000
-local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000, 5000 }
+local MAX_DUELISTS = 1000  -- (0.15.141, owner) back to 1000: 5000 crushed the production server (steps ~165 ms)
+local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local CORPSE_S = 8
 local body_steps = 0

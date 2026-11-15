@@ -1085,20 +1085,20 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     if logged[i]:find("experimental: Remove by player", 1, true) then sums = sums + 1 end
   end
   check(per == 0 and sums >= 1, "Remove of 50: one summary line, not a line per monster (0.15.140, owner)")
-  -- (0.15.140, owner) up to 5000: all come (20 a step), a check of them is spread over steps, Remove takes them all
-  check(find_row("^5000$") ~= nil, "Quantity has a 5000 button")
-  click("W:dbg:cnt:5000")
+  -- (0.15.141, owner) the cap is 1000 again: no 5000 button, and the server caps a bigger request
+  check(find_row("^5000$") == nil and find_row("^1000$") ~= nil, "Quantity: 1000 is the biggest button, no 5000")
+  click("W:dbg:cnt:1000")
   local n3, d3 = #spawned, #destroyed
   click(find_row("^Spawn Monsters$").button)
-  step(5000 / 20 + SYNC + 40)
-  check(#spawned - n3 == 5000, "5000 monsters spawned (" .. (#spawned - n3) .. ")")
-  require("features.experimental")._scan_max(500)  -- as if the clock ran out: 500 a call, the rest over the next steps
+  step(1000 / 20 + SYNC + 40)
+  check(#spawned - n3 == 1000, "1000 monsters spawned (" .. (#spawned - n3) .. ")")
+  require("features.experimental")._scan_max(300)  -- as if the clock ran out: 300 a call, the rest over the next steps
   click(find_row("Remove").button)
   for _ = 1, 200 do if #destroyed > d3 then break end step(1) end  -- the first step that removes any
   local part = #destroyed - d3
-  step(SYNC + 80)
+  step(SYNC + 40)
   require("features.experimental")._scan_max(6000)
-  check(part < 5000 and #destroyed - d3 >= 5000, "Remove takes all 5000, a part per step (" .. part .. " at first)")
+  check(part < 1000 and #destroyed - d3 >= 1000, "Remove takes all 1000, a part per step (" .. part .. " at first)")
   click("W:dbg:cnt:1")
   click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
