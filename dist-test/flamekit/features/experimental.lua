@@ -924,6 +924,7 @@ local function pvp_off_everywhere(world, why)
     p.pvp = nil
     pvp_unrule(p, "pvp_in")
     pvp_unrule(p, "pvp_out")
+    pvp_unrule(p, "pvp_obj")
     pcall(function()
       local f, now = faction(world, p.entity)
       if f and now == HIT_ALL then f.faction = (p.pvp_was and p.pvp_was ~= HIT_ALL) and p.pvp_was or PLAYER_FACTION end
@@ -1075,6 +1076,12 @@ local function pvp(world)
       if p.pvp then
         pvp_unrule(p, "pvp_in")
         pvp_unrule(p, "pvp_out")
+        -- (0.15.130, owner) a PvP player's hits never damage buildings or placed objects (EMF "objects")
+        local okb, whyb = pvp_rule(p, "pvp_obj", { from = p.entity, to = "objects", cancel = true })
+        if not okb and not p.obj_said then
+          p.obj_said = true
+          emf.log("experimental: PvP: the rule protecting buildings was refused (" .. tostring(whyb) .. ")")
+        end
         local f, now = faction(world, p.entity)
         if f and now ~= HIT_ALL then
           if not p.pvp_was then p.pvp_was = now end
@@ -1085,6 +1092,7 @@ local function pvp(world)
           end
         end
       else
+        pvp_unrule(p, "pvp_obj")
         if p.pvp_was or pvp_steps % 60 == 1 then
           local f, now = faction(world, p.entity)
           if f and now == HIT_ALL then

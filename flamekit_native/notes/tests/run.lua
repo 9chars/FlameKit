@@ -684,7 +684,8 @@ click(pv.button)
 step(3)
 r = select(2, next(hit_rules)) or {}
 check(find_row("PvP", "sw:pvp").selected == true and comps.Faction[PLAYER].faction == 1, "PvP on: the player has faction 1 (HitAll)")
-check(rule_count() == 0, "and no rule scales player-on-player hits: full damage (0.15.128, owner)")
+check(rule_count() == 1 and r.from == PLAYER and r.to == "objects" and r.cancel == true,
+  "and one rule: the PvP player's hits never damage buildings (0.15.130); no damage scaling (0.15.128)")
 check(casts[#casts] == "a player joined PvP!", "everyone is told: " .. tostring(casts[#casts]))
 do  -- (0.15.121, owner) in orange in the Messages window
   local mf = io.open(TMP .. "\\ui_messages.dat", "r")

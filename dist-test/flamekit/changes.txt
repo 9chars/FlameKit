@@ -1,3 +1,6 @@
+0.15.130 Nov 14, 2026
+- PvP: a player with PvP on can no longer damage buildings or placed objects.
+
 0.15.129 Nov 14, 2026
 - Test monsters: the dummy is level 50 now (it was 100: too much health).
 
