@@ -595,12 +595,13 @@ local spawn_queue = {}  -- { account, fn }: each spawns one queued test monster 
 
 -- (0.15.140, owner: "too clustered on top of each other") Where the monsters of a spawn stand, as { side, ahead } in
 -- metres from 3 m in front of the player: one alone right there; more scattered at random over a disc around the
--- player (owner, 0.15.140: centred on me, 200 m), about SPOT_AREA m2 each, the radius at most SPOT_R m (0.15.141: 15 about 8 m,
--- 200 about 28 m, 1000 about 62 m, as wide as the old 2 m block), none within SPOT_MIN m of the player, never
+-- player (owner, 0.15.140: centred on me, 200 m), about SPOT_AREA m2 each, the radius at most SPOT_R m (0.15.141: 15 about 7 m,
+-- 200 about 23 m, 500 about 36 m, 1000 about 50 m), none within SPOT_MIN m of the player, never
 -- closer than SPOT_MIN m to each other (a grid of cells makes each check look at 9 cells only, not at every monster:
 -- 1000 monsters take a few ms). Before: a grid 2 m apart, where big monsters stood inside each other.
--- (0.15.141, owner: "move it back to 2, keep the new pattern") 2 m apart at least, about 12 m2 each (at 9 m2 a few in 1000 could not find a free place)
-local SPOT_AREA, SPOT_MIN, SPOT_TRIES, SPOT_R = 12, 2, 30, 200
+-- (0.15.141, owner: "move it back to 2, keep the new pattern") 2 m apart at least, packed as tight as a random scatter allows: about 8 m2 each with up to 200 tries a monster
+-- (20 test runs of 1000: never closer than 2 m, at most 17 ms; 7 m2 left a few too close, the limit is about 5.7 m2)
+local SPOT_AREA, SPOT_MIN, SPOT_TRIES, SPOT_R = 8, 2, 200, 200
 scatter = function(count)
   if count <= 1 then return { { 0, 0 } } end
   local r = math.min(SPOT_R, math.sqrt(count * SPOT_AREA / math.pi + SPOT_MIN * SPOT_MIN))
