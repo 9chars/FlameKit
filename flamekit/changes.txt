@@ -1,3 +1,6 @@
+0.15.177 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the game's fireflies over loot instead of the glowing specks. Server only: no game update.
+
 0.15.176 Nov 15, 2026
 - Loot Drop: a body or loot spot that stays empty (the game fills some only when they are opened) gets the game's own loot event, as pressing E does, and is looked at again; its loot then goes on the ground. Server only: no game update.
 
