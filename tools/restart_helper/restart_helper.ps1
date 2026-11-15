@@ -250,11 +250,11 @@ function Install-Test([string]$which) {
 # FTP tool's own upload.ps1 (<work folder>\release\FlameKit FTP tool): it uploads the outbox to the production server's
 # FlameKit folder, mod.json last, and fetches the server's logs into outbox\server_log. The password stays encrypted in
 # that folder (DPAPI, this Windows user): this helper only starts the script and logs what it prints, never the password.
-function Upload {
+function Upload([switch]$List) {
     $tool = Join-Path (Split-Path -Parent $here) 'release\FlameKit FTP tool\upload.ps1'
     if (-not (Test-Path $tool)) { Log "upload: FAILED: $tool not found"; return $false }
     Log 'upload: starting the FTP tool'
-    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $tool 2>&1
+    $out = if ($List) { & powershell -NoProfile -ExecutionPolicy Bypass -File $tool -List 2>&1 } else { & powershell -NoProfile -ExecutionPolicy Bypass -File $tool 2>&1 }
     $code = $LASTEXITCODE
     foreach ($line in $out) { Log "upload: $line" }
     if ($code -ne 0) { Log "upload: FAILED (exit code $code)"; return $false }
@@ -291,8 +291,9 @@ while ($true) {
                 'installold' { $ok = Install-Test 'old'; Finish $ok 'installold' }
                 'installnew' { $ok = Install-Test 'new'; Finish $ok 'installnew' }
                 'upload' { $ok = Upload; Finish $ok 'upload' }
+                'ftplist' { $ok = Upload -List; Finish $ok 'ftplist' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, upload, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, upload, ftplist, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"
