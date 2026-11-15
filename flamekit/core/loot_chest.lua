@@ -10,9 +10,10 @@
 local M = {}
 local test_tag = require("core.test_tag")
 
--- (0.15.157, owner: 0.15.154's Prop_Decoration_T4_Storage_56 was "a magical chest designed to be used inside a base")
--- the game's treasure chest; untested: whether the game adds its own random loot when it is opened, and how many slots
-M.CHEST = "3e8fc778-06d9-4af3-a6d4-1171baf49eb4"  -- Base_LootChest_Animgraph2_Random
+-- (0.15.159) 0.15.154's Prop_Decoration_T4_Storage_56 looked like "a magical chest designed to be used inside a base";
+-- 0.15.157's treasure chest (Base_LootChest_Animgraph2_Random) refused every put ("put_items: the game refused a
+-- request (error 0x15)"). A storage chest that looks like a chest:
+M.CHEST = "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec"  -- Prop_Decoration_T5_Storage_40_Chest (40 slots)
 M.NEAR_M = 50
 M.MAX_CHESTS = 100  -- all owners together
 
@@ -37,7 +38,7 @@ local function spawn_chest(world, x, y, z)
     emf.log("loot chest: the game refused a chest (" .. tostring(id) .. ")")
     return nil
   end
-  chests[id], count = { x = x, y = y, z = z }, count + 1
+  chests[id], count = { x = x, y = y, z = z, born = os.time() }, count + 1
   return id
 end
 
@@ -78,52 +79,39 @@ function M.put(world, key, x, y, z, item, n, level, rarity, done)
   into(chest_for(world, x, y, z), n, true)
 end
 
--- Removes chests that were filled and are empty again (looked at every 2 s). Call from a feature's server tick.
--- (0.15.157: an update or reload forgot every chest, and they were never removed) after a (re)load the world is looked
--- through once, SCAN_PER entities a step (EMF's 250 ms rule), for tagged chests: tagged, with an inventory and no
--- health (test monsters carry the same tag but have health). Found ones count as filled (removed once empty).
-local SCAN_PER = 2000
-local scan = nil  -- { list, i } while looking
-local scanned = false
-local function rescan(world)
-  if scanned then return end
-  if not scan then
-    local ok, list = pcall(world.entities, world)
-    if not ok or type(list) ~= "table" then scanned = true return end
-    scan = { list = list, i = 1, found = 0 }
-  end
-  local stop = math.min(#scan.list, scan.i + SCAN_PER - 1)
-  for k = scan.i, stop do
-    local id = scan.list[k]
-    if not chests[id] and test_tag.is(world, id) then
-      local okh, hp = pcall(world.get, world, "NetworkHealth", id)
-      local oki, inv = pcall(world.get, world, "InventorySetup", id)
-      if not (okh and hp) and oki and inv then
-        local okp, x, y, z = pcall(world.position, world, id)
-        if okp and x then
-          chests[id], count = { x = x, y = y, z = z, filled = true }, count + 1
-          scan.found = scan.found + 1
-        end
-      end
-    end
-  end
-  scan.i = stop + 1
-  if scan.i > #scan.list then
-    if scan.found > 0 then emf.log(string.format("loot chest: found %d chest(s) again after a reload", scan.found)) end
-    scan, scanned = nil, true
-  end
-end
-
+-- Removes chests that were filled and are empty again (looked at every 2 s). (0.15.159: a chest counted as filled only
+-- from the game's answer to the put; the owner emptied chests that never went) Filled now also means: seen with items
+-- at a look. A chest never seen with items 30 s after it was put there (the game refused the items) goes too. Whether
+-- a removed chest is really gone is checked 2 s later and logged. Call from a feature's server tick.
+local removed = {}  -- chest id -> os.time() it was destroyed (checked once, then forgotten)
 function M.tick(world, bag)
   steps = steps + 1
   if not scanned then pcall(rescan, world) end
-  if count == 0 or steps % 120 ~= 0 then return end  -- (0.15.156) every 2 s (was 10 s)
+  if steps % 120 ~= 0 then return end
+  local now = os.time()
+  for id, at in pairs(removed) do
+    if now - at >= 2 then
+      removed[id] = nil
+      local okp, x = pcall(world.position, world, id)
+      emf.log(string.format("loot chest: chest %s %s", tostring(id), (okp and x) and "is STILL THERE after emf.destroy" or "is gone"))
+    end
+  end
+  if count == 0 then return end
   for id, c in pairs(chests) do
     local gone = not pcall(world.position, world, id) or world:position(id) == nil
-    if gone or (c.filled and #bag.entity_stacks(world, id) == 0) then
+    local n = gone and 0 or #bag.entity_stacks(world, id)
+    if n > 0 then c.filled = true end
+    local refused = not c.filled and now - (c.born or now) >= 30
+    if gone or (c.filled and n == 0) or refused then
       chests[id], count = nil, count - 1
-      if not gone then pcall(emf.destroy, world, id) end
-      emf.log(string.format("loot chest: chest %s %s", tostring(id), gone and "gone (removed by the game)" or "empty: removed"))
+      if not gone then
+        local okd, r = pcall(emf.destroy, world, id)
+        removed[id] = now
+        emf.log(string.format("loot chest: chest %s %s: destroy %s", tostring(id), refused and "never got items" or "empty",
+          okd and tostring(r) or ("error " .. tostring(r))))
+      else
+        emf.log(string.format("loot chest: chest %s gone (removed by the game)", tostring(id)))
+      end
     end
   end
 end

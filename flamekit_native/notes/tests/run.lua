@@ -1007,7 +1007,7 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
   do  -- (0.15.154, owner) runes into the killer's bag (here: the spawner), the legendary item into a spawned chest
     local runes, lruns, item, chest = nil, nil, nil, nil
-    for _, sp in ipairs(spawned) do if sp.guid == "3e8fc778-06d9-4af3-a6d4-1171baf49eb4" then chest = true end end
+    for _, sp in ipairs(spawned) do if sp.guid == "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec" then chest = true end end
     for _, pt in ipairs(puts) do
       if pt.item == emf.item("Material_T1_Token_WeaponUpgrade_Rune01") then runes = pt
       elseif pt.item == emf.item("Material_T2_Token_WeaponUpgrade_Rune02") then lruns = pt

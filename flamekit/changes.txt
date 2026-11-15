@@ -1,3 +1,6 @@
+0.15.159 Nov 15, 2026
+- Test monsters' loot chests: a storage chest that looks like a chest (Prop_Decoration_T5_Storage_40_Chest, 40 slots); the game's treasure chest refused the loot. A chest now counts as used as soon as items are seen in it (emptied chests stayed before), and a chest the game would not put items into is removed after 30 s. The server's log says whether a removed chest is really gone. Server only: no game update.
+
 0.15.158 Nov 15, 2026
 - No more flame effect on items put on the ground. Server only: no game update.
 
