@@ -1343,7 +1343,7 @@ local function debug_rows(world, rows)
       .. "version you have until a newer stable one comes out." }
   rows[#rows + 1] = { button = "dbg:chan:test", text = "Development", selected = dev, same_line = true,
     tooltip = "The very latest development versions, as soon as they are made: new things first, but they may have bugs. "
-      .. "FlameKit looks for one every minute instead of every 10 minutes." }
+      .. "FlameKit looks for one every minute, on both channels." }
   return rows
 end
 

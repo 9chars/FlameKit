@@ -1,3 +1,6 @@
+0.15.131 Nov 14, 2026
+- Updates: FlameKit now looks for a new version every minute on Stable too (it was every 10 minutes), so fixes reach you sooner.
+
 0.15.130 Nov 14, 2026
 - PvP: a player with PvP on can no longer damage buildings or placed objects.
 

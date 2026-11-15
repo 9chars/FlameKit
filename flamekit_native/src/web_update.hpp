@@ -1,7 +1,7 @@
 // web_update.hpp: FlameKit updates itself from its own repository on GitHub.
 //
-// A thread looks at the repository 15 seconds after the game starts and then every ten minutes (every minute on the
-// test channel; and at once when the player asks, check_now). It first asks GitHub for the newest commit of main, through
+// A thread looks at the repository 15 seconds after the game starts and then every minute, on both channels (0.15.131,
+// owner: 10 minutes for players was too long; and at once when the player asks, check_now). It first asks GitHub for the newest commit of main, through
 // git's own address for that (https://github.com/9chars/FlameKit.git/info/refs, what every git clone uses: not cached),
 // then reads https://raw.githubusercontent.com/9chars/FlameKit/<commit>/<channel>/update.txt and the files at that
 // exact commit, which never change, so no cache can hand out an old copy. (Without the commit: main, as before.) The list has the version on its first line, then a line
@@ -544,10 +544,8 @@ struct Updater {
             }
             check();
             if (asked && last_status.rfind("ready|", 0) != 0) clear_at = GetTickCount64() + 8000;
-            // the next look: every minute on the test channel, every 10 minutes for players; the button cuts it short
-            std::vector<uint8_t> flag;
-            const bool test = read_file(mods + L"flamekit\\update_channel.txt", flag) && flag.size() >= 4 && std::memcmp(flag.data(), "test", 4) == 0;
-            const uint64_t next = GetTickCount64() + (test ? 60ull : 600ull) * 1000;
+            // the next look: every minute on both channels (0.15.131, owner); the button cuts it short
+            const uint64_t next = GetTickCount64() + 60ull * 1000;
             while (GetTickCount64() < next && !g_check_now.load()) {
                 if (clear_at && GetTickCount64() >= clear_at) {
                     clear_at = 0;
