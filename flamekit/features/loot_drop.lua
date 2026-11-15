@@ -68,6 +68,23 @@ local function died(world, e)
                         z = okp and z or nil, t = t }
 end
 
+local fx_said = 0  -- (0.15.173) bodies whose effect components were logged (3 per run)
+local function dump(v, depth)
+  depth = depth or 0
+  if type(v) ~= "table" and type(v) ~= "userdata" then return tostring(v) end
+  if depth > 2 then return "{...}" end
+  local parts, n = {}, 0
+  local ok = pcall(function()
+    for k, x in pairs(v) do
+      n = n + 1
+      if n > 24 then parts[#parts + 1] = "..." break end
+      parts[#parts + 1] = tostring(k) .. "=" .. dump(x, depth + 1)
+    end
+  end)
+  if not ok then return tostring(v) end
+  return "{" .. table.concat(parts, ", ") .. "}"
+end
+
 local function handle(world, id, look)
   -- players never; a creature is known by its Faction at the first look only (0.15.147: the body loses it about when
   -- the game fills it with loot, 1.5-3 s after the death, and later looks skipped the body with its loot in it)
@@ -82,6 +99,14 @@ local function handle(world, id, look)
   local stacks = bag.entity_stacks(world, id)
   note("body %s, look %d: %d stack(s); InventorySetup %s, own Inventory %s", tostring(id), look, #stacks,
     tostring(get(world, "InventorySetup", id) ~= nil), tostring(get(world, "Inventory", id) ~= nil))
+  if #stacks > 0 and fx_said < 3 then  -- (0.15.173) the sparkle on a looted body: its effect components, for the log
+    fx_said = fx_said + 1
+    for _, c in ipairs({ "VfxResourceDynamic", "VfxComponent", "VfxParametersOverwriteComponent", "VfxComponentResource" }) do
+      emf.log(string.format("loot drop: body %s %s: %s", tostring(id), c, dump(get(world, c, id))))
+      local okt, tv = pcall(world.template, world, c, id)
+      if okt and tv then emf.log(string.format("loot drop: body %s %s (template): %s", tostring(id), c, dump(tv))) end
+    end
+  end
   if #stacks == 0 then return "empty" end
   for _, st in ipairs(stacks) do
     if st.gem then

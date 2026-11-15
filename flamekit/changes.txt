@@ -1,3 +1,6 @@
+0.15.173 Nov 15, 2026
+- Items Loot Drop puts on the ground have no mark for now (0.15.172's was the loot pile, not the sparkle). The server's log shows the effect components of the first 3 looted bodies, to find the sparkle the game puts on a dead body. Server only: no game update.
+
 0.15.172 Nov 15, 2026
 - Items Loot Drop puts on the ground are marked with the game's glowing loot-spot sparkle (the one on a dead body) instead of fireflies. Server only: no game update.
 

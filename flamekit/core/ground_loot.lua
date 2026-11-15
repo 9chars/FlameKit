@@ -58,12 +58,15 @@ end
 -- template (a loot container with no model: EMF re_content.md 4.1), as a mark only; untested. core/loot_spots.lua never
 -- takes these marks for a monster's loot (ground.is_mark). 0.15.171 had the fireflies (Lootpickup_Scatter_VFX_Bait_T1_
 -- Fire_Fly_Above, c2091afd-...).
-ground.MARK_FX = "4d7d3bec-6dd4-4373-aa9b-fd0eb5085e83"  -- Base_LootContainer_Enemy_VFX
+-- (0.15.173, owner: that is "the loot pile one", not the sparkle) no mark for now: the sparkle on a dead body is an
+-- effect component the game adds to the body (transform_to_loot), being read first (features/loot_drop.lua)
+ground.MARK_FX = nil  -- 0.15.172: Base_LootContainer_Enemy_VFX (4d7d3bec-...)
 ground.MARK_S = 600
 ground.MARK_MAX = 300
 local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
 
 function ground.mark(world, pickup)
+  if not ground.MARK_FX then return "off" end
   if marks_n >= ground.MARK_MAX then return "too many" end
   local ok, x, y, z = pcall(world.position, world, pickup)
   if not ok or not x then return "item not found" end
