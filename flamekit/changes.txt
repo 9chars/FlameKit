@@ -1,3 +1,7 @@
+0.15.160 Nov 15, 2026
+- Test monsters give only their runes (into the killer's bag) and their one legendary item (into the loot chest); the game's own loot in their bodies is no longer put into the chest (it goes with the body).
+- Loot chests: a new chest is given half a second before items go into it (it refused them at once, and FlameKit then put a second chest beside it), and no hidden tag any more (a chest spawned with it refused every item). FlameKit remembers its chests in loot_chests.dat, so an update does not make it forget them. Server only: no game update.
+
 0.15.159 Nov 15, 2026
 - Test monsters' loot chests: a storage chest that looks like a chest (Prop_Decoration_T5_Storage_40_Chest, 40 slots); the game's treasure chest refused the loot. A chest now counts as used as soon as items are seen in it (emptied chests stayed before), and a chest the game would not put items into is removed after 30 s. The server's log says whether a removed chest is really gone. Server only: no game update.
 

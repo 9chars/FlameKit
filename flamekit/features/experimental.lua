@@ -629,24 +629,7 @@ end
 -- equal chances of a cosmetic, a weapon, an armour piece, a ring or a gem, the gear of the tier for the monster's level
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
 local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
-local body_loot = {}  -- (0.15.156) test monster bodies whose own loot goes into a chest: { id, x, y, z, key, at, look }
 local fx_steps = 0    -- server steps (F.tick)
-local function body_loot_tick(world)
-  if #body_loot == 0 then return end
-  local keep = {}
-  for _, d in ipairs(body_loot) do
-    if d.at > fx_steps then keep[#keep + 1] = d
-    else
-      for _, st in ipairs(bag.entity_stacks(world, d.id)) do
-        pcall(emf.take, world, st.owner, st.item, st.count, function(w, taken)
-          if taken and taken > 0 then loot_chest.put(w, d.key, d.x, d.y, d.z, st.item, taken, st.level or 0, st.rarity or 0) end
-        end, { slot = st.slot, exact = true })
-      end
-      if d.look == 1 then d.look, d.at = 2, fx_steps + 180 keep[#keep + 1] = d end
-    end
-  end
-  body_loot = keep
-end
 
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
@@ -675,9 +658,8 @@ local function drop_test_loot(world, id, b)
   local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
   local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
   if name then loot_chest.put(world, key, x, y, z, name, 1, level, "legendary") end
-  -- (0.15.156, owner: too much loot on the ground) the game's own loot in the body (it comes 1.5-3 s after the death)
-  -- into the chest too: looked at 3 and 6 s after the death (the body goes at CORPSE_S, 8 s)
-  body_loot[#body_loot + 1] = { id = id, x = x, y = y, z = z, key = key, at = fx_steps + 180, look = 1 }
+  -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear") their
+  -- own game loot stays in the body, which goes CORPSE_S after the death (0.15.156 put it into the chest)
   -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
   return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
     killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
@@ -1529,7 +1511,6 @@ end
 
 function F.tick(world)
   fx_steps = fx_steps + 1
-  if world:is_server() then pcall(body_loot_tick, world) end  -- (0.15.156) test monsters' own loot into the chest
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
