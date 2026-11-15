@@ -12,6 +12,9 @@ local ground = {}
 -- the generic pickup template (EMF docs, re_inventory_api.md; this text form is the one emf.spawn takes)
 ground.PICKUP = "a56d2777-daf1-4164-90d4-b7b12749c723"
 ground.MAX_AMOUNT = 65535  -- PickupItem.pickupAmount is a u16
+-- (0.15.149, owner: a legendary helmet floated in the air) a pickup does not fall: it stays where it is spawned, so it is
+-- made just above the given height (a body's position is at its feet), not 1 m above it as before
+ground.LIFT = 0.25
 
 local RARITY = { common = 0, uncommon = 1, rare = 2, epic = 3, legendary = 4 }
 
@@ -31,7 +34,7 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread)
     local n = math.min(count, ground.MAX_AMOUNT)
     local ang = math.random() * 2 * math.pi
     local d = spread * (0.6 + 0.4 * math.random())
-    local ok, id = pcall(emf.spawn, world, ground.PICKUP, x + math.cos(ang) * d, y + 1, z + math.sin(ang) * d,
+    local ok, id = pcall(emf.spawn, world, ground.PICKUP, x + math.cos(ang) * d, y + ground.LIFT, z + math.sin(ang) * d,
       { PickupItem = { itemId = item, level = math.floor(tonumber(level) or 0), rarity = rarity, pickupAmount = n } })
     if ok and id and id ~= 0 then made = made + 1 else break end
     count = count - n

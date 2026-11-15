@@ -1,3 +1,6 @@
+0.15.149 Nov 15, 2026
+- Loot put on the ground (the server's Loot Drop and the test monsters' legendary loot) is placed just above the ground instead of 1 m above it: a dropped item stays where it is placed, and a helmet floated in the air.
+
 0.15.148 Nov 15, 2026
 - Test monsters: the server's log has one line per killed test monster saying what loot it dropped on the ground (runes, legendary runes and the legendary item) and whether each drop worked.
 
