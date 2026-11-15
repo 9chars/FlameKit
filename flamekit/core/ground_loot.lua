@@ -60,7 +60,8 @@ end
 -- Fire_Fly_Above, c2091afd-...).
 -- (0.15.173, owner: that is "the loot pile one", not the sparkle) no mark for now: the sparkle on a dead body is an
 -- effect component the game adds to the body (transform_to_loot), being read first (features/loot_drop.lua)
-ground.MARK_FX = nil  -- 0.15.172: Base_LootContainer_Enemy_VFX (4d7d3bec-...)
+-- (0.15.175, owner picked it) glowing specks, a separate effect on the item's spot as the flame was
+ground.MARK_FX = "9fcc1a72-ab1e-44dd-b2c9-02b2eadbe0bd"  -- VFX_SubEntity_Wildlife_SpiderAnt_Babies_Glowy (0.15.172: Base_LootContainer_Enemy_VFX)
 ground.MARK_S = 600
 ground.MARK_MAX = 300
 local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
@@ -69,7 +70,7 @@ local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time()
 -- (client_transformed_to_loot) when the server sends TransformedToLootEvent {entityId, useVfxDefaultParameters} for the
 -- body. The same event for a dropped item, in case the game sparkles it too. Untested; EMF lets a script send it only
 -- when it named it at the server start (ground.emits in a feature's setup), so it needs one server restart.
-ground.SPARKLE = true
+ground.SPARKLE = false  -- (0.15.175) off: no sparkle seen on a dropped item (owner, 0.15.174)
 local sparkle_ok = nil  -- nil: not asked yet; false: the event cannot be sent
 function ground.emits()
   local ok, said = pcall(emf.emits, { "TransformedToLootEvent" }, "server")

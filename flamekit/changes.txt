@@ -1,3 +1,6 @@
+0.15.175 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the game's glowing specks effect until picked up. The "turned to loot" event experiment is off (no sparkle was seen). Server only: no game update.
+
 0.15.174 Nov 15, 2026
 - Experiment: for every item Loot Drop puts on the ground, the server sends the game's "turned to loot" event, which makes a player's game put the sparkle on a dead body, in case it sparkles the item too. Needs one server restart. Server only: no game update.
 
