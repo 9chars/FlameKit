@@ -20,6 +20,12 @@ rewrite the step if any answer is no:
 7. Did Claude first check everything it can check itself (the file on the PC, what the code will do, a read-only dry
    run in the log) so the owner is not the one finding Claude's mistakes?
 
+## Rule 0a: CORE DIRECTIVE, tests and requests (owner, 2026-11-15 14:46)
+
+Every time Claude needs a new test, it says so. Never ask the owner to do anything without first giving a short, brief
+recap: what Claude needs, what Claude will do, what the owner will do. Short: a few lines, no long explanations
+(owner: "all you have to say is you need to do another test"). Without that recap the owner refuses.
+
 ## Rule 0c: copying files to the PC (found 2026-11-15)
 
 device_commit_files can send an OLD copy when the same staged path is committed again after the file changed (seen

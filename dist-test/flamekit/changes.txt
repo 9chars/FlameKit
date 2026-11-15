@@ -1,3 +1,6 @@
+0.15.146 Nov 15, 2026
+- Server test "flamekit.loottest watch": watches the next monster that dies for 6 s without sending the loot event and logs its items at 0.5, 1.5, 3 and 6 s (also when the body is gone), to see whether the game fills a body by itself.
+
 0.15.145 Nov 15, 2026
 - Server test "flamekit.loottest": the loot event now goes out with "take everything" and "skip the interaction" switched on (0.15.144 sent them in a form the framework dropped), and only once the dead body has an inventory (at most 3 s after the death). The body's items are logged 0.5, 1.5 and 3 s after the event, and whether the body has a loot table and can be looted at the moment of death.
 

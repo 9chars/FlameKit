@@ -107,6 +107,17 @@ local WAIT_MAX = 180  -- steps: send at the latest 3 s after the death
 local function test_tick(world)
   if not test.id then return end
   local age = steps - test.step
+  if test.watch then
+    for _, at in ipairs({ 30, 90, 180, 360 }) do
+      if age == at then
+        local alive = pcall(world.position, world, test.id) and world:position(test.id) ~= nil
+        if alive then describe(world, test.id, string.format("%.1f s after the death (watch: no event sent)", at / 60))
+        else emf.log(string.format("loottest: body %s, %.1f s after the death (watch): gone", tostring(test.id), at / 60)) end
+        if at == 360 then emf.log("loottest: watch done (no event was sent; nothing was taken, dropped or removed)") test.id = nil end
+      end
+    end
+    return
+  end
   if not test.sent then
     local has_inv = get(world, "InventorySetup", test.id) ~= nil or get(world, "Inventory", test.id) ~= nil
     if age == 1 then
@@ -175,11 +186,12 @@ function F.setup(k)
   if not ok then emf.log("loot drop: no death events: monsters keep their loot in their bodies") end
   local oke, said = pcall(emf.emits, { "LootInteractionEvent" }, "server")
   if not oke or said == false then emf.log("loot drop: LootInteractionEvent cannot be sent (" .. tostring(said) .. ")") end
-  pcall(emf.command, "loottest", "on|off: the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
+  pcall(emf.command, "loottest", "on|watch|off: (watch: only logs, no event) the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
       test.armed, test.id, test.sent = args[1] ~= "off", nil, nil
-      emf.log("loottest: " .. (test.armed and "armed: kill one monster" or "off"))
+      test.watch = args[1] == "watch"
+      emf.log("loottest: " .. (test.armed and ("armed" .. (test.watch and " (watch: no event)" or "") .. ": kill one monster") or "off"))
       emf.reply("loottest: " .. (test.armed and "armed" or "off"))
     end, "the loottest command"))
 end
