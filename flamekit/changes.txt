@@ -1,3 +1,8 @@
+0.15.137 Nov 14, 2026
+- Server: spawning a lot of test monsters no longer stops FlameKit on the server (it did with 100: the Party list and everything else stopped until a restart). Big spawns now come 20 at a time, and every scan over the world is kept short.
+- Test monsters no longer protect pets, animals or buildings near them: they are monsters. Spawn them away from bases.
+- If you leave the server while your monsters are still being spawned, the rest are not made.
+
 0.15.136 Nov 14, 2026
 - PvP: the kill notice is red now and stays up for 2 minutes.
 - PvP: if you die with PvP on, you are out of PvP until you switch it on again (free-for-all).

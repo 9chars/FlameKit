@@ -43,7 +43,16 @@ local SESSION_ONLY = { pvp = true }
 -- The PvP mode: "ffa", free-for-all, the only one so far. Rules that belong to it alone check it (owner, 0.15.136:
 -- future modes such as teams may differ). The cool-down and the protections are shared by every mode for now.
 local PVP_MODE = "ffa"
-local PVP_LOCK_S = 60  -- (0.15.134, owner) PvP cannot be left until this long after the last hit by another PvP player
+local PVP_LOCK_S = 60
+-- (0.15.137, production: the server's world has some 37,000 entities, and EMF pauses all of FlameKit when one call
+-- runs over 250 ms) the scans over every entity stop once they used SCAN_BUDGET seconds and go on later
+local SCAN_BUDGET = 0.06
+local SCAN_MAX = 6000  -- and never more than this many entities in one call, in case the clock does not work
+local clock_ok, clock = pcall(function() return os.clock end)
+if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = nil end
+local function now_s() return clock and clock() or 0 end
+-- one scan's limit: time (when os.clock works) and a count, whichever comes first
+local function scan_over(t0, done) return done >= SCAN_MAX or (clock ~= nil and clock() - t0 > SCAN_BUDGET) end  -- (0.15.134, owner) PvP cannot be left until this long after the last hit by another PvP player
 
 -- The options that are on until a player switches them off (the others are off until switched on).
 local DEFAULT_ON = { fly = true }
@@ -376,7 +385,7 @@ local DUEL_FACTION = 1                                      -- HitAll
 -- anyone. Before: faction 7 (Player), which only PvP players could hit (0.15.81 to 0.15.133).
 local DUMMY_FACTION = 3
 local OLD_DUMMY_FACTION = 7  -- dead dummies left before 0.15.134 (is_test_monster)
-local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 30, 180  -- SHIELD_MAX: shared by a player's duelists (0.15.134)
+local SHIELD_STEPS = 180  -- how often the duelists' building rule is checked
 local MAX_DUELISTS = 200  -- (0.15.134, owner: how many to spawn; 0.15.135: up to 50, the shield is shared; 0.15.136: 200)
 local DUEL_COUNTS = { 1, 15, 50, 100, 200 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
@@ -433,15 +442,24 @@ end
 
 -- Removes this player's test monsters and every test monster nobody keeps (left behind by a reload, or by a player
 -- who is gone), anywhere in the world. Another player's own live test monsters stay. Returns how many.
-local function remove_all(world, account, player)
-  local n = 0
-  for id, b in pairs(bodies) do
-    if b.owner == account then
-      drop_body(world, id, true)
-      n = n + 1
+local remove_left = nil  -- (0.15.137) a world scan of Remove that ran out of time: { account, player, from, n }
+local function remove_all(world, account, player, from, n)
+  n = n or 0
+  if not from then
+    for id, b in pairs(bodies) do
+      if b.owner == account then
+        drop_body(world, id, true)
+        n = n + 1
+      end
     end
   end
-  for _, id in ipairs(world:entities()) do
+  local t0, list = now_s(), world:entities()
+  for i = from or 1, #list do
+    local id = list[i]
+    if scan_over(t0, i - (from or 1)) then
+      remove_left = { account = account, player = player, from = i, n = n }  -- the rest on the next steps
+      return n, false
+    end
     if id ~= player and not bodies[id] and is_test_monster(world, id) then
       if pcall(emf.destroy, world, id) then
         n = n + 1
@@ -449,65 +467,18 @@ local function remove_all(world, account, player)
       end
     end
   end
-  return n
+  remove_left = nil
+  return n, true
 end
 
--- The duelists' shield (0.15.135, owner: up to 50 duelists): shared by all of them, so the number of EMF hit rules does
--- not grow with them (EMF has 64 for all of FlameKit). While any duelist lives: one rule keeps every creature's hits off
--- buildings and placed objects, and one rule per animal or pet within SHIELD_R m of a duelist (at most SHIELD_MAX) keeps
--- every creature's hits off it. Players still hit animals and buildings as usual. Before: rules per duelist.
-local duel_guard = { objects = nil, animals = {} }
+-- (0.15.137, owner) test monsters have no protections at all any more: they may hurt pets, animals, villagers,
+-- buildings and placed objects ("anyone who spawns 200 monsters inside someone's base..."). Before, a shared building
+-- rule and per-animal rules (0.15.66 to 0.15.136); the animal rules were a scan of the whole world for every duelist,
+-- which paused FlameKit with 100 of them. guard_duelists only takes away a building rule left from before.
+local duel_guard = { objects = nil }
 local function guard_duelists(world)
-  local centres = {}
-  for id, b in pairs(bodies) do
-    if b.kind == "duel" and not b.dead_at then
-      local okp, x, _, z = pcall(world.position, world, id)
-      if okp and x then centres[#centres + 1] = { x, z } end
-    end
-  end
-  if #centres == 0 then
-    if duel_guard.objects then pcall(emf.hit_rule_remove, duel_guard.objects) end
-    for _, r in pairs(duel_guard.animals) do pcall(emf.hit_rule_remove, r) end
-    duel_guard = { objects = nil, animals = {} }
-    return
-  end
-  if not duel_guard.objects then
-    local okr, r = pcall(emf.hit_rule, { from = "creatures", to = "objects", cancel = true })
-    if okr and r then duel_guard.objects = r else emf.log("experimental: the duelists' rule for buildings was refused (" .. tostring(r) .. ")") end
-  end
-  local keep, n = {}, 0
-  for _ in pairs(duel_guard.animals) do n = n + 1 end
-  for _, e in ipairs(world:entities()) do
-    if not bodies[e] then
-      local okp, ex, _, ez = pcall(world.position, world, e)
-      local near = false
-      if okp and ex then
-        for _, c in ipairs(centres) do
-          if (ex - c[1]) ^ 2 + (ez - c[2]) ^ 2 < SHIELD_R * SHIELD_R then near = true break end
-        end
-      end
-      if near then
-        local oka, account = pcall(world.account, world, e)
-        if not (oka and account) and protected(world, e) then
-          keep[e] = true
-          if not duel_guard.animals[e] and n < SHIELD_MAX then
-            local ok, r = pcall(emf.hit_rule, { from = "creatures", to = e, cancel = true })
-            if ok and r then duel_guard.animals[e], n = r, n + 1 end
-          end
-        end
-      end
-    end
-  end
-  for e, r in pairs(duel_guard.animals) do
-    if not keep[e] then
-      pcall(emf.hit_rule_remove, r)
-      duel_guard.animals[e] = nil
-    end
-  end
-  if n >= SHIELD_MAX and not duel_guard.full_said then
-    duel_guard.full_said = true
-    emf.log(string.format("experimental: the duelists protect only %d animals and pets near them (more are around)", SHIELD_MAX))
-  end
+  if duel_guard.objects then pcall(emf.hit_rule_remove, duel_guard.objects) end
+  duel_guard = { objects = nil }
 end
 
 -- Returns nil, or why there is no body now.
@@ -525,11 +496,16 @@ local function set_level(world, id, level)
   return true
 end
 
+local SPAWN_PER_STEP = 20
+local spawn_queue = {}  -- { account, fn }: each spawns one queued test monster (spawn_tick)
+
 local function spawn_body(world, account, player, kind, level, what, count)
   if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
+  spawn_queue = {}  -- a new spawn or Remove also stops a spawn under way
   if kind ~= "dummy" and kind ~= "duel" then  -- Remove: all of them, anywhere (0.15.136)
-    local n = remove_all(world, account, player)
+    local n, done = remove_all(world, account, player)
     guard_duelists(world)
+    if not done then return string.format("Removing test monsters... (%d so far)", n) end
     return n > 0 and string.format("Removed %d test monster%s.", n, n == 1 and "" or "s") or "No test monsters to remove."
   end
   if kind == "dummy" then level = DUMMY_LEVEL end  -- (0.15.79, owner) it never hurts anyone; (0.15.129, owner) level 50
@@ -545,12 +521,12 @@ local function spawn_body(world, account, player, kind, level, what, count)
   local d0 = kind == "duel" and duelist(what) or dummy_of(what)
   -- (0.15.134, owner) several duelists: rows of up to 10, 2 m apart, from 3 m in front of the player
   count = kind == "duel" and math.max(1, math.min(MAX_DUELISTS, math.floor(tonumber(count) or 1))) or 1
-  local made = 0
+  local jobs = {}
   for i = 1, count do
     local per_row = math.min(count, 10)
     local col, row = (i - 1) % 10, math.floor((i - 1) / 10)
     local side, ahead = (col - (per_row - 1) / 2) * 2, row * 2
-    local why = (function()
+    jobs[i] = (function(world)
   local d = d0
   local guid = d[3]
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
@@ -564,8 +540,10 @@ local function spawn_body(world, account, player, kind, level, what, count)
   if level then
     local okl, set = pcall(set_level, world, id, level)
     b.level = level
-    emf.log(string.format("experimental: the PvP test %s (entity %s) set to level %d: %s", kind, tostring(id), level,
-      okl and (set and "done" or "it has no Level") or tostring(set)))
+    if count == 1 then  -- (0.15.137) one line per monster only for a single one: logging is slow
+      emf.log(string.format("experimental: the PvP test %s (entity %s) set to level %d: %s", kind, tostring(id), level,
+        okl and (set and "done" or "it has no Level") or tostring(set)))
+    end
   end
   if kind == "dummy" then
     pcall(function() world:get("Faction", id).faction = DUMMY_FACTION end)  -- at once
@@ -575,28 +553,58 @@ local function spawn_body(world, account, player, kind, level, what, count)
   if kind == "duel" then
     pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
   end
-  emf.log(string.format("experimental: a PvP test %s (entity %s%s%s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id),
-    b.what and (", " .. b.what) or "", level and (", level " .. level) or "", tostring(player)))
-    end)()
-    if why then
-      if made == 0 then return why end
-      break
-    end
-    made = made + 1
+  if count == 1 then
+    emf.log(string.format("experimental: a PvP test %s (entity %s%s%s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id),
+      b.what and (", " .. b.what) or "", level and (", level " .. level) or "", tostring(player)))
+  end
+    end)
+  end
+  -- (0.15.137, production: 100 at once paused all of FlameKit, "the script ran longer than 250 ms") at most
+  -- SPAWN_PER_STEP now, the rest a few at a time on the next server steps (spawn_tick)
+  local first = math.min(count, SPAWN_PER_STEP)
+  for i = 1, first do
+    local why = jobs[i](world)
+    if why then return why end
+  end
+  for i = first + 1, count do spawn_queue[#spawn_queue + 1] = { account = account, fn = jobs[i] } end
+  if count > 1 then
+    emf.log(string.format("experimental: %d PvP test %ss (%s%s) for player %s%s", count, kind == "duel" and "duelist" or "dumm", d0[1] .. ": " .. d0[2],
+      level and (", level " .. level) or "", tostring(player), count > first and string.format(" (%d now, the rest over the next steps)", first) or ""))
   end
   if kind == "duel" then guard_duelists(world) end  -- buildings and animals near them, at once
-  if made < count then return string.format("Only %d of %d could be spawned.", made, count) end
+  if count > first then return string.format("Spawning %d monsters...", count) end
+end
+
+-- the rest of a big spawn, SPAWN_PER_STEP a server step; the shield follows once all are there
+local function spawn_tick(world)
+  if remove_left then  -- a Remove that ran out of time goes on, then tells its player
+    local r = remove_left
+    local n, done = remove_all(world, r.account, r.player, r.from, r.n)
+    if done and tell_player then
+      tell_player(world, r.player, r.account, n > 0 and string.format("Removed %d test monster%s.", n, n == 1 and "" or "s") or "No test monsters to remove.")
+    end
+  end
+  if #spawn_queue == 0 then return end
+  for _ = 1, math.min(SPAWN_PER_STEP, #spawn_queue) do
+    local job = table.remove(spawn_queue, 1)
+    local okj, why = pcall(job.fn, world)
+    if not okj or why then emf.log("experimental: a queued test monster was not spawned: " .. tostring(why)) end
+  end
+  if #spawn_queue == 0 then guard_duelists(world) end
 end
 
 local function bodies_tick(world)
   if next(bodies) == nil then
-    if duel_guard.objects or next(duel_guard.animals) then guard_duelists(world) end  -- the last one went: rules off
+    if duel_guard.objects then guard_duelists(world) end  -- the last one went: the rule goes
     return
   end
   body_steps = body_steps + 1
   if body_steps % SHIELD_STEPS == 0 then guard_duelists(world) end
   if body_steps % 30 ~= 0 then return end
   local session = emf.session()
+  local many = 0
+  for _ in pairs(bodies) do many = many + 1 end
+  many = many > 5  -- (0.15.137) with many test monsters their AI is not logged (slow, and the log would flood)
   for id, b in pairs(bodies) do
     local alive = false
     if b.session == session then
@@ -616,7 +624,7 @@ local function bodies_tick(world)
         b.dead_at = os.time()
         emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S))
         local o = online[b.owner]
-        if o and tell_player then
+        if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many
           tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
         end
       elseif os.time() - b.dead_at >= CORPSE_S then
@@ -633,7 +641,7 @@ local function bodies_tick(world)
       drop_body(world, id, false)
     elseif not alive then
       -- not seen this time: asked again in half a second
-    else
+    elseif not many then
       -- what its AI does, logged when it changes (for finding out why a body does not fight)
       pcall(function()
         local ai = world:get("DynamicEnemy01BehaviorState", id)
@@ -1119,13 +1127,20 @@ local function hunt(world)
   end
 end
 
+local aggro_i = 1  -- (0.15.137) where pvp_aggro's pass over the world goes on
 local function pvp_aggro(world, players)
-  hunters = {}
-  if aggro_broken or #players == 0 then return end
+  if aggro_i == 1 then hunters = {} end  -- a new pass
+  if aggro_broken or #players == 0 then hunters, aggro_i = {}, 1 return end
   local sent = 0
   local ok, err = pcall(function()
-    for _, e in ipairs(world:entities()) do
-      if has(world, "DynamicEnemy01BehaviorState", e) then
+    local t0, done, list = now_s(), 0, world:entities()
+    local i = aggro_i
+    aggro_i = 1
+    while i <= #list do
+      if scan_over(t0, done) then aggro_i = i break end
+      local e = list[i]
+      i, done = i + 1, done + 1
+      if not bodies[e] and has(world, "DynamicEnemy01BehaviorState", e) then  -- test monsters fight anyway
         local _, n = faction(world, e)
         if n and n ~= 7 and n ~= 8 and n ~= 11 then
           local hp = world:get("NetworkHealth", e)
@@ -1170,10 +1185,12 @@ local function pet_like(world, id)
   return n == 12 or (n == 11 and not has(world, "NpcState", id))
 end
 
+local pets_scan = { i = 1, keep = {} }  -- where guard_pets' pass over the world is
 local function guard_pets(world, any)
   if not any then
     for e, r in pairs(pet_rules) do pcall(emf.hit_rule_remove, r) end
     pet_rules = {}
+    pets_scan = { i = 1, keep = {} }
     return
   end
   local centres = {}
@@ -1183,9 +1200,18 @@ local function guard_pets(world, any)
       if okw and x then centres[#centres + 1] = { x, z } end
     end
   end
-  local keep, n = {}, 0
+  local n = 0
   for _ in pairs(pet_rules) do n = n + 1 end
-  for _, e in ipairs(world:entities()) do
+  -- (0.15.137) a pass over the world may take several calls: it goes on where the last call stopped, and rules are
+  -- taken away only at the end of a whole pass
+  local keep = pets_scan.keep
+  local list = world:entities()
+  local t0, done, partial = now_s(), 0, false
+  local i = pets_scan.i
+  while i <= #list do
+    if scan_over(t0, done) then partial = true break end
+    local e = list[i]
+    i, done = i + 1, done + 1
     local okp, ex, _, ez = pcall(world.position, world, e)
     if okp and ex then
       local near = false
@@ -1204,11 +1230,16 @@ local function guard_pets(world, any)
       end
     end
   end
-  for e, r in pairs(pet_rules) do
-    if not keep[e] then
-      pcall(emf.hit_rule_remove, r)
-      pet_rules[e] = nil
+  if partial then
+    pets_scan.i = i
+  else
+    for e, r in pairs(pet_rules) do
+      if not keep[e] then
+        pcall(emf.hit_rule_remove, r)
+        pet_rules[e] = nil
+      end
     end
+    pets_scan = { i = 1, keep = {} }
   end
   if n >= PET_MAX and not pets_full_said then
     pets_full_said = true
@@ -1267,7 +1298,7 @@ local function pvp(world)
     end
   end)
   if not ok then pvp_off_everywhere(world, tostring(err)) return end
-  if any and pvp_steps % AGGRO_STEPS == 0 then
+  if any and (pvp_steps % AGGRO_STEPS == 0 or aggro_i > 1) then  -- (0.15.137) a pass cut short goes on next step
     local players = {}
     for _, p in pairs(online) do if p.pvp then players[#players + 1] = p.entity end end
     pvp_aggro(world, players)
@@ -1275,7 +1306,7 @@ local function pvp(world)
     hunters = {}
   end
   if any then hunt(world) end
-  if pvp_steps % PET_STEPS == 1 or (not any and next(pet_rules)) then
+  if pvp_steps % PET_STEPS == 1 or pets_scan.i > 1 or (not any and next(pet_rules)) then
     local okg, errg = pcall(guard_pets, world, any)
     if not okg then emf.log("experimental: PvP: protecting pets failed: " .. tostring(errg)) end
   end
@@ -1300,6 +1331,7 @@ function F.tick(world)
   end
   lift(world)
   pvp(world)
+  spawn_tick(world)
   bodies_tick(world)
   retry_tick(world)
   for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
@@ -1348,6 +1380,9 @@ end
 F._marker_ids = marker_ids
 
 -- (0.15.109, owner) Has the player with this account PvP on right now? (where the world is hosted; for the party list)
+-- tests only: the most entities one scan looks at
+function F._scan_max(n) SCAN_MAX = n end
+
 -- tests only: end a player's PvP cool-down
 function F._pvp_hit_reset(account)
   if online[tostring(account)] then online[tostring(account)].pvp_hit_at = nil end
@@ -1639,7 +1674,7 @@ function F.window_rows(world)
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
   rows[#rows + 1] = { options = monster_options("dbg:what:", pick[3]), text = pick[1] .. ": " .. pick[2], color = pick[4] and "#ffb060" or nil,
-    disabled = in_pvp or nil, tooltip = in_pvp and no_spawn or "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings." }
+    disabled = in_pvp or nil, tooltip = in_pvp and no_spawn or "The monsters fight everyone and everything with full damage, PvP on or off: players, pets, animals, villagers and buildings. Spawn them away from bases." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
   -- (0.15.136, owner: clutter) only the five picks; the < > stepper and the number between them are gone
@@ -1655,7 +1690,7 @@ function F.window_rows(world)
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn Monsters",
     selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
-      .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
+      .. "or off, and anything near it, buildings included: spawn it away from bases. It replaces your test body." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
     tooltip = "Removes all your test monsters, wherever they are in the world, and any test monster nobody keeps any more." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
@@ -1871,7 +1906,11 @@ function F.setup(k)
       online[account] = nil
     end
     drop_bodies_of(world, account, true)
+    for i = #spawn_queue, 1, -1 do  -- (0.15.137) the rest of their spawn is not made
+      if spawn_queue[i].account == account then table.remove(spawn_queue, i) end
+    end
   end, "a player leaving"))
+  emf.log("experimental: scans over the world stop after " .. SCAN_MAX .. " entities" .. (clock and string.format(" or %d ms", SCAN_BUDGET * 1000) or " (os.clock is not there: no time limit)"))
   -- (0.15.136, owner) a player who dies with PvP on is out of PvP (the cool-down does not apply) until they switch it
   -- on again. A rule of the free-for-all mode only (owner: a future team mode may not want it): PVP_MODE.
   pcall(emf.on_player_died, kit.guard(F, function(world, d)

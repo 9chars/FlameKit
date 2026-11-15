@@ -742,6 +742,7 @@ do  -- (0.15.132, owner) pets and farm animals near a PvP player take no damage 
   comps.IsTame = { [900] = {} }
   local pos_pet = SW.position
   SW.position = function(self, id) if id == 900 then return 3, 0, 4 end return pos_pet(self, id) end
+  require("features.experimental")._scan_max(1)  -- (0.15.137) one entity per call: the pass must go on over the next steps
   step(125)
   local found
   for _, x in pairs(hit_rules) do if x.to == 900 and x.from == "players" and x.cancel then found = true end end
@@ -751,6 +752,7 @@ do  -- (0.15.132, owner) pets and farm animals near a PvP player take no damage 
   found = false
   for _, x in pairs(hit_rules) do if x.to == 900 then found = true end end
   check(not found, "the pet is no longer near: its rule is gone")
+  require("features.experimental")._scan_max(6000)
   comps.IsTame = nil
 end
 do  -- (0.15.121, owner) in orange in the Messages window
@@ -846,7 +848,7 @@ click(find_row("^Spawn Monsters$").button)
 step(40)
 check(#spawned == 1 and spawned[1].guid == "d5d05217-52dc-467a-9192-26b4f661d8d9" and spawned[1].z == 3, "the duelist is spawned 3 m in front of the player")
 check(comps.Faction[951].faction == 1, "and given faction 1 (HitAll)")
-check(rule_count() == rb + 2 and find_row("^Spawn Monsters$").selected, "one rule keeps it off buildings, one off the animal next to it")
+check(rule_count() == rb and find_row("^Spawn Monsters$").selected, "no protection rules for test monsters (0.15.137, owner)")
 click(find_row("Remove").button)
 step(40)
 check(destroyed[1] == 951 and rule_count() == rb and not find_row("^Spawn Monsters$").selected, "Remove: the duelist and its rules are gone")
@@ -994,6 +996,16 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   click(find_row("Remove").button)
   step(40)
   check(#destroyed - d0 >= 15, "Remove destroys all 15, also the ones out of sight (" .. (#destroyed - d0) .. ")")
+  -- (0.15.137, production: 100 at once paused all of FlameKit) a big spawn comes 20 a step, not all in one go
+  click("W:dbg:cnt:50")
+  local n1 = #spawned
+  click(find_row("^Spawn Monsters$").button)
+  step(1)
+  local after_one = #spawned - n1
+  step(SYNC + 5)
+  check(after_one <= 40 and #spawned - n1 == 50, "50 monsters: a few at a time, all 50 in the end (" .. after_one .. " at first)")
+  click(find_row("Remove").button)
+  step(40)
   click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
