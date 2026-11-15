@@ -8,8 +8,11 @@
 -- Shared core code (HANDOFF rule 0b): any feature may use it; it uses no feature.
 
 local M = {}
+local test_tag = require("core.test_tag")
 
-M.CHEST = "fae7a62e-bc70-4d64-b55a-8d222c152f3a"  -- Prop_Decoration_T4_Storage_56 (56 slots; not a Magic one: those may share contents)
+-- (0.15.157, owner: 0.15.154's Prop_Decoration_T4_Storage_56 was "a magical chest designed to be used inside a base")
+-- the game's treasure chest; untested: whether the game adds its own random loot when it is opened, and how many slots
+M.CHEST = "3e8fc778-06d9-4af3-a6d4-1171baf49eb4"  -- Base_LootChest_Animgraph2_Random
 M.NEAR_M = 50
 M.MAX_CHESTS = 100  -- all owners together
 
@@ -27,7 +30,9 @@ end
 
 local function spawn_chest(world, x, y, z)
   if count >= M.MAX_CHESTS then return nil end
-  local ok, id = pcall(emf.spawn, world, M.CHEST, x, y, z)
+  -- (0.15.157) with the invisible tag (core/test_tag.lua), so a FlameKit reload can find its chests again
+  local ok, id = pcall(emf.spawn, world, M.CHEST, x, y, z, { ScaleComponent = { uniformScale = test_tag.SCALE } })
+  if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, M.CHEST, x, y, z) end
   if not ok or not id or id == 0 then
     emf.log("loot chest: the game refused a chest (" .. tostring(id) .. ")")
     return nil
@@ -74,8 +79,44 @@ function M.put(world, key, x, y, z, item, n, level, rarity, done)
 end
 
 -- Removes chests that were filled and are empty again (looked at every 2 s). Call from a feature's server tick.
+-- (0.15.157: an update or reload forgot every chest, and they were never removed) after a (re)load the world is looked
+-- through once, SCAN_PER entities a step (EMF's 250 ms rule), for tagged chests: tagged, with an inventory and no
+-- health (test monsters carry the same tag but have health). Found ones count as filled (removed once empty).
+local SCAN_PER = 2000
+local scan = nil  -- { list, i } while looking
+local scanned = false
+local function rescan(world)
+  if scanned then return end
+  if not scan then
+    local ok, list = pcall(world.entities, world)
+    if not ok or type(list) ~= "table" then scanned = true return end
+    scan = { list = list, i = 1, found = 0 }
+  end
+  local stop = math.min(#scan.list, scan.i + SCAN_PER - 1)
+  for k = scan.i, stop do
+    local id = scan.list[k]
+    if not chests[id] and test_tag.is(world, id) then
+      local okh, hp = pcall(world.get, world, "NetworkHealth", id)
+      local oki, inv = pcall(world.get, world, "InventorySetup", id)
+      if not (okh and hp) and oki and inv then
+        local okp, x, y, z = pcall(world.position, world, id)
+        if okp and x then
+          chests[id], count = { x = x, y = y, z = z, filled = true }, count + 1
+          scan.found = scan.found + 1
+        end
+      end
+    end
+  end
+  scan.i = stop + 1
+  if scan.i > #scan.list then
+    if scan.found > 0 then emf.log(string.format("loot chest: found %d chest(s) again after a reload", scan.found)) end
+    scan, scanned = nil, true
+  end
+end
+
 function M.tick(world, bag)
   steps = steps + 1
+  if not scanned then pcall(rescan, world) end
   if count == 0 or steps % 120 ~= 0 then return end  -- (0.15.156) every 2 s (was 10 s)
   for id, c in pairs(chests) do
     local gone = not pcall(world.position, world, id) or world:position(id) == nil

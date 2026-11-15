@@ -1,3 +1,7 @@
+0.15.157 Nov 15, 2026
+- Test monsters' loot chests are the game's treasure chest instead of a base storage chest.
+- Loot chests carry an invisible tag, so FlameKit finds them again after an update or reload; before, those chests were forgotten and never removed. A chest is still only removed once it is emptied. Server only: no game update.
+
 0.15.156 Nov 15, 2026
 - Test monsters: the game's own loot in their bodies goes into the loot chest too (looked for 3 and 6 s after the death), and the server's Loot Drop no longer puts their loot on the ground.
 - An emptied loot chest goes within 2 s (was 10 s). Server only: no game update.
