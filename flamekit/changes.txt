@@ -1,3 +1,6 @@
+0.15.154 Nov 15, 2026
+- Test monsters: their runes and legendary runes go straight into the bag of the player who killed them (the last player who hit them; else whoever spawned them), and their legendary item into a large storage chest FlameKit puts beside the body. Nothing of theirs lies on the ground any more. One chest per player while within 30 m; a full chest gets a new one beside it; a chest is removed once it is emptied. Chests are not kept over a server restart. Server only: no game update.
+
 0.15.153 Nov 15, 2026
 - Server: every item put on the ground (monsters' loot from Loot Drop and all of the test monsters' loot) gets the grave flame on its spot until it is picked up (or 10 minutes), at most 300 flames at once. Server only: no game update.
 

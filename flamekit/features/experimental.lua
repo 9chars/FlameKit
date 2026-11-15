@@ -348,6 +348,8 @@ local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 local MONSTERS = require("core.monsters")
 local item_db = require("core.item_db")      -- (0.15.142) the items test monsters drop
 local ground = require("core.ground_loot")
+local loot_chest = require("core.loot_chest")  -- (0.15.154) test monsters' loot in chests
+local bag = require("core.bag")
 local MONSTER_BY_GUID, MONSTER_GROUPS = {}, {}
 for _, m in ipairs(MONSTERS) do
   MONSTER_BY_GUID[m[3]] = m
@@ -630,24 +632,34 @@ local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
 
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
-  if not ok or not x then return end
+  if not ok or not x then return "no position" end
   local twice = b.boss and 2 or 1
   local level = tonumber(b.level) or 1
   local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
-  local r1, p1 = ground.drop(world, item_db.RUNE, runes, x, y, z, 0, 0, 2)  -- runes are materials:
-  local r2, p2 = ground.drop(world, item_db.LEGENDARY_RUNE, lrunes, x, y, z, 0, 0, 2)  -- no quality of their own
-  if p1 then ground.mark(world, p1) end  -- (0.15.153, owner) every dropped item gets the flame
-  if p2 then ground.mark(world, p2) end
+  -- (0.15.154, owner: too much loot on the ground) runes straight into the killer's bag (the last player who hit it;
+  -- else whoever spawned it); what does not fit there, and the legendary item, into a chest beside the body
+  -- (core/loot_chest.lua: a new chest when one is full)
+  local killer = b.last_hitter
+  if not killer and online[b.owner] then killer = online[b.owner].entity end
+  local key = killer or ("owner:" .. tostring(b.owner))
+  local function to_bag(item, n)
+    local iid = item
+    if type(iid) == "string" then local okn, v = pcall(emf.item, iid) iid = okn and v or nil end
+    if not killer or not iid then loot_chest.put(world, key, x, y, z, item, n, 0, 0) return end
+    local okp = pcall(emf.put, world, killer, iid, n, function(w, added)
+      added = tonumber(added) or 0
+      if added < n then loot_chest.put(w, key, x, y, z, iid, n - added, 0, 0) end  -- the bag is full: the rest in the chest
+    end)
+    if not okp then loot_chest.put(world, key, x, y, z, iid, n, 0, 0) end
+  end
+  to_bag(item_db.RUNE, runes)
+  to_bag(item_db.LEGENDARY_RUNE, lrunes)
   local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
   local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
-  local r3, pid = 0, nil
-  if name then r3, pid = ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) end
-  -- (0.15.152, owner: "put a sparkle particle effect on them") 0.15.150/151's pickups with an effect showed a bright orb
-  -- and only the model: the plain pickup again, with the game's grave flame on its spot until it is picked up
-  local fx = pid and ground.mark(world, pid) or "no item"
-  -- (0.15.148) one line per kill, so the drop can be checked in the log (summed when there are many: see the caller)
-  return string.format("%d runes (%s), %d legendary runes (%s), %s %s level %d legendary (%s), effect: %s", runes, r1 > 0 and "ok" or "FAILED",
-    lrunes, r2 > 0 and "ok" or "FAILED", kind, tostring(name), level, r3 > 0 and "ok" or "FAILED", fx)
+  if name then loot_chest.put(world, key, x, y, z, name, 1, level, "legendary") end
+  -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
+  return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
+    killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
 end
 
 local function spawn_body(world, account, player, kind, level, what, count)
@@ -1498,6 +1510,7 @@ local fx_steps = 0
 function F.tick(world)
   fx_steps = fx_steps + 1
   if fx_steps % 30 == 0 and world:is_server() then pcall(ground.fx_tick, world) end  -- (0.15.152) flames on picked-up loot
+  if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)
@@ -2125,6 +2138,12 @@ function F.setup(k)
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
+    -- (0.15.154) a test monster remembers the last player who hit it: its runes go into that player's bag
+    if bodies[hit.target] then
+      for _, p in pairs(online) do
+        if p.entity == hit.attacker then bodies[hit.target].last_hitter = hit.attacker break end
+      end
+    end
     -- (0.15.136, owner: heals, buffs and regeneration reset it) only damage counts: a hit that did damage (also over
     -- time, from a debuff), or an attack that was blocked or parried; never a heal or a hit of 0 (a buff)
     local amount = tonumber(hit.amount) or 0

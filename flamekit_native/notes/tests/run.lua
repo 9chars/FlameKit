@@ -990,27 +990,32 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   comps.NetworkHealth[kid] = { health = 100 }
   click(find_row("^Spawn Monsters$").button)
   step(40)
+  local puts, put_before = {}, emf.put  -- (0.15.154) the loot goes into bags and chests: record the puts
+  emf.put = function(w, ent, item, n, fn, opts)
+    if type(fn) == "table" then fn, opts = nil, fn end
+    puts[#puts + 1] = { ent = ent, item = item, n = n, opts = opts }
+    if fn then fn(w, n) end
+    return true
+  end
   comps.NetworkHealth[kid].health = 0
   step(65)
+  emf.put = put_before
   local d1 = #destroyed
   check(not find_row("^Spawn Monsters$").selected and destroyed[#destroyed] ~= kid, "killed: no longer your duelist, its body stays a moment")
   clock = clock + 9
   step(35)
   check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
-  do  -- (0.15.142, owner) a killed test monster's loot on the ground: runes, legendary runes, one legendary item
-    local runes, lruns, item = nil, nil, nil
-    for i = #spawned, math.max(1, #spawned - 20), -1 do
-      local sp = spawned[i]
-      local p = sp.c and sp.c.PickupItem
-      if sp.guid == "a56d2777-daf1-4164-90d4-b7b12749c723" and p then
-        if p.itemId == emf.item("Material_T1_Token_WeaponUpgrade_Rune01") then runes = runes or p
-        elseif p.itemId == emf.item("Material_T2_Token_WeaponUpgrade_Rune02") then lruns = lruns or p
-        elseif p.rarity == 4 then item = item or p end
-      end
+  do  -- (0.15.154, owner) runes into the killer's bag (here: the spawner), the legendary item into a spawned chest
+    local runes, lruns, item, chest = nil, nil, nil, nil
+    for _, sp in ipairs(spawned) do if sp.guid == "fae7a62e-bc70-4d64-b55a-8d222c152f3a" then chest = true end end
+    for _, pt in ipairs(puts) do
+      if pt.item == emf.item("Material_T1_Token_WeaponUpgrade_Rune01") then runes = pt
+      elseif pt.item == emf.item("Material_T2_Token_WeaponUpgrade_Rune02") then lruns = pt
+      elseif pt.opts and pt.opts.rarity == "legendary" then item = pt end
     end
-    check(runes and (runes.pickupAmount == 10 or runes.pickupAmount == 15) and lruns
-      and (lruns.pickupAmount == 5 or lruns.pickupAmount == 10) and item and item.pickupAmount == 1,
-      "a killed test monster drops 10 or 15 runes, 5 or 10 legendary runes and one legendary item on the ground")
+    check(runes and (runes.n == 10 or runes.n == 15) and lruns and (lruns.n == 5 or lruns.n == 10)
+      and runes.ent == lruns.ent and item and item.n == 1 and item.ent ~= runes.ent and chest,
+      "a killed test monster: 10 or 15 runes and 5 or 10 legendary runes into the bag, one legendary item into a spawned chest")
   end
   -- (0.15.141, production log) a fresh monster reads as dead until the game sets its health: not killed, kept
   local fid = 950 + #spawned + 1
