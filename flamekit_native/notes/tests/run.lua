@@ -809,14 +809,14 @@ local real_position = SW.position
 local function near(self, id) if id == 951 or id == 900 or id == 901 then return 1, 0, 3 end return real_position(self, id) end
 SW.position = near
 local rb = rule_count()
-click(find_row("^Spawn duelist$").button)
+click(find_row("^Spawn Monsters$").button)
 step(40)
 check(#spawned == 1 and spawned[1].guid == "d5d05217-52dc-467a-9192-26b4f661d8d9" and spawned[1].z == 3, "the duelist is spawned 3 m in front of the player")
 check(comps.Faction[951].faction == 1, "and given faction 1 (HitAll)")
-check(rule_count() == rb + 2 and find_row("^Spawn duelist$").selected, "one rule keeps it off buildings, one off the animal next to it")
+check(rule_count() == rb + 2 and find_row("^Spawn Monsters$").selected, "one rule keeps it off buildings, one off the animal next to it")
 click(find_row("Remove").button)
 step(40)
-check(destroyed[1] == 951 and rule_count() == rb and not find_row("^Spawn duelist$").selected, "Remove: the duelist and its rules are gone")
+check(destroyed[1] == 951 and rule_count() == rb and not find_row("^Spawn Monsters$").selected, "Remove: the duelist and its rules are gone")
 -- the duelist's kind and level (0.15.70): picked in the tab, sent with the spawn
 comps.Level = { [952] = { dataStorage = { 1, 0 } } }
 comps.DynamicEnemyScaling = { [952] = { nextUpdateTime = { value = 99 } } }
@@ -840,7 +840,7 @@ step(12)
 dd = nil
 for _, r in ipairs(exp_rows()) do if r.options then dd = r end end
 check(dd.text == "Beasts: Wolf" and find_row("^26$") ~= nil, "the drop-down shows the pick, the level line 26")
-click(find_row("^Spawn duelist$").button)
+click(find_row("^Spawn Monsters$").button)
 step(40)
 check(#spawned == 2 and spawned[2].guid == "478381c5-585f-4264-b373-dbb1ea596eca", "the duelist is the picked creature")
 check(comps.Level[952].dataStorage[1] == 26 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
@@ -859,7 +859,7 @@ do
   comps.Faction[953] = { faction = 6 }
   comps.NetworkHealth[953] = { health = 100 }
   comps.Level[953] = { dataStorage = { 1, 0 } }
-  click(find_row("^Spawn dummy$").button)
+  click(find_row("^Spawn Dummy$").button)
   step(40)
   check(comps.Level[953].dataStorage[1] == 50, "the dummy is level 50 (0.15.129, owner: 100 was too high)")
   check(spawned[3] and spawned[3].guid == boar.key:match("dbg:dwhat:(.+)$") and comps.Faction[953].faction == 3,
@@ -875,7 +875,7 @@ do
   local before = #spawned
   comps.Faction[954] = { faction = 6 }
   comps.NetworkHealth[954] = { health = 100 }
-  click(find_row("^Spawn dummy$").button)
+  click(find_row("^Spawn Dummy$").button)
   step(40)
   local g = spawned[before + 1] and spawned[before + 1].guid
   check(g and g ~= "9543cfb0-b4d7-408e-905c-ccb79a15136d" and (g == "4227fee0-b8e6-4518-9dc6-358472b3957b" or require("core.monsters")[1] ~= nil),
@@ -883,7 +883,7 @@ do
   local dd2
   for _, r in ipairs(exp_rows()) do if r.options and not dd2 then dd2 = r end end
   check(dd2.tooltip:find("Anyone can hit it", 1, true) ~= nil, "the dummy's tooltip: anyone can hit it (0.15.134)")
-  check(find_row("Spawn dummy").tooltip:find("Anyone can hit it", 1, true) ~= nil, "so does Spawn dummy's")
+  check(find_row("Spawn Dummy").tooltip:find("Anyone can hit it", 1, true) ~= nil, "so does Spawn dummy's")
   for _, r in ipairs(exp_rows()) do check(not (r.dim and (r.text or ""):find("never hurts")), "no block of text above the dummy's drop-down") end
   click(find_row("Remove").button)
   step(40)
@@ -893,40 +893,40 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   local nid = 950 + #spawned + 1
   comps.Faction[nid] = { faction = 6 }
   comps.NetworkHealth[nid] = { health = 100 }
-  click(find_row("^Spawn duelist$").button)
+  click(find_row("^Spawn Monsters$").button)
   step(40)
-  check(#spawned == nid - 950 and find_row("^Spawn duelist$").selected, "a duelist before PvP")
+  check(#spawned == nid - 950 and find_row("^Spawn Monsters$").selected, "a duelist before PvP")
   local d0 = #destroyed
   click(find_row("PvP", "sw:pvp").button)
   step(3)
-  check(#destroyed == d0 + 1 and destroyed[#destroyed] == nid and not find_row("^Spawn duelist$").selected,
+  check(#destroyed == d0 + 1 and destroyed[#destroyed] == nid and not find_row("^Spawn Monsters$").selected,
     "PvP on: the player's duelist is removed")
-  check(find_row("^Spawn duelist$").disabled and find_row("^Spawn dummy$").disabled
-    and find_row("^Spawn dummy$").tooltip:find("Off while you are in PvP", 1, true), "both spawn buttons are greyed out and say why")
+  check(find_row("^Spawn Monsters$").disabled and find_row("^Spawn Dummy$").disabled
+    and find_row("^Spawn Dummy$").tooltip:find("Off while you are in PvP", 1, true), "both spawn buttons are greyed out and say why")
   local dds = 0
   for _, r in ipairs(exp_rows()) do if r.options then dds = dds + (r.disabled and 1 or 0) end end
   check(dds == 2 and find_row("^>$").disabled and find_row("^50$").disabled, "the two monster drop-downs and the level buttons too (0.15.120)")
   local n = #spawned
-  click(find_row("^Spawn duelist$").button)
+  click(find_row("^Spawn Monsters$").button)
   step(40)
-  click(find_row("^Spawn dummy$").button)
+  click(find_row("^Spawn Dummy$").button)
   step(40)
   check(#spawned == n, "and the server spawns nothing while PvP is on")
   click(find_row("PvP", "sw:pvp").button)
   step(3)
-  check(not find_row("^Spawn duelist$").disabled, "PvP off: spawning is back")
+  check(not find_row("^Spawn Monsters$").disabled, "PvP off: spawning is back")
   -- (0.15.126, owner) a killed test monster's body goes by itself; Remove also clears dead ones left near the player
   local kid = 950 + #spawned + 1
   local pos_before = SW.position
   SW.position = function(self, id) if id == kid then return 2, 0, 2 end return pos_before(self, id) end
   comps.Faction[kid] = { faction = 6 }
   comps.NetworkHealth[kid] = { health = 100 }
-  click(find_row("^Spawn duelist$").button)
+  click(find_row("^Spawn Monsters$").button)
   step(40)
   comps.NetworkHealth[kid].health = 0
   step(65)
   local d1 = #destroyed
-  check(not find_row("^Spawn duelist$").selected and destroyed[#destroyed] ~= kid, "killed: no longer your duelist, its body stays a moment")
+  check(not find_row("^Spawn Monsters$").selected and destroyed[#destroyed] ~= kid, "killed: no longer your duelist, its body stays a moment")
   clock = clock + 9
   step(35)
   check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
@@ -941,11 +941,13 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     "Remove clears a dead test monster's body left near you (one from before 0.15.126)")
   comps.NetworkHealth[901], comps.Faction[901] = nil, f901
   -- (0.15.134, owner) several duelists at once: side by side
-  click("W:dbg:cnt:3")
-  local n0 = #spawned
-  click(find_row("Spawn 3 duelists").button)
+  click("W:dbg:cnt:20")
+  local n0, r0 = #spawned, rule_count()
+  click(find_row("^Spawn Monsters$").button)
   step(40)
-  check(#spawned == n0 + 3 and spawned[n0 + 1].x ~= spawned[n0 + 3].x, "How many 3: three duelists, side by side")
+  check(#spawned == n0 + 20 and spawned[n0 + 1].x ~= spawned[n0 + 10].x and spawned[n0 + 1].z ~= spawned[n0 + 11].z,
+    "How many 20: twenty monsters, in two rows of ten (0.15.135)")
+  check(rule_count() - r0 <= 1 + 30, "and the hit rules do not grow with them (one shared shield)")
   click(find_row("Remove").button)
   step(40)
   click("W:dbg:cnt:1")

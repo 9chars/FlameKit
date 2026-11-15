@@ -375,7 +375,8 @@ local DUEL_FACTION = 1                                      -- HitAll
 local DUMMY_FACTION = 3
 local OLD_DUMMY_FACTION = 7  -- dead dummies left before 0.15.134 (sweep_corpses)
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 30, 180  -- SHIELD_MAX: shared by a player's duelists (0.15.134)
-local MAX_DUELISTS = 5  -- (0.15.134, owner: how many to spawn) EMF has 64 hit rules for all of FlameKit
+local MAX_DUELISTS = 50  -- (0.15.134, owner: how many to spawn; 0.15.135: up to 50, the shield is shared)
+local DUEL_COUNTS = { 1, 5, 10, 20, 50 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local CORPSE_S, CORPSE_R = 8, 15
 local body_steps = 0
@@ -436,36 +437,61 @@ local function sweep_corpses(world, player)
   return n
 end
 
--- The duelist's shield: a hit rule against each animal or pet near it, none for anything farther away.
-local function shield(world, id, b)
-  local x, _, z = world:position(id)
-  if not x then return end
+-- The duelists' shield (0.15.135, owner: up to 50 duelists): shared by all of them, so the number of EMF hit rules does
+-- not grow with them (EMF has 64 for all of FlameKit). While any duelist lives: one rule keeps every creature's hits off
+-- buildings and placed objects, and one rule per animal or pet within SHIELD_R m of a duelist (at most SHIELD_MAX) keeps
+-- every creature's hits off it. Players still hit animals and buildings as usual. Before: rules per duelist.
+local duel_guard = { objects = nil, animals = {} }
+local function guard_duelists(world)
+  local centres = {}
+  for id, b in pairs(bodies) do
+    if b.kind == "duel" and not b.dead_at then
+      local okp, x, _, z = pcall(world.position, world, id)
+      if okp and x then centres[#centres + 1] = { x, z } end
+    end
+  end
+  if #centres == 0 then
+    if duel_guard.objects then pcall(emf.hit_rule_remove, duel_guard.objects) end
+    for _, r in pairs(duel_guard.animals) do pcall(emf.hit_rule_remove, r) end
+    duel_guard = { objects = nil, animals = {} }
+    return
+  end
+  if not duel_guard.objects then
+    local okr, r = pcall(emf.hit_rule, { from = "creatures", to = "objects", cancel = true })
+    if okr and r then duel_guard.objects = r else emf.log("experimental: the duelists' rule for buildings was refused (" .. tostring(r) .. ")") end
+  end
   local keep, n = {}, 0
-  for _ in pairs(b.guard) do n = n + 1 end
+  for _ in pairs(duel_guard.animals) do n = n + 1 end
   for _, e in ipairs(world:entities()) do
-    if e ~= id and not bodies[e] then
+    if not bodies[e] then
       local okp, ex, _, ez = pcall(world.position, world, e)
-      if okp and ex and (ex - x) ^ 2 + (ez - z) ^ 2 < SHIELD_R * SHIELD_R then
+      local near = false
+      if okp and ex then
+        for _, c in ipairs(centres) do
+          if (ex - c[1]) ^ 2 + (ez - c[2]) ^ 2 < SHIELD_R * SHIELD_R then near = true break end
+        end
+      end
+      if near then
         local oka, account = pcall(world.account, world, e)
         if not (oka and account) and protected(world, e) then
           keep[e] = true
-          if not b.guard[e] and n < (b.shield_max or SHIELD_MAX) then
-            local ok, r = pcall(emf.hit_rule, { from = id, to = e, cancel = true })
-            if ok and r then b.guard[e], n = r, n + 1 end
+          if not duel_guard.animals[e] and n < SHIELD_MAX then
+            local ok, r = pcall(emf.hit_rule, { from = "creatures", to = e, cancel = true })
+            if ok and r then duel_guard.animals[e], n = r, n + 1 end
           end
         end
       end
     end
   end
-  for e, r in pairs(b.guard) do
+  for e, r in pairs(duel_guard.animals) do
     if not keep[e] then
       pcall(emf.hit_rule_remove, r)
-      b.guard[e] = nil
+      duel_guard.animals[e] = nil
     end
   end
-  if n >= (b.shield_max or SHIELD_MAX) and not b.full_said then
-    b.full_said = true
-    emf.log(string.format("experimental: the duelist %s protects only %d animals and pets near it (more are around)", tostring(id), b.shield_max or SHIELD_MAX))
+  if n >= SHIELD_MAX and not duel_guard.full_said then
+    duel_guard.full_said = true
+    emf.log(string.format("experimental: the duelists protect only %d animals and pets near them (more are around)", SHIELD_MAX))
   end
 end
 
@@ -501,20 +527,21 @@ local function spawn_body(world, account, player, kind, level, what, count)
     if len > 0.01 then fx, fz = ax / len, az / len end
   end)
   local d0 = kind == "duel" and duelist(what) or dummy_of(what)
-  -- (0.15.134, owner) several duelists: side by side, 2 m apart, 3 m in front of the player
+  -- (0.15.134, owner) several duelists: rows of up to 10, 2 m apart, from 3 m in front of the player
   count = kind == "duel" and math.max(1, math.min(MAX_DUELISTS, math.floor(tonumber(count) or 1))) or 1
   local made = 0
   for i = 1, count do
-    local side = (i - (count + 1) / 2) * 2
+    local per_row = math.min(count, 10)
+    local col, row = (i - 1) % 10, math.floor((i - 1) / 10)
+    local side, ahead = (col - (per_row - 1) / 2) * 2, row * 2
     local why = (function()
   local d = d0
   local guid = d[3]
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
-  local ok, id = pcall(emf.spawn, world, guid, x + fx * 3 - fz * side, y, z + fz * 3 + fx * side)
+  local ok, id = pcall(emf.spawn, world, guid, x + fx * (3 + ahead) - fz * side, y, z + fz * (3 + ahead) + fx * side)
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
-  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2],
-    shield_max = math.max(4, math.floor(SHIELD_MAX / count)) }
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
   bodies[id] = b
   if level then
     local okl, set = pcall(set_level, world, id, level)
@@ -529,9 +556,6 @@ local function spawn_body(world, account, player, kind, level, what, count)
   end
   if kind == "duel" then
     pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
-    local okr, r = pcall(emf.hit_rule, { from = id, to = "objects", cancel = true })
-    if okr and r then b.rules.objects = r else emf.log("experimental: the duelist's rule for buildings was refused (" .. tostring(r) .. ")") end
-    shield(world, id, b)
   end
   emf.log(string.format("experimental: a PvP test %s (entity %s%s%s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id),
     b.what and (", " .. b.what) or "", level and (", level " .. level) or "", tostring(player)))
@@ -542,12 +566,17 @@ local function spawn_body(world, account, player, kind, level, what, count)
     end
     made = made + 1
   end
+  if kind == "duel" then guard_duelists(world) end  -- buildings and animals near them, at once
   if made < count then return string.format("Only %d of %d could be spawned.", made, count) end
 end
 
 local function bodies_tick(world)
-  if next(bodies) == nil then return end
+  if next(bodies) == nil then
+    if duel_guard.objects or next(duel_guard.animals) then guard_duelists(world) end  -- the last one went: rules off
+    return
+  end
   body_steps = body_steps + 1
+  if body_steps % SHIELD_STEPS == 0 then guard_duelists(world) end
   if body_steps % 30 ~= 0 then return end
   local session = emf.session()
   for id, b in pairs(bodies) do
@@ -619,7 +648,6 @@ local function bodies_tick(world)
         local f = world:get("Faction", id)
         if f and tonumber(tostring(f.faction)) ~= DUEL_FACTION then f.faction = DUEL_FACTION end
       end)
-      if body_steps % SHIELD_STEPS == 0 then shield(world, id, b) end
     end
   end
 end
@@ -1581,7 +1609,7 @@ function F.window_rows(world)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Anyone can hit it, PvP on or off." }
-  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
+  rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn Dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. Anyone can hit it, PvP on or off. It swings at you "
       .. "but never does damage. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
@@ -1601,12 +1629,12 @@ function F.window_rows(world)
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q,
       disabled = in_pvp or nil, tooltip = lvl_tip }
   end
-  rows[#rows + 1] = { label = true, text = "How many" }  -- (0.15.134, owner)
-  for c = 1, MAX_DUELISTS do
+  rows[#rows + 1] = { label = true, text = "How many" }  -- (0.15.134, owner; 0.15.135: 1, 5, 10, 20, 50)
+  for _, c in ipairs(DUEL_COUNTS) do
     rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
-      disabled = in_pvp or nil, tooltip = "How many duelists one Spawn makes, side by side." }
+      disabled = in_pvp or nil, tooltip = "How many monsters one Spawn makes, in rows of up to 10." }
   end
-  rows[#rows + 1] = { button = "dbg:body:duel", text = duel_count > 1 and ("Spawn " .. duel_count .. " duelists") or "Spawn duelist",
+  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn Monsters",
     selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
       .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }

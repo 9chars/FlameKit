@@ -1,3 +1,6 @@
+0.15.135 Nov 14, 2026
+- Test monsters: "How many" is now 1, 5, 10, 20 or 50, in rows of 10. The buttons are called "Spawn Monsters" and "Spawn Dummy".
+
 0.15.134 Nov 14, 2026
 - PvP: a kill is announced as "<killer> brutally murdered <victim> in PvP.", in red in Messages, and for 30 seconds in orange in everyone's Notices window (several kills show together; close any with its x).
 - PvP: once another PvP player hits you, you cannot switch PvP off for a minute. The Party list shows everyone how long is left ("PvP 42s").
