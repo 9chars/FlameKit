@@ -628,44 +628,23 @@ end
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
 local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
 
--- (0.15.152) an effect on a dropped legendary item's spot, removed once the item is gone (picked up) or after
--- LOOT_FX_S at the latest. Not saved: after a FlameKit reload a flame still burning is no longer tracked.
-local LOOT_FX = "2c2c4511-0173-40ee-85a3-2f9383d14b72"  -- VFX_SubEntity_Player_LootCorpse_Tombstone_Flame
-local LOOT_FX_S = 600
-local loot_fx = {}  -- effect id -> { item = pickup id, at = os.time() }
-local mark_loot = function(world, pickup)
-  local ok, x, y, z = pcall(world.position, world, pickup)
-  if not ok or not x then return "item not found" end
-  local oks, id = pcall(emf.spawn, world, LOOT_FX, x, y, z)
-  if not oks or not id or id == 0 then return "refused (" .. tostring(id) .. ")" end
-  loot_fx[id] = { item = pickup, at = os.time() }
-  return "placed (entity " .. tostring(id) .. ")"
-end
-local function loot_fx_tick(world)
-  for id, m in pairs(loot_fx) do
-    local ok, x = pcall(world.position, world, m.item)
-    if not ok or not x or os.time() - m.at >= LOOT_FX_S then
-      loot_fx[id] = nil
-      pcall(emf.destroy, world, id)
-      emf.log(string.format("experimental: loot effect %s removed (%s)", tostring(id), (ok and x) and "time" or "the item was picked up"))
-    end
-  end
-end
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
   if not ok or not x then return end
   local twice = b.boss and 2 or 1
   local level = tonumber(b.level) or 1
   local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
-  local r1 = ground.drop(world, item_db.RUNE, runes, x, y, z, 0, 0, 2)  -- runes are materials:
-  local r2 = ground.drop(world, item_db.LEGENDARY_RUNE, lrunes, x, y, z, 0, 0, 2)  -- no quality of their own
+  local r1, p1 = ground.drop(world, item_db.RUNE, runes, x, y, z, 0, 0, 2)  -- runes are materials:
+  local r2, p2 = ground.drop(world, item_db.LEGENDARY_RUNE, lrunes, x, y, z, 0, 0, 2)  -- no quality of their own
+  if p1 then ground.mark(world, p1) end  -- (0.15.153, owner) every dropped item gets the flame
+  if p2 then ground.mark(world, p2) end
   local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
   local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
   local r3, pid = 0, nil
   if name then r3, pid = ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) end
   -- (0.15.152, owner: "put a sparkle particle effect on them") 0.15.150/151's pickups with an effect showed a bright orb
   -- and only the model: the plain pickup again, with the game's grave flame on its spot until it is picked up
-  local fx = pid and mark_loot(world, pid) or "no item"
+  local fx = pid and ground.mark(world, pid) or "no item"
   -- (0.15.148) one line per kill, so the drop can be checked in the log (summed when there are many: see the caller)
   return string.format("%d runes (%s), %d legendary runes (%s), %s %s level %d legendary (%s), effect: %s", runes, r1 > 0 and "ok" or "FAILED",
     lrunes, r2 > 0 and "ok" or "FAILED", kind, tostring(name), level, r3 > 0 and "ok" or "FAILED", fx)
@@ -1518,7 +1497,7 @@ end
 local fx_steps = 0
 function F.tick(world)
   fx_steps = fx_steps + 1
-  if fx_steps % 30 == 0 and next(loot_fx) and world:is_server() then pcall(loot_fx_tick, world) end  -- (0.15.152)
+  if fx_steps % 30 == 0 and world:is_server() then pcall(ground.fx_tick, world) end  -- (0.15.152) flames on picked-up loot
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)

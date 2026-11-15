@@ -1,3 +1,6 @@
+0.15.153 Nov 15, 2026
+- Server: every item put on the ground (monsters' loot from Loot Drop and all of the test monsters' loot) gets the grave flame on its spot until it is picked up (or 10 minutes), at most 300 flames at once. Server only: no game update.
+
 0.15.152 Nov 15, 2026
 - Test monsters: the legendary item they drop is a plain item on the ground again, with the game's grave flame effect on its spot; the flame goes away when the item is picked up (or after 10 minutes).
 
