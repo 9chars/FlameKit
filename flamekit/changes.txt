@@ -1,3 +1,10 @@
+0.15.136 Nov 14, 2026
+- PvP: the kill notice is red now and stays up for 2 minutes.
+- PvP: if you die with PvP on, you are out of PvP until you switch it on again (free-for-all).
+- PvP: the cool-down is only started again by damage from another PvP player, not by heals, buffs or regeneration.
+- Test monsters: "Quantity" (was "How many") is 1, 15, 50, 100 or 200. The level is picked with its five buttons (the < > is gone).
+- Test monsters: Remove now removes all your test monsters wherever they are, and any left behind with nobody to remove them.
+
 0.15.135 Nov 14, 2026
 - Test monsters: "How many" is now 1, 5, 10, 20 or 50, in rows of 10. The buttons are called "Spawn Monsters" and "Spawn Dummy".
 

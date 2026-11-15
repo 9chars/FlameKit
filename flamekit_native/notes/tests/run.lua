@@ -693,7 +693,12 @@ do  -- (0.15.134, owner) hit by another PvP player: PvP cannot be left for 60 s
   local X = require("features.experimental")
   local OTHER = 102
   X._online_test(OTHER, "0x00000000000000cc", true)  -- another player with PvP on, for the test
+  -- (0.15.136, owner) a heal, a buff (0 damage) or regeneration from another PvP player does not start it
+  for _, fn in ipairs(hit_fns) do fn(SW, { kind = "hit", attacker = OTHER, target = PLAYER, amount = -25, healing = true }) end
+  for _, fn in ipairs(hit_fns) do fn(SW, { kind = "hit", attacker = OTHER, target = PLAYER, amount = 0 }) end
+  check(require("features.experimental").pvp_lock_left(ACCOUNT) == 0, "a heal or a buff from a PvP player: no cool-down")
   for _, fn in ipairs(hit_fns) do fn(SW, { kind = "hit", attacker = OTHER, target = PLAYER, amount = 10 }) end
+  check(require("features.experimental").pvp_lock_left(ACCOUNT) == 60, "damage from a PvP player: 60 s")
   click(find_row("PvP", "sw:pvp").button)
   step(SYNC)
   check(find_row("PvP", "sw:pvp").selected == true and find_row("you can leave PvP in") ~= nil,
@@ -704,6 +709,34 @@ do  -- (0.15.134, owner) hit by another PvP player: PvP cannot be left for 60 s
   check(plist:find("\nv\tpvp\nv\tlock\t%d+") ~= nil, "the Party list carries the PvP cool-down's seconds: " .. plist:gsub("\n", "|"):sub(1, 160))
   X._online_test(OTHER, nil)
   require("features.experimental")._pvp_hit_reset(ACCOUNT)  -- the cool-down over (no clock jump: a joined player would time out)
+end
+do  -- (0.15.136, owner) dying with PvP on ends PvP, cool-down or not
+  for _, fn in ipairs(hit_fns) do fn(SW, { kind = "hit", attacker = 999, target = PLAYER, amount = 10 }) end
+  for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 0 }) end
+  step(SYNC)
+  check(find_row("PvP", "sw:pvp").selected ~= true and casts[#casts] == "a player has left PvP.",
+    "died with PvP on: PvP is off and everyone is told: " .. tostring(casts[#casts]))
+  casts[#casts] = nil
+  click(find_row("PvP", "sw:pvp").button)  -- on again for the tests below
+  step(SYNC)
+  casts[#casts] = nil
+  check(find_row("PvP", "sw:pvp").selected == true, "and it can be switched on again")
+  -- killed by another player: the kill line says it all, no "has left PvP" line too (0.15.136, owner)
+  local old_acc = SW.account
+  SW.account = function(w, id) if id == 777 then return "0x00000000000000dd" end return old_acc(w, id) end
+  local before = #casts
+  for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 777 }) end
+  step(SYNC)
+  local left_line = false
+  for i = before + 1, #casts do if casts[i]:find("has left PvP", 1, true) then left_line = true end end
+  check(find_row("PvP", "sw:pvp").selected ~= true and not left_line, "killed by a player: PvP off, and only the kill line goes out")
+  for i = #casts, before + 1, -1 do casts[i] = nil end
+  SW.account = old_acc
+  if commands.board_reset then commands.board_reset(SW, {}) end  -- that death went on the PvP Leaderboard: cleared again
+  os.remove(TMP .. "\\leaderboard.json")
+  click(find_row("PvP", "sw:pvp").button)
+  step(SYNC)
+  casts[#casts] = nil
 end
 do  -- (0.15.132, owner) pets and farm animals near a PvP player take no damage from players
   comps.IsTame = { [900] = {} }
@@ -835,15 +868,14 @@ click("W:" .. wolf.key)
 step(12)
 click(find_row("^25$").button)
 step(12)
-click(find_row("^>$").button)
-step(12)
 dd = nil
 for _, r in ipairs(exp_rows()) do if r.options then dd = r end end
-check(dd.text == "Beasts: Wolf" and find_row("^26$") ~= nil, "the drop-down shows the pick, the level line 26")
+check(dd.text == "Beasts: Wolf" and find_row("^25$").selected and find_row("^>$") == nil and find_row("^<$") == nil,
+  "the drop-down shows the pick, level 25 is lit, no < > stepper any more (0.15.136)")
 click(find_row("^Spawn Monsters$").button)
 step(40)
 check(#spawned == 2 and spawned[2].guid == "478381c5-585f-4264-b373-dbb1ea596eca", "the duelist is the picked creature")
-check(comps.Level[952].dataStorage[1] == 26 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
+check(comps.Level[952].dataStorage[1] == 25 and comps.DynamicEnemyScaling[952].nextUpdateTime.value == 0, "at the picked level")
 click(find_row("Remove").button)
 step(40)
 -- (0.15.81) the dummy is picked the same way, from its own drop-down (the first one), and gets faction 7 (harmless)
@@ -905,7 +937,7 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     and find_row("^Spawn Dummy$").tooltip:find("Off while you are in PvP", 1, true), "both spawn buttons are greyed out and say why")
   local dds = 0
   for _, r in ipairs(exp_rows()) do if r.options then dds = dds + (r.disabled and 1 or 0) end end
-  check(dds == 2 and find_row("^>$").disabled and find_row("^50$").disabled, "the two monster drop-downs and the level buttons too (0.15.120)")
+  check(dds == 2 and find_row("^25$").disabled and find_row("^50$").disabled, "the two monster drop-downs and the level buttons too (0.15.120)")
   local n = #spawned
   click(find_row("^Spawn Monsters$").button)
   step(40)
@@ -937,19 +969,31 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   check(not find_row("Remove").disabled, "Remove is there without a test monster of your own")
   click(find_row("Remove").button)
   step(40)
-  check(destroyed[#destroyed] == 901 and find_row("Removed 1 dead test monster near you") ~= nil,
-    "Remove clears a dead test monster's body left near you (one from before 0.15.126)")
+  check(destroyed[#destroyed] == 901 and find_row("Removed 1 test monster") ~= nil,
+    "Remove clears a dead test monster's body left behind (one from before 0.15.126)")
+  -- (0.15.136, owner) Remove reaches every test monster in the world: a live duelist nobody keeps, far away
+  comps.NetworkHealth[901] = { health = 500 }
+  comps.Faction[901] = { faction = 1 }
+  local far_pos = SW.position
+  SW.position = function(self, id) if id == 901 then return 9000, 0, 9000 end return far_pos(self, id) end
+  click(find_row("Remove").button)
+  step(40)
+  check(destroyed[#destroyed] == 901, "Remove clears a test monster nobody keeps, far away")
+  SW.position = far_pos
   comps.NetworkHealth[901], comps.Faction[901] = nil, f901
   -- (0.15.134, owner) several duelists at once: side by side
-  click("W:dbg:cnt:20")
+  click("W:dbg:cnt:15")
   local n0, r0 = #spawned, rule_count()
   click(find_row("^Spawn Monsters$").button)
   step(40)
-  check(#spawned == n0 + 20 and spawned[n0 + 1].x ~= spawned[n0 + 10].x and spawned[n0 + 1].z ~= spawned[n0 + 11].z,
-    "How many 20: twenty monsters, in two rows of ten (0.15.135)")
+  check(#spawned == n0 + 15 and spawned[n0 + 1].x ~= spawned[n0 + 10].x and spawned[n0 + 1].z ~= spawned[n0 + 11].z
+    and find_row("^Quantity$") ~= nil, "Quantity 15: fifteen monsters, in rows of ten (0.15.136)")
   check(rule_count() - r0 <= 1 + 30, "and the hit rules do not grow with them (one shared shield)")
+  step(200)  -- out of sight (not placed in this test): kept for Remove since 0.15.136
+  local d0 = #destroyed
   click(find_row("Remove").button)
   step(40)
+  check(#destroyed - d0 >= 15, "Remove destroys all 15, also the ones out of sight (" .. (#destroyed - d0) .. ")")
   click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
@@ -1375,7 +1419,7 @@ do
     return t
   end
   join_all()  -- the test player left earlier: back in the world
-  check(#died_fns == 1, "the leaderboard asks EMF for player deaths")
+  check(#died_fns >= 1, "the leaderboard asks EMF for player deaths (experimental too, since 0.15.136)")
   local KILLER = 101
   local old_account = SW.account
   SW.account = function(w, id) if id == KILLER then return "0x00000000000000bb" end return old_account(w, id) end
@@ -1390,7 +1434,7 @@ do
     local mf = io.open(TMP .. "\\ui_messages.dat", "r"); local mt = mf and mf:read("a") or ""; if mf then mf:close() end
     local nf = io.open(TMP .. "\\ui_notices.dat", "r"); local nt = nf and nf:read("a") or ""; if nf then nf:close() end
     check(mt:find("ff4040 Rival brutally murdered Ninechars in PvP.", 1, true) ~= nil, "red in the Messages window")
-    check(nt:find("n announce_%d+ ff9632 Rival brutally murdered Ninechars in PvP%.") ~= nil, "and orange in the Notices window")
+    check(nt:find("n announce_%d+ ff4040 Rival brutally murdered Ninechars in PvP%.") ~= nil, "and red in the Notices window (0.15.136)")
   end
   for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 950 }) end
   for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 0 }) end
@@ -1405,10 +1449,14 @@ do
     local function notices_text() local f = io.open(TMP .. "\\ui_notices.dat", "r"); local x = f and f:read("a") or ""; if f then f:close() end; return x end
     local _, n = notices_text():gsub("brutally murdered", "")
     check(n >= 2, "two kills close together: both in the Notices window (" .. n .. ")")
-    clock = clock + 31
+    clock = clock + 100
+    step(70)
+    local _, n1 = notices_text():gsub("brutally murdered", "")
+    check(n1 >= 2, "still up after 100 s (0.15.136: 2 minutes)")
+    clock = clock + 21
     step(70)
     local _, n2 = notices_text():gsub("brutally murdered", "")
-    check(n2 == 0, "30 s later they are gone")
+    check(n2 == 0, "2 minutes later they are gone")
   end
   local jf = io.open(TMP .. "\\leaderboard.json", "r")
   check(jf ~= nil, "the board is kept in leaderboard.json")

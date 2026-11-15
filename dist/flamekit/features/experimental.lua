@@ -40,6 +40,9 @@ local SWITCHES = {
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
 local SESSION_ONLY = { pvp = true }
+-- The PvP mode: "ffa", free-for-all, the only one so far. Rules that belong to it alone check it (owner, 0.15.136:
+-- future modes such as teams may differ). The cool-down and the protections are shared by every mode for now.
+local PVP_MODE = "ffa"
 local PVP_LOCK_S = 60  -- (0.15.134, owner) PvP cannot be left until this long after the last hit by another PvP player
 
 -- The options that are on until a player switches them off (the others are off until switched on).
@@ -326,9 +329,8 @@ end
 -- Spawned bodies are not saved with the world. One body per player; a new one replaces the old. It goes when its
 -- player clicks Remove or leaves, or when the world reloads. (0.15.126, owner: a killed duelist's body could not be
 -- looted and never went away, in a flame altar's area, and Remove was greyed out) When it dies, its body is destroyed
--- CORPSE_S seconds later. Remove is always there: it also destroys any dead test monster within CORPSE_R m of the
--- player, the ones left before 0.15.126 too (a dead body of faction 1 or 7 without an account: the game's own monsters
--- never have those factions, players have an account).
+-- CORPSE_S seconds later. Remove is always there: since 0.15.136 it destroys every test monster in the world that is
+-- the player's own or nobody's (remove_all, is_test_monster).
 local DUMMY_GUID = "9543cfb0-b4d7-408e-905c-ccb79a15136d"  -- FakePlayer_Vukah_Melee
 local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 -- What a duelist can be (0.15.72, owner: any monster from a list): every creature in core/monsters.lua, read from
@@ -373,12 +375,12 @@ local DUEL_FACTION = 1                                      -- HitAll
 -- every player can hit it and monsters leave it alone; a hit rule cancels all of its own hits, so it never hurts
 -- anyone. Before: faction 7 (Player), which only PvP players could hit (0.15.81 to 0.15.133).
 local DUMMY_FACTION = 3
-local OLD_DUMMY_FACTION = 7  -- dead dummies left before 0.15.134 (sweep_corpses)
+local OLD_DUMMY_FACTION = 7  -- dead dummies left before 0.15.134 (is_test_monster)
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 30, 180  -- SHIELD_MAX: shared by a player's duelists (0.15.134)
-local MAX_DUELISTS = 50  -- (0.15.134, owner: how many to spawn; 0.15.135: up to 50, the shield is shared)
-local DUEL_COUNTS = { 1, 5, 10, 20, 50 }
+local MAX_DUELISTS = 200  -- (0.15.134, owner: how many to spawn; 0.15.135: up to 50, the shield is shared; 0.15.136: 200)
+local DUEL_COUNTS = { 1, 15, 50, 100, 200 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
-local CORPSE_S, CORPSE_R = 8, 15
+local CORPSE_S = 8
 local body_steps = 0
 
 local function has(world, comp, id)
@@ -409,29 +411,42 @@ local function drop_bodies_of(world, account, destroy)
   end
 end
 
--- Destroys the dead test monsters within CORPSE_R m of the player (see above). Returns how many.
-local function sweep_corpses(world, player)
-  local px, _, pz = world:position(player)
-  if not px then return 0 end
+-- (0.15.136, owner: Remove must clear every test monster in the world, near and far) Every test monster is spawned
+-- with a ScaleComponent of TAG_SCALE (0.1% smaller than normal: not visible) so it can be found again, also after a
+-- reload of FlameKit (which forgets `bodies`). Older ones: a duelist has faction 1 (no game monster has it); a dead
+-- dummy from before 0.15.134 has faction 7. Players are never touched (they have an account).
+local TAG_SCALE = 0.999
+local function is_test_monster(world, id)
+  local oka, acc = pcall(world.account, world, id)
+  if oka and acc then return false end
+  local oks, sc = pcall(world.get, world, "ScaleComponent", id)
+  if oks and sc and sc.uniformScale and math.abs(sc.uniformScale - TAG_SCALE) < 0.0003 then return true end
+  local okf, f = pcall(world.get, world, "Faction", id)
+  local fn = okf and f and tonumber(tostring(f.faction))
+  if fn == DUEL_FACTION then return has(world, "NetworkHealth", id) end  -- a creature, not something placed
+  if fn == OLD_DUMMY_FACTION then
+    local okh, hp = pcall(world.get, world, "NetworkHealth", id)
+    return okh and hp ~= nil and hp.health <= 0  -- only dead ones (a live faction 7 creature may be a companion)
+  end
+  return false
+end
+
+-- Removes this player's test monsters and every test monster nobody keeps (left behind by a reload, or by a player
+-- who is gone), anywhere in the world. Another player's own live test monsters stay. Returns how many.
+local function remove_all(world, account, player)
   local n = 0
+  for id, b in pairs(bodies) do
+    if b.owner == account then
+      drop_body(world, id, true)
+      n = n + 1
+    end
+  end
   for _, id in ipairs(world:entities()) do
-    if id ~= player and not bodies[id] then
-      pcall(function()
-        local x, _, z = world:position(id)
-        if not x or (x - px) ^ 2 + (z - pz) ^ 2 > CORPSE_R * CORPSE_R then return end
-        local hp = world:get("NetworkHealth", id)
-        if not hp or hp.health > 0 then return end
-        local f = world:get("Faction", id)
-        local fn = f and tonumber(tostring(f.faction))
-        if fn ~= DUEL_FACTION and fn ~= OLD_DUMMY_FACTION then return end
-        local oka, acc = pcall(world.account, world, id)
-        if oka and acc then return end  -- a player
-        if emf.destroy(world, id) ~= false then
-          n = n + 1
-          emf.log(string.format("experimental: a dead test monster (entity %s, faction %s) near player %s removed", tostring(id),
-            tostring(fn), tostring(player)))
-        end
-      end)
+    if id ~= player and not bodies[id] and is_test_monster(world, id) then
+      if pcall(emf.destroy, world, id) then
+        n = n + 1
+        emf.log(string.format("experimental: a test monster nobody keeps (entity %s) removed by player %s", tostring(id), tostring(player)))
+      end
     end
   end
   return n
@@ -511,10 +526,11 @@ local function set_level(world, id, level)
 end
 
 local function spawn_body(world, account, player, kind, level, what, count)
-  drop_bodies_of(world, account, true)
-  if kind ~= "dummy" and kind ~= "duel" then  -- Remove
-    local n = sweep_corpses(world, player)
-    return n > 0 and string.format("Removed %d dead test monster%s near you.", n, n == 1 and "" or "s") or nil
+  if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
+  if kind ~= "dummy" and kind ~= "duel" then  -- Remove: all of them, anywhere (0.15.136)
+    local n = remove_all(world, account, player)
+    guard_duelists(world)
+    return n > 0 and string.format("Removed %d test monster%s.", n, n == 1 and "" or "s") or "No test monsters to remove."
   end
   if kind == "dummy" then level = DUMMY_LEVEL end  -- (0.15.79, owner) it never hurts anyone; (0.15.129, owner) level 50
   local x, y, z = where(world, player)
@@ -538,7 +554,9 @@ local function spawn_body(world, account, player, kind, level, what, count)
   local d = d0
   local guid = d[3]
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
-  local ok, id = pcall(emf.spawn, world, guid, x + fx * (3 + ahead) - fz * side, y, z + fz * (3 + ahead) + fx * side)
+  local sx, sz = x + fx * (3 + ahead) - fz * side, z + fz * (3 + ahead) + fx * side
+  local ok, id = pcall(emf.spawn, world, guid, sx, y, sz, { ScaleComponent = { uniformScale = TAG_SCALE } })  -- the tag
+  if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, guid, sx, y, sz) end  -- without it
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
@@ -606,8 +624,11 @@ local function bodies_tick(world)
         drop_body(world, id, true)
       end
     elseif not alive and b.missing >= 3 and b.session == session then
-      emf.log(string.format("experimental: the PvP test %s (entity %s) is gone: %s", b.kind, tostring(id), b.why or "?"))
-      drop_body(world, id, false)
+      -- (0.15.136) out of sight (far from every player, not loaded) is not gone: kept, so Remove still reaches it
+      if not b.away_said then
+        b.away_said = true
+        emf.log(string.format("experimental: the PvP test %s (entity %s) is out of sight: %s (kept for Remove)", b.kind, tostring(id), b.why or "?"))
+      end
     elseif not alive and b.session ~= session then
       drop_body(world, id, false)
     elseif not alive then
@@ -1613,7 +1634,7 @@ function F.window_rows(world)
     tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. Anyone can hit it, PvP on or off. It swings at you "
       .. "but never does damage. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
-    tooltip = "Removes your test monster, and any dead test monster's body near you." }
+    tooltip = "Removes all your test monsters, wherever they are in the world, and any test monster nobody keeps any more." }
   rows[#rows + 1] = { separator = true }
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
@@ -1621,15 +1642,12 @@ function F.window_rows(world)
     disabled = in_pvp or nil, tooltip = in_pvp and no_spawn or "The duelist fights everyone with full damage, PvP on or off, but never animals, pets or buildings." }
   local lvl_tip = "Its level: the game sets its health and damage from it (level 50: about 6700 health, level 100: about 53000)."
   rows[#rows + 1] = { label = true, text = "Level" }
-  rows[#rows + 1] = { button = "dbg:lvl:-1", text = "<", same_line = true, disabled = in_pvp or duel_level <= 1, tooltip = "One level lower" }
-  rows[#rows + 1] = { label = true, text = tostring(duel_level), same_line = true, color = duel_level > 50 and "#ff8060" or nil,
-    tooltip = lvl_tip }
-  rows[#rows + 1] = { button = "dbg:lvl:1", text = ">", same_line = true, disabled = in_pvp or duel_level >= MAX_LEVEL, tooltip = "One level higher" }
+  -- (0.15.136, owner: clutter) only the five picks; the < > stepper and the number between them are gone
   for _, q in ipairs({ 1, 25, 50, 75, 100 }) do
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q,
       disabled = in_pvp or nil, tooltip = lvl_tip }
   end
-  rows[#rows + 1] = { label = true, text = "How many" }  -- (0.15.134, owner; 0.15.135: 1, 5, 10, 20, 50)
+  rows[#rows + 1] = { label = true, text = "Quantity" }  -- (0.15.134, owner; 0.15.136: "Quantity", 1, 15, 50, 100, 200)
   for _, c in ipairs(DUEL_COUNTS) do
     rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
       disabled = in_pvp or nil, tooltip = "How many monsters one Spawn makes, in rows of up to 10." }
@@ -1639,7 +1657,7 @@ function F.window_rows(world)
     tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
       .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
-    tooltip = "Removes your test monster, and any dead test monster's body near you." }
+    tooltip = "Removes all your test monsters, wherever they are in the world, and any test monster nobody keeps any more." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
   return rows
 end
@@ -1854,9 +1872,35 @@ function F.setup(k)
     end
     drop_bodies_of(world, account, true)
   end, "a player leaving"))
+  -- (0.15.136, owner) a player who dies with PvP on is out of PvP (the cool-down does not apply) until they switch it
+  -- on again. A rule of the free-for-all mode only (owner: a future team mode may not want it): PVP_MODE.
+  pcall(emf.on_player_died, kit.guard(F, function(world, d)
+    if PVP_MODE ~= "ffa" or not d or not d.account then return end
+    local account = tostring(d.account)
+    local o = online[account]
+    if not (o and o.pvp) then return end
+    o.pvp, o.pvp_hit_at = nil, nil
+    emf.log(string.format("experimental: player %s died with PvP on: PvP off", tostring(d.player)))
+    -- killed by another player: the kill line has told everyone already (leaderboard.lua); otherwise say it here
+    local by_player = false
+    if d.killer and d.killer ~= 0 and d.killer ~= d.player then
+      local oka, acc = pcall(world.account, world, d.killer)
+      by_player = oka and acc ~= nil
+    end
+    if not by_player then
+      local name = require("core.players").name(world, d.player, "a player")
+      pcall(require("features.chat").announce, world, name .. " has left PvP.", "#ff9632")
+    end
+    if tell_player then tell_player(world, d.player, account, "You died: PvP is off. Switch it on again to fight.") end
+  end, "a player's death"))
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
+    -- (0.15.136, owner: heals, buffs and regeneration reset it) only damage counts: a hit that did damage (also over
+    -- time, from a debuff), or an attack that was blocked or parried; never a heal or a hit of 0 (a buff)
+    local amount = tonumber(hit.amount) or 0
+    if hit.healing or amount < 0 then return end
+    if amount == 0 and not (hit.blocked or hit.parried) then return end
     local pa, pt
     for _, p in pairs(online) do
       if p.entity == hit.attacker then pa = p elseif p.entity == hit.target then pt = p end
