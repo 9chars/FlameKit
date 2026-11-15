@@ -71,6 +71,7 @@ local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = fa
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
 local teleports = {}
+local bodies_tp = {}  -- (0.15.140) teleports of test monsters onto the ground
 left_fns = {}
 died_fns = {}  -- the leaderboard's emf.on_player_died
 hit_fns = {}   -- emf.on_hit (experimental: the PvP cool-down, 0.15.134)
@@ -227,7 +228,9 @@ emf = {
       return true
     end,
   },
-  teleport = function(w, id, x, y, z, opts, fn) teleports[#teleports + 1] = opts.spawn_point or 'ground'; last_tp = { x = x, y = y, z = z, opts = opts, fn = fn, w = w }; return true end,
+  teleport = function(w, id, x, y, z, opts, fn)
+    if bodies_tp and id ~= PLAYER then bodies_tp[#bodies_tp + 1] = { id = id, x = x, y = y, z = z, opts = opts, fn = fn } return true end
+    teleports[#teleports + 1] = opts.spawn_point or 'ground'; last_tp = { x = x, y = y, z = z, opts = opts, fn = fn, w = w }; return true end,
   key_down = function(k) return held_key == k end,
   hit_rule = function(r) next_rule = next_rule + 1; hit_rules[next_rule] = r; return next_rule end,
   hit_rule_remove = function(id) local had = hit_rules[id] ~= nil; hit_rules[id] = nil; return had end,
@@ -1002,12 +1005,29 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   SW.position = far_pos
   comps.NetworkHealth[901], comps.Faction[901] = nil, f901
   -- (0.15.134, owner) several duelists at once: side by side
+  for _, t in ipairs(bodies_tp) do t.fn(true) end  -- the earlier ones landed
   click("W:dbg:cnt:15")
   local n0, r0 = #spawned, rule_count()
   click(find_row("^Spawn Monsters$").button)
   step(40)
-  check(#spawned == n0 + 15 and spawned[n0 + 1].x ~= spawned[n0 + 10].x and spawned[n0 + 1].z ~= spawned[n0 + 11].z
-    and find_row("^Quantity$") ~= nil, "Quantity 15: fifteen monsters, in rows of ten (0.15.136)")
+  local tp0 = #bodies_tp
+  step(130)
+  local on_ground = 0
+  for i = tp0 + 1, #bodies_tp do
+    if bodies_tp[i].opts.ground == true and bodies_tp[i].fn then on_ground = on_ground + 1 end
+  end
+  check(#bodies_tp >= tp0 and on_ground == #bodies_tp - tp0 and on_ground >= 15,
+    "about 2 s after the spawn every monster is moved onto the ground (game's ground search) (0.15.140): " .. on_ground)
+  for i = tp0 + 1, #bodies_tp do bodies_tp[i].fn(true) end
+  local close, behind = 0, 0
+  for i = n0 + 1, n0 + 15 do
+    if spawned[i].x ^ 2 + spawned[i].z ^ 2 < 9 - 0.01 then behind = behind + 1 end  -- (now: too close to the player)
+    for j = i + 1, n0 + 15 do
+      if (spawned[i].x - spawned[j].x) ^ 2 + (spawned[i].z - spawned[j].z) ^ 2 < 9 - 0.01 then close = close + 1 end
+    end
+  end
+  check(#spawned == n0 + 15 and close == 0 and behind == 0 and find_row("^Quantity$") ~= nil,
+    "Quantity 15: fifteen monsters scattered around the player, none within 3 m of another or of the player (0.15.140, owner)")
   check(rule_count() - r0 <= 1 + 30, "and the hit rules do not grow with them (one shared shield)")
   step(200)  -- out of sight (not placed in this test): kept for Remove since 0.15.136
   local d0 = #destroyed
@@ -1047,6 +1067,21 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     if logged[i]:find("experimental: Remove by player", 1, true) then sums = sums + 1 end
   end
   check(per == 0 and sums >= 1, "Remove of 50: one summary line, not a line per monster (0.15.140, owner)")
+  -- (0.15.140, owner) up to 5000: all come (20 a step), a check of them is spread over steps, Remove takes them all
+  check(find_row("^5000$") ~= nil, "Quantity has a 5000 button")
+  click("W:dbg:cnt:5000")
+  local n3, d3 = #spawned, #destroyed
+  click(find_row("^Spawn Monsters$").button)
+  step(5000 / 20 + SYNC + 40)
+  check(#spawned - n3 == 5000, "5000 monsters spawned (" .. (#spawned - n3) .. ")")
+  require("features.experimental")._scan_max(500)  -- as if the clock ran out: 500 a call, the rest over the next steps
+  click(find_row("Remove").button)
+  for _ = 1, 200 do if #destroyed > d3 then break end step(1) end  -- the first step that removes any
+  local part = #destroyed - d3
+  step(SYNC + 80)
+  require("features.experimental")._scan_max(6000)
+  check(part < 5000 and #destroyed - d3 >= 5000, "Remove takes all 5000, a part per step (" .. part .. " at first)")
+  click("W:dbg:cnt:1")
   click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end

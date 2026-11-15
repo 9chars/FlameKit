@@ -397,8 +397,8 @@ local SHIELD_STEPS = 180  -- how often the duelists' building rule is checked
 -- (0.15.134, owner: how many to spawn) MAX_DUELISTS: the most one request may ask for (the server refuses more, so a
 -- bug or a modified game cannot ask for 100,000); owner, 0.15.139: 1000. Measured on the production server
 -- (2026-11-14): 200 level-1 monsters fighting one player put the game server at its limit per step (~17 ms of 16.7).
-local MAX_DUELISTS = 1000
-local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000 }
+local MAX_DUELISTS = 5000  -- (0.15.140, owner) 5000
+local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000, 5000 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local CORPSE_S = 8
 local body_steps = 0
@@ -456,15 +456,22 @@ end
 local remove_left = nil  -- (0.15.137) a world scan of Remove that ran out of time: { account, player, from, n }
 local function remove_all(world, account, player, from, n)
   n = n or 0
-  if not from then
+  local t0 = now_s()
+  if not from then  -- (0.15.140: up to 5000) the player's own ones, within the budget too; the rest on the next steps
+    local k = 0
     for id, b in pairs(bodies) do
       if b.owner == account then
+        if scan_over(t0, k) then
+          remove_left = { account = account, player = player, n = n }
+          return n, false
+        end
         drop_body(world, id, true)
-        n = n + 1
+        n, k = n + 1, k + 1
       end
     end
+    t0 = now_s()
   end
-  local t0, list = now_s(), world:entities()
+  local list = world:entities()
   for i = from or 1, #list do
     local id = list[i]
     if scan_over(t0, i - (from or 1)) then
@@ -506,6 +513,46 @@ local function set_level(world, id, level)
 end
 
 local SPAWN_PER_STEP = 20
+local scatter  -- below
+-- (0.15.140, owner: "spawn on top of the terrain so they don't end up inside stuff") emf.spawn puts a monster exactly
+-- at the given place: the player's height, which on a slope is inside the hill or in the air. So GROUND_WAIT_STEPS
+-- after its spawn each one is moved with emf.teleport and the game's own ground search (fast travel's: the nearest
+-- walkable spot within about 10 m up or down; EMF docs: +4..+8 and -3..-10 m snapped, +-16 m not, then it stays
+-- where it is). The wait: EMF refuses a creature spawned a moment ago (it reads as dead until the game sets its
+-- health). At most GROUND_MAX at once (EMF allows 64 teleports under way for all of FlameKit; the rest for players).
+-- Untested in game.
+local GROUND_WAIT_STEPS, GROUND_MAX, GROUND_GIVEUP_STEPS = 120, 40, 900
+local ground_q, ground_head, ground_busy, ground_step = {}, 1, {}, 0
+local ground_n = 0  -- how many in ground_busy
+local function to_ground(id, x, y, z)
+  ground_q[#ground_q + 1] = { id = id, x = x, y = y, z = z, at = ground_step + GROUND_WAIT_STEPS }
+end
+local function ground_tick(world)
+  ground_step = ground_step + 1
+  if ground_n > 0 and ground_step % 60 == 0 then  -- an answer that never came (a reload): not counted any more
+    for id, at in pairs(ground_busy) do
+      if ground_step - at > GROUND_GIVEUP_STEPS then ground_busy[id], ground_n = nil, ground_n - 1 end
+    end
+  end
+  while ground_head <= #ground_q and ground_n < GROUND_MAX do
+    local g = ground_q[ground_head]
+    if g.at > ground_step then break end
+    ground_head = ground_head + 1  -- (entries stay until the queue is empty: # of a table with holes is not reliable)
+    if bodies[g.id] and not ground_busy[g.id] then
+      local x, z = g.x, g.z
+      pcall(function()  -- where it is now (it may have walked a little), at the height it was given
+        local px, _, pz = world:position(g.id)
+        if px and pz then x, z = px, pz end
+      end)
+      local id = g.id
+      local okt, queued = pcall(emf.teleport, world, id, x, g.y, z, { ground = true }, function()
+        if ground_busy[id] then ground_busy[id], ground_n = nil, ground_n - 1 end
+      end)
+      if okt and queued then ground_busy[id], ground_n = ground_step, ground_n + 1 end
+    end
+  end
+  if ground_head > #ground_q then ground_q, ground_head = {}, 1 end
+end
 -- (0.15.139, owner: "I don't want the dummy to attack me back") Since 0.15.134 the dummy has the monsters' faction so
 -- anyone can hit it, and so its AI goes for players: it swung but did no damage. Before (faction 7) it stood still.
 -- Now its threat table (DynamicAggro) and its target (SelectedTargets) are emptied every server step: with no Alarmed
@@ -546,6 +593,49 @@ local function calm_tick(world)
 end
 local spawn_queue = {}  -- { account, fn }: each spawns one queued test monster (spawn_tick)
 
+-- (0.15.140, owner: "too clustered on top of each other") Where the monsters of a spawn stand, as { side, ahead } in
+-- metres from 3 m in front of the player: one alone right there; more scattered at random over a disc around the
+-- player (owner, 0.15.140: centred on me, 200 m), about SPOT_AREA m2 each, the radius at most SPOT_R m (15: about 11 m,
+-- 200: about 40 m, 1000: about 90 m, 5000: 200 m), none within SPOT_MIN m of the player, never
+-- closer than SPOT_MIN m to each other (a grid of cells makes each check look at 9 cells only, not at every monster:
+-- 1000 monsters take a few ms). Before: a grid 2 m apart, where big monsters stood inside each other.
+local SPOT_AREA, SPOT_MIN, SPOT_TRIES, SPOT_R = 25, 3, 30, 200
+scatter = function(count)
+  if count <= 1 then return { { 0, 0 } } end
+  local r = math.min(SPOT_R, math.sqrt(count * SPOT_AREA / math.pi + SPOT_MIN * SPOT_MIN))
+  local cells, spots = {}, {}
+  local function cell(a, b) return math.floor(a / SPOT_MIN) .. ":" .. math.floor(b / SPOT_MIN) end
+  local function free(a, b)
+    local ca, cb = math.floor(a / SPOT_MIN), math.floor(b / SPOT_MIN)
+    for i = ca - 1, ca + 1 do
+      for j = cb - 1, cb + 1 do
+        local c = cells[i .. ":" .. j]
+        if c then
+          for _, q in ipairs(c) do
+            if (q[1] - a) ^ 2 + (q[2] - b) ^ 2 < SPOT_MIN * SPOT_MIN then return false end
+          end
+        end
+      end
+    end
+    return true
+  end
+  for _ = 1, count do
+    local a, b
+    for _ = 1, SPOT_TRIES do  -- a free place; if none is found, the last one tried (still on the disc)
+      -- evenly over the ring from SPOT_MIN to r around the player
+      local ang = math.random() * 2 * math.pi
+      local dist = math.sqrt(SPOT_MIN * SPOT_MIN + math.random() * (r * r - SPOT_MIN * SPOT_MIN))
+      a, b = math.cos(ang) * dist, math.sin(ang) * dist
+      if free(a, b) then break end
+    end
+    local k = cell(a, b)
+    cells[k] = cells[k] or {}
+    table.insert(cells[k], { a, b })
+    spots[#spots + 1] = { a, b - 3 }  -- (spawn_body adds the 3 m in front again: the disc's centre is the player)
+  end
+  return spots
+end
+
 local function spawn_body(world, account, player, kind, level, what, count)
   if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
   spawn_queue = {}  -- a new spawn or Remove also stops a spawn under way
@@ -569,12 +659,9 @@ local function spawn_body(world, account, player, kind, level, what, count)
   -- (0.15.134, owner) several duelists: rows of up to 10, 2 m apart, from 3 m in front of the player
   count = kind == "duel" and math.max(1, math.min(MAX_DUELISTS, math.floor(tonumber(count) or 1))) or 1
   local jobs = {}
+  local spots = scatter(count)
   for i = 1, count do
-    -- rows of 10; a big spawn in a square block instead (1000: 32 x 32, about 64 m), not a column 200 m long
-    local width = math.max(10, math.ceil(math.sqrt(count)))
-    local per_row = math.min(count, width)
-    local col, row = (i - 1) % width, math.floor((i - 1) / width)
-    local side, ahead = (col - (per_row - 1) / 2) * 2, row * 2
+    local side, ahead = spots[i][1], spots[i][2]
     jobs[i] = (function(world)
   local d = d0
   if d[3] == RANDOM_KEY then d = RANDOM_POOL[math.random(#RANDOM_POOL)] end  -- a different one each time
@@ -587,6 +674,7 @@ local function spawn_body(world, account, player, kind, level, what, count)
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
   bodies[id] = b
+  to_ground(id, sx, y, sz)  -- (0.15.140) put on the ground a moment later
   if level then
     local okl, set = pcall(set_level, world, id, level)
     b.level = level
@@ -645,6 +733,7 @@ local function spawn_tick(world)
   if #spawn_queue == 0 then guard_duelists(world) end
 end
 
+local body_pass = nil  -- a check of the test monsters under way (bodies_tick)
 local function bodies_tick(world)
   if next(bodies) == nil then
     if duel_guard.objects then guard_duelists(world) end  -- the last one went: the rule goes
@@ -652,14 +741,29 @@ local function bodies_tick(world)
   end
   body_steps = body_steps + 1
   if body_steps % SHIELD_STEPS == 0 then guard_duelists(world) end
-  if body_steps % 30 ~= 0 then return end
+  -- (0.15.140, owner: up to 5000) a check of all test monsters starts every 30 steps and, with many, goes on over the
+  -- next steps within SCAN_BUDGET (a list of their ids, so new ones spawned meanwhile wait for the next check)
+  if not body_pass then
+    if body_steps % 30 ~= 0 then return end
+    local list = {}
+    for id in pairs(bodies) do list[#list + 1] = id end
+    body_pass = { list = list, i = 1, killed = 0, gone = 0, away = 0, many = #list > 5 }
+  end
+  local pass, t0 = body_pass, now_s()
   local session = emf.session()
-  local many = 0
-  for _ in pairs(bodies) do many = many + 1 end
-  many = many > 5  -- (0.15.137) with many test monsters their AI is not logged (slow, and the log would flood)
+  local many = pass.many  -- (0.15.137) with many test monsters their AI is not logged (slow, and the log would flood)
   -- (0.15.140, owner) nor their deaths, bodies and going out of sight one by one: one summary line per check
-  local killed, gone, away = 0, 0, 0
-  for id, b in pairs(bodies) do
+  local killed, gone, away = pass.killed, pass.gone, pass.away
+  local done = 0
+  while pass.i <= #pass.list do
+    if scan_over(t0, done) then
+      pass.killed, pass.gone, pass.away = killed, gone, away
+      return
+    end
+    local id = pass.list[pass.i]
+    pass.i, done = pass.i + 1, done + 1
+    local b = bodies[id]
+    if b then
     local alive = false
     if b.session == session then
       pcall(function()
@@ -735,7 +839,9 @@ local function bodies_tick(world)
         if f and tonumber(tostring(f.faction)) ~= DUEL_FACTION then f.faction = DUEL_FACTION end
       end)
     end
+    end  -- if b
   end
+  body_pass = nil
   if many and killed + gone + away > 0 then
     emf.log(string.format("experimental: test monsters: %d killed, %d bodies removed, %d out of sight (kept for Remove)", killed, gone, away))
   end
@@ -1384,6 +1490,7 @@ function F.tick(world)
   lift(world)
   pvp(world)
   spawn_tick(world)
+  ground_tick(world)
   calm_tick(world)
   bodies_tick(world)
   retry_tick(world)
@@ -1435,6 +1542,7 @@ F._marker_ids = marker_ids
 -- (0.15.109, owner) Has the player with this account PvP on right now? (where the world is hosted; for the party list)
 -- tests only: the most entities one scan looks at
 function F._scan_max(n) SCAN_MAX = n end
+function F._ground() return ground_n, #ground_q - ground_head + 1 end
 
 -- tests only: end a player's PvP cool-down
 function F._pvp_hit_reset(account)

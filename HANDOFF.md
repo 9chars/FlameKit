@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.139 on Development and Stable (owner, 2026-11-15 01:05: both channels).
+Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.140 on Development and Stable (owner, 2026-11-15 01:52: all channels).
 
 ## What FlameKit is
 
@@ -278,3 +278,4 @@ runs FlameKit vX, too old for this game...". An older server that is still compa
 | 0.15.137 | server | no (production server test only) |
 | 0.15.138 | game: min check, "Server updated to" line, tooltips | no |
 | 0.15.139 | both: Random, cap 1000, calm dummy, option notices, Windows tab minimap row and Reset All | no: an older server spawns Vukah Melee for Random and caps lower; an older game never sends Random |
+| 0.15.140 | server: scatter, ground snap, cap 5000, budgeted checks, summary logs; game: 5000 button | no: an older server caps the 5000 request at its own cap |

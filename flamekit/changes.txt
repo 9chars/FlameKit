@@ -1,3 +1,9 @@
+0.15.140 Nov 15, 2026
+- Test monsters: Quantity goes up to 5000 (new 5000 button).
+- Test monsters: a spawn is scattered at random in a circle around you (up to 200 m for 5000), never within 3 m of you or of each other, instead of a tight grid.
+- Test monsters: a moment after they appear, they are put on the ground (within about 10 m up or down), so fewer end up inside hills or in the air.
+- Server: big spawns and Remove no longer write a log line per monster, and very big ones are handled a bit at a time.
+
 0.15.139 Nov 15, 2026
 - Test monsters: "Random" is the first choice in the Spawn Monsters list and the default: every monster of a spawn is a different random one (no bosses).
 - Test monsters: Quantity goes up to 1000 (new 500 and 1000 buttons); big spawns stand in a square block.
