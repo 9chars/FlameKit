@@ -1039,13 +1039,13 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   for i = tp0 + 1, #bodies_tp do bodies_tp[i].fn(true) end
   local close, behind = 0, 0
   for i = n0 + 1, n0 + 15 do
-    if spawned[i].x ^ 2 + spawned[i].z ^ 2 < 9 - 0.01 then behind = behind + 1 end  -- (now: too close to the player)
+    if spawned[i].x ^ 2 + spawned[i].z ^ 2 < 4 - 0.01 then behind = behind + 1 end  -- (now: too close to the player)
     for j = i + 1, n0 + 15 do
-      if (spawned[i].x - spawned[j].x) ^ 2 + (spawned[i].z - spawned[j].z) ^ 2 < 9 - 0.01 then close = close + 1 end
+      if (spawned[i].x - spawned[j].x) ^ 2 + (spawned[i].z - spawned[j].z) ^ 2 < 4 - 0.01 then close = close + 1 end
     end
   end
   check(#spawned == n0 + 15 and close == 0 and behind == 0 and find_row("^Quantity$") ~= nil,
-    "Quantity 15: fifteen monsters scattered around the player, none within 3 m of another or of the player (0.15.140, owner)")
+    "Quantity 15: fifteen monsters scattered around the player, none within 2 m of another or of the player (0.15.141, owner)")
   check(rule_count() - r0 <= 1 + 30, "and the hit rules do not grow with them (one shared shield)")
   step(200)  -- out of sight (not placed in this test): kept for Remove since 0.15.136
   local d0 = #destroyed
