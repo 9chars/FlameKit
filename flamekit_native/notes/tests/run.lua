@@ -73,6 +73,7 @@ local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
 local teleports = {}
 left_fns = {}
 died_fns = {}  -- the leaderboard's emf.on_player_died
+hit_fns = {}   -- emf.on_hit (experimental: the PvP cool-down, 0.15.134)
 joined_fns = {}  -- EMF reports the players already there (the test player) after the world data
 SESSION_TOKEN = "run-1"
 held_key = nil
@@ -158,6 +159,7 @@ emf = {
   session_token = function() return SESSION_TOKEN end,
   on_player_joined = function(fn) joined_fns[#joined_fns + 1] = fn; return true end,
   on_player_died = function(fn) died_fns[#died_fns + 1] = fn; return true end,
+  on_hit = function(fn) hit_fns[#hit_fns + 1] = fn; return true end,
   -- buffs (Lua 1.24): the player is Wet (812.4 s left) and has a buff without a timer and one the game hides
   buffs = function(w, id)
     if id ~= PLAYER then return {} end
@@ -393,7 +395,7 @@ do  -- (0.15.76) FlameKit's announcements go to the Messages window (features/ch
   -- `casts` now collects them there, and emf.broadcast must not be used any more
   local chat = require("features.chat")
   local real = chat.announce
-  chat.announce = function(w, t, k) casts[#casts + 1] = t; return real(w, t, k) end
+  chat.announce = function(w, t, k, n) casts[#casts + 1] = t; return real(w, t, k, n) end
   local real_broadcast = emf.broadcast
   emf.broadcast = function(...) broadcasts = broadcasts + 1; return real_broadcast(...) end
 end
@@ -687,6 +689,22 @@ check(find_row("PvP", "sw:pvp").selected == true and comps.Faction[PLAYER].facti
 check(rule_count() == 1 and r.from == PLAYER and r.to == "objects" and r.cancel == true,
   "and one rule: the PvP player's hits never damage buildings (0.15.130); no damage scaling (0.15.128)")
 check(casts[#casts] == "a player joined PvP!", "everyone is told: " .. tostring(casts[#casts]))
+do  -- (0.15.134, owner) hit by another PvP player: PvP cannot be left for 60 s
+  local X = require("features.experimental")
+  local OTHER = 102
+  X._online_test(OTHER, "0x00000000000000cc", true)  -- another player with PvP on, for the test
+  for _, fn in ipairs(hit_fns) do fn(SW, { kind = "hit", attacker = OTHER, target = PLAYER, amount = 10 }) end
+  click(find_row("PvP", "sw:pvp").button)
+  step(SYNC)
+  check(find_row("PvP", "sw:pvp").selected == true and find_row("you can leave PvP in") ~= nil,
+    "hit by a PvP player: switching PvP off is refused, with the seconds left")
+  step(35)  -- (0.15.134, owner) the Party list shows everyone the cool-down
+  local plist
+  if JOINED then plist = party_down[#party_down] or "" else local pf = io.open(TMP .. "\\ui_party.dat", "r"); plist = pf and pf:read("a") or ""; if pf then pf:close() end end
+  check(plist:find("\nv\tpvp\nv\tlock\t%d+") ~= nil, "the Party list carries the PvP cool-down's seconds: " .. plist:gsub("\n", "|"):sub(1, 160))
+  X._online_test(OTHER, nil)
+  require("features.experimental")._pvp_hit_reset(ACCOUNT)  -- the cool-down over (no clock jump: a joined player would time out)
+end
 do  -- (0.15.132, owner) pets and farm animals near a PvP player take no damage from players
   comps.IsTame = { [900] = {} }
   local pos_pet = SW.position
@@ -844,8 +862,11 @@ do
   click(find_row("^Spawn dummy$").button)
   step(40)
   check(comps.Level[953].dataStorage[1] == 50, "the dummy is level 50 (0.15.129, owner: 100 was too high)")
-  check(spawned[3] and spawned[3].guid == boar.key:match("dbg:dwhat:(.+)$") and comps.Faction[953].faction == 7,
-    "the dummy is the picked monster, with faction 7 (its hits do no damage)")
+  check(spawned[3] and spawned[3].guid == boar.key:match("dbg:dwhat:(.+)$") and comps.Faction[953].faction == 3,
+    "the dummy is the picked monster, with the monsters' faction 3: anyone can hit it (0.15.134)")
+  local harmless
+  for _, x in pairs(hit_rules) do if x.from == 953 and x.cancel and x.to == nil then harmless = true end end
+  check(harmless, "and a rule cancels all of its own hits: it never hurts anyone")
   click(find_row("Remove").button)
   step(40)
   -- (0.15.97) "Player-like" spawns a random human-looking body, never the Vukah fake player
@@ -861,8 +882,8 @@ do
     "Player-like spawns a human-looking body: " .. tostring(g))
   local dd2
   for _, r in ipairs(exp_rows()) do if r.options and not dd2 then dd2 = r end end
-  check(dd2.tooltip:find("Switch PvP on to hit it", 1, true) ~= nil, "the dummy's tooltip says PvP must be on to hit it")
-  check(find_row("Spawn dummy").tooltip:find("must have PvP on", 1, true) ~= nil, "so does Spawn dummy's")
+  check(dd2.tooltip:find("Anyone can hit it", 1, true) ~= nil, "the dummy's tooltip: anyone can hit it (0.15.134)")
+  check(find_row("Spawn dummy").tooltip:find("Anyone can hit it", 1, true) ~= nil, "so does Spawn dummy's")
   for _, r in ipairs(exp_rows()) do check(not (r.dim and (r.text or ""):find("never hurts")), "no block of text above the dummy's drop-down") end
   click(find_row("Remove").button)
   step(40)
@@ -919,6 +940,15 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   check(destroyed[#destroyed] == 901 and find_row("Removed 1 dead test monster near you") ~= nil,
     "Remove clears a dead test monster's body left near you (one from before 0.15.126)")
   comps.NetworkHealth[901], comps.Faction[901] = nil, f901
+  -- (0.15.134, owner) several duelists at once: side by side
+  click("W:dbg:cnt:3")
+  local n0 = #spawned
+  click(find_row("Spawn 3 duelists").button)
+  step(40)
+  check(#spawned == n0 + 3 and spawned[n0 + 1].x ~= spawned[n0 + 3].x, "How many 3: three duelists, side by side")
+  click(find_row("Remove").button)
+  step(40)
+  click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
 SW.position = real_position
@@ -1353,6 +1383,13 @@ do
   local t = board_text()
   check(t:find("source server\nr\t1\t1\t0\t0\tRival\nr\t2\t0\t1\t1\tNinechars\nend\n", 1, true) ~= nil,
     "a kill by another player: the killer first with 1 kill, you second with 1 death, your row marked: " .. t:gsub("\n", "|"))
+  check(casts[#casts] == "Rival brutally murdered Ninechars in PvP.", "the kill line (0.15.134): " .. tostring(casts[#casts]))
+  if not JOINED then  -- in your own game the line is written at once: red in Messages, orange in Notices
+    local mf = io.open(TMP .. "\\ui_messages.dat", "r"); local mt = mf and mf:read("a") or ""; if mf then mf:close() end
+    local nf = io.open(TMP .. "\\ui_notices.dat", "r"); local nt = nf and nf:read("a") or ""; if nf then nf:close() end
+    check(mt:find("ff4040 Rival brutally murdered Ninechars in PvP.", 1, true) ~= nil, "red in the Messages window")
+    check(nt:find("n announce_%d+ ff9632 Rival brutally murdered Ninechars in PvP%.") ~= nil, "and orange in the Notices window")
+  end
   for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 950 }) end
   for _, fn in ipairs(died_fns) do fn(SW, { player = PLAYER, account = ACCOUNT, name = "Ninechars", killer = 0 }) end
   step(3)
@@ -1362,6 +1399,15 @@ do
   step(3)
   t = board_text()
   check(t:find("r\t1\t2\t1\t1\tNinechars\nr\t2\t1\t2\t0\tRival\n", 1, true) ~= nil, "more kills rank first: " .. t:gsub("\n", "|"))
+  if not JOINED then  -- (0.15.134, owner) two kills: both notices are up; each goes after 30 s (or its x)
+    local function notices_text() local f = io.open(TMP .. "\\ui_notices.dat", "r"); local x = f and f:read("a") or ""; if f then f:close() end; return x end
+    local _, n = notices_text():gsub("brutally murdered", "")
+    check(n >= 2, "two kills close together: both in the Notices window (" .. n .. ")")
+    clock = clock + 31
+    step(70)
+    local _, n2 = notices_text():gsub("brutally murdered", "")
+    check(n2 == 0, "30 s later they are gone")
+  end
   local jf = io.open(TMP .. "\\leaderboard.json", "r")
   check(jf ~= nil, "the board is kept in leaderboard.json")
   if jf then jf:close() end

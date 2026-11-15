@@ -126,7 +126,11 @@ local function died(world, p)
   changed = true
   emf.log(string.format("leaderboard: %s killed %s (%d kills; %d deaths)", killer_name, victim_name, k.kills, v.deaths))
   local okc, chat = pcall(require, "features.chat")
-  if okc and chat.announce then chat.announce(world, string.format("PvP: %s killed %s.", killer_name, victim_name)) end
+  -- (0.15.134, owner) red in Messages, and the same line for a few seconds in everyone's Notices window, in orange
+  if okc and chat.announce then
+    chat.announce(world, string.format("%s brutally murdered %s in PvP.", killer_name, victim_name), "#ff4040",
+      { colour = "#ff9632", seconds = 30 })
+  end
 end
 F.died = died
 

@@ -1,3 +1,12 @@
+0.15.134 Nov 14, 2026
+- PvP: a kill is announced as "<killer> brutally murdered <victim> in PvP.", in red in Messages, and for 30 seconds in orange in everyone's Notices window (several kills show together; close any with its x).
+- PvP: once another PvP player hits you, you cannot switch PvP off for a minute. The Party list shows everyone how long is left ("PvP 42s").
+- Test monsters: anyone can hit and kill the dummy now, PvP on or off. It still never hurts anyone.
+- Test monsters: "How many" spawns up to 5 duelists at once, side by side.
+
+0.15.133 Nov 14, 2026
+- Map Waypoint: also works for far waypoints set on the game's own map, not only ones set on the minimap.
+
 0.15.132 Nov 14, 2026
 - PvP: pets and farm animals (birds, livestock) near a player with PvP on no longer take damage from players. Wild animals can still be hunted.
 

@@ -2934,6 +2934,7 @@ struct PartyLayer : PinnedLayer {
         std::wstring where;    // the location line, made when the list is read
         std::vector<Buff> buffs;
         bool pvp = false;      // PvP on (0.15.109): a red "PvP" tag on the name line, for everyone to see
+        int lock = 0;          // (0.15.134) seconds before this player may leave PvP (hit by a PvP player): "PvP 42s"
     };
     std::vector<Member> members;
     bool server = false;  // the list came from FlameKit's server half (else: what this game knows itself)
@@ -3060,6 +3061,10 @@ struct PartyLayer : PinnedLayer {
             }
             if (std::strcmp(line, "v\tpvp") == 0) {  // the player above has PvP on (0.15.109)
                 if (!list.empty()) list.back().pvp = true;
+                continue;
+            }
+            if (std::strncmp(line, "v\tlock\t", 7) == 0) {  // (0.15.134) their PvP cool-down, in seconds
+                if (!list.empty()) list.back().lock = std::max(0, std::atoi(line + 7));
                 continue;
             }
             if (line[0] != 'p' || line[1] != '\t') continue;
@@ -3246,9 +3251,10 @@ struct PartyLayer : PinnedLayer {
                 right -= 10;
             }
             if (m.pvp) {  // (0.15.109, owner) PvP on: a red tag before the level, everyone sees who can be fought
-                static const std::wstring kPvp = L"PvP";
+                // (0.15.134, owner) with the cool-down: "PvP 42s", the time before they may leave PvP, for everyone
+                const std::wstring kPvp = m.lock > 0 ? L"PvP " + std::to_wstring(m.lock) + L"s" : L"PvP";
                 const int tw = text.width(kPvp) + 10;
-                box(right - tw, ny + 1, right, ny + 20, 150, 30, 30, 0.9f);
+                box(right - tw, ny + 1, right, ny + 20, m.lock > 0 ? 190.0f : 150.0f, 30, 30, 0.9f);
                 text.draw(canvas, right - tw + 5, ny, kPvp, 255, 225, 220);
                 right -= tw + 8;
             }

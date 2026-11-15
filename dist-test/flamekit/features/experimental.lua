@@ -40,6 +40,7 @@ local SWITCHES = {
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
 local SESSION_ONLY = { pvp = true }
+local PVP_LOCK_S = 60  -- (0.15.134, owner) PvP cannot be left until this long after the last hit by another PvP player
 
 -- The options that are on until a player switches them off (the others are off until switched on).
 local DEFAULT_ON = { fly = true }
@@ -56,7 +57,7 @@ local TIPS = {
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
-    .. "on the server is told when you switch it. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
+    .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -260,9 +261,8 @@ local function waypoint_move(world, player, account, x, y, z, ground, why)
       tostring(player), why, tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
       not ground and ", straight there" or info and info.raw_target and ", no ground found: stood exactly there" or ", on the ground"))
     if moved then return end
-    local k = wp_known[player]
-    if ground and k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3 then
-      retry[player] = { x = x, y = k.y, z = z, account = account, steps = 30 }  -- once EMF's watchdog took its Teleport away
+    if ground and y ~= 0 then
+      retry[player] = { x = x, y = y, z = z, account = account, steps = 30 }  -- once EMF's watchdog took its Teleport away
     elseif tell_player then
       tell_player(world, player, account, "The game could not find ground at the waypoint in time. Set the waypoint by "
         .. "clicking a marker on the minimap, then try again.")
@@ -282,6 +282,9 @@ local function go_waypoint(world, player, msg, account)
   local k = wp_known[player]
   local known = k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3
   if known then y = k.y end
+  -- (0.15.133, production log: a waypoint set on the game's own map had a real height, 808, the player stood at 945)
+  -- a waypoint from the game's map is as good: any real height counts
+  if not known and y ~= 0 then known = true end
   local far = not px or (px - x) ^ 2 + (pz - z) ^ 2 > NEAR_M * NEAR_M
   local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
   local raw = known and far
@@ -366,8 +369,13 @@ end
 local DUMMY_LEVEL = 50  -- (0.15.129, owner: 100 was too high) about 6700 health
 local MAX_LEVEL = 100  -- owner (0.15.78): a round top. The game's own is 105: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
 local DUEL_FACTION = 1                                      -- HitAll
-local DUMMY_FACTION = 7                                     -- Player: its hits do no damage (0.15.81)
-local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
+-- (0.15.134, owner: anyone should be able to kill the dummy, not only PvP players) the monsters' own faction (3), so
+-- every player can hit it and monsters leave it alone; a hit rule cancels all of its own hits, so it never hurts
+-- anyone. Before: faction 7 (Player), which only PvP players could hit (0.15.81 to 0.15.133).
+local DUMMY_FACTION = 3
+local OLD_DUMMY_FACTION = 7  -- dead dummies left before 0.15.134 (sweep_corpses)
+local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 30, 180  -- SHIELD_MAX: shared by a player's duelists (0.15.134)
+local MAX_DUELISTS = 5  -- (0.15.134, owner: how many to spawn) EMF has 64 hit rules for all of FlameKit
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local CORPSE_S, CORPSE_R = 8, 15
 local body_steps = 0
@@ -414,7 +422,7 @@ local function sweep_corpses(world, player)
         if not hp or hp.health > 0 then return end
         local f = world:get("Faction", id)
         local fn = f and tonumber(tostring(f.faction))
-        if fn ~= DUEL_FACTION and fn ~= DUMMY_FACTION then return end
+        if fn ~= DUEL_FACTION and fn ~= OLD_DUMMY_FACTION then return end
         local oka, acc = pcall(world.account, world, id)
         if oka and acc then return end  -- a player
         if emf.destroy(world, id) ~= false then
@@ -441,7 +449,7 @@ local function shield(world, id, b)
         local oka, account = pcall(world.account, world, e)
         if not (oka and account) and protected(world, e) then
           keep[e] = true
-          if not b.guard[e] and n < SHIELD_MAX then
+          if not b.guard[e] and n < (b.shield_max or SHIELD_MAX) then
             local ok, r = pcall(emf.hit_rule, { from = id, to = e, cancel = true })
             if ok and r then b.guard[e], n = r, n + 1 end
           end
@@ -455,9 +463,9 @@ local function shield(world, id, b)
       b.guard[e] = nil
     end
   end
-  if n >= SHIELD_MAX and not b.full_said then
+  if n >= (b.shield_max or SHIELD_MAX) and not b.full_said then
     b.full_said = true
-    emf.log(string.format("experimental: the duelist %s protects only %d animals and pets near it (more are around)", tostring(id), SHIELD_MAX))
+    emf.log(string.format("experimental: the duelist %s protects only %d animals and pets near it (more are around)", tostring(id), b.shield_max or SHIELD_MAX))
   end
 end
 
@@ -476,7 +484,7 @@ local function set_level(world, id, level)
   return true
 end
 
-local function spawn_body(world, account, player, kind, level, what)
+local function spawn_body(world, account, player, kind, level, what, count)
   drop_bodies_of(world, account, true)
   if kind ~= "dummy" and kind ~= "duel" then  -- Remove
     local n = sweep_corpses(world, player)
@@ -492,13 +500,21 @@ local function spawn_body(world, account, player, kind, level, what)
     local len = math.sqrt(ax * ax + az * az)
     if len > 0.01 then fx, fz = ax / len, az / len end
   end)
-  local d = kind == "duel" and duelist(what) or dummy_of(what)
+  local d0 = kind == "duel" and duelist(what) or dummy_of(what)
+  -- (0.15.134, owner) several duelists: side by side, 2 m apart, 3 m in front of the player
+  count = kind == "duel" and math.max(1, math.min(MAX_DUELISTS, math.floor(tonumber(count) or 1))) or 1
+  local made = 0
+  for i = 1, count do
+    local side = (i - (count + 1) / 2) * 2
+    local why = (function()
+  local d = d0
   local guid = d[3]
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
-  local ok, id = pcall(emf.spawn, world, guid, x + fx * 3, y, z + fz * 3)
+  local ok, id = pcall(emf.spawn, world, guid, x + fx * 3 - fz * side, y, z + fz * 3 + fx * side)
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
-  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2],
+    shield_max = math.max(4, math.floor(SHIELD_MAX / count)) }
   bodies[id] = b
   if level then
     local okl, set = pcall(set_level, world, id, level)
@@ -507,7 +523,9 @@ local function spawn_body(world, account, player, kind, level, what)
       okl and (set and "done" or "it has no Level") or tostring(set)))
   end
   if kind == "dummy" then
-    pcall(function() world:get("Faction", id).faction = DUMMY_FACTION end)  -- at once: its hits do no damage
+    pcall(function() world:get("Faction", id).faction = DUMMY_FACTION end)  -- at once
+    local okr, r = pcall(emf.hit_rule, { from = id, cancel = true })  -- its own hits never land (0.15.134)
+    if okr and r then b.rules.harmless = r else emf.log("experimental: the dummy's rule against its own hits was refused (" .. tostring(r) .. ")") end
   end
   if kind == "duel" then
     pcall(function() world:get("Faction", id).faction = DUEL_FACTION end)  -- at once, before its AI picks a target
@@ -517,6 +535,14 @@ local function spawn_body(world, account, player, kind, level, what)
   end
   emf.log(string.format("experimental: a PvP test %s (entity %s%s%s) for player %s", kind == "duel" and "duelist" or "dummy", tostring(id),
     b.what and (", " .. b.what) or "", level and (", level " .. level) or "", tostring(player)))
+    end)()
+    if why then
+      if made == 0 then return why end
+      break
+    end
+    made = made + 1
+  end
+  if made < count then return string.format("Only %d of %d could be spawned.", made, count) end
 end
 
 local function bodies_tick(world)
@@ -672,11 +698,21 @@ local function handle(world, account, entity, msg)
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
     local what = type(msg.what) == "string" and msg.what or nil
-    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what)
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count)
     if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
     local v = view(account)
     v.note = not ok and "That did not work on this game version." or why
     return v
+  end
+  if msg.op == "set" and msg.key == "pvp" and msg.on ~= true and online[account] and online[account].pvp then
+    -- (0.15.134, owner: no leaving PvP when close to death) not until PVP_LOCK_S seconds after the last hit by a PvP player
+    local at = online[account].pvp_hit_at
+    local left = at and PVP_LOCK_S - (os.time() - at) or 0
+    if left > 0 then
+      local v = view(account)
+      v.note = string.format("You were attacked by a PvP player %d s ago: you can leave PvP in %d seconds.", PVP_LOCK_S - left, left)
+      return v
+    end
   end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
@@ -1094,8 +1130,8 @@ local function guard_pets(world, any)
   local centres = {}
   for _, p in pairs(online) do
     if p.pvp then
-      local x, _, z = where(world, p.entity)
-      if x then centres[#centres + 1] = { x, z } end
+      local okw, x, _, z = pcall(where, world, p.entity)
+      if okw and x then centres[#centres + 1] = { x, z } end
     end
   end
   local keep, n = {}, 0
@@ -1240,6 +1276,7 @@ local was_held, held_said = false, 0
 local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = DUEL_GUID, 1  -- the Debug section's duelist choice, this session (0.15.70)
+local duel_count = 1  -- (0.15.134, owner) how many duelists one Spawn makes
 local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
@@ -1262,6 +1299,27 @@ end
 F._marker_ids = marker_ids
 
 -- (0.15.109, owner) Has the player with this account PvP on right now? (where the world is hosted; for the party list)
+-- tests only: end a player's PvP cool-down
+function F._pvp_hit_reset(account)
+  if online[tostring(account)] then online[tostring(account)].pvp_hit_at = nil end
+end
+
+-- tests only: put another player into (or out of) the online list, with PvP on or off
+function F._online_test(entity, account, pvp)
+  if not account then
+    for acc, p in pairs(online) do if p.entity == entity then drop_rules(p); online[acc] = nil end end
+    return
+  end
+  online[account] = { entity = entity, rules = {}, seen = os.time() + 3600, pvp = pvp or nil }
+end
+
+-- (0.15.134, owner) the seconds left of a player's PvP cool-down (0: none), for the Party list
+function F.pvp_lock_left(account)
+  local p = account and online[tostring(account)]
+  if not (p and p.pvp and p.pvp_hit_at) then return 0 end
+  return math.max(0, PVP_LOCK_S - (os.time() - p.pvp_hit_at))
+end
+
 function F.pvp_of(account)
   return account ~= nil and is_on(tostring(account), "pvp") == true
 end
@@ -1522,10 +1580,10 @@ function F.window_rows(world)
   local dpick = dummy_of(dummy_what)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Switch PvP on to hit it." }
+    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Anyone can hit it, PvP on or off." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. You must have PvP on to hit it. It swings at you "
-      .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
+    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. Anyone can hit it, PvP on or off. It swings at you "
+      .. "but never does damage. It replaces your test monster." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
     tooltip = "Removes your test monster, and any dead test monster's body near you." }
   rows[#rows + 1] = { separator = true }
@@ -1543,8 +1601,14 @@ function F.window_rows(world)
     rows[#rows + 1] = { button = "dbg:lvlset:" .. q, text = tostring(q), same_line = true, selected = duel_level == q,
       disabled = in_pvp or nil, tooltip = lvl_tip }
   end
-  rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel", disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
+  rows[#rows + 1] = { label = true, text = "How many" }  -- (0.15.134, owner)
+  for c = 1, MAX_DUELISTS do
+    rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
+      disabled = in_pvp or nil, tooltip = "How many duelists one Spawn makes, side by side." }
+  end
+  rows[#rows + 1] = { button = "dbg:body:duel", text = duel_count > 1 and ("Spawn " .. duel_count .. " duelists") or "Spawn duelist",
+    selected = v.body == "duel", disabled = in_pvp or nil,
+    tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
       .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
   rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
     tooltip = "Removes your test monster, and any dead test monster's body near you." }
@@ -1593,11 +1657,13 @@ function F.click(world, key)
   if step then duel_level = math.max(1, math.min(MAX_LEVEL, duel_level + tonumber(step))) return end
   local set = key:match("^dbg:lvlset:(%d+)$")
   if set then duel_level = math.max(1, math.min(MAX_LEVEL, tonumber(set))) return end
+  local cset = key:match("^dbg:cnt:(%d+)$")
+  if cset then duel_count = math.max(1, math.min(MAX_DUELISTS, tonumber(cset))) return end
   local kind = key:match("^dbg:body:(%a+)$")
   if kind then
     note = nil
     local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or kind == "dummy" and dummy_what or nil,
-      level = kind == "duel" and duel_level or nil }
+      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil }
     if hosting(world) then
       local account, player = me(world)
       if account then note = handle(world, account, player, msg).note end
@@ -1680,7 +1746,7 @@ function F.click(world, key)
     if not account then return end
     load_saved()
     if view(account)[name .. "_pvp"] then return end  -- held off by PvP
-    handle(world, account, player, { op = "set", key = name, on = not view(account)[name] })
+    note = handle(world, account, player, { op = "set", key = name, on = not view(account)[name] }).note
   elseif shown then
     if shown[name .. "_pvp"] then return end  -- held off by PvP
     shown[name] = not shown[name]  -- at once on screen; the server's answer follows
@@ -1760,6 +1826,15 @@ function F.setup(k)
     end
     drop_bodies_of(world, account, true)
   end, "a player leaving"))
+  -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
+  pcall(emf.on_hit, kit.guard(F, function(world, hit)
+    if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
+    local pa, pt
+    for _, p in pairs(online) do
+      if p.entity == hit.attacker then pa = p elseif p.entity == hit.target then pt = p end
+    end
+    if pa and pt and pa.pvp and pt.pvp then pt.pvp_hit_at = os.time() end
+  end, "a hit"))
   pcall(emf.on_player_joined, kit.guard(F, function(world, p)
     if p and p.account and p.player and p.player ~= 0 then
       load_saved()
