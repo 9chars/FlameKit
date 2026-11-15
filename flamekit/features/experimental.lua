@@ -593,48 +593,30 @@ local function calm_tick(world)
 end
 local spawn_queue = {}  -- { account, fn }: each spawns one queued test monster (spawn_tick)
 
--- (0.15.140, owner: "too clustered on top of each other") Where the monsters of a spawn stand, as { side, ahead } in
--- metres from 3 m in front of the player: one alone right there; more scattered at random over a disc around the
--- player (owner, 0.15.140: centred on me, 200 m), about SPOT_AREA m2 each, the radius at most SPOT_R m (0.15.141: 15 about 7 m,
--- 200 about 23 m, 500 about 36 m, 1000 about 50 m), none within SPOT_MIN m of the player, never
--- closer than SPOT_MIN m to each other (a grid of cells makes each check look at 9 cells only, not at every monster:
--- 1000 monsters take a few ms). Before: a grid 2 m apart, where big monsters stood inside each other.
--- (0.15.141, owner: "move it back to 2, keep the new pattern") 2 m apart at least, packed as tight as a random scatter allows: about 8 m2 each with up to 200 tries a monster
--- (20 test runs of 1000: never closer than 2 m, at most 17 ms; 7 m2 left a few too close, the limit is about 5.7 m2)
-local SPOT_AREA, SPOT_MIN, SPOT_TRIES, SPOT_R = 8, 2, 200, 200
+-- Where the monsters of a spawn stand, as { side, ahead } in metres from 3 m in front of the player (spawn_body adds
+-- the 3 m): one alone right there. More: (0.15.141, owner: "packed as tight as possible", "do a hexagonal grid") a
+-- hexagonal grid SPOT_MIN m apart (each monster 2 m from its six neighbours, about 3.5 m2 each: the tightest packing),
+-- centred on the player and filled from the inside out, so the spawn is round; no monster within SPOT_MIN m of the
+-- player. 15: within about 5 m, 200: about 16 m, 1000: about 34 m. (0.15.140 had a random scatter, 0.15.139 a square
+-- grid.) Each monster is then put on the ground (to_ground).
+local SPOT_MIN = 2
 scatter = function(count)
   if count <= 1 then return { { 0, 0 } } end
-  local r = math.min(SPOT_R, math.sqrt(count * SPOT_AREA / math.pi + SPOT_MIN * SPOT_MIN))
-  local cells, spots = {}, {}
-  local function cell(a, b) return math.floor(a / SPOT_MIN) .. ":" .. math.floor(b / SPOT_MIN) end
-  local function free(a, b)
-    local ca, cb = math.floor(a / SPOT_MIN), math.floor(b / SPOT_MIN)
-    for i = ca - 1, ca + 1 do
-      for j = cb - 1, cb + 1 do
-        local c = cells[i .. ":" .. j]
-        if c then
-          for _, q in ipairs(c) do
-            if (q[1] - a) ^ 2 + (q[2] - b) ^ 2 < SPOT_MIN * SPOT_MIN then return false end
-          end
-        end
-      end
+  local row = SPOT_MIN * math.sqrt(3) / 2  -- the distance between two rows of a hexagonal grid
+  local r = math.sqrt(count * SPOT_MIN * row / math.pi) + 2 * SPOT_MIN  -- a little more than the area they need
+  local cells = {}
+  for j = -math.ceil(r / row), math.ceil(r / row) do
+    local b = j * row
+    local shift = (j % 2 == 0) and 0 or SPOT_MIN / 2
+    for i = -math.ceil(r / SPOT_MIN) - 1, math.ceil(r / SPOT_MIN) + 1 do
+      local a = i * SPOT_MIN + shift
+      local d2 = a * a + b * b
+      if d2 >= SPOT_MIN * SPOT_MIN - 0.01 and d2 <= r * r then cells[#cells + 1] = { a, b, d2 } end
     end
-    return true
   end
-  for _ = 1, count do
-    local a, b
-    for _ = 1, SPOT_TRIES do  -- a free place; if none is found, the last one tried (still on the disc)
-      -- evenly over the ring from SPOT_MIN to r around the player
-      local ang = math.random() * 2 * math.pi
-      local dist = math.sqrt(SPOT_MIN * SPOT_MIN + math.random() * (r * r - SPOT_MIN * SPOT_MIN))
-      a, b = math.cos(ang) * dist, math.sin(ang) * dist
-      if free(a, b) then break end
-    end
-    local k = cell(a, b)
-    cells[k] = cells[k] or {}
-    table.insert(cells[k], { a, b })
-    spots[#spots + 1] = { a, b - 3 }  -- (spawn_body adds the 3 m in front again: the disc's centre is the player)
-  end
+  table.sort(cells, function(p, q) return p[3] < q[3] end)  -- nearest first: a round spawn
+  local spots = {}
+  for k = 1, math.min(count, #cells) do spots[k] = { cells[k][1], cells[k][2] - 3 } end
   return spots
 end
 

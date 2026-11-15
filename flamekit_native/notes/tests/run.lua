@@ -1045,7 +1045,7 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     end
   end
   check(#spawned == n0 + 15 and close == 0 and behind == 0 and find_row("^Quantity$") ~= nil,
-    "Quantity 15: fifteen monsters scattered around the player, none within 2 m of another or of the player (0.15.141, owner)")
+    "Quantity 15: fifteen monsters on a hexagonal grid around the player, none within 2 m of another or of the player (0.15.141, owner)")
   check(rule_count() - r0 <= 1 + 30, "and the hit rules do not grow with them (one shared shield)")
   step(200)  -- out of sight (not placed in this test): kept for Remove since 0.15.136
   local d0 = #destroyed
