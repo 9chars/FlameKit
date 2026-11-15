@@ -321,7 +321,11 @@ end
 --            12 FarmAnimal, or 11 PlayerAlly unless it is a villager, with NpcState). Villagers are fair game.
 --            Voxel walls and terrain never take hits (EMF), and monsters do not break them.
 -- Spawned bodies are not saved with the world. One body per player; a new one replaces the old. It goes when its
--- player clicks Remove or leaves, when it dies, or when the world reloads.
+-- player clicks Remove or leaves, or when the world reloads. (0.15.126, owner: a killed duelist's body could not be
+-- looted and never went away, in a flame altar's area, and Remove was greyed out) When it dies, its body is destroyed
+-- CORPSE_S seconds later. Remove is always there: it also destroys any dead test monster within CORPSE_R m of the
+-- player, the ones left before 0.15.126 too (a dead body of faction 1 or 7 without an account: the game's own monsters
+-- never have those factions, players have an account).
 local DUMMY_GUID = "9543cfb0-b4d7-408e-905c-ccb79a15136d"  -- FakePlayer_Vukah_Melee
 local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 -- What a duelist can be (0.15.72, owner: any monster from a list): every creature in core/monsters.lua, read from
@@ -364,6 +368,7 @@ local DUEL_FACTION = 1                                      -- HitAll
 local DUMMY_FACTION = 7                                     -- Player: its hits do no damage (0.15.81)
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
+local CORPSE_S, CORPSE_R = 8, 15
 local body_steps = 0
 
 local function has(world, comp, id)
@@ -392,6 +397,34 @@ local function drop_bodies_of(world, account, destroy)
   for id, b in pairs(bodies) do
     if b.owner == account then drop_body(world, id, destroy) end
   end
+end
+
+-- Destroys the dead test monsters within CORPSE_R m of the player (see above). Returns how many.
+local function sweep_corpses(world, player)
+  local px, _, pz = world:position(player)
+  if not px then return 0 end
+  local n = 0
+  for _, id in ipairs(world:entities()) do
+    if id ~= player and not bodies[id] then
+      pcall(function()
+        local x, _, z = world:position(id)
+        if not x or (x - px) ^ 2 + (z - pz) ^ 2 > CORPSE_R * CORPSE_R then return end
+        local hp = world:get("NetworkHealth", id)
+        if not hp or hp.health > 0 then return end
+        local f = world:get("Faction", id)
+        local fn = f and tonumber(tostring(f.faction))
+        if fn ~= DUEL_FACTION and fn ~= DUMMY_FACTION then return end
+        local oka, acc = pcall(world.account, world, id)
+        if oka and acc then return end  -- a player
+        if emf.destroy(world, id) ~= false then
+          n = n + 1
+          emf.log(string.format("experimental: a dead test monster (entity %s, faction %s) near player %s removed", tostring(id),
+            tostring(fn), tostring(player)))
+        end
+      end)
+    end
+  end
+  return n
 end
 
 -- The duelist's shield: a hit rule against each animal or pet near it, none for anything farther away.
@@ -444,7 +477,10 @@ end
 
 local function spawn_body(world, account, player, kind, level, what)
   drop_bodies_of(world, account, true)
-  if kind ~= "dummy" and kind ~= "duel" then return nil end
+  if kind ~= "dummy" and kind ~= "duel" then  -- Remove
+    local n = sweep_corpses(world, player)
+    return n > 0 and string.format("Removed %d dead test monster%s near you.", n, n == 1 and "" or "s") or nil
+  end
   if kind == "dummy" then level = MAX_LEVEL end  -- (0.15.79, owner) it never hurts anyone: lots of health to beat on
   local x, y, z = where(world, player)
   if not x then return "Your position is not known." end
@@ -500,7 +536,20 @@ local function bodies_tick(world)
     -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a
     -- far place may not be streamed in yet.) So a body counts as gone only when it was missing three checks in a row.
     if not alive then b.missing = (b.missing or 0) + 1 else b.missing = 0 end
-    if not alive and b.missing >= 3 and b.session == session then
+    if not alive and b.why == "killed" and b.session == session then
+      -- its body goes CORPSE_S seconds after the kill (it cannot be looted and the game never removes it)
+      if not b.dead_at then
+        b.dead_at = os.time()
+        emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S))
+        local o = online[b.owner]
+        if o and tell_player then
+          tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
+        end
+      elseif os.time() - b.dead_at >= CORPSE_S then
+        emf.log(string.format("experimental: the PvP test %s (entity %s): its body removed", b.kind, tostring(id)))
+        drop_body(world, id, true)
+      end
+    elseif not alive and b.missing >= 3 and b.session == session then
       emf.log(string.format("experimental: the PvP test %s (entity %s) is gone: %s", b.kind, tostring(id), b.why or "?"))
       drop_body(world, id, false)
     elseif not alive and b.session ~= session then
@@ -551,7 +600,7 @@ end
 -- What the Debug section shows about your body.
 body_of = function(account)
   for id, b in pairs(bodies) do
-    if b.owner == account then return b.kind end
+    if b.owner == account and not b.dead_at then return b.kind end  -- a killed one's body is on its way out
   end
 end
 
@@ -1403,8 +1452,8 @@ function F.window_rows(world)
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
       .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
-  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
-    tooltip = "Removes your test monster." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
+    tooltip = "Removes your test monster, and any dead test monster's body near you." }
   rows[#rows + 1] = { separator = true }
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
@@ -1423,8 +1472,8 @@ function F.window_rows(world)
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
       .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
-  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
-    tooltip = "Removes your test body." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
+    tooltip = "Removes your test monster, and any dead test monster's body near you." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
   return rows
 end

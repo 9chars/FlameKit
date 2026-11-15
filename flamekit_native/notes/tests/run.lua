@@ -876,6 +876,31 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   click(find_row("PvP", "sw:pvp").button)
   step(3)
   check(not find_row("^Spawn duelist$").disabled, "PvP off: spawning is back")
+  -- (0.15.126, owner) a killed test monster's body goes by itself; Remove also clears dead ones left near the player
+  local kid = 950 + #spawned + 1
+  local pos_before = SW.position
+  SW.position = function(self, id) if id == kid then return 2, 0, 2 end return pos_before(self, id) end
+  comps.Faction[kid] = { faction = 6 }
+  comps.NetworkHealth[kid] = { health = 100 }
+  click(find_row("^Spawn duelist$").button)
+  step(40)
+  comps.NetworkHealth[kid].health = 0
+  step(65)
+  local d1 = #destroyed
+  check(not find_row("^Spawn duelist$").selected and destroyed[#destroyed] ~= kid, "killed: no longer your duelist, its body stays a moment")
+  clock = clock + 9
+  step(35)
+  check(#destroyed == d1 + 1 and destroyed[#destroyed] == kid, "8 s later its body is destroyed")
+  SW.position = pos_before
+  comps.NetworkHealth[901] = { health = 0 }
+  local f901 = comps.Faction[901]
+  comps.Faction[901] = { faction = 1 }
+  check(not find_row("Remove").disabled, "Remove is there without a test monster of your own")
+  click(find_row("Remove").button)
+  step(40)
+  check(destroyed[#destroyed] == 901 and find_row("Removed 1 dead test monster near you") ~= nil,
+    "Remove clears a dead test monster's body left near you (one from before 0.15.126)")
+  comps.NetworkHealth[901], comps.Faction[901] = nil, f901
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
 SW.position = real_position
