@@ -15,6 +15,12 @@ rewrite the step if any answer is no:
 4. Would the step make sense if it were the only step he read?
 5. Does the last step say what to tell Claude when done, and what Claude does then?
 
+## Rule 0c: copying files to the PC (found 2026-11-15)
+
+device_commit_files can send an OLD copy when the same staged path is committed again after the file changed (seen
+twice: upload.ps1 and the lt test mod). Always stage every new version under a new folder in /mnt/user-data/outputs/,
+and after every commit check the file on the PC (md5sum through device_bash) before relying on it.
+
 ## Rule 0b: code design (owner, 2026-11-15)
 
 Features never build on other features. Code two features both need goes into a shared module in `core/` (as
