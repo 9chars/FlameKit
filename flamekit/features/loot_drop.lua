@@ -27,6 +27,14 @@ local bodies = {}              -- body id -> step to remove it at
 local steps = 0
 local tally = { bodies = 0, items = 0, kept = 0, empty = 0 }  -- summed, logged once a minute (no line per monster)
 
+-- 0.15.144 test (owner: "why can't the loot go into the dead monster's body and then dumped out to the ground?"):
+-- console "flamekit.loottest on" arms it for the next monster death on the server; that body gets the game's own
+-- LootInteractionEvent with itself as guest AND host (what pressing E does, the loot moved into the body itself), then
+-- its items are only logged at 0.5, 1.5 and 3 s. Nothing is taken, dropped or removed; the normal Loot Drop skips that
+-- body. "flamekit.loottest off" disarms it. EMF delivers an event only to scripts that named it in their first run, so
+-- this needs one server restart after the update (emf.emits in F.setup).
+local test = { armed = false, id = nil, step = 0, looks = { 1, 30, 90, 180 }, n = 0 }
+
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   if ok then return v end
@@ -34,11 +42,15 @@ local function get(world, c, id)
 end
 
 local function died(world, e)
-  if not server.get("loot_to_ground") then return end
   local id = e and e.deadEntityId
   if type(id) == "table" then id = id.id end
   id = tonumber(id)
   if not id or id == 0 then return end
+  if test.armed and not test.id and not get(world, "PlayerState", id) and get(world, "Faction", id) then
+    test.armed, test.id, test.step, test.n = false, id, steps, 0
+    return  -- this body is the test's: the normal Loot Drop leaves it alone
+  end
+  if not server.get("loot_to_ground") then return end
   queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1 }
 end
 
@@ -78,8 +90,40 @@ local function handle(world, id, look)
   return "done"
 end
 
+local function describe(world, id, what)
+  local stacks = bag.entity_stacks(world, id)
+  local parts = {}
+  for i, st in ipairs(stacks) do
+    if i > 12 then parts[#parts + 1] = "..." break end
+    parts[#parts + 1] = string.format("%s x%s lvl %s rar %s", tostring(st.item), tostring(st.count), tostring(st.level), tostring(st.rarity))
+  end
+  emf.log(string.format("loottest: body %s, %s: %d stack(s) [%s]; InventorySetup %s, own Inventory %s", tostring(id), what,
+    #stacks, table.concat(parts, "; "), tostring(get(world, "InventorySetup", id) ~= nil), tostring(get(world, "Inventory", id) ~= nil)))
+end
+
+local function test_tick(world)
+  if not test.id then return end
+  local age = steps - test.step
+  if age == test.looks[1] then
+    describe(world, test.id, "before the event")
+    local ok, done = pcall(emf.emit, "server", "LootInteractionEvent",
+      { guestId = test.id, hostId = test.id, offerId = 0, lootAll = 1, bypassInteraction = 1 })
+    emf.log(string.format("loottest: body %s: LootInteractionEvent guest = host = body sent: ok %s, answer %s",
+      tostring(test.id), tostring(ok), tostring(done)))
+  else
+    for i = 2, #test.looks do
+      if age == test.looks[i] then
+        describe(world, test.id, string.format("%.1f s after the death", test.looks[i] / 60))
+        if i == #test.looks then emf.log("loottest: done (nothing was taken, dropped or removed)") test.id = nil end
+      end
+    end
+  end
+end
+
 function F.tick(world)
   steps = steps + 1
+  local okt, why = pcall(test_tick, world)
+  if not okt then emf.log("loottest: error: " .. tostring(why)) test.id = nil end
   local n = 0
   while head <= #queue and n < PER_STEP do
     local d = queue[head]
@@ -116,6 +160,15 @@ function F.setup(k)
   kit = k
   local ok = pcall(emf.on_event, "EntityDiedEvent", kit.guard(F, died, "a death"), "server")
   if not ok then emf.log("loot drop: no death events: monsters keep their loot in their bodies") end
+  local oke, said = pcall(emf.emits, { "LootInteractionEvent" }, "server")
+  if not oke or said == false then emf.log("loot drop: LootInteractionEvent cannot be sent (" .. tostring(said) .. ")") end
+  pcall(emf.command, "loottest", "on|off: the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      test.armed, test.id = args[1] ~= "off", nil
+      emf.log("loottest: " .. (test.armed and "armed: kill one monster" or "off"))
+      emf.reply("loottest: " .. (test.armed and "armed" or "off"))
+    end, "the loottest command"))
 end
 
 return F

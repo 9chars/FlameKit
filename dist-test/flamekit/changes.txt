@@ -1,3 +1,6 @@
+0.15.144 Nov 15, 2026
+- Server test (console, local server): "flamekit.loottest on" makes the next monster that dies get the game's own loot event (as if E were pressed) with its own body as the receiver, and logs the body's items before and 0.5, 1.5 and 3 s after. Nothing is taken, dropped or removed; the normal Loot Drop leaves that body alone. "flamekit.loottest off" cancels it. Needs one server restart.
+
 0.15.143 Nov 15, 2026
 - Monsters drop their loot on the ground: a body is looked into again a few times after the death (the game fills it a moment later), and a body is only removed once its loot is on the ground. Before, a body could be removed with its loot still in it.
 
