@@ -186,18 +186,60 @@ local function test_tick(world)
   end
 end
 
--- (0.15.176, owner: "the loot didnt drop out") some bodies and loot spots are filled only when someone opens them (EMF
--- ecs_programs random_loot_on_interaction): the game's own loot event, as pressing E does, with the body or spot as
--- both giver and receiver (0.15.145: a body had its loot 0.5 s after it), then it is looked at again.
-local function poke(world, id)
-  local ok, done = pcall(emf.emit, "server", "LootInteractionEvent",
-    { guestId = id, hostId = id, offerId = 0, lootAll = true, bypassInteraction = true })
-  note("%s: still empty: loot event sent (%s)", tostring(id), (ok and done ~= false) and "ok" or "refused")
-  return ok and done ~= false
+-- (0.15.176, owner: "the loot didnt drop out"; 0.15.178) some bodies and loot spots hold only a loot table: the game
+-- rolls it when someone opens them (EMF re_villages.md, immediate_loot_action: the loot goes into the GUEST's inventory,
+-- all or nothing; 0.15.176 used the body as its own guest and nothing happened). So: a small storage chest is put 3 m
+-- under the ground at the body (out of sight; Prop_Decoration_T0_Storage_16, spawned and filled that way in EMF's
+-- re_villager_jobs.md), half a second later the game's loot event {guest = chest, host = body} (as pressing E does),
+-- half a second after that the chest's items go on the ground at the body and the chest is removed.
+local TEMP_CHEST = "669facd1-dc9a-41ab-8fa5-6b9f98c6a382"  -- Prop_Decoration_T0_Storage_16
+local pulls = {}  -- { host, chest, x, y, z, at, stage, label }
+local function poke(world, id, x, y, z, label)
+  if not x then
+    local okp, px, py, pz = pcall(world.position, world, id)
+    if not okp or not px then note("%s: no position, cannot be opened", tostring(label)) return false end
+    x, y, z = px, py, pz
+  end
+  local ok, chest = pcall(emf.spawn, world, TEMP_CHEST, x, y - 3, z)
+  if not ok or not chest or chest == 0 then note("%s: the game refused the receiving chest", tostring(label)) return false end
+  pulls[#pulls + 1] = { host = id, chest = chest, x = x, y = y, z = z, at = steps + 30, stage = 1, label = label }
+  return true
 end
 
--- (0.15.170) the body is gone, or stayed empty: its loot is in a separate loot spot (core/loot_spots.lua). Its items go
--- on the ground at the spot (same quality and level), then the empty spot is removed.
+local function pull_tick(world)
+  if #pulls == 0 then return end
+  local keep = {}
+  for _, p in ipairs(pulls) do
+    if p.at > steps then keep[#keep + 1] = p
+    elseif p.stage == 1 then
+      local ok, done = pcall(emf.emit, "server", "LootInteractionEvent",
+        { guestId = p.chest, hostId = p.host, offerId = 0, lootAll = true, bypassInteraction = true })
+      note("%s: loot event into a receiving chest (%s)", tostring(p.label), (ok and done ~= false) and "ok" or "refused")
+      p.stage, p.at = 2, steps + 30
+      keep[#keep + 1] = p
+    elseif p.stage == 2 then
+      local stacks = bag.entity_stacks(world, p.chest)
+      for _, st in ipairs(stacks) do
+        local level, rarity = st.level or 0, st.rarity or 0
+        emf.take(world, st.owner, st.item, st.count, function(w, taken)
+          if taken and taken > 0 then
+            local made, pid = ground.drop(w, st.item, taken, p.x, p.y, p.z, level, rarity, 2.5)
+            if made > 0 then tally.items = tally.items + 1 if pid then ground.mark(w, pid) end
+            else emf.put(w, p.host, st.item, taken, nil, { level = level, rarity = rarity }) end
+          end
+        end, { slot = st.slot, exact = true })
+      end
+      note("%s: %d stack(s) from the receiving chest to the ground", tostring(p.label), #stacks)
+      if #stacks > 0 then tally.bodies = tally.bodies + 1 else tally.empty = tally.empty + 1 end
+      p.stage, p.at = 3, steps + 30
+      keep[#keep + 1] = p
+    else
+      pcall(emf.destroy, world, p.chest)  -- the receiving chest goes (its items were taken a step ago)
+    end
+  end
+  pulls = keep
+end
+
 local body_again  -- below (it uses handle)
 local function from_spot(world, d, again)
   local asked = spots.find(d.id, d.x, d.z, d.t, function(w, ids)
@@ -205,7 +247,11 @@ local function from_spot(world, d, again)
     for _, cid in ipairs(ids) do
       local stacks = bag.entity_stacks(w, cid)
       if #stacks == 0 and (again or 0) < 2 then  -- not filled yet: once more, a second later (the 2nd time: poked)
-        if again == 1 then poke(w, cid) else note("body %s: loot spot %s still empty, looking again", tostring(d.id), tostring(cid)) end
+        if again == 1 then  -- (0.15.178) still empty: opened into a receiving chest
+          poke(w, cid, nil, nil, nil, "loot spot " .. tostring(cid))
+          return
+        end
+        note("body %s: loot spot %s still empty, looking again", tostring(d.id), tostring(cid))
         retry[#retry + 1] = { d = d, at = steps + 60, again = (again or 0) + 1 }
         return
       end
@@ -243,6 +289,7 @@ end
 function F.tick(world)
   steps = steps + 1
   pcall(spots.tick, world)
+  pcall(pull_tick, world)  -- (0.15.178) bodies and spots opened into a receiving chest
   if steps % 30 == 0 then pcall(ground.fx_tick, world) end  -- (0.15.171) fireflies off picked-up items
   if #retry > 0 then
     local keep = {}
@@ -270,8 +317,7 @@ function F.tick(world)
       elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
         -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
         d.poked = true
-        poke(world, d.id)
-        retry[#retry + 1] = { body = true, d = d, at = steps + 30 }
+        if not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id)) then pcall(from_spot, world, d) end
       else
         pcall(from_spot, world, d)  -- (0.15.170) empty at every look: its loot may be in a separate spot
       end

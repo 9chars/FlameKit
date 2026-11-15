@@ -1,3 +1,6 @@
+0.15.178 Nov 15, 2026
+- Loot Drop: a body or loot spot that holds only a loot table (the game rolls it when someone opens it) is opened with the game's own loot event into a small chest hidden under the ground, and that chest's items go on the ground at the body; the chest is then removed. 0.15.176 opened it into itself, which did nothing. Server only: no game update.
+
 0.15.177 Nov 15, 2026
 - Items Loot Drop puts on the ground are marked with the game's fireflies over loot instead of the glowing specks. Server only: no game update.
 
