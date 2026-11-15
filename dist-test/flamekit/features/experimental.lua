@@ -632,11 +632,15 @@ local function drop_test_loot(world, id, b)
   if not ok or not x then return end
   local twice = b.boss and 2 or 1
   local level = tonumber(b.level) or 1
-  ground.drop(world, item_db.RUNE, (math.random(2) == 1 and 10 or 15) * twice, x, y, z, 0, 0, 2)  -- runes are materials:
-  ground.drop(world, item_db.LEGENDARY_RUNE, (math.random(2) == 1 and 5 or 10) * twice, x, y, z, 0, 0, 2)  -- no quality of their own
+  local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
+  local r1 = ground.drop(world, item_db.RUNE, runes, x, y, z, 0, 0, 2)  -- runes are materials:
+  local r2 = ground.drop(world, item_db.LEGENDARY_RUNE, lrunes, x, y, z, 0, 0, 2)  -- no quality of their own
   local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
   local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
-  if name then ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) end
+  local r3 = name and ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) or 0
+  -- (0.15.148) one line per kill, so the drop can be checked in the log (summed when there are many: see the caller)
+  return string.format("%d runes (%s), %d legendary runes (%s), %s %s level %d legendary (%s)", runes, r1 > 0 and "ok" or "FAILED",
+    lrunes, r2 > 0 and "ok" or "FAILED", kind, tostring(name), level, r3 > 0 and "ok" or "FAILED")
 end
 
 local function spawn_body(world, account, player, kind, level, what, count)
@@ -790,7 +794,10 @@ local function bodies_tick(world)
       if not b.dead_at then
         b.dead_at = os.time()
         killed = killed + 1
-        if b.kind == "duel" then drop_test_loot(world, id, b) end  -- (0.15.142, owner) its loot on the ground
+        if b.kind == "duel" then  -- (0.15.142, owner) its loot on the ground
+          local okd, what = pcall(drop_test_loot, world, id, b)
+          if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
+        end
         if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end
         local o = online[b.owner]
         if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many

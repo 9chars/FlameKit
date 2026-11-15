@@ -1,3 +1,6 @@
+0.15.148 Nov 15, 2026
+- Test monsters: the server's log has one line per killed test monster saying what loot it dropped on the ground (runes, legendary runes and the legendary item) and whether each drop worked.
+
 0.15.147 Nov 15, 2026
 - Monsters drop their loot on the ground: a body is no longer skipped at the later looks (3 and 6 s after the death) when it has stopped counting as a creature; the game fills it with loot about then, and the loot stayed in the body.
 
