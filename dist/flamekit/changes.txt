@@ -1,3 +1,23 @@
+0.15.130 Nov 14, 2026
+- PvP: a player with PvP on can no longer damage buildings or placed objects.
+
+0.15.129 Nov 14, 2026
+- Test monsters: the dummy is level 50 now (it was 100: too much health).
+
+0.15.128 Nov 14, 2026
+- PvP: players now do full damage to each other (it was 25% before).
+
+0.15.127 Nov 14, 2026
+- Minimap: a waypoint can no longer be set on a place you have not discovered yet (the "?" marks). Messages tells you why.
+
+0.15.126 Nov 14, 2026
+- Test monsters: a killed dummy or duelist no longer leaves a body behind that cannot be looted or removed: it goes 8 seconds after the kill.
+- Remove (Experimental window, test monsters) is always there now: it also clears any dead test monster's body near you, including ones left by earlier versions.
+
+0.15.125 Nov 14, 2026
+- Map Waypoint: fixed moves that failed on a dedicated server ("The game refused the move"). A waypoint set by clicking a marker on the minimap now has the marker's height, and a far move goes straight there. If the game cannot find ground in time, FlameKit tries once more and otherwise tells you what to do.
+- A second click on a travel button while you are still on the way is answered ("one move at a time") instead of failing.
+
 0.15.124 Nov 14, 2026
 - Experimental tab, Debug: "Updates: Stable / Development". Stable (the default) gets the released versions; Development gets the very latest versions as soon as they are made, which may have bugs. FlameKit looks for an update right away when you switch.
 

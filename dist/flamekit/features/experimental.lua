@@ -55,7 +55,7 @@ local TIPS = {
   immortal = "Nothing can hurt or kill you: enemies, lava, the shroud, falling. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   stamina = "Your stamina never runs out. Stays on until you switch it off. Everyone on the server is told when you switch it.",
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
-    .. "and spells (25% of the damage). Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
+    .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
@@ -175,6 +175,9 @@ end
 
 -- The rescue button: moves the player to the nearest flame altar, the way a respawn lands there. The game's own
 -- fast travel is refused inside the shroud; this is not. Returns nil, or why it could not be done.
+-- EMF refused a move at once (its log says why: most often one still under way for that player)
+local REFUSED = "The move could not start: wait a moment and try again."
+
 local function go_home(world, player)
   local px, py, pz = where(world, player)
   local best, best_d = nil, nil
@@ -188,7 +191,7 @@ local function go_home(world, player)
   end
   if not best then return "There is no flame altar in this world to go to." end
   if not emf.teleport(world, player, nil, nil, nil, { spawn_point = best }) then
-    return "The game refused the move (see the server's emf_core.log)."
+    return REFUSED
   end
   emf.log(string.format("experimental: player %s sent to the flame altar %s", tostring(player), tostring(best)))
 end
@@ -215,35 +218,94 @@ local function go_near(world, player, msg)
   else
     queued = emf.teleport(world, player, x, y, z, { ground = true })
   end
-  if not queued then return "The game refused the move (see the server's emf_core.log)." end
+  if not queued then return REFUSED end
   emf.log(string.format("experimental: player %s sent to %.0f %.0f %.0f (pad %s)", tostring(player), x, y, z, tostring(best)))
 end
 
 -- Fast travel to the waypoint on the player's map (0.15.60). Their own game sends the waypoint's place (PlayerWaypoint
--- of their player, in their game's world). The game's ground search lands them on the nearest walkable spot within
--- about 10 m (EMF reference "v20"); where there is none they stand exactly there: in the air they fall, inside the
--- terrain the game sends them to their spawn point. So fall damage is off for that player for 30 s after the move
--- (an EMF hit rule, removed again by F.tick). Every move is logged with the waypoint's height and where they landed.
+-- of their player, in their game's world). So fall damage is off for that player for 30 s after the move (an EMF hit
+-- rule, removed again by F.tick). Every move is logged with the waypoint's height and where they landed.
+-- (0.15.125, production server log 2026-11-14) The game's ground search (`ground = true`) never finished for moves of
+-- some hundred metres on the dedicated server: EMF gave up after 10 s ("still has a Teleport 10 s after EMF's push"),
+-- the player stood frozen meanwhile, and a click in that time was refused. The ground search needs the destination's
+-- path grid, which a dedicated server has only near players. And a minimap waypoint had the player's own height, not
+-- the marker's. Now: a minimap click sends the marker's height too (wp_known); a move farther than NEAR_M to a waypoint
+-- whose height is known goes straight there, 1.5 m above it, without the ground search (fall damage is off anyway);
+-- a ground search that gives up is tried again once that way when the height is known; otherwise the player is told.
+-- One move per player at a time (moving[]): a second click while one is under way is answered, not refused.
 local fall_guard = {}  -- player entity -> { rule = hit rule id, till = os.time() when it goes }
-local function go_waypoint(world, player, msg)
-  local x, y, z = tonumber(msg.x), tonumber(msg.y), tonumber(msg.z)
-  if not (x and y and z) or x ~= x or z ~= z or x < 0 or z < 0 or x > 10240 or z > 10240 or y < -1000 or y > 5000 then
-    return "That waypoint is not on the map."
-  end
-  local _, py = where(world, player)
-  local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
+local wp_known = {}    -- player entity -> { x, y, z }: the last minimap waypoint, with the marker's own height
+local moving = {}      -- player entity -> os.time() when its waypoint move started (cleared by the answer, or after 15 s)
+local retry = {}       -- player entity -> { x, y, z, account, steps }: a raw move to try once the given-up one is gone
+local NEAR_M = 64      -- closer than this: the ground search (its area is loaded around the player)
+
+local function guard_falls(player)
   local okr, rule = pcall(emf.hit_rule, { kinds = "fall", to = player, cancel = true })
   if okr and rule then
     if fall_guard[player] then pcall(emf.hit_rule_remove, fall_guard[player].rule) end
     fall_guard[player] = { rule = rule, till = os.time() + 30 }
   end
-  local queued = emf.teleport(world, player, x, ty, z, { ground = true }, function(moved, mx, my, mz, info)
-    emf.log(string.format("experimental: waypoint travel of player %s: %s at %.0f %.0f %.0f (waypoint height %.0f, %s)",
-      tostring(player), tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
-      info and info.raw_target and "no ground found: stood exactly there" or "on the ground"))
+end
+
+-- A line for one player's FlameKit window (the note under the buttons), from a callback: no reply to send it with.
+local tell_player  -- set below, once `view` and the channel are known
+
+local function waypoint_move(world, player, account, x, y, z, ground, why)
+  guard_falls(player)
+  moving[player] = os.time()
+  local ty = ground and y or y + 1.5
+  local queued = emf.teleport(world, player, x, ty, z, { ground = ground }, function(moved, mx, my, mz, info)
+    moving[player] = nil
+    emf.log(string.format("experimental: waypoint travel of player %s (%s): %s at %.0f %.0f %.0f (waypoint height %.0f%s)",
+      tostring(player), why, tostring(info and info.status), mx or -1, my or -1, mz or -1, y,
+      not ground and ", straight there" or info and info.raw_target and ", no ground found: stood exactly there" or ", on the ground"))
+    if moved then return end
+    local k = wp_known[player]
+    if ground and k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3 then
+      retry[player] = { x = x, y = k.y, z = z, account = account, steps = 30 }  -- once EMF's watchdog took its Teleport away
+    elseif tell_player then
+      tell_player(world, player, account, "The game could not find ground at the waypoint in time. Set the waypoint by "
+        .. "clicking a marker on the minimap, then try again.")
+    end
   end)
-  if not queued then return "The game refused the move (see the server's emf_core.log)." end
-  emf.log(string.format("experimental: player %s sent to the waypoint %.0f %.0f %.0f (asked height %.0f)", tostring(player), x, y, z, ty))
+  if not queued then moving[player] = nil end
+  return queued
+end
+
+local function go_waypoint(world, player, msg, account)
+  local x, y, z = tonumber(msg.x), tonumber(msg.y), tonumber(msg.z)
+  if not (x and y and z) or x ~= x or z ~= z or x < 0 or z < 0 or x > 10240 or z > 10240 or y < -1000 or y > 5000 then
+    return "That waypoint is not on the map."
+  end
+  if moving[player] and os.time() - moving[player] < 15 then return "Still on the way: one move at a time." end
+  local px, py, pz = where(world, player)
+  local k = wp_known[player]
+  local known = k and math.abs(k.x - x) < 3 and math.abs(k.z - z) < 3
+  if known then y = k.y end
+  local far = not px or (px - x) ^ 2 + (pz - z) ^ 2 > NEAR_M * NEAR_M
+  local ty = y ~= 0 and y or (py or 300)  -- a waypoint without a height: start from yours
+  local raw = known and far
+  if not waypoint_move(world, player, account, x, ty, z, not raw, raw and "far, marker height" or "ground search") then
+    return REFUSED
+  end
+  emf.log(string.format("experimental: player %s sent to the waypoint %.0f %.0f %.0f (%s)", tostring(player), x, ty, z,
+    raw and "straight there" or "ground search"))
+end
+
+-- once a step (server world): the raw retry of a given-up ground search
+local function retry_tick(world)
+  for player, r in pairs(retry) do
+    r.steps = r.steps - 1
+    if r.steps <= 0 then
+      retry[player] = nil
+      if not waypoint_move(world, player, r.account, r.x, r.y, r.z, false, "again, straight there") and tell_player then
+        tell_player(world, player, r.account, "The move to the waypoint did not work: try again.")
+      end
+    end
+  end
+  for player, t in pairs(moving) do
+    if os.time() - t >= 15 then moving[player] = nil end  -- no answer came (a reload): not stuck for ever
+  end
 end
 
 -- ---- PvP test bodies (Debug section, 0.15.66) ----
@@ -259,7 +321,11 @@ end
 --            12 FarmAnimal, or 11 PlayerAlly unless it is a villager, with NpcState). Villagers are fair game.
 --            Voxel walls and terrain never take hits (EMF), and monsters do not break them.
 -- Spawned bodies are not saved with the world. One body per player; a new one replaces the old. It goes when its
--- player clicks Remove or leaves, when it dies, or when the world reloads.
+-- player clicks Remove or leaves, or when the world reloads. (0.15.126, owner: a killed duelist's body could not be
+-- looted and never went away, in a flame altar's area, and Remove was greyed out) When it dies, its body is destroyed
+-- CORPSE_S seconds later. Remove is always there: it also destroys any dead test monster within CORPSE_R m of the
+-- player, the ones left before 0.15.126 too (a dead body of faction 1 or 7 without an account: the game's own monsters
+-- never have those factions, players have an account).
 local DUMMY_GUID = "9543cfb0-b4d7-408e-905c-ccb79a15136d"  -- FakePlayer_Vukah_Melee
 local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 -- What a duelist can be (0.15.72, owner: any monster from a list): every creature in core/monsters.lua, read from
@@ -297,11 +363,13 @@ local function dummy_of(guid)
   if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
   return MONSTER_BY_GUID[guid]
 end
+local DUMMY_LEVEL = 50  -- (0.15.129, owner: 100 was too high) about 6700 health
 local MAX_LEVEL = 100  -- owner (0.15.78): a round top. The game's own is 105: any higher level is set back to 105 (measured 2026-11-14: 150 to 100000 all became 105, 62687 health)
 local DUEL_FACTION = 1                                      -- HitAll
 local DUMMY_FACTION = 7                                     -- Player: its hits do no damage (0.15.81)
 local SHIELD_R, SHIELD_MAX, SHIELD_STEPS = 40, 40, 180
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
+local CORPSE_S, CORPSE_R = 8, 15
 local body_steps = 0
 
 local function has(world, comp, id)
@@ -330,6 +398,34 @@ local function drop_bodies_of(world, account, destroy)
   for id, b in pairs(bodies) do
     if b.owner == account then drop_body(world, id, destroy) end
   end
+end
+
+-- Destroys the dead test monsters within CORPSE_R m of the player (see above). Returns how many.
+local function sweep_corpses(world, player)
+  local px, _, pz = world:position(player)
+  if not px then return 0 end
+  local n = 0
+  for _, id in ipairs(world:entities()) do
+    if id ~= player and not bodies[id] then
+      pcall(function()
+        local x, _, z = world:position(id)
+        if not x or (x - px) ^ 2 + (z - pz) ^ 2 > CORPSE_R * CORPSE_R then return end
+        local hp = world:get("NetworkHealth", id)
+        if not hp or hp.health > 0 then return end
+        local f = world:get("Faction", id)
+        local fn = f and tonumber(tostring(f.faction))
+        if fn ~= DUEL_FACTION and fn ~= DUMMY_FACTION then return end
+        local oka, acc = pcall(world.account, world, id)
+        if oka and acc then return end  -- a player
+        if emf.destroy(world, id) ~= false then
+          n = n + 1
+          emf.log(string.format("experimental: a dead test monster (entity %s, faction %s) near player %s removed", tostring(id),
+            tostring(fn), tostring(player)))
+        end
+      end)
+    end
+  end
+  return n
 end
 
 -- The duelist's shield: a hit rule against each animal or pet near it, none for anything farther away.
@@ -382,8 +478,11 @@ end
 
 local function spawn_body(world, account, player, kind, level, what)
   drop_bodies_of(world, account, true)
-  if kind ~= "dummy" and kind ~= "duel" then return nil end
-  if kind == "dummy" then level = MAX_LEVEL end  -- (0.15.79, owner) it never hurts anyone: lots of health to beat on
+  if kind ~= "dummy" and kind ~= "duel" then  -- Remove
+    local n = sweep_corpses(world, player)
+    return n > 0 and string.format("Removed %d dead test monster%s near you.", n, n == 1 and "" or "s") or nil
+  end
+  if kind == "dummy" then level = DUMMY_LEVEL end  -- (0.15.79, owner) it never hurts anyone; (0.15.129, owner) level 50
   local x, y, z = where(world, player)
   if not x then return "Your position is not known." end
   local fx, fz = 0, 1
@@ -438,7 +537,20 @@ local function bodies_tick(world)
     -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a
     -- far place may not be streamed in yet.) So a body counts as gone only when it was missing three checks in a row.
     if not alive then b.missing = (b.missing or 0) + 1 else b.missing = 0 end
-    if not alive and b.missing >= 3 and b.session == session then
+    if not alive and b.why == "killed" and b.session == session then
+      -- its body goes CORPSE_S seconds after the kill (it cannot be looted and the game never removes it)
+      if not b.dead_at then
+        b.dead_at = os.time()
+        emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S))
+        local o = online[b.owner]
+        if o and tell_player then
+          tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
+        end
+      elseif os.time() - b.dead_at >= CORPSE_S then
+        emf.log(string.format("experimental: the PvP test %s (entity %s): its body removed", b.kind, tostring(id)))
+        drop_body(world, id, true)
+      end
+    elseif not alive and b.missing >= 3 and b.session == session then
       emf.log(string.format("experimental: the PvP test %s (entity %s) is gone: %s", b.kind, tostring(id), b.why or "?"))
       drop_body(world, id, false)
     elseif not alive and b.session ~= session then
@@ -489,7 +601,7 @@ end
 -- What the Debug section shows about your body.
 body_of = function(account)
   for id, b in pairs(bodies) do
-    if b.owner == account then return b.kind end
+    if b.owner == account and not b.dead_at then return b.kind end  -- a killed one's body is on its way out
   end
 end
 
@@ -516,7 +628,7 @@ local function handle(world, account, entity, msg)
   if msg.op == "home" or msg.op == "go" or msg.op == "wp" then
     local ok, why
     if msg.op == "home" then ok, why = pcall(go_home, world, entity)
-    elseif msg.op == "wp" then ok, why = pcall(go_waypoint, world, entity, msg)
+    elseif msg.op == "wp" then ok, why = pcall(go_waypoint, world, entity, msg, account)
     else ok, why = pcall(go_near, world, entity, msg) end
     local v = view(account)
     v.note = not ok and "The move failed on this game version." or why
@@ -528,15 +640,19 @@ local function handle(world, account, entity, msg)
       local w = world:get("PlayerWaypoint", entity)
       if not w then error("the player has no waypoint component") end
       if msg.op == "clearwp" then
+        wp_known[entity] = nil
         w.enabled = false
         emf.log(string.format("experimental: waypoint of player %s cleared from the minimap", tostring(entity)))
         return
       end
       local x, z = tonumber(msg.x), tonumber(msg.z)
       if not x or not z or x ~= x or z ~= z or x < -1000 or z < -1000 or x > 20000 or z > 20000 then error("not a place on the map") end
-      local _, py = world:position(entity)  -- the marker's height is not known here: the player's (Map Waypoint looks for ground)
+      local _, py = world:position(entity)
+      local my = tonumber(msg.y)  -- (0.15.125) the marker's own height, from the minimap; else the player's
+      if my and (my ~= my or my < -1000 or my > 5000) then my = nil end
+      wp_known[entity] = my and { x = x, y = my, z = z } or nil
       w.waypointPosition.x = math.floor(x * 2 ^ 32)
-      w.waypointPosition.y = math.floor((py or 0) * 2 ^ 32)
+      w.waypointPosition.y = math.floor((my or py or 0) * 2 ^ 32)
       w.waypointPosition.z = math.floor(z * 2 ^ 32)
       w.enabled = true
       emf.log(string.format("experimental: waypoint of player %s set from the minimap at %.0f %.0f", tostring(entity), x, z))
@@ -774,12 +890,12 @@ end
 -- is not player side is the players' enemy. So a player with PvP on gets faction 1 (written again every step: the game
 -- may set it back, after a death for example), and the game's own weapons, arrows and spells hit them and let them hit.
 -- EMF hit rules keep it between PvP players: while anyone has PvP on, each player without it gets two rules (no damage
--- from players, no damage to players), and one rule scales every player-on-player hit to PVP_SCALE. Heals are never
+-- from players, no damage to players). (0.15.128, owner: too little damage) Player-on-player hits are full damage now:
+-- the rule that scaled them to 25% (0.15.65 to 0.15.127) is gone. Heals are never
 -- matched by a rule (EMF: damage hits only), so a friend's heal still works.
 -- The faction is saved with the world, so it is put back to 7 when PvP goes off, and any player without PvP who is
 -- found with faction 1 (left over from a crash, a reload or a leave) is put back within a second.
 local HIT_ALL, PLAYER_FACTION = 1, 7
-local PVP_SCALE = 0.25
 local pvp_steps = 0
 local pvp_scale_rule = nil
 
@@ -808,6 +924,7 @@ local function pvp_off_everywhere(world, why)
     p.pvp = nil
     pvp_unrule(p, "pvp_in")
     pvp_unrule(p, "pvp_out")
+    pvp_unrule(p, "pvp_obj")
     pcall(function()
       local f, now = faction(world, p.entity)
       if f and now == HIT_ALL then f.faction = (p.pvp_was and p.pvp_was ~= HIT_ALL) and p.pvp_was or PLAYER_FACTION end
@@ -959,6 +1076,12 @@ local function pvp(world)
       if p.pvp then
         pvp_unrule(p, "pvp_in")
         pvp_unrule(p, "pvp_out")
+        -- (0.15.130, owner) a PvP player's hits never damage buildings or placed objects (EMF "objects")
+        local okb, whyb = pvp_rule(p, "pvp_obj", { from = p.entity, to = "objects", cancel = true })
+        if not okb and not p.obj_said then
+          p.obj_said = true
+          emf.log("experimental: PvP: the rule protecting buildings was refused (" .. tostring(whyb) .. ")")
+        end
         local f, now = faction(world, p.entity)
         if f and now ~= HIT_ALL then
           if not p.pvp_was then p.pvp_was = now end
@@ -969,6 +1092,7 @@ local function pvp(world)
           end
         end
       else
+        pvp_unrule(p, "pvp_obj")
         if p.pvp_was or pvp_steps % 60 == 1 then
           local f, now = faction(world, p.entity)
           if f and now == HIT_ALL then
@@ -988,10 +1112,7 @@ local function pvp(world)
         end
       end
     end
-    if any and not pvp_scale_rule then
-      local okr, id = pcall(emf.hit_rule, { from = "players", to = "players", scale = PVP_SCALE })
-      if okr and id then pvp_scale_rule = id end
-    elseif not any and pvp_scale_rule then
+    if pvp_scale_rule then  -- (0.15.128) full damage: one left from before a reload goes
       pcall(emf.hit_rule_remove, pvp_scale_rule)
       pvp_scale_rule = nil
     end
@@ -1027,6 +1148,7 @@ function F.tick(world)
   lift(world)
   pvp(world)
   bodies_tick(world)
+  retry_tick(world)
   for id, g in pairs(fall_guard) do  -- the waypoint's fall protection ends
     if os.time() >= g.till then
       pcall(emf.hit_rule_remove, g.rule)
@@ -1168,6 +1290,18 @@ end
 
 local function hosting(world)
   return kit.is_host() or world:is_server()
+end
+
+-- (0.15.125) a line under the buttons of one player's Experimental window, from a teleport's answer (server world)
+tell_player = function(world, player, account, text)
+  local mine = kit.is_host() and emf.local_player() == player
+  if mine then
+    note = text
+    return
+  end
+  local v = view(tostring(account))
+  v.note = text
+  pcall(emf.net.send_to, world, player, CHANNEL, emf.json.encode(v))
 end
 
 -- The Debug section at the bottom of the tab: the test players (features/party.lua) and FlameKit's log level
@@ -1314,18 +1448,18 @@ function F.window_rows(world)
     end
     return options
   end
-  -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level 100
+  -- the dummy (0.15.81, owner: chosen like the duelist): never hurts anyone, level DUMMY_LEVEL
   local in_pvp = v.pvp == true  -- (0.15.119, owner) no spawning while PvP is on: it could throw a fight
   local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
   rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level 100: beat on it as long as you like. Switch PvP on to hit it." }
+    tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Switch PvP on to hit it." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
-    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level 100 3 m in front of you. You must have PvP on to hit it. It swings at you "
+    tooltip = in_pvp and no_spawn or "Spawns the dummy (" .. dpick[2] .. ") at level " .. DUMMY_LEVEL .. " 3 m in front of you. You must have PvP on to hit it. It swings at you "
       .. "but never does damage: hit it to see whether your weapons hurt a player. It replaces your test monster." }
-  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
-    tooltip = "Removes your test monster." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
+    tooltip = "Removes your test monster, and any dead test monster's body near you." }
   rows[#rows + 1] = { separator = true }
   -- the duelist (0.15.73: one drop-down; the level with < > and five quick picks)
   local pick = duelist(duel_what)
@@ -1344,8 +1478,8 @@ function F.window_rows(world)
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn duelist", selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
       .. "or off, but never animals, pets or buildings; villagers are fair game. Spawn it away from your base. It replaces your test body." }
-  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true, disabled = v.body == nil,
-    tooltip = "Removes your test body." }
+  rows[#rows + 1] = { button = "dbg:body:none", text = "Remove", same_line = true,
+    tooltip = "Removes your test monster, and any dead test monster's body near you." }
   if note then rows[#rows + 1] = { color = "#ff8060", text = note } end
   return rows
 end
@@ -1358,12 +1492,20 @@ end
 -- writes the player's PlayerWaypoint (the game's own waypoint: its map and compass show it, Map Waypoint goes there).
 function F.minimap_waypoint(world, arg)
   local msg
+  if arg == "undiscovered" then  -- (0.15.127, owner) a "?" place on the minimap: no waypoint there
+    kit.note("Waypoints can only be set on places you have discovered.", "#ff9632", true)
+    return
+  end
   if arg == "clear" then
     msg = { op = "clearwp" }
   else
-    local x, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+)$")
-    if not x then return end
-    msg = { op = "setwp", x = tonumber(x), z = tonumber(z) }
+    -- "x,z", or "x,y,z" with the marker's height (0.15.125)
+    local x, y, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+),(%-?[%d%.]+)$")
+    if not x then
+      x, z = tostring(arg):match("^(%-?[%d%.]+),(%-?[%d%.]+)$")
+      if not x then return end
+    end
+    msg = { op = "setwp", x = tonumber(x), y = y and tonumber(y) or nil, z = tonumber(z) }
   end
   if hosting(world) then
     local account, player = me(world)
