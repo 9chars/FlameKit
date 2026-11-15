@@ -1,12 +1,12 @@
 FlameKit FTP tool
 =================
-Move this whole folder somewhere Claude cannot reach (for example your Documents folder), NOT inside
-"C:\enshrouded mod shit". Then:
+Lives in C:\enshrouded mod shit\release\FlameKit FTP tool (owner, 2026-11-15: Claude may upload to the production
+server). Then:
 
 1. Double-click ftp_setup.cmd once and type the production server's FTP details (G-Portal's FTP page). The password
-   is kept encrypted for your Windows user only.
-2. When Claude says a server fix is ready, double-click upload.cmd. It uploads what Claude put in the outbox
-   (C:\enshrouded mod shit\outbox) into the server's FlameKit folder, mod.json last, then fetches the server's log
-   into the outbox so Claude can check the reload.
+   is kept encrypted for your Windows user only (ftp_password.dat); Claude never opens it.
+2. Uploads: Claude asks the restart helper (keep restart_watch.cmd open) with an 'upload' request, or you double-click
+   upload.cmd yourself. It uploads what is in the outbox (C:\enshrouded mod shit\outbox) into the server's FlameKit
+   folder, mod.json last, then fetches the server's logs into outbox\server_log.
 
 It never deletes anything on the server and never touches any other folder there.

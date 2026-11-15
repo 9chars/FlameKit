@@ -246,6 +246,21 @@ function Install-Test([string]$which) {
     return $code -eq 0
 }
 
+# (owner, 2026-11-15: "I'm going to give you direct access to upload to the production FTP folder") 'upload' runs the
+# FTP tool's own upload.ps1 (<work folder>\release\FlameKit FTP tool): it uploads the outbox to the production server's
+# FlameKit folder, mod.json last, and fetches the server's logs into outbox\server_log. The password stays encrypted in
+# that folder (DPAPI, this Windows user): this helper only starts the script and logs what it prints, never the password.
+function Upload {
+    $tool = Join-Path (Split-Path -Parent $here) 'release\FlameKit FTP tool\upload.ps1'
+    if (-not (Test-Path $tool)) { Log "upload: FAILED: $tool not found"; return $false }
+    Log 'upload: starting the FTP tool'
+    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $tool 2>&1
+    $code = $LASTEXITCODE
+    foreach ($line in $out) { Log "upload: $line" }
+    if ($code -ne 0) { Log "upload: FAILED (exit code $code)"; return $false }
+    return $true
+}
+
 function Finish([bool]$ok, [string]$text) {
     Set-Content -Path $doneFile -Value ("{0} {1}" -f $(if ($ok) { 'ok' } else { 'failed' }), $text) -Encoding UTF8
     Log "done: $(if ($ok) { 'ok' } else { 'FAILED' }): $text"
@@ -275,8 +290,9 @@ while ($true) {
                 'sign' { $ok = Sign; Finish $ok 'sign' }
                 'installold' { $ok = Install-Test 'old'; Finish $ok 'installold' }
                 'installnew' { $ok = Install-Test 'new'; Finish $ok 'installnew' }
+                'upload' { $ok = Upload; Finish $ok 'upload' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, upload, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"

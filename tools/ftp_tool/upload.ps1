@@ -1,6 +1,7 @@
 # upload.ps1 (FlameKit FTP tool): uploads what Claude left in the outbox to the production server, then fetches the
-# server's log back into the outbox so Claude can check the reload. The owner runs it (upload.cmd); this folder is not
-# connected to Claude, so Claude can neither change this script nor use the password. It only ever writes into the
+# server's log back into the outbox so Claude can check the reload. The owner runs it (upload.cmd), or (owner,
+# 2026-11-15) Claude through the restart helper's 'upload' request. The password stays encrypted for the owner's Windows
+# user (ftp_password.dat, DPAPI): it is never shown or logged, and Claude never opens that file. It only ever writes into the
 # server's FlameKit folder (ftp.txt mod_dir), mod.json last, and reads the log (log_path). It never deletes on the server.
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
