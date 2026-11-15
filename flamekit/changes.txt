@@ -1,3 +1,6 @@
+0.15.169 Nov 15, 2026
+- Loot Drop: the server's log says for every body what happened to it (queued, skipped and why, gone, what was in it), up to 20 lines a minute; before, only the first 10 bodies of a run. Server only: no game update.
+
 0.15.168 Nov 15, 2026
 - Test monsters: rings and gems come only from the ones that are legendary by type (5 rings, 5 gems: the others keep a lower rarity whatever FlameKit gives them); weapons and armour as before. As a safety, an item that shows up below legendary in the chest is taken out again and another one picked.
 - Loot chests carry the grave flame effect (the glow effect showed nothing). Server only: no game update.

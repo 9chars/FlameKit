@@ -42,38 +42,41 @@ local function get(world, c, id)
   return nil
 end
 
+local diag = 0  -- (0.15.169) detail lines this minute (at most DIAG_MAX; was 10 for the whole run)
+local DIAG_MAX = 20
+local function note(fmt, ...)
+  if diag < DIAG_MAX then diag = diag + 1 emf.log(string.format("loot drop: " .. fmt, ...)) end
+end
+
 local function died(world, e)
   local id = e and e.deadEntityId
   if type(id) == "table" then id = id.id end
   id = tonumber(id)
-  if not id or id == 0 then return end
+  if not id or id == 0 then note("a death without a body id") return end
   if test.armed and not test.id and not get(world, "PlayerState", id) and get(world, "Faction", id) then
     test.armed, test.id, test.step, test.sent = false, id, steps, nil
     return  -- this body is the test's: the normal Loot Drop leaves it alone
   end
   if not server.get("loot_to_ground") then return end
   if test_tag.is(world, id) then return end  -- (0.15.156, owner) FlameKit's test monsters: their loot goes into chests
+  note("body %s died: queued", tostring(id))
   queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1 }
 end
 
-local diag = 0  -- the first bodies of a run are described in the log (what FlameKit could read of them)
 local function handle(world, id, look)
   -- players never; a creature is known by its Faction at the first look only (0.15.147: the body loses it about when
   -- the game fills it with loot, 1.5-3 s after the death, and later looks skipped the body with its loot in it)
-  if get(world, "PlayerState", id) or (look == 1 and not get(world, "Faction", id)) then return "skip" end
+  if get(world, "PlayerState", id) then note("body %s: a player, skipped", tostring(id)) return "skip" end
+  if look == 1 and not get(world, "Faction", id) then note("body %s, look 1: no Faction (not a creature), skipped", tostring(id)) return "skip" end
   local x, y, z = world:position(id)
   if not x then
-    if diag < 10 then diag = diag + 1 emf.log(string.format("loot drop: body %s, look %d: gone", tostring(id), look)) end
+    note("body %s, look %d: gone (no position)", tostring(id), look)
     return "gone"
   end
   local keep = false
   local stacks = bag.entity_stacks(world, id)
-  if diag < 10 then
-    diag = diag + 1
-    local setup = get(world, "InventorySetup", id)
-    emf.log(string.format("loot drop: body %s, look %d: %d stack(s); InventorySetup %s, own Inventory %s", tostring(id),
-      look, #stacks, tostring(setup ~= nil), tostring(get(world, "Inventory", id) ~= nil)))
-  end
+  note("body %s, look %d: %d stack(s); InventorySetup %s, own Inventory %s", tostring(id), look, #stacks,
+    tostring(get(world, "InventorySetup", id) ~= nil), tostring(get(world, "Inventory", id) ~= nil))
   if #stacks == 0 then return "empty" end
   for _, st in ipairs(stacks) do
     if st.gem then
@@ -181,6 +184,7 @@ function F.tick(world)
       end
     end
   end
+  if steps % 3600 == 0 then diag = 0 end
   if steps % 3600 == 0 and tally.bodies + tally.empty > 0 then
     emf.log(string.format("loot drop: last minute: %d bodies, %d stacks on the ground, %d kept in a body (socketed gem), %d empty",
       tally.bodies, tally.items, tally.kept, tally.empty))
