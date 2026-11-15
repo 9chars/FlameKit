@@ -472,13 +472,11 @@ local function remove_all(world, account, player, from, n)
       return n, false
     end
     if id ~= player and not bodies[id] and is_test_monster(world, id) then
-      if pcall(emf.destroy, world, id) then
-        n = n + 1
-        emf.log(string.format("experimental: a test monster nobody keeps (entity %s) removed by player %s", tostring(id), tostring(player)))
-      end
+      if pcall(emf.destroy, world, id) then n = n + 1 end  -- (0.15.140, owner) no line per monster: one at the end
     end
   end
   remove_left = nil
+  emf.log(string.format("experimental: Remove by player %s: %d test monster%s removed", tostring(player), n, n == 1 and "" or "s"))
   return n, true
 end
 
@@ -659,6 +657,8 @@ local function bodies_tick(world)
   local many = 0
   for _ in pairs(bodies) do many = many + 1 end
   many = many > 5  -- (0.15.137) with many test monsters their AI is not logged (slow, and the log would flood)
+  -- (0.15.140, owner) nor their deaths, bodies and going out of sight one by one: one summary line per check
+  local killed, gone, away = 0, 0, 0
   for id, b in pairs(bodies) do
     local alive = false
     if b.session == session then
@@ -676,20 +676,23 @@ local function bodies_tick(world)
       -- its body goes CORPSE_S seconds after the kill (it cannot be looted and the game never removes it)
       if not b.dead_at then
         b.dead_at = os.time()
-        emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S))
+        killed = killed + 1
+        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end
         local o = online[b.owner]
         if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many
           tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
         end
       elseif os.time() - b.dead_at >= CORPSE_S then
-        emf.log(string.format("experimental: the PvP test %s (entity %s): its body removed", b.kind, tostring(id)))
+        gone = gone + 1
+        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s): its body removed", b.kind, tostring(id))) end
         drop_body(world, id, true)
       end
     elseif not alive and b.missing >= 3 and b.session == session then
       -- (0.15.136) out of sight (far from every player, not loaded) is not gone: kept, so Remove still reaches it
       if not b.away_said then
         b.away_said = true
-        emf.log(string.format("experimental: the PvP test %s (entity %s) is out of sight: %s (kept for Remove)", b.kind, tostring(id), b.why or "?"))
+        away = away + 1
+        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) is out of sight: %s (kept for Remove)", b.kind, tostring(id), b.why or "?")) end
       end
     elseif not alive and b.session ~= session then
       drop_body(world, id, false)
@@ -732,6 +735,9 @@ local function bodies_tick(world)
         if f and tonumber(tostring(f.faction)) ~= DUEL_FACTION then f.faction = DUEL_FACTION end
       end)
     end
+  end
+  if many and killed + gone + away > 0 then
+    emf.log(string.format("experimental: test monsters: %d killed, %d bodies removed, %d out of sight (kept for Remove)", killed, gone, away))
   end
 end
 

@@ -1038,8 +1038,15 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   local nk = 0
   for _ in pairs(kinds) do nk = nk + 1 end
   check(#spawned - n2 == 50 and nk >= 10 and bosses == 0, "Random x50: 50 monsters, " .. nk .. " kinds, no bosses")
+  local l0 = #logged
   click(find_row("Remove").button)
   step(40)
+  local per, sums = 0, 0
+  for i = l0 + 1, #logged do
+    if logged[i]:find("nobody keeps (entity", 1, true) or logged[i]:find("its body removed", 1, true) then per = per + 1 end
+    if logged[i]:find("experimental: Remove by player", 1, true) then sums = sums + 1 end
+  end
+  check(per == 0 and sums >= 1, "Remove of 50: one summary line, not a line per monster (0.15.140, owner)")
   click("W:dbg:cnt:1")
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
