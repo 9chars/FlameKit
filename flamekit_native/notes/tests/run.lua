@@ -1524,12 +1524,12 @@ do
   check(require("core.kit").debug_level(true) == "normal", "and back to normal")
   toggle_panel()
 end
--- after an update FlameKit's window is asked to open on What's New (once)
+-- (0.15.188, owner) after an update FlameKit's window is NOT opened on What's New any more (open_on_start is off here)
 do
   local f = io.open(TMP .. "\\ui_open.dat", "r")
   local what = f and f:read("a") or ""
   if f then f:close() end
-  check(what == "changes", "after an update FlameKit's window is asked to open on the What's New tab")
+  check(what ~= "changes", "after an update FlameKit's window does not open by itself on What's New")
 end
 check(require("core.items").is_keeper("_Material_TX_Trophy_Wolf_Heavy_head"), "a trophy is kept: not offered in the bag list")
 -- the server's FlameKit version (features/server_version.lua), the server's state and a new update (0.15.117): lines in

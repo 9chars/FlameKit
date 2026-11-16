@@ -1,3 +1,6 @@
+0.15.188 Nov 15, 2026
+- FlameKit's window no longer opens by itself on What's New after an update; the Messages window still says "FlameKit was updated to vX.", and the What's New tab still has the details. The setting that opens it at every start is unchanged.
+
 0.15.187 Nov 15, 2026
 - Experimental window, test monsters: the Dummy drop-down has no bosses any more, and the server gives the plain dummy for a boss asked for by an older game (a boss dummy could still hurt players).
 

@@ -4,8 +4,8 @@
 -- its lines, then an empty line. The
 -- last version this player has seen is kept in seen_version.json; when the mod's version is another one, a message
 -- (kit.note: FlameKit's Messages window) says once, the first time the game is in a world, that the tab has what is new.
--- The tab: this version's lines, and under them the versions before it. After an update (and at every world when the
--- setting open_on_start is on) FlameKit's window is opened on this tab: emf\mods\flamekit\ui_open.dat gets the tab's id;
+-- The tab: this version's lines, and under them the versions before it. At every world when the setting open_on_start
+-- is on (since 0.15.188 no longer after an update by itself) FlameKit's window is opened on this tab: emf\mods\flamekit\ui_open.dat gets the tab's id;
 -- FlameKit's DLL opens the window once and deletes the file.
 
 local F = { id = "changes", title = "What's New" }
@@ -73,7 +73,9 @@ function F.client_tick(world)
     pending = false
     kit.store.save("seen_version", { version = kit.version })
     kit.note(string.format("%s was updated to v%s.", kit.name, kit.version), "#9fd2ff")
-    open_window()
+    -- (0.15.188, owner: "so many frequent updates, that its just becoming annoying for users") no longer opens the
+    -- window on What's New after an update: the Messages line is enough; open_on_start still opens it at every world
+    if kit.setting("open_on_start", false) == true then open_window() end
   elseif kit.setting("open_on_start", false) == true then
     open_window()
   end
