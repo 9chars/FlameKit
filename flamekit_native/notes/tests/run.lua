@@ -1398,7 +1398,7 @@ do  -- (0.15.205, owner) "<name> joined the server!" / "left the server!": yello
   local nf = io.open(TMP .. "\\ui_notices.dat", "r"); local nt = nf and nf:read("a") or ""; if nf then nf:close() end
   check(nt:find("ffe14d [^\n]*joined the server!") ~= nil, "a join: a yellow notice 'joined the server!'")
   local mf = io.open(TMP .. "\\ui_messages.dat", "r"); local mt = mf and mf:read("a") or ""; if mf then mf:close() end
-  check(not mt:find("joined the server!", 1, true), "and no line in the Messages window")
+  check(mt:find("ffe14d [^\n]*joined the server!") ~= nil, "(0.15.206, owner) and a yellow line in the Messages window")
 end
 local vt = io.open(TMP .. "\\experimental.json"); local visit = vt:read("a"); vt:close()
 check(visit:find('"fall":true', 1, true) ~= nil, "but the option stays saved")

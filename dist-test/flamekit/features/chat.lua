@@ -8,7 +8,7 @@
 -- 2. FlameKit's own announcements (for example "Ninechars joined PvP!", in orange): no longer chat lines, only the Messages
 --    window of every player with FlameKit (F.announce). Players without FlameKit do not see them.
 -- 3. (0.15.205, owner) "Player joined the server!" and "Player left the server!" in yellow in everyone's Notices
---    window only (kind "n": a notice, no Messages line). A join is told 3 s after it (the character name is there by
+--    window and (0.15.206, owner) their Messages window too, as an announcement (kind "a" with a notice). A join is told 3 s after it (the character name is there by
 --    then); the joins EMF reports again when FlameKit reloads are not told (the first second after the setup).
 
 local players = require("core.players")
@@ -85,7 +85,7 @@ function F.tick(world)
       joining[id] = nil
       local name = name_of(world, id)
       names[id] = name
-      to_all(world, { t = name .. " joined the server!", c = "n", nc = JOIN_COLOUR, ns = 10 })
+      to_all(world, { t = name .. " joined the server!", c = "a", k = JOIN_COLOUR, nc = JOIN_COLOUR, ns = 10 })
     end
   end
 end
@@ -102,7 +102,7 @@ function F.setup(k)
     if type(p) ~= "table" or not p.player then return end
     local name = names[p.player] or name_of(world, p.player)
     names[p.player], joining[p.player] = nil, nil
-    to_all(world, { t = name .. " left the server!", c = "n", nc = JOIN_COLOUR, ns = 10 })
+    to_all(world, { t = name .. " left the server!", c = "a", k = JOIN_COLOUR, nc = JOIN_COLOUR, ns = 10 })
   end, "a player leaving"))
   local ok = emf.net.channel(CHANNEL, {
     version = 1, to = "players", max = 1024, per_10s = 100,
