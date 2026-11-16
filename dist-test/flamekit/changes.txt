@@ -1,3 +1,9 @@
+0.15.217 Nov 16, 2026
+- Experimental tab: Super B Jump tap speed, a drop-down from 100 ms to 267 ms (default 183 ms): how quickly you must tap jump twice for a leap. Only for you. Needs FlameKit 0.15.217 on the server.
+
+0.15.216 Nov 16, 2026
+- Super B Jump (server): the double tap must be quicker (within 0.18 s instead of 0.33 s), so a slightly early double jump stays a normal double jump. Server only: no game update.
+
 0.15.215 Nov 16, 2026
 - Super B Jump height: 35x and 40x added. A leap never goes above 2480 m, so the game never sends you back for flying too high: from high ground a leap is shorter. Needs FlameKit 0.15.215 on the server.
 

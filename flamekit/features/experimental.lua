@@ -162,17 +162,29 @@ glide.SBJ = {
     tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.213: 20x)
   { which = "steer", key = "sbj_steer", label = "Super B Jump air steering", steps = { 0, 1, 2, 3, 4, 5, 7, 10, 15 },
     tip = "How much left and right moves you while in the air after a leap: 0x is the game's own steering only. Only for you." },
+  -- (0.15.217, owner: "add a setting so it can be fine tuned") how quick the double tap must be, in server steps (60 a
+  -- second); 11 is core/leap.lua's WINDOW. The owner's quick taps: 8-9 steps; the game's double jump: 13 steps on.
+  { which = "window", key = "sbj_window", label = "Super B Jump tap speed", default = 11,
+    steps = { 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 },
+    name = function(n)
+      local ms = math.floor(n * 1000 / 60 + 0.5)
+      return ms .. " ms" .. (n == 11 and " (default)" or n <= 8 and " (fast)" or n >= 13 and " (relaxed)" or "")
+    end,
+    tip = "How quickly you must tap jump twice for a leap. Shorter: fewer leaps by accident, but you must tap faster. Longer: easier to leap, but a quick normal double jump may become a leap (from about 217 ms on). Only for you." },
 }
 function glide.sbj(account, which)
   for _, d in ipairs(glide.SBJ) do
     if d.which == which or d.key == which then
       local f = tonumber(((saved or {})[account] or {})[d.key])
-      return f and f >= 0 and f or 1, d
+      return f and f >= 0 and f or (d.default or 1), d
     end
   end
   return 1
 end
-function glide.sbj_label(f) return f == 0 and "Off (0x)" or glide.label(f) end
+function glide.sbj_label(f, d)
+  if d and d.name then return d.name(f) end
+  return f == 0 and "Off (0x)" or glide.label(f)
+end
 function glide.sbj_allowed(key, f)
   for _, d in ipairs(glide.SBJ) do
     if d.key == key then
@@ -271,7 +283,7 @@ local function view(account)
   local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
               glide_speed = glide.factor(account), damage_pct = glide.damage(account),
               sbj_height = glide.sbj(account, "height"), sbj_forward = glide.sbj(account, "forward"),
-              sbj_steer = glide.sbj(account, "steer"),
+              sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
@@ -1175,10 +1187,11 @@ local function handle(world, account, entity, msg)
     local f = tonumber(msg.value)
     if f and glide.sbj_allowed(msg.key, f) then
       local set = saved[account] or {}
-      set[msg.key] = f ~= 1 and f or nil
+      local _, d = glide.sbj(account, msg.key)
+      set[msg.key] = f ~= ((d and d.default) or 1) and f or nil
       saved[account] = next(set) and set or nil
       save_all()
-      emf.log(string.format("experimental: player %s set %s to %s", tostring(entity), msg.key, glide.sbj_label(f)))
+      emf.log(string.format("experimental: player %s set %s to %s", tostring(entity), msg.key, glide.sbj_label(f, d)))
     end
     return view(account)
   end
@@ -1408,12 +1421,13 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     -- height, forward and air steering factors
     if is_on(account, "superbjump") then
       p.leap = p.leap or {}
-      local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer") }
+      local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer"),
+                  window = glide.sbj(account, "window") }
       local what = glide.leap.step(world, p.entity, p.leap, o)
       if what == "leap" then
         local cap = glide.leap.last_cap
         emf.log(string.format("experimental: super b jump: player %s leaps (taps %s steps apart, window %s; height %sx%s, forward %sx at input %.2f, steering %sx)",
-          tostring(p.entity), tostring(glide.leap.last_gap), tostring(glide.leap.WINDOW), tostring(o.height),
+          tostring(p.entity), tostring(glide.leap.last_gap), tostring(o.window), tostring(o.height),
           cap and string.format(", capped to %.1fx from %.0f m: the ceiling is %d m", cap.got, cap.from or 0, glide.leap.CEILING) or "",
           tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
       elseif what == "ceiling" then
@@ -2076,13 +2090,13 @@ local function panel_rows(world)
   end
   rows[#rows + 1] = { separator = true }
   for _, d in ipairs(glide.SBJ) do  -- (0.15.209, owner) Super B Jump's own settings: drop-downs, per player
-    local cur = tonumber(v[d.key]) or 1
+    local cur = tonumber(v[d.key]) or d.default or 1
     local opts = {}
     for _, f in ipairs(d.steps) do
-      opts[#opts + 1] = { key = "sbj:" .. d.key .. ":" .. tostring(f), text = glide.sbj_label(f), selected = f == cur }
+      opts[#opts + 1] = { key = "sbj:" .. d.key .. ":" .. tostring(f), text = glide.sbj_label(f, d), selected = f == cur }
     end
     rows[#rows + 1] = { label = true, text = d.label }
-    rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur), same_line = true, tooltip = d.tip }
+    rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur, d), same_line = true, tooltip = d.tip }
   end
   return debug_rows(world, rows)
 end

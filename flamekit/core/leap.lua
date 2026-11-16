@@ -168,7 +168,7 @@ function M.step(world, entity, s, opts)
       s.jumped_at = t  -- the jump (a fall from a ledge has jumpCount 0: no leap from a fall)
     end
     if pressed and st == IN_AIR and count == 1 and s.jumped_at and not s.leapt
-        and t - s.jumped_at >= 2 and t - s.jumped_at <= M.WINDOW then
+        and t - s.jumped_at >= 2 and t - s.jumped_at <= (s.opts.window or M.WINDOW) then  -- (0.15.217) the player's own
       if skills.has(world, entity, skills.DOUBLE_JUMP) == true then
         local okst, stamina = pcall(emf.attribute, world, entity, "stamina")
         stamina = okst and tonumber(stamina) or nil
