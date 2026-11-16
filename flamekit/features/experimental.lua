@@ -2488,7 +2488,8 @@ function F.setup(k)
       if a1 == "effect" then d.EFFECT = a2 or d.EFFECT say("fastdive: landing effect " .. tostring(d.EFFECT)) return end
       if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID>": the effect 3 m in front of them
         local id, guid = tonumber(a2), args[3]
-        local x, y, z = id and world:position(id)
+        local x, y, z
+        if id then x, y, z = world:position(id) end  -- (0.15.222) "id and world:position(id)" kept only x: z was nil
         if not (x and guid) then emf.reply("fastdive boom <player entity> <template GUID>") return end
         local q = world:get("CurrentTransform", id).transform.orientation
         local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
