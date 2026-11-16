@@ -233,23 +233,9 @@ function glide.fall_line(what, entity, r)
     r.pct and string.format("%.3f", r.pct) or "nil"))
 end
 function glide.fall_probe(world, p, what)
-  local q = p.fall_probe or {}
-  p.fall_probe = q
-  local r = glide.fall_snap(world, p.entity)
-  local t = world:tick()
-  if what == "dive" then q.dive = true q.next = t end
-  if q.dive and q.next and t >= q.next then glide.fall_line("diving", p.entity, r) q.next = t + 30 end
-  local landed = what == "landed" or (q.prev and q.prev.st ~= 0 and r.st == 0)
-  if landed then
-    if q.prev then glide.fall_line("step before landing", p.entity, q.prev) end
-    glide.fall_line(what == "landed" and "LANDED (fast dive)" or "landed (normal)", p.entity, r)
-    q.after, q.dive, q.next = 5, nil, nil
-  elseif q.after then
-    glide.fall_line("after landing", p.entity, r)
-    q.after = q.after > 1 and q.after - 1 or nil
-  end
-  if what == "cancel" then q.dive, q.next = nil, nil end
-  q.prev = r
+  -- (0.15.257, owner: trim it) one line at each Fast Dive landing (what the game's fall damage measured); every fall
+  -- damage hit stays in the on_hit below. The full probe (every half second, every landing) is in git, 0.15.250.
+  if what == "landed" then glide.fall_line("LANDED (fast dive)", p.entity, glide.fall_snap(world, p.entity)) end
 end
 -- (0.15.253/254, owner: "when the player pops open their glider ... a notice message ... telling them to double tap
 -- the bound key", "every time", "like 5 seconds" (10 since 0.15.255), "light blue is good", "if you're below the minimum height it shouldn't
