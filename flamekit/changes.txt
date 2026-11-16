@@ -1,3 +1,6 @@
+0.15.214 Nov 16, 2026
+- Super B Jump height: 25x and 30x added (30x is about 1600 m up). Needs FlameKit 0.15.214 on the server for the new steps.
+
 0.15.213 Nov 16, 2026
 - Super B Jump forward: 12x, 15x and 20x added. Needs FlameKit 0.15.213 on the server for the new steps.
 
