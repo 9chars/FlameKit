@@ -200,7 +200,7 @@ end
 -- landing's word never comes), taken back at the landing
 function glide.dive_notice(msg)
   if msg.on == true then
-    kit.notice("fastdive", "Fast Dive in progress!", "#ff9632", 120)
+    kit.notice("fastdive", "Fast Dive in progress! Prepare for impact!", "#ff9632", 120)  -- (0.15.242, owner's words)
   else
     kit.notice("fastdive")
   end
