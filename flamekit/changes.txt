@@ -1,3 +1,6 @@
+0.15.252 Nov 16, 2026
+- Fast Dive: landing in water ends the dive: no blast, and the notice goes away (before, it stayed up and the blast came at the next landing on ground). Server only: no game update.
+
 0.15.251 Nov 16, 2026
 - Fast Dive: the landing of a free-fall dive is now a real fall from your highest point, so the game's own fall damage kills you (before, after a Super B Jump the game measured the fall from where you took off). Glider dives, No Fall Damage and Invincible Mode still keep you alive. The fall probe stays for now. Server only: no game update.
 

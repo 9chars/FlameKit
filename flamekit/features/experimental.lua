@@ -1524,7 +1524,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
           tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or p.dive.auto and ", automatic" or "",
           tostring(o.speed), tostring(o.landing)))
       elseif what == "cancel" then  -- (0.15.247)
-        emf.log(string.format("experimental: fast dive: player %s pulled up: dive cancelled (%s)", tostring(p.entity),
+        emf.log(string.format("experimental: fast dive: player %s: dive cancelled (%s)", tostring(p.entity),
           tostring(p.dive.cancel_why)))
       elseif what == "low" then
         emf.log(string.format("experimental: fast dive: player %s too low (ground %.1f m below, minimum %s m)",

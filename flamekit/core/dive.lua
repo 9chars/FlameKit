@@ -201,7 +201,18 @@ function M.step(world, entity, s, opts)
       s.first, s.top, s.glider_closed, s.was_gliding = nil, nil, nil, nil
       return
     end
-    if st ~= IN_AIR and st ~= GLIDING then s.first, s.top = nil, nil return end
+    if st ~= IN_AIR and st ~= GLIDING then
+      -- (0.15.252, owner: a dive into water kept the notice up and blew up on the next landing, out of the water)
+      -- water (swimming 9, under water 10) ends a dive at once: no blast, the notice goes. Other states (sliding on a
+      -- slope) keep it: the landing on the ground comes next.
+      if s.diving and (st == 9 or st == 10) then
+        s.diving = nil
+        result = "cancel"
+        s.cancel_why = "landed in water"
+      end
+      s.first, s.top = nil, nil
+      return
+    end
     -- (0.15.248) the highest point of this time in the air, and whether the glider was just closed
     if st == GLIDING then
       s.was_gliding, s.top = true, nil
