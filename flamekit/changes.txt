@@ -1,3 +1,6 @@
+0.15.199 Nov 15, 2026
+- Messages window: the line now says "Press F4 for FlameKit Main Menu" (with your FlameKit Menu key); Esc does not open it.
+
 0.15.198 Nov 15, 2026
 - Fixed (Loot Drop, server): when several monsters died close together, some kept their loot in their bodies. A death waited behind the earlier ones' later looks, and by the time its body was looked at the game no longer counted it as a creature.
 

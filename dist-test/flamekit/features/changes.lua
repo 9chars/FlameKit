@@ -34,7 +34,7 @@ function F.client_tick(world)
   opened_this_game = true
   -- (0.15.196, owner) every world: how to open FlameKit's window, in the Messages window
   local key = tostring(kit.setting("window_key", "F4") or "")
-  kit.note(string.format("Press ESC or %s for FlameKit Main Menu", key ~= "" and key or "F4"), "#9fd2ff")
+  kit.note(string.format("Press %s for FlameKit Main Menu", key ~= "" and key or "F4"), "#9fd2ff")  -- (0.15.199) no ESC: it does not open it
   if pending then
     pending = false
     kit.store.save("seen_version", { version = kit.version })

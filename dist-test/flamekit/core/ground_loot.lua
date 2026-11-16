@@ -66,7 +66,10 @@ end
 ground.MARK_FX = "eb3633fc-6b5b-4cfa-b133-60b2c87ed66e"  -- VFX_Altar_FlameEssence
 ground.MARK_S = 600
 ground.MARK_MAX = 300
-local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }
+local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time(), x, y, z = where the mark was put }
+-- (0.15.197, owner: "sometimes this loot moves and slides around ... I would like the sparkle to move along with it")
+-- an item that moved this far from its mark gets a new mark where it is now (the old one is removed)
+ground.FOLLOW_M = 0.6
 
 -- (0.15.174, owner: the sparkle on a dead body; experiment) that sparkle is put on by the player's game itself
 -- (client_transformed_to_loot) when the server sends TransformedToLootEvent {entityId, useVfxDefaultParameters} for the
@@ -92,23 +95,37 @@ function ground.mark(world, pickup)
   if not ok or not x then return "item not found" end
   local oks, id = pcall(emf.spawn, world, ground.MARK_FX, x, y, z)
   if not oks or not id or id == 0 then return "refused (" .. tostring(id) .. ")" end
-  marks[id], marks_n = { item = pickup, at = os.time() }, marks_n + 1
+  marks[id], marks_n = { item = pickup, at = os.time(), x = x, y = y, z = z }, marks_n + 1
   return "placed"
 end
 
 -- True for one of these marks (so nothing takes a mark for a monster's loot spot).
 function ground.is_mark(id) return marks[id] ~= nil end
 
--- Removes the marks of items that were picked up. Call now and then from a feature's server tick.
+-- Removes the marks of items that were picked up, and moves a mark with its item when the item slid away (0.15.197:
+-- a new mark at the item's spot, the old one removed). Call now and then from a feature's server tick.
 function ground.fx_tick(world)
   if marks_n == 0 then return end
   local now = os.time()
+  local moved = {}
   for id, m in pairs(marks) do
-    local ok, x = pcall(world.position, world, m.item)
+    local ok, x, y, z = pcall(world.position, world, m.item)
     if not ok or not x or now - m.at >= ground.MARK_S then
       marks[id], marks_n = nil, marks_n - 1
       pcall(emf.destroy, world, id)
+    elseif m.x and y and z then
+      local dx, dy, dz = x - m.x, y - m.y, z - m.z
+      if dx * dx + dy * dy + dz * dz >= ground.FOLLOW_M * ground.FOLLOW_M then moved[#moved + 1] = { id, m, x, y, z } end
     end
+  end
+  for _, mv in ipairs(moved) do  -- (after the walk: the table is not changed while pairs() goes through it)
+    local old, m, x, y, z = mv[1], mv[2], mv[3], mv[4], mv[5]
+    local oks, id = pcall(emf.spawn, world, ground.MARK_FX, x, y, z)
+    if oks and id and id ~= 0 then
+      marks[old] = nil
+      pcall(emf.destroy, world, old)
+      marks[id] = { item = m.item, at = m.at, x = x, y = y, z = z }
+    end  -- refused: the old mark stays, and it is tried again next time
   end
 end
 

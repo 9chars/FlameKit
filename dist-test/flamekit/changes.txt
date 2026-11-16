@@ -1,3 +1,12 @@
+0.15.199 Nov 15, 2026
+- Messages window: the line now says "Press F4 for FlameKit Main Menu" (with your FlameKit Menu key); Esc does not open it.
+
+0.15.198 Nov 15, 2026
+- Fixed (Loot Drop, server): when several monsters died close together, some kept their loot in their bodies. A death waited behind the earlier ones' later looks, and by the time its body was looked at the game no longer counted it as a creature.
+
+0.15.197 Nov 15, 2026
+- Loot Drop (server): the sparkle over dropped loot moves with it when the loot slides away.
+
 0.15.196 Nov 15, 2026
 - Minimap tab: the smallest size is gone. The sizes are now Small, Medium (the default), Large and Extra Large (they were Medium, Large, Extra large and Extra extra large).
 - Settings tab: "Show the FlameKit version on the game's main screen" is gone; the version is always shown.
