@@ -17,18 +17,21 @@ local M = {
   WINDOW = 11,           -- steps: the default tap speed (the player's own comes in opts.window)
   STICK = 0.5,           -- forward on the stick at least this far counts as a press of W
   SPEED = 80,            -- the push down (the impulse's y, negative); the game's own top fall speed is 20 m/s
-  SECONDS = 10,          -- each push lasts this long; renewed every RENEW steps until the landing (0.15.221)
-  RENEW = 300,           -- steps (5 s)
+  -- (0.15.224, owner: the 5 s renewals of 0.15.221 "looks janky": each restarted the push's speed curve from zero)
+  -- one push for SECONDS: from the 2480 m ceiling to sea level at about 60 m/s is about 40 s; it ends at the landing
+  SECONDS = 120,
+  RENEW = 0,             -- steps between renewals; 0 = none
   MIN_HEIGHT = 10,       -- metres above the ground (groundDistance) before a dive is allowed; 0 = anywhere
   KICK_GLIDER = false,   -- a dive from the glider writes the locomotion state to Falling (2): did nothing (0.15.219)
   -- (0.15.223, owner: "the second one was good and the damage on the ground was good too") the game's Meteoric Descent
   -- landing (Explosion_Player_WeaponGem_MeteoricDescent): its boom and a crater. Before: Explosion_Player_Skill_Shockwave
   -- (3b874eb5-...), which made no sound of its own when spawned
-  EFFECT = "896758dd-f2d5-4e26-89f0-a4856f489e77",
+  -- (0.15.224, owner: it was #3 that dug, "Explosion_Player_Tool_TNT_T1"; Meteoric Descent landed with sound, no crater)
+  EFFECT = "3ed869e3-c65b-4751-98da-4ce3c6242bac",  -- Explosion_Player_Tool_TNT_T1
   -- (0.15.223, owner: "try the head-first dive pose") TEST: while diving out of the glider, "input" adds the game's
   -- HeadDive input (PlayerInputType 33, bit 33 of digitalInput) to what the player's game sent; "flag" sets the
   -- HeadDiving state (keen::actor::StateFlag 33) in Actor.currentState; "off" neither
-  POSE = "input",
+  POSE = "flag",  -- (0.15.224) "input" showed no head-first pose (owner, 0.15.223 test)
   LANDING_SHIELD = 1.5,  -- seconds the diver takes no hits after the landing (their own shockwave)
   -- keepAliveMask: (0.15.220) the game ended a push naming Jumping, Falling and HangGliding at once within 1/4 s
   -- (0.15.219 test): the player must be in every state named. So only the state the player is in: Falling (32), or
@@ -162,7 +165,7 @@ function M.step(world, entity, s, opts)
       end
       -- (0.15.221, owner: the dive slowed down before the ground: its 10 s push ran out about 1000 m down) the push is
       -- renewed every RENEW steps until the landing; its kind follows the glider (open or closed)
-      if (t - s.dive_t) % M.RENEW == 0 then push_down(world, entity, st == GLIDING, true) end
+      if M.RENEW > 0 and (t - s.dive_t) % M.RENEW == 0 then push_down(world, entity, st == GLIDING, true) end
       return
     end
     if not pressed then return end
