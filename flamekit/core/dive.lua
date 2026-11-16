@@ -46,6 +46,12 @@ local M = {
     [5] = { name = "Huge crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", rings = { { 4, 1.5 } }, down = 2 },
     [6] = { name = "Massive crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50",
             rings = { { 8, 1.5 }, { 12, 4, math.pi / 12 } }, down = 3 },
+    -- (0.15.246, owner: "thats good lmao, put it into the game") the same rings plus two more (16 at 6.5 m, 20 at 9 m),
+    -- in 4 layers 3 m apart from 12 m down up to 3 m down: 228 big TNTs. Layers closer than one blast's reach (about
+    -- 3 m) join into one solid pit (owner: not "lumpy"); each layer below adds about 3 m of depth
+    [7] = { name = "Gigantic crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50",
+            rings = { { 8, 1.5 }, { 12, 4, math.pi / 12 }, { 16, 6.5 }, { 20, 9, math.pi / 20 } },
+            down = 12, layers = 4, layer_step = 3 },
   },
   -- (0.15.232, owner: "an option not to blow up stuff inside someones base", per player) a landing inside a base (the
   -- game's InSaveZone actor state, keen::actor::StateFlag 14: a flame altar's area) uses BOOM_ONLY unless the player
@@ -55,7 +61,7 @@ local M = {
   -- (0.15.233, owner: a crater just outside a base still damaged it near the border) also boom only within this many
   -- metres around a base's build zone (core/bases.lua), by the size of the blast; tuned with flamekit.fastdive margin
   -- (0.15.242, owner: "too aggressive ... pull it in by 20 m") was 10, 15, 25, 30, 40; never below 0 (the base itself)
-  MARGIN = { [1] = 2, [2] = 2, [3] = 5, [5] = 10, [6] = 20 },  -- (0.15.244, owner: small and medium 2 m; 1 m in 0.15.243)
+  MARGIN = { [1] = 2, [2] = 2, [3] = 5, [5] = 10, [6] = 20, [7] = 30 },  -- (0.15.244, owner: small and medium 2 m; 1 m in 0.15.243)
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -135,7 +141,9 @@ local function landing(world, entity, kind, s)
       M.shields[#M.shields + 1] = { rule = rule, until_tick = world:tick() + math.floor(M.LANDING_SHIELD * 60) }
     end
   end
-  M.blast(world, x, y - (l.down or 0), z, l.guid, l.rings)
+  for layer = 0, (l.layers or 1) - 1 do
+    M.blast(world, x, y - (l.down or 0) + layer * (l.layer_step or 0), z, l.guid, l.rings)
+  end
 end
 
 -- (0.15.237) one blast in the middle and rings around it: rings = { {count, radius}, ... }; returns how many spawned

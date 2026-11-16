@@ -1,3 +1,16 @@
+0.15.246 Nov 16, 2026
+- Fast Dive landing: Gigantic crater (228 big TNTs in 4 rings and 4 layers, a pit about 15 m deep). Kept 30 m away from bases with Boom only. Needs FlameKit 0.15.246 on the server.
+- Server (test): the ring test can stack layers (since 0.15.245); small and medium crater keep 2 m from bases (0.15.243, 0.15.244).
+
+0.15.245 Nov 16, 2026
+- Server (test): the ring explosion test can stack layers of explosions on top of each other. Server only: no game update.
+
+0.15.244 Nov 16, 2026
+- Fast Dive near bases (with Boom only): small and medium crater keep 2 m away from a base. Server only: no game update.
+
+0.15.243 Nov 16, 2026
+- Fast Dive near bases (with Boom only): small and medium crater keep 1 m away from a base. Server only: no game update.
+
 0.15.242 Nov 16, 2026
 - Fast Dive: the notice says "Fast Dive in progress! Prepare for impact!".
 - Fast Dive near bases (with Boom only): the protected area around a base is 20 m smaller (small and medium crater: the base itself, big 5 m, huge 10 m, massive 20 m).
