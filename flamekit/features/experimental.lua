@@ -156,10 +156,10 @@ end
 -- factors of core/leap.lua's tuned values (1x: about 50 m up, the forward arc and air steering as tested 2026-11-16).
 -- experimental.json keys sbj_height, sbj_forward, sbj_steer (1x is not kept).
 glide.SBJ = {
-  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 },
-    tip = "How high the leap goes: 1.0x is about 50 m (a double jump is about 4 m). Only for you." },
-  { which = "forward", key = "sbj_forward", label = "Super B Jump forward", steps = { 0, 0.25, 0.5, 0.75, 1, 1.5, 2 },
-    tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },
+  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10 },
+    tip = "How high the leap goes: 1.0x is about 50 m (a double jump is about 4 m). Only for you." },  -- (0.15.210, owner: up to 10x)
+  { which = "forward", key = "sbj_forward", label = "Super B Jump forward", steps = { 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10 },
+    tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },  -- (0.15.210, owner: up to 10x)
   { which = "steer", key = "sbj_steer", label = "Super B Jump air steering", steps = { 0, 1, 2, 3, 4, 5, 7, 10, 15 },
     tip = "How much left and right moves you while in the air after a leap: 0x is the game's own steering only. Only for you." },
 }

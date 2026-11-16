@@ -1,3 +1,6 @@
+0.15.210 Nov 16, 2026
+- Super B Jump height and forward: up to 10x (2.5x, 3x, 4x, 5x, 6x, 7x, 8x, 9x, 10x added). Needs FlameKit 0.15.210 on the server for the new steps.
+
 0.15.209 Nov 16, 2026
 - Minimap: your grave is drawn on top of every other marker, flame altars included, so it is never hidden.
 - New Experimental option: Super B Jump (named after SuperB, who asked for it). Tap jump twice quickly to leap high into the air (about 50 m); hold forward to leap up and over, and steer left and right in the air. Needs the Double Jump skill and at least 50 stamina (a yellow notice says so when you have less). A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Off in PvP.
