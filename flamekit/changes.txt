@@ -1,3 +1,6 @@
+0.15.208 Nov 16, 2026
+- No Fall Damage and Invincible Mode (server): a deadly fall no longer shows you dead for a moment or tells the server you died. Your fall height is reset while you fall, so the game never sees a deadly fall.
+
 0.15.207 Nov 16, 2026
 - Damage bonus: up to +1000% (+250%, +300%, +350%, +400%, +450%, +500%, +600%, +700%, +800%, +900%, +1000% added).
 - Glider speed: 0.05x is gone (too slow).

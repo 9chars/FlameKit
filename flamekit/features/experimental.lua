@@ -1342,7 +1342,7 @@ end
 local stamina_broken = false
 
 local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
-  if stamina_broken and glide.mana_broken then return end
+  if stamina_broken and glide.mana_broken and glide.fall_broken then return end
   for account, p in pairs(online) do
     if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
@@ -1352,6 +1352,27 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       if not ok then
         stamina_broken = true
         emf.log("experimental: stamina cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
+    -- (0.15.208, owner: with No Fall Damage a deadly fall showed the player dead for a moment and told the server they
+    -- died: the hit rule gives the health back only after the game took it) the game's fall start height is set to
+    -- where the player is now, every step while they fall, so the landing is never a long fall. The rule stays too.
+    if (is_on(account, "fall") or is_on(account, "immortal")) and not glide.fall_broken then
+      local ok, err = pcall(function()
+        local fd = world:get("DynamicFallDamage", p.entity)
+        if not fd or not fd.wasFalling then return end
+        local _, y = world:position(p.entity)
+        local start = tonumber(fd.fallStartAltitude)
+        if not y or not start then return end
+        if (glide.fall_said or 0) < 3 and start - y > 5 then  -- the first few, for the log: start and height in one unit?
+          glide.fall_said = (glide.fall_said or 0) + 1
+          emf.log(string.format("experimental: no fall damage: fall start %.2f, height now %.2f", start, y))
+        end
+        if start > y and start - y < 5000 then fd.fallStartAltitude = y end
+      end)
+      if not ok then
+        glide.fall_broken = true
+        emf.log("experimental: the fall height cannot be reset on this game version (" .. tostring(err) .. ")")
       end
     end
     -- (0.15.207, owner: "Invincible Mode also needs to keep the mana bar full like it does the HP bar")
