@@ -1,3 +1,6 @@
+0.15.185 Nov 15, 2026
+- Test monsters' loot chests are removed 15 minutes after the last item went into them, with whatever is still inside (each new item starts the 15 minutes again). An emptied chest still goes at once. Server only: no game update.
+
 0.15.184 Nov 15, 2026
 - New option (F4 menu, Windows tab, and Settings): "Show the pointer while you stand still". On: the mouse pointer for FlameKit's windows and the minimap comes out by itself when you give no keyboard or controller input for 3/4 of a second (in the world, not in a game menu or build mode), and goes away with your next key or controller input. Mouse clicks do not count. The pointer key works as before. Off by default.
 
