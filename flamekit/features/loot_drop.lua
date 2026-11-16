@@ -340,7 +340,7 @@ function F.tick(world)
     end
     fx_shown = keep
   end
-  if steps % 30 == 0 then pcall(ground.fx_tick, world) end  -- (0.15.171) fireflies off picked-up items
+  if steps % 10 == 0 then pcall(ground.fx_tick, world) end  -- (0.15.171) marks off picked-up items; (0.15.197) 3x as often: marks follow sliding items
   if #retry > 0 then
     local keep = {}
     for _, r in ipairs(retry) do

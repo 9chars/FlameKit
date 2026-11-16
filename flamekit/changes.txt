@@ -1,3 +1,6 @@
+0.15.197 Nov 15, 2026
+- Loot Drop (server): the sparkle over dropped loot moves with it when the loot slides away.
+
 0.15.196 Nov 15, 2026
 - Minimap tab: the smallest size is gone. The sizes are now Small, Medium (the default), Large and Extra Large (they were Medium, Large, Extra large and Extra extra large).
 - Settings tab: "Show the FlameKit version on the game's main screen" is gone; the version is always shown.
