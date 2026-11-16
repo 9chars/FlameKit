@@ -1,3 +1,6 @@
+0.15.236 Nov 16, 2026
+- Server (test): a console test that sets off several explosions at once in a ring. Server only: no game update.
+
 0.15.235 Nov 16, 2026
 - Server (test): the Fast Dive effect test can set off an explosion at a bigger scale. Server only: no game update.
 

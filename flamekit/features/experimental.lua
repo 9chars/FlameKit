@@ -2517,6 +2517,24 @@ function F.setup(k)
         for _, e in ipairs(b.list) do say(string.format("  base at %.1f %.1f, zone reaches %.1f x %.1f m from %.1f %.1f", e.ax, e.az, e.hx, e.hz, e.x, e.z)) end
         return
       end
+      if a1 == "ring" then  -- (0.15.236, test) "fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]":
+        -- one in the middle and <count> around it, <radius> m out (a bigger blast from the game's own explosion)
+        local id, guid, count, radius, ahead = tonumber(a2), args[3], tonumber(args[4]) or 4, tonumber(args[5]) or 6, tonumber(args[6]) or 10
+        local x, y, z
+        if id then x, y, z = world:position(id) end
+        if not (x and guid) then emf.reply("fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]") return end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local cx, cz = x + fx / len * ahead, z + fz / len * ahead
+        local made = d.boom(world, cx, y, cz, guid) and 1 or 0
+        for k = 1, count do
+          local a = 2 * math.pi * k / count
+          if d.boom(world, cx + math.cos(a) * radius, y, cz + math.sin(a) * radius, guid) then made = made + 1 end
+        end
+        say(string.format("fastdive ring: %s, %d of %d spawned, %s m around a point %s m in front", tostring(guid), made, count + 1, tostring(radius), tostring(ahead)))
+        return
+      end
       if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID> [scale] [metres in front]"
         local id, guid, scale, ahead = tonumber(a2), args[3], tonumber(args[4]), tonumber(args[5]) or 3
         local x, y, z
