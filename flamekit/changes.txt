@@ -1,3 +1,6 @@
+0.15.192 Nov 15, 2026
+- F4 menu: a new "About" tab at the end. It has the update line and the "Check for updates" button at the top (they were on What's New) and the README text below (it was in the "About FlameKit" window). The "About" button on What's New is gone.
+
 0.15.191 Nov 15, 2026
 - Fixed: setting the pointer key (0.15.190) took no key or mouse button: the setting was left out of the list the key capture looks in.
 

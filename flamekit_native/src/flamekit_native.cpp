@@ -526,8 +526,6 @@ std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
 // (0.15.100, owner) "Check for updates" clicked: until then (GetTickCount64), an update that is ready shows the update
 // dialog again, even when it was shown for that version already
 std::atomic<uint64_t> g_update_ask_until{0};
-std::atomic<bool> g_about_request{false};
-// (0.15.103) the What's New tab's About button: AboutDialog opens
 
 // A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
 std::wstring key_label(uint32_t vk) {
@@ -3840,6 +3838,109 @@ void draw_item_tip(Canvas& c, TextPainter& text, int mx, int my, int w, int h, c
 }
 std::string read_text(const std::wstring& path, size_t max);
 
+// ---- README.md, for the window's About tab (0.15.192, owner; it was the About window of 0.15.103) ----
+// README.md from FlameKit's repository on GitHub (raw.githubusercontent.com, branch main), fetched on its own thread
+// each time the About tab is opened. Markdown is shown plainly: headings in gold, ** and ` left out, bullets as dots,
+// table rows as their cells.
+struct ReadmeFetch {
+    std::mutex lock;
+    bool busy = false, done = false, failed = false;
+    std::string text;
+};
+ReadmeFetch g_readme;
+
+struct Readme {
+    struct Line {
+        std::wstring text;
+        bool head = false;
+    };
+    std::vector<Line> source, lines;  // source: README's lines, cleaned; lines: wrapped to the box
+    bool have_text = false;
+    int wrapped_w = -1;
+
+    static void fetch() {
+        {
+            std::lock_guard<std::mutex> l(g_readme.lock);
+            if (g_readme.busy) return;
+            g_readme.busy = true;
+            g_readme.done = false;
+        }
+        std::thread([] {
+            std::vector<uint8_t> raw;
+            const bool ok = web_update::fetch(L"/9chars/FlameKit/main/README.md", raw, nullptr);
+            std::lock_guard<std::mutex> l(g_readme.lock);
+            g_readme.busy = false;
+            g_readme.done = true;
+            g_readme.failed = !ok || raw.empty();
+            g_readme.text.assign(raw.begin(), raw.end());
+            FK_LOG(ok ? fklog::kInfo : fklog::kWarn, "about: README.md %s (%d bytes)", ok ? "fetched" : "could NOT be fetched", static_cast<int>(raw.size()));
+        }).detach();
+    }
+
+    static std::wstring strip(std::wstring t) {
+        for (const wchar_t* cut : {L"**", L"`"}) {
+            for (size_t at; (at = t.find(cut)) != std::wstring::npos;) t.erase(at, std::wcslen(cut));
+        }
+        return t;
+    }
+
+    void take_text(const std::string& md) {
+        source.clear();
+        size_t at = 0;
+        while (at <= md.size()) {
+            size_t nl = md.find('\n', at);
+            if (nl == std::string::npos) nl = md.size();
+            std::string l = md.substr(at, nl - at);
+            at = nl + 1;
+            if (!l.empty() && l.back() == '\r') l.pop_back();
+            std::wstring t = widen(l);
+            Line out;
+            if (!t.empty() && t[0] == L'#') {
+                size_t k = t.find_first_not_of(L'#');
+                out.head = true;
+                t = k == std::wstring::npos ? L"" : t.substr(k);
+                while (!t.empty() && t[0] == L' ') t.erase(0, 1);
+            } else if (t.rfind(L"- ", 0) == 0 || t.rfind(L"* ", 0) == 0) {
+                t = L"\u2022 " + t.substr(2);
+            } else if (!t.empty() && t[0] == L'|') {
+                if (t.find(L"---") != std::wstring::npos) continue;  // a table's line under its head
+                std::wstring row;
+                size_t p = 1;
+                while (p < t.size()) {
+                    size_t q = t.find(L'|', p);
+                    if (q == std::wstring::npos) q = t.size();
+                    std::wstring cell = t.substr(p, q - p);
+                    while (!cell.empty() && cell.front() == L' ') cell.erase(0, 1);
+                    while (!cell.empty() && cell.back() == L' ') cell.pop_back();
+                    if (!cell.empty()) row += (row.empty() ? L"" : L"  \u2013  ") + cell;
+                    p = q + 1;
+                }
+                t = row;
+            }
+            out.text = strip(t);
+            source.push_back(std::move(out));
+        }
+        while (!source.empty() && source.back().text.empty()) source.pop_back();
+        have_text = true;
+        wrapped_w = -1;
+    }
+
+    void wrap(TextPainter& text, TextPainter& head, int width) {
+        if (wrapped_w == width) return;
+        wrapped_w = width;
+        lines.clear();
+        for (const Line& src : source) {
+            TextPainter& tp = src.head ? head : text;
+            if (src.text.empty()) {
+                lines.push_back({L"", false});
+                continue;
+            }
+            const bool bullet = src.text.rfind(L"\u2022 ", 0) == 0;  // its next lines start under the text, not the dot
+            for (std::wstring& l : wrap_words(tp, src.text, width, bullet ? L"  " : L"")) lines.push_back({std::move(l), src.head});
+        }
+    }
+};
+
 // ---- FlameKit's window: a tab per feature ----
 // This layer only draws and takes clicks: it never reads the game. What it shows comes from the Lua part
 // (features/native_ui.lua), and every click goes back to the Lua part as a line in emf\mods\flamekit\ui_actions.txt;
@@ -3890,7 +3991,7 @@ struct WindowLayer : Layer {
         std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey };
     struct Hit {
         RECT r;
         Kind kind;
@@ -3946,8 +4047,10 @@ struct WindowLayer : Layer {
     std::vector<Hit> hits;
     std::vector<std::string> actions;
     uint64_t last_action = 0, list_stamp = 0, tabs_stamp = 0;
-    TextPainter text;
+    TextPainter text, head;  // head: the About tab's README headings
     bool fonts = false;
+    Readme readme;  // the About tab (0.15.192): README.md, fetched each time the tab is opened
+    std::wstring readme_status;
     std::unordered_map<uint32_t, std::vector<uint8_t>> pictures;  // an empty one: no picture to be had
 
     WindowLayer() {
@@ -4131,6 +4234,7 @@ struct WindowLayer : Layer {
         if (!complete) return false;
         tabs = std::move(t);
         tabs.push_back({"windows", L"Windows"});  // this DLL's own tab: the pinned windows
+        tabs.push_back({"about", L"About"});      // and this one: updates and README.md (0.15.192, owner: the last tab)
         if (of != rows_of || gen != generation) rows_page = of == rows_of ? rows_page : 0;
         if (of != rows_of) rows_scroll = 0;
         if (of != rows_of || list_open >= static_cast<int>(r.size()) || (list_open >= 0 && r[static_cast<size_t>(list_open)].kind != 'd')) list_open = -1;
@@ -4166,7 +4270,7 @@ struct WindowLayer : Layer {
 
     // Tells the Lua part which generic tab is shown (it writes that tab's rows only then).
     void tell_view() {
-        const std::string want = open && current != "loot_filter" && current != "windows" ? current : "";
+        const std::string want = open && current != "loot_filter" && current != "windows" && current != "about" ? current : "";
         if (want == viewing) return;
         viewing = want;
         act("view", want.empty() ? "-" : want);
@@ -4462,13 +4566,59 @@ struct WindowLayer : Layer {
     }
 
     void wheel(int delta, int x, int y) override {
-        if (current == "loot_filter" || current == "windows") return;
+        if (current == "loot_filter" || current == "windows") return;  // (the About tab scrolls like a tab of rows)
         if (list_open >= 0 && x >= list_r.left && x < list_r.right && y >= list_r.top && y < list_r.bottom) {
             list_scroll -= delta * 3 / WHEEL_DELTA;  // 3 entries a notch; draw_list keeps it in range
             dirty = true;
             return;
         }
         scroll_to(rows_scroll - delta * 66 / WHEEL_DELTA);  // 3 lines a notch
+    }
+
+    void fetch_readme() {  // each time the About tab is opened: README.md as it is on GitHub now
+        readme.have_text = false;
+        readme_status = L"Loading README.md from GitHub...";
+        Readme::fetch();
+        dirty = true;
+    }
+
+    // The About tab (0.15.192, owner): README.md in a box under the update line, scrolled like a tab of rows (the same
+    // scroll bar, wheel and view; clear_outside cuts off what is scrolled out).
+    void draw_readme() {
+        const int view = kViewBottom - kViewTop, line = 22;
+        box(kPad, kViewTop, kW - kPad, kViewBottom, 24, 26, 32, 1.0f);
+        frame_box(kPad, kViewTop, kW - kPad, kViewBottom, 1, 70, 74, 86);
+        if (!readme.have_text) {
+            max_scroll = rows_scroll = 0;
+            track_r = thumb_r = RECT{};
+            text.draw(canvas, kPad + 12, kViewTop + 10, readme_status, 150, 155, 165);
+            return;
+        }
+        readme.wrap(text, head, kW - 2 * kPad - 24 - kBarW - 8);
+        const int content_h = static_cast<int>(readme.lines.size()) * line + 16;
+        max_scroll = std::max(0, content_h - view);
+        rows_scroll = std::clamp(rows_scroll, 0, max_scroll);
+        for (size_t i = 0; i < readme.lines.size(); ++i) {
+            const int y = kViewTop + 8 + static_cast<int>(i) * line - rows_scroll;
+            if (y + line < kViewTop || y > kViewBottom) continue;  // out of view
+            const Readme::Line& l = readme.lines[i];
+            if (l.head) head.draw(canvas, kPad + 12, y, l.text, 255, 210, 122);
+            else text.draw(canvas, kPad + 12, y, l.text, 225, 225, 230);
+        }
+        if (max_scroll > 0) {  // the scroll bar: as draw_rows'
+            const int x0 = kW - kPad - kBarW - 4, x1 = kW - kPad - 4;
+            const int track_h = view - 8, thumb_h = std::max(30, track_h * view / content_h);
+            const int thumb_y = kViewTop + 4 + (track_h - thumb_h) * rows_scroll / max_scroll;
+            track_r = {x0, kViewTop + 4, x1, kViewTop + 4 + track_h};
+            thumb_r = {x0, thumb_y, x1, thumb_y + thumb_h};
+            box(track_r.left, track_r.top, track_r.right, track_r.bottom, 40, 42, 50, 1.0f);
+            const bool over = thumb_drag || inside(thumb_r);
+            box(thumb_r.left + 1, thumb_r.top, thumb_r.right - 1, thumb_r.bottom, over ? 150.0f : 110.0f, over ? 160.0f : 118.0f, over ? 185.0f : 135.0f, 1.0f);
+            hits.push_back({track_r, kScrollTrack, 0});
+            hits.push_back({thumb_r, kScrollThumb, 0});
+        } else {
+            track_r = thumb_r = RECT{};
+        }
     }
 
     // The Windows tab (this DLL's own): each pinned window with Show/Hide and Reset, and how to move them.
@@ -4664,7 +4814,7 @@ struct WindowLayer : Layer {
         kBagTop = kBagHead + 30;
         kJunkHead = kBagTop + kBagRows * kIcon + (kBagRows - 1) * kGap + kPad;
         kJunkTop = kJunkHead + 30;
-        kViewTop = kTop + 2 + (current == "changes" ? 44 : 0);  // What's New: the Check for updates button above
+        kViewTop = kTop + 2 + (current == "about" ? 44 : 0);  // About: the Check for updates button above
         kViewBottom = kH - kPad;
     }
 
@@ -4672,15 +4822,17 @@ struct WindowLayer : Layer {
         if (!fonts) {
             fonts = true;
             text.ready(g_screen, 16);
+            head.ready(g_screen, 17);
         }
         resize(kW, kH);
         hits.clear();
         std::fill(pixels.begin(), pixels.end(), 0u);
         lay_out();
         box(0, 0, kW, kH, 18, 18, 22, 0.94f);
-        const bool rows_tab = current != "loot_filter" && current != "windows";
-        if (rows_tab) {  // first, so the title bar and the tabs are drawn over what is scrolled out at the top
-            draw_rows();
+        const bool rows_tab = current != "loot_filter" && current != "windows" && current != "about";
+        if (rows_tab || current == "about") {  // first, so the title bar and the tabs are drawn over what is scrolled out at the top
+            if (rows_tab) draw_rows();
+            else draw_readme();
             clear_outside();
         }
         // the title bar: FlameKit and its version, the x that closes the window; dragged to move the window
@@ -4711,15 +4863,13 @@ struct WindowLayer : Layer {
         box(kPad, kTop - 6, kW - kPad, kTop - 5, 70, 110, 170, 1.0f);
         if (current == "loot_filter") draw_junk();
         else if (current == "windows") draw_windows();
-        if (current == "changes") {  // the updater's normal check, at once (web_update::g_check_now)
+        if (current == "about") {  // the updater's normal check, at once (web_update::g_check_now); was on What's New until 0.15.192
             const int cw = text.width(L"Check for updates") + 24;
             // how often the updater looks (web_update.hpp): every minute, on both channels (0.15.131)
             const bool test = read_text(g_flamekit_dir + L"update_channel.txt", 16).rfind("test", 0) == 0;
             text.draw(canvas, kPad, kTop + 9, test ? L"FlameKit looks for updates every minute (Development)." : L"FlameKit looks for updates every minute.",
                       150, 155, 165);
             button(kW - kPad - cw, kTop + 4, cw, L"Check for updates", false, kCheckUpdates);
-            const int aw = text.width(L"About") + 30;  // (0.15.103, owner) README.md from FlameKit's repository (AboutDialog)
-            button(kW - kPad - cw - 8 - aw, kTop + 4, aw, L"About", false, kAbout);
         }
         // the frame, and the grip in the lower right corner that resizes the window
         frame_box(0, 0, kW, kH, 1, 120, 160, 220);
@@ -4825,6 +4975,16 @@ struct WindowLayer : Layer {
                     act("key", pointer_key_name(vk));  // the Lua part's Settings takes it as pointer_key
                     FK_LOG(fklog::kInfo, "window: pointer key set to %s", pointer_key_name(vk).c_str());
                 }
+            }
+        }
+        if (open && current == "about" && !readme.have_text && readme_status.empty()) fetch_readme();  // opened on it
+        if (open && current == "about" && !readme.have_text) {  // README.md has come (or could not be had)
+            std::lock_guard<std::mutex> l(g_readme.lock);
+            if (g_readme.done) {
+                if (g_readme.failed) readme_status = L"README.md could not be loaded from GitHub (no internet?).";
+                else readme.take_text(g_readme.text);
+                g_readme.done = false;
+                dirty = true;
             }
         }
         // the Lua part asks for the window on a tab (after an update: What's New; features/changes.lua): ui_open.dat
@@ -5000,6 +5160,7 @@ struct WindowLayer : Layer {
                     current = tabs[h.index].id;
                     rows_page = 0;
                     rows_scroll = 0;
+                    if (current == "about") fetch_readme();
                     FK_LOG(fklog::kInfo, "window: tab %s", current.c_str());
                     tell_view();
                 }
@@ -5078,10 +5239,6 @@ struct WindowLayer : Layer {
                 break;
             case kScrollTrack:  // above or below the thumb: a view's height up or down
                 scroll_to(rows_scroll + (y < thumb_r.top ? -1 : 1) * (kViewBottom - kViewTop - 40));
-                break;
-            case kAbout:
-                g_about_request = true;
-                FK_LOG(fklog::kInfo, "window: About");
                 break;
             case kCheckUpdates:
                 web_update::g_check_now = true;
@@ -5553,268 +5710,6 @@ struct ExperimentalLayer : PinnedLayer {
             return;
         }
         PinnedLayer::wheel(delta, x, y);
-    }
-};
-
-// ---- the About window (0.15.103, owner) ----
-// The What's New tab's About button: README.md from FlameKit's repository on GitHub (raw.githubusercontent.com, branch
-// main, fetched each time it opens, on its own thread), in a scrollable box with an OK button. Markdown is shown
-// plainly: headings in gold, ** and ` left out, bullets as dots, table rows as their cells. OK, Esc or Enter close it.
-struct AboutText {
-    std::mutex lock;
-    bool busy = false, done = false, failed = false;
-    std::string text;
-};
-AboutText g_about;
-
-struct AboutDialog : Layer {
-    bool stays_in_build() const override { return true; }
-    const char* name() const override { return "about window"; }
-    bool open = false, dirty = true, fonts = false, have_text = false;
-    struct Line {
-        std::wstring text;
-        bool head = false;
-    };
-    std::vector<Line> source, lines;  // source: README's lines, cleaned; lines: wrapped to the box
-    TextPainter text, head;
-    RECT ok_r{}, box_r{};
-    int mouse_x = -1, mouse_y = -1, scroll = 0, max_scroll = 0, w = 0, h = 0, wrapped_w = -1;
-    bool dragging = false;  // the scroll bar's handle is held
-    int bar_top = 0, bar_len = 0, thumb_y = 0, thumb_len = 0, grab = 0;
-    std::wstring status = L"Loading README.md from GitHub...";
-    static constexpr int kHead = 32, kLine = 20;
-
-    void fill(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
-        for (int y = y0; y < y1; ++y)
-            for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
-    }
-
-    static void fetch_readme() {
-        std::thread([] {
-            std::vector<uint8_t> raw;
-            const bool ok = web_update::fetch(L"/9chars/FlameKit/main/README.md", raw, nullptr);
-            std::lock_guard<std::mutex> l(g_about.lock);
-            g_about.busy = false;
-            g_about.done = true;
-            g_about.failed = !ok || raw.empty();
-            g_about.text.assign(raw.begin(), raw.end());
-            FK_LOG(ok ? fklog::kInfo : fklog::kWarn, "about: README.md %s (%d bytes)", ok ? "fetched" : "could NOT be fetched", static_cast<int>(raw.size()));
-        }).detach();
-    }
-
-    static std::wstring strip(std::wstring t) {
-        for (const wchar_t* cut : {L"**", L"`"}) {
-            for (size_t at; (at = t.find(cut)) != std::wstring::npos;) t.erase(at, std::wcslen(cut));
-        }
-        return t;
-    }
-
-    void take_text(const std::string& md) {
-        source.clear();
-        size_t at = 0;
-        while (at <= md.size()) {
-            size_t nl = md.find('\n', at);
-            if (nl == std::string::npos) nl = md.size();
-            std::string l = md.substr(at, nl - at);
-            at = nl + 1;
-            if (!l.empty() && l.back() == '\r') l.pop_back();
-            std::wstring t = widen(l);
-            Line out;
-            if (!t.empty() && t[0] == L'#') {
-                size_t k = t.find_first_not_of(L'#');
-                out.head = true;
-                t = k == std::wstring::npos ? L"" : t.substr(k);
-                while (!t.empty() && t[0] == L' ') t.erase(0, 1);
-            } else if (t.rfind(L"- ", 0) == 0 || t.rfind(L"* ", 0) == 0) {
-                t = L"• " + t.substr(2);
-            } else if (!t.empty() && t[0] == L'|') {
-                if (t.find(L"---") != std::wstring::npos) continue;  // a table's line under its head
-                std::wstring row;
-                size_t p = 1;
-                while (p < t.size()) {
-                    size_t q = t.find(L'|', p);
-                    if (q == std::wstring::npos) q = t.size();
-                    std::wstring cell = t.substr(p, q - p);
-                    while (!cell.empty() && cell.front() == L' ') cell.erase(0, 1);
-                    while (!cell.empty() && cell.back() == L' ') cell.pop_back();
-                    if (!cell.empty()) row += (row.empty() ? L"" : L"  –  ") + cell;
-                    p = q + 1;
-                }
-                t = row;
-            }
-            out.text = strip(t);
-            source.push_back(std::move(out));
-        }
-        while (!source.empty() && source.back().text.empty()) source.pop_back();
-        have_text = true;
-        wrapped_w = -1;
-    }
-
-    void wrap(int width) {
-        if (wrapped_w == width) return;
-        wrapped_w = width;
-        lines.clear();
-        for (const Line& src : source) {
-            TextPainter& tp = src.head ? head : text;
-            if (src.text.empty()) {
-                lines.push_back({L"", false});
-                continue;
-            }
-            const bool bullet = src.text.rfind(L"\u2022 ", 0) == 0;  // its next lines start under the text, not the dot
-            for (std::wstring& l : wrap_words(tp, src.text, width, bullet ? L"  " : L"")) lines.push_back({std::move(l), src.head});
-        }
-    }
-
-    void draw() {
-        if (!fonts) {
-            fonts = true;
-            head.ready(g_screen, 17);
-            text.ready(g_screen, 15);
-        }
-        resize(w, h);
-        std::fill(pixels.begin(), pixels.end(), 0u);
-        fill(0, 0, w, h, 14, 15, 19, 0.96f);
-        fill(0, 0, w, kHead, 30, 34, 44, 1.0f);
-        fill(0, 0, w, 1, 120, 160, 220, 1.0f);
-        fill(0, h - 1, w, h, 120, 160, 220, 1.0f);
-        fill(0, 0, 1, h, 120, 160, 220, 1.0f);
-        fill(w - 1, 0, w, h, 120, 160, 220, 1.0f);
-        head.draw(canvas, 12, 6, L"About FlameKit", 235, 225, 205);
-        box_r = {14, kHead + 12, w - 14, h - 62};
-        fill(box_r.left, box_r.top, box_r.right, box_r.bottom, 22, 24, 30, 1.0f);
-        fill(box_r.left, box_r.top, box_r.right, box_r.top + 1, 70, 74, 86, 1.0f);
-        fill(box_r.left, box_r.bottom - 1, box_r.right, box_r.bottom, 70, 74, 86, 1.0f);
-        const int inner_w = box_r.right - box_r.left - 34, view_h = box_r.bottom - box_r.top - 12;
-        if (!have_text) {
-            text.draw(canvas, box_r.left + 12, box_r.top + 10, status, 150, 155, 165);
-        } else {
-            wrap(inner_w);
-            const int total = static_cast<int>(lines.size()) * kLine;
-            max_scroll = std::max(0, total - view_h);
-            scroll = std::clamp(scroll, 0, max_scroll);
-            for (size_t i = 0; i < lines.size(); ++i) {
-                const int y = box_r.top + 6 + static_cast<int>(i) * kLine - scroll;
-                if (y < box_r.top + 2 || y + kLine > box_r.bottom - 2) continue;  // only whole lines inside the box
-                if (lines[i].head) head.draw(canvas, box_r.left + 12, y, lines[i].text, 255, 210, 122);
-                else text.draw(canvas, box_r.left + 12, y, lines[i].text, 225, 225, 230);
-            }
-            if (max_scroll > 0) {  // the scroll bar (0.15.115: dragged with the mouse, or a click above or below its handle)
-                const int track = box_r.bottom - box_r.top - 8, th = std::max(24, track * view_h / std::max(1, total));
-                const int ty = box_r.top + 4 + (track - th) * scroll / max_scroll;
-                fill(box_r.right - 14, box_r.top + 4, box_r.right - 4, box_r.bottom - 4, 40, 42, 50, 1.0f);
-                fill(box_r.right - 14, ty, box_r.right - 4, ty + th, dragging ? 170.0f : 120.0f, dragging ? 178.0f : 128.0f,
-                     dragging ? 200.0f : 145.0f, 1.0f);
-                bar_top = box_r.top + 4, bar_len = track, thumb_y = ty, thumb_len = th;
-            } else {
-                bar_len = 0;
-            }
-        }
-        const int bw = 120, bh = 32;
-        ok_r = {(w - bw) / 2, h - bh - 16, (w + bw) / 2, h - 16};
-        const bool over = mouse_x >= ok_r.left && mouse_y >= ok_r.top && mouse_x < ok_r.right && mouse_y < ok_r.bottom;
-        fill(ok_r.left, ok_r.top, ok_r.right, ok_r.bottom, over ? 92.0f : 62.0f, over ? 96.0f : 66.0f, over ? 108.0f : 76.0f, 1.0f);
-        fill(ok_r.left, ok_r.top, ok_r.right, ok_r.top + 1, 120, 160, 220, 1.0f);
-        fill(ok_r.left, ok_r.bottom - 1, ok_r.right, ok_r.bottom, 120, 160, 220, 1.0f);
-        text.draw(canvas, ok_r.left + (bw - text.width(L"OK")) / 2, ok_r.top + 7, L"OK", 235, 235, 240);
-        changed = true;
-    }
-
-    void update(const Frame& f) override {
-        if (g_about_request.exchange(false)) {
-            open = true;
-            dirty = true;
-            scroll = 0;
-            have_text = false;
-            status = L"Loading README.md from GitHub...";
-            std::lock_guard<std::mutex> l(g_about.lock);
-            if (!g_about.busy) {
-                g_about.busy = true;
-                g_about.done = false;
-                fetch_readme();
-            }
-        }
-        if (open && !have_text) {
-            std::lock_guard<std::mutex> l(g_about.lock);
-            if (g_about.done) {
-                if (g_about.failed) {
-                    status = L"README.md could not be loaded from GitHub (no internet?).";
-                } else {
-                    take_text(g_about.text);
-                }
-                g_about.done = false;
-                dirty = true;
-            }
-        }
-        const bool want = open && f.gw > 0 && f.gh > 0;
-        if (want != visible) {
-            visible = want;
-            changed = true;
-        }
-        if (!visible) return;
-        // (0.15.115, owner: bigger) up to 1100 x 900, 40 px inside the game window on each side
-        const int nw = std::min(1100, std::max(320, f.gw - 80)), nh = std::min(900, std::max(240, f.gh - 80));
-        if (nw != w || nh != h) {
-            w = nw;
-            h = nh;
-            wrapped_w = -1;
-            dirty = true;
-        }
-        if (dirty) {
-            dirty = false;
-            draw();
-        }
-        place(std::max(0, (f.gw - w) / 2), std::max(0, (f.gh - h) / 2));
-    }
-
-    void close(const char* how) {
-        open = false;
-        FK_LOG(fklog::kInfo, "about: closed (%s)", how);
-    }
-    bool wants_mouse() const override { return open; }
-    bool wants_keys() const override { return open; }
-    void key(WPARAM vk) override {
-        if (vk == VK_ESCAPE) close("Esc");
-        else if (vk == VK_RETURN) close("Enter");
-        else if (vk == VK_DOWN || vk == VK_NEXT) { scroll += vk == VK_DOWN ? kLine : (box_r.bottom - box_r.top - 40); dirty = true; }
-        else if (vk == VK_UP || vk == VK_PRIOR) { scroll -= vk == VK_UP ? kLine : (box_r.bottom - box_r.top - 40); dirty = true; }
-    }
-    void wheel(int delta, int x, int y) override {
-        scroll -= delta * 3 * kLine / WHEEL_DELTA;  // draw keeps it in range
-        dirty = true;
-    }
-    void mouse_left() override {
-        mouse_x = mouse_y = -1;
-        dirty = true;
-    }
-    void mouse(UINT msg, int x, int y) override {
-        if (msg == WM_MOUSEMOVE) {
-            if (dragging && max_scroll > 0) {  // the handle follows the pointer (draw keeps scroll in range)
-                scroll = (y - grab - bar_top) * max_scroll / std::max(1, bar_len - thumb_len);
-                dirty = true;
-            }
-            if (x != mouse_x || y != mouse_y) {
-                mouse_x = x;
-                mouse_y = y;
-                dirty = true;
-            }
-            return;
-        }
-        if (msg == WM_LBUTTONDOWN && bar_len > 0 && x >= box_r.right - 18 && x < box_r.right && y >= bar_top && y < bar_top + bar_len) {
-            if (y >= thumb_y && y < thumb_y + thumb_len) {  // the handle: dragged
-                dragging = true;
-                grab = y - thumb_y;
-            } else {  // above or below it: a page
-                scroll += (y < thumb_y ? -1 : 1) * (box_r.bottom - box_r.top - 40);
-            }
-            dirty = true;
-            return;
-        }
-        if (msg == WM_LBUTTONUP && dragging) {
-            dragging = false;
-            dirty = true;
-            return;
-        }
-        if (msg == WM_LBUTTONUP && x >= ok_r.left && y >= ok_r.top && x < ok_r.right && y < ok_r.bottom) close("OK");
     }
 };
 
@@ -6594,9 +6489,8 @@ void ui_thread_body() {
     experimental.window = &window;
     BoardLayer board;
     UpdateDialog update_dialog;
-    AboutDialog about;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &about, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
@@ -6695,7 +6589,7 @@ void ui_thread_body() {
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
         // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
         {
-            g_ui_modal = window.open || update_dialog.open || about.open;  // the one list (see g_ui_modal)
+            g_ui_modal = window.open || update_dialog.open;  // the one list (see g_ui_modal)
             const bool mode = hold || g_ui_modal;
             if (mode && !g_pointer_mode) {
                 restore_rounds = 5;
