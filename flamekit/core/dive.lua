@@ -37,6 +37,10 @@ local M = {
     [2] = { name = "Medium crater", guid = "93ee028c-2fa7-4d31-bfc6-1e7b5ef4ac70" },  -- Explosion_Player_Tool_TNT_T3
     [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50" },     -- Explosion_Player_Tool_TNT_T4
     [4] = { name = "Boom only (no crater)", guid = "896758dd-f2d5-4e26-89f0-a4856f489e77" },  -- ..._MeteoricDescent
+    -- (0.15.237, owner: "that one was good ... call it huge crater") the big TNT in the middle and 4 more 1.5 m around
+    -- it (a ScaleComponent does not make a blast bigger: 1x, 3x and 6x looked the same, 0.15.235 test; the game's boss
+    -- blasts did nothing when spawned alone, 0.15.236 test)
+    [5] = { name = "Huge crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", rings = { { 4, 1.5 } } },
   },
   -- (0.15.232, owner: "an option not to blow up stuff inside someones base", per player) a landing inside a base (the
   -- game's InSaveZone actor state, keen::actor::StateFlag 14: a flame altar's area) uses BOOM_ONLY unless the player
@@ -45,7 +49,7 @@ local M = {
   BOOM_ONLY = 4,
   -- (0.15.233, owner: a crater just outside a base still damaged it near the border) also boom only within this many
   -- metres around a base's build zone (core/bases.lua), by the size of the blast; tuned with flamekit.fastdive margin
-  MARGIN = { [1] = 10, [2] = 15, [3] = 25 },
+  MARGIN = { [1] = 10, [2] = 15, [3] = 25, [5] = 30 },
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -125,7 +129,19 @@ local function landing(world, entity, kind, s)
       M.shields[#M.shields + 1] = { rule = rule, until_tick = world:tick() + math.floor(M.LANDING_SHIELD * 60) }
     end
   end
-  M.boom(world, x, y, z, l.guid)
+  M.blast(world, x, y, z, l.guid, l.rings)
+end
+
+-- (0.15.237) one blast in the middle and rings around it: rings = { {count, radius}, ... }; returns how many spawned
+function M.blast(world, x, y, z, guid, rings)
+  local made = M.boom(world, x, y, z, guid) and 1 or 0
+  for _, r in ipairs(rings or {}) do
+    for k = 1, r[1] do
+      local a = 2 * math.pi * k / r[1] + (r[3] or 0)
+      if M.boom(world, x + math.cos(a) * r[2], y, z + math.sin(a) * r[2], guid) then made = made + 1 end
+    end
+  end
+  return made
 end
 
 -- the shields of earlier landings run out (every step, any player)

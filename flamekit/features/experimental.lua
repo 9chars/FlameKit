@@ -177,7 +177,7 @@ glide.SBJ = {
   { which = "divespeed", key = "sbj_divespeed", label = "Fast Dive speed", sep = true,
     steps = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10 },  -- (0.15.228, owner: faster options)
     tip = "How fast the dive goes down: 1.0x is about 60 m/s, three times the game's fastest fall. Only for you." },
-  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 4 },
+  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 5, 4 },
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
     tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
@@ -2515,6 +2515,28 @@ function F.setup(k)
         local b = require("core.bases")
         say(string.format("fastdive: %d base(s) known", #b.list))
         for _, e in ipairs(b.list) do say(string.format("  base at %.1f %.1f, zone reaches %.1f x %.1f m from %.1f %.1f", e.ax, e.az, e.hx, e.hz, e.x, e.z)) end
+        return
+      end
+      if a1 == "rings" then  -- (0.15.237, test) "fastdive rings <player entity> <template GUID> <metres in front>
+        -- <count>:<radius> [<count>:<radius> ...]": one in the middle and each ring around it (each next ring turned by
+        -- half a step, so its blasts sit between the last one's)
+        local id, guid, ahead = tonumber(a2), args[3], tonumber(args[4]) or 10
+        local x, y, z
+        if id then x, y, z = world:position(id) end
+        if not (x and guid) then emf.reply("fastdive rings <player entity> <template GUID> <metres in front> <count>:<radius> ...") return end
+        local rings, total = {}, 1
+        for i = 5, #args do
+          local c, r = tostring(args[i]):match("^(%d+):([%d%.]+)$")
+          if c then
+            rings[#rings + 1] = { tonumber(c), tonumber(r), #rings % 2 == 1 and math.pi / tonumber(c) or 0 }
+            total = total + tonumber(c)
+          end
+        end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local made = d.blast(world, x + fx / len * ahead, y, z + fz / len * ahead, guid, rings)
+        say(string.format("fastdive rings: %s, %d of %d spawned, %d ring(s), %s m in front", tostring(guid), made, total, #rings, tostring(ahead)))
         return
       end
       if a1 == "ring" then  -- (0.15.236, test) "fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]":

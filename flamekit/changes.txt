@@ -1,3 +1,7 @@
+0.15.237 Nov 16, 2026
+- Fast Dive landing: Huge crater (five big TNTs at once, close together). The choice comes to the Experimental tab with a later game update.
+- Server (test): a console test with several rings of explosions.
+
 0.15.236 Nov 16, 2026
 - Server (test): a console test that sets off several explosions at once in a ring. Server only: no game update.
 
