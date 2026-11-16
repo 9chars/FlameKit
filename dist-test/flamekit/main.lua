@@ -9,7 +9,7 @@
 local kit = require("core.kit")
 
 kit.start({
-  "features.changes",       -- What's New. The tabs of FlameKit's window come in this order (then the DLL's own Windows tab)
+  "features.changes",       -- the update message (no tab since 0.15.193). The tabs of FlameKit's window come in this order (then the DLL's own Windows and About tabs)
   "features.loot_filter",
   "features.minimap",
   "features.experimental",  -- its Debug section has the party's test players

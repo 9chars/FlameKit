@@ -526,6 +526,7 @@ std::atomic<bool> g_board_toggle{false};  // the PvP Leaderboard's key (0.15.95)
 // (0.15.100, owner) "Check for updates" clicked: until then (GetTickCount64), an update that is ready shows the update
 // dialog again, even when it was shown for that version already
 std::atomic<uint64_t> g_update_ask_until{0};
+std::atomic<bool> g_changelog_request{false};  // (0.15.193) the About tab's Change Log button: ChangeLogDialog opens
 
 // A key as players read it ("F6", "K"; "" for none), for the window titles (0.15.81, owner: "Experimental [F6]")
 std::wstring key_label(uint32_t vk) {
@@ -3991,7 +3992,7 @@ struct WindowLayer : Layer {
         std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kChangeLog, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey };
     struct Hit {
         RECT r;
         Kind kind;
@@ -4021,7 +4022,7 @@ struct WindowLayer : Layer {
     uint64_t last_toggle = 0;  // when the window key last opened or closed the window (GetTickCount64)
     // the tabs
     std::vector<Tab> tabs;
-    std::string current = "changes";      // the tab shown: What's New the first time in a game, after that the last one
+    std::string current;                  // the tab shown: the first one the first time in a game, after that the last one
     std::string viewing;                  // what the Lua part was last told it shows ("" none)
     std::string rows_of;                  // the tab the rows belong to
     uint64_t generation = 0;
@@ -4870,6 +4871,8 @@ struct WindowLayer : Layer {
             text.draw(canvas, kPad, kTop + 9, test ? L"FlameKit looks for updates every minute (Development)." : L"FlameKit looks for updates every minute.",
                       150, 155, 165);
             button(kW - kPad - cw, kTop + 4, cw, L"Check for updates", false, kCheckUpdates);
+            const int lw = text.width(L"Change Log") + 24;  // (0.15.193, owner) changes.txt in its own window (ChangeLogDialog)
+            button(kW - kPad - cw - 8 - lw, kTop + 4, lw, L"Change Log", false, kChangeLog);
         }
         // the frame, and the grip in the lower right corner that resizes the window
         frame_box(0, 0, kW, kH, 1, 120, 160, 220);
@@ -5239,6 +5242,10 @@ struct WindowLayer : Layer {
                 break;
             case kScrollTrack:  // above or below the thumb: a view's height up or down
                 scroll_to(rows_scroll + (y < thumb_r.top ? -1 : 1) * (kViewBottom - kViewTop - 40));
+                break;
+            case kChangeLog:
+                g_changelog_request = true;
+                FK_LOG(fklog::kInfo, "window: Change Log");
                 break;
             case kCheckUpdates:
                 web_update::g_check_now = true;
@@ -5710,6 +5717,228 @@ struct ExperimentalLayer : PinnedLayer {
             return;
         }
         PinnedLayer::wheel(delta, x, y);
+    }
+};
+
+// ---- the Change Log window (0.15.193, owner) ----
+// The About tab's Change Log button: changes.txt (what What's New showed until 0.15.193) in a scrollable box with an OK
+// button, as the About window of 0.15.103 was. OK, Esc or Enter close it.
+struct ChangeLogDialog : Layer {
+    bool stays_in_build() const override { return true; }
+    const char* name() const override { return "change log window"; }
+    bool open = false, dirty = true, fonts = false, have_text = false;
+    struct Line {
+        std::wstring text;
+        bool head = false, now = false, rule = false;  // now: this version's heading (blue); rule: a separator line
+    };
+    std::vector<Line> source, lines;  // source: changes.txt's lines; lines: wrapped to the box
+    TextPainter text, head;
+    RECT ok_r{}, box_r{};
+    int mouse_x = -1, mouse_y = -1, scroll = 0, max_scroll = 0, w = 0, h = 0, wrapped_w = -1;
+    bool dragging = false;  // the scroll bar's handle is held
+    int bar_top = 0, bar_len = 0, thumb_y = 0, thumb_len = 0, grab = 0;
+    std::wstring status = L"Nothing is written down about this version.";
+    static constexpr int kHead = 32, kLine = 20;
+
+    void fill(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
+        for (int y = y0; y < y1; ++y)
+            for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
+    }
+
+    // changes.txt (beside mod.json): the versions newest first, "0.15.0 Nov 12, 2026" and then "- " lines. Shown as
+    // What's New showed it until 0.15.193: this version, then "Previous Versions", up to 12 versions.
+    void read_changes() {
+        source.clear();
+        const std::string mine = version_in(g_flamekit_dir + L"mod.json");
+        const std::string all = read_text(g_flamekit_dir + L"changes.txt", 4u << 20);
+        int shown = 0;
+        bool skip = false;
+        size_t at = 0;
+        while (at < all.size()) {
+            size_t nl = all.find('\n', at);
+            if (nl == std::string::npos) nl = all.size();
+            std::string l = all.substr(at, nl - at);
+            at = nl + 1;
+            if (!l.empty() && l.back() == '\r') l.pop_back();
+            if (l.rfind("\xEF\xBB\xBF", 0) == 0) l.erase(0, 3);
+            const bool heading = !l.empty() && std::isdigit(static_cast<unsigned char>(l[0])) && l.find('.') != std::string::npos &&
+                                 l.find_first_not_of("0123456789.") > l.find('.');
+            if (heading) {
+                const size_t sp = l.find(' ');
+                const std::string v = l.substr(0, sp);
+                std::string date = sp == std::string::npos ? "" : l.substr(sp + 1);
+                while (!date.empty() && date.back() == ' ') date.pop_back();
+                skip = shown >= 12;
+                if (skip) break;
+                ++shown;
+                if (shown == 2) {
+                    if (!source.empty()) source.push_back({L"", false, false, false});
+                    source.push_back({L"", false, false, true});
+                    source.push_back({L"Previous Versions", true, false, false});
+                }
+                if (shown > 1) source.push_back({L"", false, false, false});
+                source.push_back({widen(v + (date.empty() ? "" : " (" + date + ")")), true, v == mine, false});
+                continue;
+            }
+            if (skip || shown == 0) continue;
+            size_t k = l.find_first_not_of(" \t");
+            if (k == std::string::npos) continue;
+            if (l.compare(k, 2, "- ") == 0) k += 2;
+            source.push_back({L"\u2022 " + widen(l.substr(k)), false, false, false});
+        }
+        have_text = !source.empty();
+        wrapped_w = -1;
+    }
+
+    void wrap(int width) {
+        if (wrapped_w == width) return;
+        wrapped_w = width;
+        lines.clear();
+        for (const Line& src : source) {
+            TextPainter& tp = src.head ? head : text;
+            if (src.text.empty()) {
+                lines.push_back(src);
+                continue;
+            }
+            const bool bullet = src.text.rfind(L"\u2022 ", 0) == 0;  // its next lines start under the text, not the dot
+            for (std::wstring& l : wrap_words(tp, src.text, width, bullet ? L"  " : L"")) lines.push_back({std::move(l), src.head, src.now, false});
+        }
+    }
+
+    void draw() {
+        if (!fonts) {
+            fonts = true;
+            head.ready(g_screen, 17);
+            text.ready(g_screen, 15);
+        }
+        resize(w, h);
+        std::fill(pixels.begin(), pixels.end(), 0u);
+        fill(0, 0, w, h, 14, 15, 19, 0.96f);
+        fill(0, 0, w, kHead, 30, 34, 44, 1.0f);
+        fill(0, 0, w, 1, 120, 160, 220, 1.0f);
+        fill(0, h - 1, w, h, 120, 160, 220, 1.0f);
+        fill(0, 0, 1, h, 120, 160, 220, 1.0f);
+        fill(w - 1, 0, w, h, 120, 160, 220, 1.0f);
+        head.draw(canvas, 12, 6, L"Change Log", 235, 225, 205);
+        box_r = {14, kHead + 12, w - 14, h - 62};
+        fill(box_r.left, box_r.top, box_r.right, box_r.bottom, 22, 24, 30, 1.0f);
+        fill(box_r.left, box_r.top, box_r.right, box_r.top + 1, 70, 74, 86, 1.0f);
+        fill(box_r.left, box_r.bottom - 1, box_r.right, box_r.bottom, 70, 74, 86, 1.0f);
+        const int inner_w = box_r.right - box_r.left - 34, view_h = box_r.bottom - box_r.top - 12;
+        if (!have_text) {
+            text.draw(canvas, box_r.left + 12, box_r.top + 10, status, 150, 155, 165);
+        } else {
+            wrap(inner_w);
+            const int total = static_cast<int>(lines.size()) * kLine;
+            max_scroll = std::max(0, total - view_h);
+            scroll = std::clamp(scroll, 0, max_scroll);
+            for (size_t i = 0; i < lines.size(); ++i) {
+                const int y = box_r.top + 6 + static_cast<int>(i) * kLine - scroll;
+                if (y < box_r.top + 2 || y + kLine > box_r.bottom - 2) continue;  // only whole lines inside the box
+                if (lines[i].rule) fill(box_r.left + 12, y + kLine / 2, box_r.right - 24, y + kLine / 2 + 1, 90, 90, 100, 1.0f);
+                else if (lines[i].now) head.draw(canvas, box_r.left + 12, y, lines[i].text, 159, 210, 255);
+                else if (lines[i].head) head.draw(canvas, box_r.left + 12, y, lines[i].text, 255, 210, 122);
+                else text.draw(canvas, box_r.left + 12, y, lines[i].text, 225, 225, 230);
+            }
+            if (max_scroll > 0) {  // the scroll bar (0.15.115: dragged with the mouse, or a click above or below its handle)
+                const int track = box_r.bottom - box_r.top - 8, th = std::max(24, track * view_h / std::max(1, total));
+                const int ty = box_r.top + 4 + (track - th) * scroll / max_scroll;
+                fill(box_r.right - 14, box_r.top + 4, box_r.right - 4, box_r.bottom - 4, 40, 42, 50, 1.0f);
+                fill(box_r.right - 14, ty, box_r.right - 4, ty + th, dragging ? 170.0f : 120.0f, dragging ? 178.0f : 128.0f,
+                     dragging ? 200.0f : 145.0f, 1.0f);
+                bar_top = box_r.top + 4, bar_len = track, thumb_y = ty, thumb_len = th;
+            } else {
+                bar_len = 0;
+            }
+        }
+        const int bw = 120, bh = 32;
+        ok_r = {(w - bw) / 2, h - bh - 16, (w + bw) / 2, h - 16};
+        const bool over = mouse_x >= ok_r.left && mouse_y >= ok_r.top && mouse_x < ok_r.right && mouse_y < ok_r.bottom;
+        fill(ok_r.left, ok_r.top, ok_r.right, ok_r.bottom, over ? 92.0f : 62.0f, over ? 96.0f : 66.0f, over ? 108.0f : 76.0f, 1.0f);
+        fill(ok_r.left, ok_r.top, ok_r.right, ok_r.top + 1, 120, 160, 220, 1.0f);
+        fill(ok_r.left, ok_r.bottom - 1, ok_r.right, ok_r.bottom, 120, 160, 220, 1.0f);
+        text.draw(canvas, ok_r.left + (bw - text.width(L"OK")) / 2, ok_r.top + 7, L"OK", 235, 235, 240);
+        changed = true;
+    }
+
+    void update(const Frame& f) override {
+        if (g_changelog_request.exchange(false)) {  // the About tab's Change Log button: changes.txt as it is now
+            open = true;
+            dirty = true;
+            scroll = 0;
+            read_changes();
+            FK_LOG(fklog::kInfo, "change log: opened (%d line(s))", static_cast<int>(source.size()));
+        }
+        const bool want = open && f.gw > 0 && f.gh > 0;
+        if (want != visible) {
+            visible = want;
+            changed = true;
+        }
+        if (!visible) return;
+        // (0.15.115, owner: bigger) up to 1100 x 900, 40 px inside the game window on each side
+        const int nw = std::min(1100, std::max(320, f.gw - 80)), nh = std::min(900, std::max(240, f.gh - 80));
+        if (nw != w || nh != h) {
+            w = nw;
+            h = nh;
+            wrapped_w = -1;
+            dirty = true;
+        }
+        if (dirty) {
+            dirty = false;
+            draw();
+        }
+        place(std::max(0, (f.gw - w) / 2), std::max(0, (f.gh - h) / 2));
+    }
+
+    void close(const char* how) {
+        open = false;
+        FK_LOG(fklog::kInfo, "change log: closed (%s)", how);
+    }
+    bool wants_mouse() const override { return open; }
+    bool wants_keys() const override { return open; }
+    void key(WPARAM vk) override {
+        if (vk == VK_ESCAPE) close("Esc");
+        else if (vk == VK_RETURN) close("Enter");
+        else if (vk == VK_DOWN || vk == VK_NEXT) { scroll += vk == VK_DOWN ? kLine : (box_r.bottom - box_r.top - 40); dirty = true; }
+        else if (vk == VK_UP || vk == VK_PRIOR) { scroll -= vk == VK_UP ? kLine : (box_r.bottom - box_r.top - 40); dirty = true; }
+    }
+    void wheel(int delta, int x, int y) override {
+        scroll -= delta * 3 * kLine / WHEEL_DELTA;  // draw keeps it in range
+        dirty = true;
+    }
+    void mouse_left() override {
+        mouse_x = mouse_y = -1;
+        dirty = true;
+    }
+    void mouse(UINT msg, int x, int y) override {
+        if (msg == WM_MOUSEMOVE) {
+            if (dragging && max_scroll > 0) {  // the handle follows the pointer (draw keeps scroll in range)
+                scroll = (y - grab - bar_top) * max_scroll / std::max(1, bar_len - thumb_len);
+                dirty = true;
+            }
+            if (x != mouse_x || y != mouse_y) {
+                mouse_x = x;
+                mouse_y = y;
+                dirty = true;
+            }
+            return;
+        }
+        if (msg == WM_LBUTTONDOWN && bar_len > 0 && x >= box_r.right - 18 && x < box_r.right && y >= bar_top && y < bar_top + bar_len) {
+            if (y >= thumb_y && y < thumb_y + thumb_len) {  // the handle: dragged
+                dragging = true;
+                grab = y - thumb_y;
+            } else {  // above or below it: a page
+                scroll += (y < thumb_y ? -1 : 1) * (box_r.bottom - box_r.top - 40);
+            }
+            dirty = true;
+            return;
+        }
+        if (msg == WM_LBUTTONUP && dragging) {
+            dragging = false;
+            dirty = true;
+            return;
+        }
+        if (msg == WM_LBUTTONUP && x >= ok_r.left && y >= ok_r.top && x < ok_r.right && y < ok_r.bottom) close("OK");
     }
 };
 
@@ -6489,8 +6718,9 @@ void ui_thread_body() {
     experimental.window = &window;
     BoardLayer board;
     UpdateDialog update_dialog;
+    ChangeLogDialog change_log;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &change_log, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;
@@ -6589,7 +6819,7 @@ void ui_thread_body() {
         // does not jump around; the first time, in the middle of the game window. It is put there at once and on the
         // next 4 rounds (60 ms), because the game may still move it while it lets go of the mouse.
         {
-            g_ui_modal = window.open || update_dialog.open;  // the one list (see g_ui_modal)
+            g_ui_modal = window.open || update_dialog.open || change_log.open;  // the one list (see g_ui_modal)
             const bool mode = hold || g_ui_modal;
             if (mode && !g_pointer_mode) {
                 restore_rounds = 5;

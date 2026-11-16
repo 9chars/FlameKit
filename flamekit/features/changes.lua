@@ -1,4 +1,5 @@
--- features/changes.lua: the What's New tab of FlameKit's window (F4), and after an update a message that says so.
+-- features/changes.lua: after an update a message that says so, and open_on_start. (0.15.193, owner) the What's New tab
+-- is gone: changes.txt is shown by FlameKit's DLL in its Change Log window (the About tab's Change Log button).
 --
 -- changes.txt lists the versions, newest first: a line with the version and its date ("0.15.0 Nov 12, 2026"), then
 -- its lines, then an empty line. The
@@ -8,50 +9,12 @@
 -- is on (since 0.15.188 no longer after an update by itself) FlameKit's window is opened on this tab: emf\mods\flamekit\ui_open.dat gets the tab's id;
 -- FlameKit's DLL opens the window once and deletes the file.
 
-local F = { id = "changes", title = "What's New" }
+local F = { id = "changes", title = "Change Log" }  -- no panel: not a tab
 
 local kit
-local entries = {}     -- {version, lines}, newest first
 local pending = false  -- a new version: the message is still to be shown
 local opened_this_game = false
 local steps = 0
-
-local function load_entries()
-  local f = io.open(emf.dir .. "\\changes.txt", "r")
-  if not f then return end
-  local entry = nil
-  for line in f:lines() do
-    line = line:gsub("\r$", ""):gsub("^\239\187\191", "")
-    local version, date = line:match("^(%d+%.[%d%.]+)%s*(.-)%s*$")
-    if version then
-      entry = { version = version, date = date ~= "" and " (" .. date .. ")" or "", lines = {} }
-      entries[#entries + 1] = entry
-    elseif entry and line:match("%S") then
-      entry.lines[#entry.lines + 1] = (line:gsub("^%s*%-%s*", ""))
-    end
-  end
-  f:close()
-end
-
-local MOST_VERSIONS = 12  -- the tab shows this version and the ones before it, up to this many
-
-function F.panel(world)
-  local rows = {}
-  local shown = 0
-  for _, e in ipairs(entries) do
-    if #e.lines > 0 and not kit.newer(e.version, kit.version) and shown < MOST_VERSIONS then
-      shown = shown + 1
-      if shown == 2 then
-        rows[#rows + 1] = { separator = true }
-        rows[#rows + 1] = { heading = "Previous Versions" }
-      end
-      rows[#rows + 1] = { heading = e.version .. e.date, color = e.version == kit.version and "#9fd2ff" or nil }
-      for _, line in ipairs(e.lines) do rows[#rows + 1] = { text = "- " .. line } end
-    end
-  end
-  if #rows == 0 then rows[1] = { dim = true, text = "Nothing is written down about this version." } end
-  return rows
-end
 
 -- Asks FlameKit's DLL to open its window on this tab.
 local function open_window()
@@ -59,7 +22,7 @@ local function open_window()
   if not f then return end
   f:write(F.id)
   f:close()
-  kit.debug("info", "changes: FlameKit's window asked to open on What's New")
+  kit.debug("info", "changes: FlameKit's window asked to open (open_on_start)")
 end
 
 function F.client_tick(world)
@@ -83,7 +46,6 @@ end
 
 function F.setup(k)
   kit = k
-  load_entries()
   local seen = kit.store.load("seen_version", {}).version
   if type(seen) ~= "string" then seen = nil end
   pending = seen ~= kit.version

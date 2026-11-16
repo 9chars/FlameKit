@@ -1,3 +1,7 @@
+0.15.193 Nov 15, 2026
+- F4 menu, About tab: a "Change Log" button left of "Check for updates". It opens a "Change Log" window with the list of changes (what What's New showed) and an OK button that closes it.
+- The What's New tab is gone. "Open FlameKit's window when you enter a world" now opens it on the first tab.
+
 0.15.192 Nov 15, 2026
 - F4 menu: a new "About" tab at the end. It has the update line and the "Check for updates" button at the top (they were on What's New) and the README text below (it was in the "About FlameKit" window). The "About" button on What's New is gone.
 
