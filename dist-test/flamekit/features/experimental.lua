@@ -175,7 +175,7 @@ glide.SBJ = {
     tip = "How quickly you must tap twice: jump for a Super B Jump, forward for a Fast Dive. Shorter: fewer by accident, but you must tap faster. Longer: easier, but a quick normal double jump may become a leap (from about 217 ms on). Only for you." },
   -- (0.15.226, owner: "give me all the settings to tweak it like the other features") Fast Dive's own settings
   { which = "divespeed", key = "sbj_divespeed", label = "Fast Dive speed", sep = true,
-    steps = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5 },
+    steps = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10 },  -- (0.15.228, owner: faster options)
     tip = "How fast the dive goes down: 1.0x is about 60 m/s, three times the game's fastest fall. Only for you." },
   { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 4 },
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
@@ -1440,6 +1440,14 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed"),
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin") }
       local what = glide.dive.step(world, p.entity, p.dive, o)
+      if what == "dive" or what == "landed" then  -- (0.15.228) the diver's own game presses HeadDive and Sneak
+        local m = { op = "dive", on = what == "dive", free = what == "dive" and not p.dive.from_glider }
+        if kit.is_host() and emf.local_player() == p.entity then
+          pcall(glide.dive.client_msg, m)
+        else
+          pcall(emf.net.send_to, world, p.entity, CHANNEL, emf.json.encode(m))
+        end
+      end
       if what == "dive" then
         emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (speed %sx, landing %s)",
           tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or "",
@@ -1816,6 +1824,7 @@ end
 
 function F.tick(world)
   fx_steps = fx_steps + 1
+  if not world:is_server() then pcall(glide.dive.client_tick, world) end  -- (0.15.228) Fast Dive's pose, the diver's own game
   if world:is_server() then  -- (0.15.161) test monster bodies emptied; (0.15.186) their loot piles removed
     pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
   end
@@ -2648,6 +2657,7 @@ function F.setup(k)
     end, "a message from a player"),
     on_player = kit.guard(F, function(world, from, data)
       local msg = emf.json.decode(data)
+      if type(msg) == "table" and msg.op == "dive" then pcall(glide.dive.client_msg, msg) return end  -- (0.15.228)
       if type(msg) == "table" and msg.op == "state" then
         shown = msg
         if msg.note then note = msg.note end
