@@ -20,6 +20,14 @@ rewrite the step if any answer is no:
 7. Did Claude first check everything it can check itself (the file on the PC, what the code will do, a read-only dry
    run in the log) so the owner is not the one finding Claude's mistakes?
 
+## Rule 0r: CORE DIRECTIVE, restart status FIRST (owner, 2026-11-16 08:05)
+
+Every message that reports a change (or a copy to the local server, G-Portal or a channel) STARTS with one bold line,
+before anything else: **Restart: client** / **Restart: server** / **Restart: both** / **Restart: none**, with a few
+words why (e.g. "Restart: none: EMF reloaded the server's Lua by itself"). Owner: "you never tell me this and it takes a
+while to read all your shit to figure out if I need to restart or not ... I have to keep telling and asking you this."
+No exceptions, also for small changes, probes and test copies.
+
 ## Rule 0a: CORE DIRECTIVE, tests and requests (owner, 2026-11-15 14:46)
 
 Every time Claude needs a new test, it says so. Never ask the owner to do anything without first giving a short, brief
