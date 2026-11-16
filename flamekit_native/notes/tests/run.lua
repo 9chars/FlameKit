@@ -313,7 +313,7 @@ local function step(n)
     local asks = ptest_up
     ptest_up = {}
     for _, data in ipairs(asks) do channels.party_test.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
-    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW); require("features.leaderboard").tick(SW); require("features.loot_drop").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
+    if JOINED then server.tick(SW); require("features.experimental").tick(SW); require("features.party").tick(SW); require("features.server_save").tick(SW); require("features.leaderboard").tick(SW); require("features.loot_drop").tick(SW); require("features.chat").tick(SW) else for _, f in ipairs(ticks) do f(SW) end end
     side = "client"
     msgs = to_client
     to_client = {}
@@ -1343,6 +1343,28 @@ do  -- (0.15.200, owner) the glider speed: a drop-down in the Experimental tab, 
   h = glide_at("1")
   check(h == 18.7, "glider speed 1x: the game's own speed, nothing written")
 end
+do  -- (0.15.205, owner) the damage bonus: a drop-down, a hit rule against creatures with the player's scale
+  local dr = find_row("^Off %(%+0%%%)$")
+  check(dr and dr.options and #dr.options == 15, "the Experimental tab has the damage bonus drop-down, off")
+  local function rule()
+    for _, r in pairs(hit_rules) do if r.from == PLAYER and r.to == "creatures" and r.scale then return r end end
+  end
+  click("W:dmg:200")
+  step(JOINED and 10 or 3)
+  local r = rule()
+  check(r and r.scale == 3, "damage bonus +200%: a rule from the player to creatures, three times the damage")
+  click("W:dmg:50")
+  step(JOINED and 10 or 3)
+  r = rule()
+  local n = 0
+  for _, x in pairs(hit_rules) do if x.from == PLAYER and x.to == "creatures" then n = n + 1 end end
+  check(r and r.scale == 1.5 and n == 1, "+50%: one rule, 1.5 times")
+  local jf = io.open(TMP .. "\\experimental.json"); local js = jf and jf:read("a") or ""; if jf then jf:close() end
+  check(js:find('"damage_pct":50', 1, true) ~= nil, "the damage bonus is kept for the player")
+  click("W:dmg:0")
+  step(JOINED and 10 or 3)
+  check(rule() == nil, "off: the rule is gone")
+end
 comps.Velocity[PLAYER].velocity.y = -4.5
 step(5)
 check(comps.Velocity[PLAYER].velocity.y == -4.5, "S let go: the climb stops at once")
@@ -1371,6 +1393,13 @@ local pl = require("core.players")
 check(#pl.ids(SW) == 0, "the player left: core/players.lua no longer lists them")
 join_all()  -- and comes back
 check(#pl.ids(SW) == 1 and pl.ids(SW)[1] == PLAYER, "EMF reports the player joined: core/players.lua lists their entity id")
+do  -- (0.15.205, owner) "<name> joined the server!" / "left the server!": yellow, in the Notices window only
+  step(200)
+  local nf = io.open(TMP .. "\\ui_notices.dat", "r"); local nt = nf and nf:read("a") or ""; if nf then nf:close() end
+  check(nt:find("ffe14d [^\n]*joined the server!") ~= nil, "a join: a yellow notice 'joined the server!'")
+  local mf = io.open(TMP .. "\\ui_messages.dat", "r"); local mt = mf and mf:read("a") or ""; if mf then mf:close() end
+  check(not mt:find("joined the server!", 1, true), "and no line in the Messages window")
+end
 local vt = io.open(TMP .. "\\experimental.json"); local visit = vt:read("a"); vt:close()
 check(visit:find('"fall":true', 1, true) ~= nil, "but the option stays saved")
 step(JOINED and 320 or 40)
@@ -1595,8 +1624,8 @@ if JOINED then
   local hud_text = hf and hf:read("a") or ""
   if hf then hf:close() end
   check(not hud_text:find("notice", 1, true), "nothing for the lower left corner")
-  check(not (io.open(TMP .. "\\ui_notices.dat", "r") or { read = function() return "" end }):read("a"):find("server", 1, true),
-    "and nothing about the server in the Notices window")
+  check(not (io.open(TMP .. "\\ui_notices.dat", "r") or { read = function() return "" end }):read("a"):gsub("[^\n|]*the server!", ""):find("server", 1, true),
+    "and nothing about the server in the Notices window (0.15.205: but the joins and leaves)")
   emf.session = real_session
 end
 do  -- a new update downloaded (update_status.txt from the DLL's updater): a green line in Messages, once

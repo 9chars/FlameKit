@@ -1,3 +1,8 @@
+0.15.205 Nov 15, 2026
+- Experimental tab: "Damage bonus", from +10% to +200% (Off is the game's own damage). More damage to creatures with every hit; each player sets their own and it is kept. Off while you are in PvP.
+- Notices window: "<name> joined the server!" and "<name> left the server!", in yellow, for everyone with FlameKit.
+- Both need FlameKit 0.15.205 on the server.
+
 0.15.204 Nov 15, 2026
 - Glider speed: an even slower choice, 0.05x. Needs FlameKit 0.15.204 on the server.
 

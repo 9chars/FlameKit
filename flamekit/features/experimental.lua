@@ -135,6 +135,20 @@ function glide.apply(world, account, p)
   end
 end
 
+-- (0.15.205, owner: "a huge damage multiplier ... up to 200% more than my usual damage ... a drop down") each player's
+-- own damage bonus against creatures, +0% to +200% (experimental.json damage_pct; 0 is not kept): an EMF hit rule
+-- {from = the player, to = "creatures", scale = 1 + bonus}. Off while the player is in PvP (the PvP duelists and the
+-- leaderboard stay fair). Kept in this table with the glider speed (Lua's limit of 200 locals in this file).
+glide.DAMAGE = { 0, 10, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200 }
+function glide.damage(account)
+  local d = tonumber(((saved or {})[account] or {}).damage_pct)
+  return d and d > 0 and d or 0
+end
+function glide.damage_allowed(d)
+  for _, s in ipairs(glide.DAMAGE) do if s == d then return true end end
+  return false
+end
+
 -- What the player switched, PvP or not.
 local function wants(account, key)
   if SESSION_ONLY[key] then return online[account] ~= nil and online[account][key] == true end
@@ -155,6 +169,7 @@ end
 local function drop_rules(p)
   for key, id in pairs(p.rules) do pcall(emf.hit_rule_remove, id) end
   p.rules = {}
+  p.dmg_scale = nil  -- (0.15.205) the damage bonus rule is made again
 end
 
 -- Makes the rules match the switches of the players who are here. Cheap: called every server step, so a reload puts
@@ -186,6 +201,18 @@ local function apply()
           p.rules[key] = nil
         end
       end
+      -- (0.15.205) the damage bonus: a rule with this player's scale (made again when the bonus changes; none in PvP)
+      local bonus = glide.damage(account)
+      local scale = (bonus > 0 and not wants(account, "pvp")) and (1 + bonus / 100) or false
+      if p.dmg_scale ~= scale then
+        if p.rules.damage then pcall(emf.hit_rule_remove, p.rules.damage) p.rules.damage = nil end
+        p.dmg_scale = scale
+        if scale then
+          local ok, id = pcall(emf.hit_rule, { from = p.entity, to = "creatures", scale = scale })
+          if ok and id then p.rules.damage = id
+          else emf.log("experimental: the damage bonus rule was refused (" .. tostring(id) .. ")") end
+        end
+      end
     end
   end
 end
@@ -209,7 +236,8 @@ local input_broken = false  -- the game's own input cannot be read: players' gam
 local body_of  -- forward: the PvP test bodies, below
 local function view(account)
   local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
-              glide_speed = glide.factor(account) }
+              glide_speed = glide.factor(account), damage_pct = glide.damage(account),
+              damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -1096,6 +1124,18 @@ local function handle(world, account, entity, msg)
       return v
     end
   end
+  if msg.op == "set" and msg.key == "damage_pct" then  -- (0.15.205) the damage bonus
+    local d = tonumber(msg.value)
+    if d and glide.damage_allowed(d) then
+      local set = saved[account] or {}
+      set.damage_pct = d > 0 and d or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      emf.log(string.format("experimental: player %s set the damage bonus to +%d%%", tostring(entity), d))
+    end
+    return view(account)
+  end
   if msg.op == "set" and msg.key == "glide_speed" then  -- (0.15.200) the glider speed
     local f = tonumber(msg.value)
     if f and glide.allowed(f) then
@@ -1938,6 +1978,15 @@ local function panel_rows(world)
     rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
       tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
   end
+  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +200%
+    local dp = tonumber(v.damage_pct) or 0
+    local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
+    local opts = {}
+    for _, d in ipairs(glide.DAMAGE) do opts[#opts + 1] = { key = "dmg:" .. tostring(d), text = name(d), selected = d == dp } end
+    rows[#rows + 1] = { label = true, text = "Damage bonus" }
+    rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
+      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +200% three times. Only for you; off while you are in PvP." }
+  end
   return debug_rows(world, rows)
 end
 
@@ -2174,6 +2223,20 @@ function F.click(world, key)
   if key == "waypoint" then
     note = nil
     want_waypoint = true
+    return
+  end
+  if key:sub(1, 4) == "dmg:" then  -- (0.15.205) the damage bonus
+    local d = tonumber(key:sub(5))
+    if not d then return end
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = "damage_pct", value = d }).note
+    elseif shown then
+      shown.damage_pct = d  -- at once on screen; the server's answer follows
+      ask({ op = "set", key = "damage_pct", value = d })
+    end
     return
   end
   if key:sub(1, 3) == "gs:" then  -- (0.15.200) the glider speed
