@@ -31,7 +31,9 @@ local M = {
   -- (0.15.223, owner: "try the head-first dive pose") TEST: while diving out of the glider, "input" adds the game's
   -- HeadDive input (PlayerInputType 33, bit 33 of digitalInput) to what the player's game sent; "flag" sets the
   -- HeadDiving state (keen::actor::StateFlag 33) in Actor.currentState; "off" neither
-  POSE = "flag",  -- (0.15.224) "input" showed no head-first pose (owner, 0.15.223 test)
+  -- (0.15.225) "input" showed no head-first pose (0.15.223 test); "flag" showed none either and LEFT the player rolling
+  -- forward on the ground after the landing (owner, 0.15.224 test: the HeadDiving state stayed set). Off.
+  POSE = "off",
   LANDING_SHIELD = 1.5,  -- seconds the diver takes no hits after the landing (their own shockwave)
   -- keepAliveMask: (0.15.220) the game ended a push naming Jumping, Falling and HangGliding at once within 1/4 s
   -- (0.15.219 test): the player must be in every state named. So only the state the player is in: Falling (32), or
@@ -138,6 +140,16 @@ function M.step(world, entity, s, opts)
     local down = forward_down(world, entity)
     local pressed = down and not s.down
     s.down = down
+    -- (0.15.225) a HeadDiving state FlameKit set (0.15.224 "flag") must never stay: cleared every step while not diving
+    -- (the player rolled forward on the ground, in any movement state)
+    if not s.diving and (st == ON_GROUND or st == 1) then  -- walking or sliding: never in the air (the game's own head dive into water)
+      local a = world:get("Actor", entity)
+      local cs = a and math.tointeger(a.currentState)
+      if cs and cs & HEAD_DIVE ~= 0 then
+        a.currentState = cs & ~HEAD_DIVE
+        emf.log("fast dive: player " .. tostring(entity) .. ": the head-dive state is cleared")
+      end
+    end
     if st == ON_GROUND then
       if s.diving then
         s.diving = nil

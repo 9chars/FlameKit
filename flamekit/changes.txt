@@ -1,3 +1,6 @@
+0.15.225 Nov 16, 2026
+- Fast Dive (server, test): no head-first pose test any more (it left the player rolling forward on the ground); a player stuck that way is freed on the ground.
+
 0.15.224 Nov 16, 2026
 - Fast Dive (server, test): one smooth push all the way down (no more slowdowns every 5 s); lands with the game's small TNT (a boom and a crater); a second try at the head-first pose.
 
