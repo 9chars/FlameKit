@@ -1454,7 +1454,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       elseif what == "landed" then
         local _, y = world:position(p.entity)
         emf.log(string.format("experimental: fast dive: player %s landed at %.1f m, %s, blast %s", tostring(p.entity), y or 0,
-          p.dive.in_base == nil and "base unknown" or p.dive.in_base and "inside a base" or "outside bases",
+          p.dive.in_base == nil and "base unknown" or p.dive.in_base and "inside a base"
+            or p.dive.near_base and string.format("near the base at %.0f %.0f", p.dive.near_base.x, p.dive.near_base.z)
+            or "away from bases",
           tostring(p.dive.landed_with)))
       end
     end
@@ -2502,6 +2504,19 @@ function F.setup(k)
       local d, a1, a2 = glide.dive, args[1], args[2]
       local function say(line) emf.log("experimental: " .. line) emf.reply(line) end
       if a1 == "speed" then d.SPEED = tonumber(a2) or d.SPEED say("fastdive: speed at 1x " .. d.SPEED) return end
+      if a1 == "margin" then  -- (0.15.233) "fastdive margin <small> [medium] [big]": metres around bases, boom only
+        d.MARGIN[1] = tonumber(a2) or d.MARGIN[1]
+        d.MARGIN[2] = tonumber(args[3]) or d.MARGIN[2]
+        d.MARGIN[3] = tonumber(args[4]) or d.MARGIN[3]
+        say(string.format("fastdive: margin around bases %s / %s / %s m", d.MARGIN[1], d.MARGIN[2], d.MARGIN[3]))
+        return
+      end
+      if a1 == "bases" then  -- (0.15.233) the bases core/bases.lua knows
+        local b = require("core.bases")
+        say(string.format("fastdive: %d base(s) known", #b.list))
+        for _, e in ipairs(b.list) do say(string.format("  base at %.1f %.1f, zone reaches %.1f x %.1f m from %.1f %.1f", e.ax, e.az, e.hx, e.hz, e.x, e.z)) end
+        return
+      end
       if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID>": the effect 3 m in front of them
         local id, guid = tonumber(a2), args[3]
         local x, y, z

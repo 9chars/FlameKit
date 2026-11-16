@@ -21,6 +21,7 @@
 --   height only stops a dive just above the ground.
 
 local fall_guard = require("core.fall_guard")
+local bases = require("core.bases")
 
 local M = {
   WINDOW = 11,           -- steps: the default tap speed (the player's own comes in opts.window)
@@ -42,6 +43,9 @@ local M = {
   -- chose craters there too (opts.base == 1)
   SAVE_ZONE = 1 << 14,
   BOOM_ONLY = 4,
+  -- (0.15.233, owner: a crater just outside a base still damaged it near the border) also boom only within this many
+  -- metres around a base's build zone (core/bases.lua), by the size of the blast; tuned with flamekit.fastdive margin
+  MARGIN = { [1] = 10, [2] = 15, [3] = 25 },
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -103,7 +107,11 @@ local function landing(world, entity, kind, s)
   local x, y, z = world:position(entity)
   if not x then return end
   s.in_base = M.in_base(world, entity)
-  if s.in_base and (kind or 1) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
+  s.near_base = nil
+  if not s.in_base and s.base ~= 1 and M.MARGIN[kind or 1] then
+    s.near_base = bases.near(x, z, M.MARGIN[kind or 1])
+  end
+  if (s.in_base or s.near_base) and (kind or 1) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
   s.landed_with = kind
   local l = M.LANDINGS[kind or 1]
   if not (l and l.guid) then return end
@@ -119,6 +127,7 @@ end
 
 -- the shields of earlier landings run out (every step, any player)
 function M.tick(world)
+  if world:is_server() then pcall(bases.tick, world) end  -- (0.15.233) the list of bases, made in the background
   if not M.shields then return end
   local t = world:tick()
   for i = #M.shields, 1, -1 do
