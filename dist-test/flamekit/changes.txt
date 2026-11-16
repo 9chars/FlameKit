@@ -1,3 +1,6 @@
+0.15.184 Nov 15, 2026
+- New option (F4 menu, Windows tab, and Settings): "Show the pointer while you stand still". On: the mouse pointer for FlameKit's windows and the minimap comes out by itself when you give no keyboard or controller input for 3/4 of a second (in the world, not in a game menu or build mode), and goes away with your next key or controller input. Mouse clicks do not count. The pointer key works as before. Off by default.
+
 0.15.183 Nov 15, 2026
 - Experimental window, test monsters: "Reward loot" is Off by default (each game start).
 - Fixed: "Reward loot: Off" was sent as on (0.15.182), so test monsters still gave loot.
