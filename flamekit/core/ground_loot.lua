@@ -61,8 +61,9 @@ end
 -- (0.15.173, owner: that is "the loot pile one", not the sparkle) no mark for now: the sparkle on a dead body is an
 -- effect component the game adds to the body (transform_to_loot), being read first (features/loot_drop.lua)
 -- (0.15.175, owner picked it) glowing specks, a separate effect on the item's spot as the flame was
--- (0.15.177, owner) the fireflies the game puts over loot pickups (0.15.175: VFX_SubEntity_Wildlife_SpiderAnt_Babies_Glowy)
-ground.MARK_FX = "c2091afd-f631-4160-ac79-574b951f5a4a"  -- Lootpickup_Scatter_VFX_Bait_T1_Fire_Fly_Above
+-- (0.15.181, owner picked it from the flamekit.fx preview: "probably the only one out of all of those that might work")
+-- 0.15.177's fireflies (Lootpickup_Scatter_VFX_Bait_T1_Fire_Fly_Above) did not show; 0.15.175: the glowing specks
+ground.MARK_FX = "eb3633fc-6b5b-4cfa-b133-60b2c87ed66e"  -- VFX_Altar_FlameEssence
 ground.MARK_S = 600
 ground.MARK_MAX = 300
 local marks, marks_n = {}, 0  -- effect id -> { item = pickup id, at = os.time() }

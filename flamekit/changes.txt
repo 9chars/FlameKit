@@ -1,3 +1,6 @@
+0.15.181 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the Flame Altar's essence effect (picked from the preview) until picked up; the fireflies did not show. Server only: no game update.
+
 0.15.180 Nov 15, 2026
 - Server console "flamekit.fx <1-10>": shows one of 10 candidate effects for the ground-loot mark 3 m in front of the player for 10 s, to pick one. Server only: no game update.
 
