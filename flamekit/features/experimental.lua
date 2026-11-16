@@ -73,7 +73,7 @@ local TIPS = {
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
-  fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing does not hurt you and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
+  fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing from a free-fall dive kills you unless No Fall Damage is on (a dive started in the glider is survived), and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -1458,6 +1458,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
                   base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto") }
       local what = glide.dive.step(world, p.entity, p.dive, o)
+      p.dive.landed_now = what == "landed" or nil
       -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
       -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
       if what == "dive" or what == "landed" or what == "cancel" then
@@ -1490,7 +1491,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     if is_on(account, "superbjump") then
       p.leap = p.leap or {}
       local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer"),
-                  window = glide.sbj(account, "window") }
+                  window = glide.sbj(account, "window"),
+                  -- (0.15.249) a free-fall Fast Dive is deadly: the leap's fall protection waits until that landing is done
+                  no_guard = p.dive ~= nil and not p.dive.from_glider and (p.dive.diving or p.dive.landed_now) or nil }
       local what = glide.leap.step(world, p.entity, p.leap, o)
       if what == "leap" then
         local cap = glide.leap.last_cap

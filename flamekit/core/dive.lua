@@ -210,7 +210,10 @@ function M.step(world, entity, s, opts)
     end
     if y and (not s.top or y > s.top) then s.top = y end
     if s.diving then
-      fall_guard.step(world, entity)
+      -- (0.15.249, owner: "the impact should kill you", "let the natural fall kill the player", "let the glider dive
+      -- bomb survive") only a dive started in the glider keeps the fall short; a free-fall dive lands as the game's own
+      -- fall (No Fall Damage and Invincible Mode still protect: features/experimental.lua)
+      if s.from_glider then fall_guard.step(world, entity) end
       -- (0.15.248, owner) an automatic dive (free fall) is cancelled only by opening the glider
       if s.auto and st == GLIDING then
         s.diving = nil
