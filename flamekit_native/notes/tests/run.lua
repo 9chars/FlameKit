@@ -1323,6 +1323,26 @@ check(comps.Velocity[PLAYER].velocity.y == -4.5, "not gliding: nothing is writte
 comps.DynamicLocomotion[PLAYER].state = 4
 held_key = nil
 step(5)
+do  -- (0.15.200, owner) the glider speed: a drop-down in the Experimental tab, kept for the player
+  local gl = find_row("^1%.0x$")
+  check(gl and gl.options and #gl.options == 8, "the Experimental tab has the glider speed drop-down at 1.0x")
+  local function glide_at(choice)
+    click("W:gs:" .. choice)  -- (a drop-down entry's click reaches the feature's click as its key)
+    step(JOINED and 10 or 3)
+    comps.Velocity[PLAYER].velocity = { x = 18.7, y = -4.5, z = 0 }
+    step(1)
+    local v = comps.Velocity[PLAYER].velocity
+    return math.sqrt(v.x * v.x + v.z * v.z), v.y
+  end
+  local h, y = glide_at("2")
+  check(math.abs(h - 37.4) < 0.01 and y == -4.5, "glider speed 2x: twice the cruising speed, sinking as before (" .. h .. ")")
+  h = glide_at("0.5")
+  check(math.abs(h - 9.35) < 0.01, "glider speed 0.5x: half (" .. h .. ")")
+  local jf = io.open(TMP .. "\\experimental.json"); local js = jf and jf:read("a") or ""; if jf then jf:close() end
+  check(js:find('"glide_speed":0.5', 1, true) ~= nil, "the glider speed is kept for the player")
+  h = glide_at("1")
+  check(h == 18.7, "glider speed 1x: the game's own speed, nothing written")
+end
 comps.Velocity[PLAYER].velocity.y = -4.5
 step(5)
 check(comps.Velocity[PLAYER].velocity.y == -4.5, "S let go: the climb stops at once")

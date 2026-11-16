@@ -97,6 +97,44 @@ local function load_saved()
   end
 end
 
+-- (0.15.200, owner: "control my glider speed ... a slider so I can set myself to go slower or faster") each player's
+-- own glider speed, 0.5x to 3x (experimental.json glide_speed; 1x is not kept). Measured on G-Portal (0.15.200 probe):
+-- the game pulls a gliding player's horizontal speed to about 18.7 m/s (sinking 4.5 m/s) whatever it was, so the
+-- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
+-- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
+-- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
+local glide = { CRUISE = 18.7, STEPS = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3 }, broken = false }
+function glide.factor(account)
+  local f = tonumber(((saved or {})[account] or {}).glide_speed)
+  return f and f > 0 and f or 1
+end
+function glide.label(f)
+  return (string.format("%.2f", f):gsub("0+$", ""):gsub("%.$", ".0")) .. "x"
+end
+function glide.allowed(f)
+  for _, s in ipairs(glide.STEPS) do if s == f then return true end end
+  return false
+end
+function glide.apply(world, account, p)
+  local f = glide.factor(account)
+  if f == 1 or p.climb or glide.broken then return end
+  local ok, err = pcall(function()
+    local move = world:get("DynamicLocomotion", p.entity)
+    if not move or tonumber(tostring(move.state)) ~= HANG_GLIDING then return end
+    local v = world:get("Velocity", p.entity).velocity
+    local h = math.sqrt(v.x * v.x + v.z * v.z)
+    local target = glide.CRUISE * f
+    if h < 0.5 then return end
+    if f > 1 and (h < glide.CRUISE * 0.6 or h >= target) then return end
+    if f < 1 and h <= target then return end
+    v.x, v.z = v.x / h * target, v.z / h * target
+  end)
+  if not ok then
+    glide.broken = true
+    emf.log("experimental: the glider speed cannot be set on this game version (" .. tostring(err) .. ")")
+  end
+end
+
 -- What the player switched, PvP or not.
 local function wants(account, key)
   if SESSION_ONLY[key] then return online[account] ~= nil and online[account][key] == true end
@@ -170,7 +208,8 @@ local input_broken = false  -- the game's own input cannot be read: players' gam
 
 local body_of  -- forward: the PvP test bodies, below
 local function view(account)
-  local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil }
+  local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
+              glide_speed = glide.factor(account) }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -1057,6 +1096,17 @@ local function handle(world, account, entity, msg)
       return v
     end
   end
+  if msg.op == "set" and msg.key == "glide_speed" then  -- (0.15.200) the glider speed
+    local f = tonumber(msg.value)
+    if f and glide.allowed(f) then
+      local set = saved[account] or {}
+      set.glide_speed = f ~= 1 and f or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      emf.log(string.format("experimental: player %s set the glider speed to %s", tostring(entity), glide.label(f)))
+    end
+    return view(account)
+  end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
       if s[1] == msg.key and held_by_pvp(account, s[1]) then
@@ -1174,6 +1224,7 @@ local function lift(world)
   if lift_broken then return end
   for account, p in pairs(online) do
     read_input(world, account, p)
+    glide.apply(world, account, p)  -- (0.15.200) the player's glider speed
     -- The updraft burst. The game gives one per flight: it notes the used burst in the glider's flags (bit 64) and
     -- lifts the player with two impulses. With the switch on, the note is taken away (so the game's own display
     -- shows a burst ready) and every later press of the burst key gets the same two impulses from here.
@@ -1879,6 +1930,14 @@ local function panel_rows(world)
       end
     end
   end
+  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.5x to 3x
+    local gs = tonumber(v.glide_speed) or 1
+    local opts = {}
+    for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
+    rows[#rows + 1] = { label = true, text = "Glider speed" }
+    rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
+      tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
+  end
   return debug_rows(world, rows)
 end
 
@@ -2115,6 +2174,20 @@ function F.click(world, key)
   if key == "waypoint" then
     note = nil
     want_waypoint = true
+    return
+  end
+  if key:sub(1, 3) == "gs:" then  -- (0.15.200) the glider speed
+    local f = tonumber(key:sub(4))
+    if not f then return end
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = "glide_speed", value = f }).note
+    elseif shown then
+      shown.glide_speed = f  -- at once on screen; the server's answer follows
+      ask({ op = "set", key = "glide_speed", value = f })
+    end
     return
   end
   if key:sub(1, 3) ~= "sw:" then return end
