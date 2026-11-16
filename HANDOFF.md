@@ -66,7 +66,7 @@ level), the test monsters' legendary loot, the Server tab.
 
 ## Where things stand (end of the conversation of 2026-11-13..15; the owner starts a new one)
 
-- Versions (2026-11-15 23:40): 0.15.202 on Development, the local server and production (G-Portal); Stable: 0.15.199.
+- Versions (2026-11-15 23:46): 0.15.203 on Development, the local server and production (G-Portal); Stable: 0.15.199.
 - `C:\enshrouded mod shit\outbox` still holds the 0.15.142 Lua files (from before the owner stopped the G-Portal
   upload): never upload them unless the owner asks for G-Portal; replace them with the right files when he does.
 - The Server tab's "Monsters drop their loot on the ground" is ON on the local server (server_settings.json); with
