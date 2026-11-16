@@ -37,6 +37,7 @@ local SWITCHES = {
   { "fly", "Enhanced Glider Mode" },  -- on by default; see lift()
   { "pvp", "PvP (free-for-all)", nil, "PvP" },  -- no hit rule of its own: see pvp() (0.15.65)
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
+  { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -72,6 +73,7 @@ local TIPS = {
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
+  fastdive = "In the air or gliding, tap forward twice quickly to dive straight down, fast. Uses your Super B Jump tap speed. Landing does not hurt you; it lands with a shockwave. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -105,7 +107,7 @@ end
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), dive = require("core.dive"), CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -1400,7 +1402,8 @@ end
 local stamina_broken = false
 
 local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
-  if stamina_broken and glide.mana_broken and glide.fall_guard.broken and glide.leap.broken then return end
+  pcall(glide.dive.tick, world)  -- (0.15.218) Fast Dive's landing shields run out
+  if stamina_broken and glide.mana_broken and glide.fall_guard.broken and glide.leap.broken and glide.dive.broken then return end
   for account, p in pairs(online) do
     if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
@@ -1419,6 +1422,22 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     if is_on(account, "fall") or is_on(account, "immortal") then glide.fall_guard.step(world, p.entity) end
     -- (0.15.209, owner) Super B Jump: a quick double tap of jump leaps high (core/leap.lua), with the player's own
     -- height, forward and air steering factors
+    -- (0.15.218, owner) Fast Dive: a quick double tap of forward in the air dives straight down (core/dive.lua)
+    if is_on(account, "fastdive") then
+      p.dive = p.dive or {}
+      local what = glide.dive.step(world, p.entity, p.dive, { window = glide.sbj(account, "window") })
+      if what == "dive" then
+        emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (ground %s m below, speed %s)",
+          tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", out of the glider" or "",
+          p.dive.ground and string.format("%.1f", p.dive.ground) or "unknown", tostring(glide.dive.SPEED)))
+      elseif what == "low" then
+        emf.log(string.format("experimental: fast dive: player %s too low (ground %.1f m below, minimum %s m)",
+          tostring(p.entity), p.dive.ground or 0, tostring(glide.dive.MIN_HEIGHT)))
+      elseif what == "landed" then
+        local _, y = world:position(p.entity)
+        emf.log(string.format("experimental: fast dive: player %s landed at %.1f m", tostring(p.entity), y or 0))
+      end
+    end
     if is_on(account, "superbjump") then
       p.leap = p.leap or {}
       local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer"),
@@ -2452,6 +2471,38 @@ function F.setup(k)
         tostring(test.rule ~= nil), why or "spawned"))
       emf.reply("pvptest: on")
     end, "the pvptest command"))
+  -- (0.15.218) Fast Dive from the server console, for testing and tuning (until a reload): "fastdive <player entity>
+  -- on|off", "fastdive speed <n>", "fastdive min <m>", "fastdive seconds <s>", "fastdive kick on|off",
+  -- "fastdive effect <template GUID>|off", "fastdive shield <s>", "fastdive ground <player entity>" (logs groundDistance)
+  pcall(emf.command, "fastdive", "<player entity> on|off, or speed|min|seconds|kick|effect|shield <value>, or ground <player entity>: Fast Dive (a test)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      load_saved()
+      local d, a1, a2 = glide.dive, args[1], args[2]
+      local function say(line) emf.log("experimental: " .. line) emf.reply(line) end
+      if a1 == "speed" then d.SPEED = tonumber(a2) or d.SPEED say("fastdive: speed " .. d.SPEED) return end
+      if a1 == "min" then d.MIN_HEIGHT = tonumber(a2) or d.MIN_HEIGHT say("fastdive: minimum height " .. d.MIN_HEIGHT .. " m") return end
+      if a1 == "seconds" then d.SECONDS = tonumber(a2) or d.SECONDS say("fastdive: push lasts " .. d.SECONDS .. " s") return end
+      if a1 == "shield" then d.LANDING_SHIELD = tonumber(a2) or d.LANDING_SHIELD say("fastdive: landing shield " .. d.LANDING_SHIELD .. " s") return end
+      if a1 == "kick" then d.KICK_GLIDER = a2 ~= "off" say("fastdive: kick out of the glider " .. tostring(d.KICK_GLIDER)) return end
+      if a1 == "effect" then d.EFFECT = a2 or d.EFFECT say("fastdive: landing effect " .. tostring(d.EFFECT)) return end
+      if a1 == "ground" then
+        local id = tonumber(a2)
+        say("fastdive: ground distance of " .. tostring(id) .. ": " .. tostring(id and d.ground_distance(world, id)))
+        return
+      end
+      local player = tonumber(a1)
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("fastdive: no player with entity " .. tostring(a1)) return end
+      account = tostring(account)
+      seen(account, player)
+      local set = saved[account] or {}
+      set.fastdive = a2 ~= "off" or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      say(string.format("fastdive: %s for player %s", set.fastdive and "on" or "off", tostring(player)))
+    end, "the fastdive command"))
   -- (0.15.209) Super B Jump from the server console (emf\commands.txt), to try it before the games have the switch and
   -- to tune the push: "superbjump <player entity> on|off", "superbjump push <up> [seconds] [forward] [forward seconds] [sideways] [sign]"
   -- (until a reload)

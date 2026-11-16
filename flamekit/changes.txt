@@ -1,3 +1,6 @@
+0.15.218 Nov 16, 2026
+- New Experimental option (server, first test): Fast Dive. In the air or gliding, tap forward twice quickly to dive straight down, fast; landing does not hurt you and lands with a shockwave. Off in PvP. The switch comes to the Experimental tab with a later game update.
+
 0.15.217 Nov 16, 2026
 - Experimental tab: Super B Jump tap speed, a drop-down from 100 ms to 267 ms (default 183 ms): how quickly you must tap jump twice for a leap. Only for you. Needs FlameKit 0.15.217 on the server.
 
