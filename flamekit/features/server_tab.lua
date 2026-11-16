@@ -44,8 +44,7 @@ end
 
 function F.panel(world)
   local rows = {
-    { color = "#ff9632", text = "These settings are server wide: they apply to every player on this server and the "
-      .. "whole world. Change them with care." },
+    { color = "#ff9632", text = "Server wide settings apply to all players and affect the whole world." },  -- (0.15.196, owner)
     { separator = true },
   }
   local v = values()

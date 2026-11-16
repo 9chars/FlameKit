@@ -63,7 +63,8 @@ local function save_hidden(set)
 end
 
 -- The sizes the tab offers: the dial's width in pixels (the setting map_size takes any size from 120 to 480).
-local SIZES = { { 160, "Small" }, { 220, "Medium" }, { 300, "Large" }, { 380, "Extra large" }, { 480, "Extra extra large" } }  -- Large is the default
+-- (0.15.196, owner) the smallest size (160) is gone and the names moved down one: 220 is Small now
+local SIZES = { { 220, "Small" }, { 300, "Medium" }, { 380, "Large" }, { 480, "Extra Large" } }  -- Medium is the default
 
 local function on(key)
   for _, s in ipairs(SWITCHES) do

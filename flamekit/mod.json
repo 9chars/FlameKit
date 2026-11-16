@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.195",
+  "version": "0.15.196",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -29,15 +29,6 @@
       "help": "Hold it (or press it once, with Pointer key behavior set to Toggle) to get the mouse pointer for FlameKit's windows and the minimap. Any key or mouse button but the left one; set it with the button in FlameKit's window, Windows tab.",
       "live": true,
       "group": "Windows"
-    },
-    {
-      "key": "open_on_start",
-      "type": "bool",
-      "default": false,
-      "label": "Open FlameKit's window when you enter a world",
-      "help": "It opens on the first tab.",
-      "live": true,
-      "group": "FlameKit"
     },
     {
       "key": "lf_enabled",
@@ -335,15 +326,6 @@
       "label": "Size (pixels)",
       "live": true,
       "group": "Minimap"
-    },
-    {
-      "key": "show_label",
-      "type": "bool",
-      "default": true,
-      "label": "Show the FlameKit version on the game's main screen",
-      "help": "On by default: \"FlameKit vX\" in the lower right corner of the game's main screen. Switch it off to take it away; FlameKit keeps working.",
-      "live": true,
-      "group": "FlameKit label"
     }
   ]
 }

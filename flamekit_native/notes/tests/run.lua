@@ -488,7 +488,7 @@ step(500)
 check(hud.messages >= 1, "the message stays in the Messages window's list")
 settings.show_label = false
 step(1)
-check(hud.label == "", "the label can be switched off")
+check(hud.label == "FlameKit v9.9.9", "(0.15.196) the label cannot be switched off")
 settings.show_label = true
 -- build mode: ClientPlayerInput.data.mask's two low bits (the building cursors) are set while the building tool is out
 check(hud.build == false, "not building: no build line")
@@ -1757,7 +1757,7 @@ do  -- (0.15.142, owner) the Server tab: a warning, and its setting changed (whe
   local st = require("features.server_tab")
   local server = require("core.server_settings")
   local rows = st.panel(UI)
-  check(rows[1].text:find("server wide", 1, true) and rows[1].color, "the Server tab starts with the server-wide warning")
+  check(rows[1].text:find("Server wide settings apply to all players", 1, true) and rows[1].color, "the Server tab starts with the server-wide warning")
   if not JOINED then
     local on
     for _, r in ipairs(rows) do if r.button == "on:loot_to_ground" then on = r end end

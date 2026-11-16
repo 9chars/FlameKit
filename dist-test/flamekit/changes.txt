@@ -1,3 +1,11 @@
+0.15.196 Nov 15, 2026
+- Minimap tab: the smallest size is gone. The sizes are now Small, Medium (the default), Large and Extra Large (they were Medium, Large, Extra large and Extra extra large).
+- Settings tab: "Show the FlameKit version on the game's main screen" is gone; the version is always shown.
+- Settings tab: "Open FlameKit's window when you enter a world" is gone.
+- The first time FlameKit is used, its window opens on the About tab.
+- Messages window: "Press ESC or F4 for FlameKit Main Menu" (with your FlameKit Menu key) when you enter a world.
+- Server tab: the warning at the top now says "Server wide settings apply to all players and affect the whole world."
+
 0.15.195 Nov 15, 2026
 - Minimap tab: the "Size" title is gone; "Shape" is the section's title. "What it shows" is now "Display".
 - Experimental tab: the "Fast Travel, PvP and the test monsters..." line is gone.
