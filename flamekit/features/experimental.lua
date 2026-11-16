@@ -36,6 +36,7 @@ local SWITCHES = {
   { "stamina", "Unlimited Stamina", nil, "Unlimited Stamina" },  -- no hit rule: topped up every server step
   { "fly", "Enhanced Glider Mode" },  -- on by default; see lift()
   { "pvp", "PvP (free-for-all)", nil, "PvP" },  -- no hit rule of its own: see pvp() (0.15.65)
+  { "superjump", "Super Jump", nil, "Super Jump" },  -- (0.15.209) no hit rule: core/leap.lua every server step
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -70,6 +71,7 @@ local TIPS = {
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
+  superjump = "Tap jump twice quickly to leap high into the air. Needs the Double Jump skill. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -103,7 +105,7 @@ end
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -1342,7 +1344,7 @@ end
 local stamina_broken = false
 
 local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
-  if stamina_broken and glide.mana_broken and glide.fall_broken then return end
+  if stamina_broken and glide.mana_broken and glide.fall_guard.broken and glide.leap.broken then return end
   for account, p in pairs(online) do
     if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
@@ -1357,22 +1359,15 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     -- (0.15.208, owner: with No Fall Damage a deadly fall showed the player dead for a moment and told the server they
     -- died: the hit rule gives the health back only after the game took it) the game's fall start height is set to
     -- where the player is now, every step while they fall, so the landing is never a long fall. The rule stays too.
-    if (is_on(account, "fall") or is_on(account, "immortal")) and not glide.fall_broken then
-      local ok, err = pcall(function()
-        local fd = world:get("DynamicFallDamage", p.entity)
-        if not fd or not fd.wasFalling then return end
-        local _, y = world:position(p.entity)
-        local start = tonumber(fd.fallStartAltitude)
-        if not y or not start then return end
-        if (glide.fall_said or 0) < 3 and start - y > 5 then  -- the first few, for the log: start and height in one unit?
-          glide.fall_said = (glide.fall_said or 0) + 1
-          emf.log(string.format("experimental: no fall damage: fall start %.2f, height now %.2f", start, y))
-        end
-        if start > y and start - y < 5000 then fd.fallStartAltitude = y end
-      end)
-      if not ok then
-        glide.fall_broken = true
-        emf.log("experimental: the fall height cannot be reset on this game version (" .. tostring(err) .. ")")
+    -- (0.15.209) the reset itself is core/fall_guard.lua, shared with Super Jump.
+    if is_on(account, "fall") or is_on(account, "immortal") then glide.fall_guard.step(world, p.entity) end
+    -- (0.15.209, owner) Super Jump: a quick double tap of jump leaps high (core/leap.lua)
+    if is_on(account, "superjump") then
+      p.leap = p.leap or {}
+      if glide.leap.step(world, p.entity, p.leap) == "leap" then
+        emf.log(string.format("experimental: super jump: player %s leaps (up %s for %s s, forward %s x %.2f for %s s)",
+          tostring(p.entity), tostring(glide.leap.STRENGTH), tostring(glide.leap.SECONDS), tostring(glide.leap.FORWARD),
+          glide.leap.last_forward or 0, tostring(glide.leap.FORWARD_SECONDS)))
       end
     end
     -- (0.15.207, owner: "Invincible Mode also needs to keep the mana bar full like it does the HP bar")
@@ -2360,6 +2355,40 @@ function F.setup(k)
         tostring(test.rule ~= nil), why or "spawned"))
       emf.reply("pvptest: on")
     end, "the pvptest command"))
+  -- (0.15.209) Super Jump from the server console (emf\commands.txt), to try it before the games have the switch and
+  -- to tune the push: "superjump <player entity> on|off", "superjump push <up> [seconds] [forward] [forward seconds] [sideways] [sign]"
+  -- (until a reload)
+  pcall(emf.command, "superjump", "<player entity> on|off, or push <up> [seconds] [forward] [forward seconds] [sideways] [sideways sign]: Super Jump for that player, or its push (a test)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      load_saved()
+      if args[1] == "push" then
+        glide.leap.STRENGTH = tonumber(args[2]) or glide.leap.STRENGTH
+        glide.leap.SECONDS = tonumber(args[3]) or glide.leap.SECONDS
+        glide.leap.FORWARD = tonumber(args[4]) or glide.leap.FORWARD
+        glide.leap.FORWARD_SECONDS = tonumber(args[5]) or glide.leap.FORWARD_SECONDS
+        glide.leap.SIDE = tonumber(args[6]) or glide.leap.SIDE
+        glide.leap.SIDE_SIGN = tonumber(args[7]) or glide.leap.SIDE_SIGN
+        local line = string.format("superjump: push up %s for %s s, forward %s for %s s, sideways %s (sign %s)",
+          tostring(glide.leap.STRENGTH), tostring(glide.leap.SECONDS), tostring(glide.leap.FORWARD),
+          tostring(glide.leap.FORWARD_SECONDS), tostring(glide.leap.SIDE), tostring(glide.leap.SIDE_SIGN))
+        emf.log("experimental: " .. line)
+        emf.reply(line)
+        return
+      end
+      local player = tonumber(args[1])
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("superjump: no player with entity " .. tostring(args[1])) return end
+      account = tostring(account)
+      seen(account, player)
+      local set = saved[account] or {}
+      set.superjump = args[2] ~= "off" or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      emf.log(string.format("experimental: superjump: %s for player %s", set.superjump and "on" or "off", tostring(player)))
+      emf.reply("superjump: " .. (set.superjump and "on" or "off"))
+    end, "the superjump command"))
   -- the game event that points monsters at PvP players (see pvp_aggro); EMF wants it named in the mod's first run
   local okx, said = pcall(emf.emits, { "AddThreatTargetEvent" }, "server")
   if not okx or said == false then emf.log("experimental: AddThreatTargetEvent cannot be sent (" .. tostring(said) .. "): monsters may ignore PvP players") end
