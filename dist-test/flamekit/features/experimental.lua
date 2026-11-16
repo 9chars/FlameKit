@@ -386,7 +386,8 @@ local PLAYER_LIKE = {
   "b5f02f01-513e-4543-a6f1-d82c64d3194b",  -- Enemy_Scavenger_ColdHeights_Melee01-07
 }
 local function dummy_of(guid)
-  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
+  -- (0.15.187, owner: a boss dummy fought and hurt him: its attacks got past the rule) no boss as the dummy
+  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[guid][4] then return DUMMY_PLAIN end
   return MONSTER_BY_GUID[guid]
 end
 local DUMMY_LEVEL = 50  -- (0.15.129, owner: 100 was too high) about 6700 health
@@ -630,8 +631,27 @@ end
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
 local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }  -- (0.15.162, owner: "we want cosmetics too")
 local fx_steps = 0    -- server steps (F.tick)
-local body_clear = {}  -- (0.15.161) test monster bodies to empty: { id, at }
-local function body_clear_tick(world)
+-- (0.15.186) what happens after a test monster's death, in one table (the file is at Lua's limit of 200 locals)
+local after = { clear = {}, piles = {}, spots = require("core.loot_spots") }
+-- (0.15.186, owner: Reward loot off, 50 killed, "quite a few of them still left loot") many monsters leave their game
+-- loot in a separate loot pile where they died (core/loot_spots.lua); the body is removed at the kill, the pile stayed.
+-- 2 s after a test monster's death its pile is looked for (within 4 m) and removed, Reward loot on or off.
+after.piles_tick = function(world)  -- after.piles: { id, x, z, at, many }
+  if #after.piles == 0 then return end
+  local keep = {}
+  for _, p in ipairs(after.piles) do
+    if p.at > fx_steps then keep[#keep + 1] = p
+    else
+      after.spots.find(p.id, p.x, p.z, nil, function(w, ids)
+        for _, cid in ipairs(ids) do pcall(emf.destroy, w, cid) end
+        if #ids > 0 and not p.many then emf.log(string.format("experimental: test monster %s: its loot pile removed (%d)", tostring(p.id), #ids)) end
+      end)
+    end
+  end
+  after.piles = keep
+end
+after.clear_tick = function(world)  -- (0.15.161) test monster bodies to empty: { id, at }
+  local body_clear = after.clear
   if #body_clear == 0 then return end
   local keep = {}
   for _, d in ipairs(body_clear) do
@@ -642,7 +662,7 @@ local function body_clear_tick(world)
       end
     end
   end
-  body_clear = keep
+  after.clear = keep
 end
 
 local not_legendary = {}  -- (0.15.168) debug names that came out of the chest below legendary
@@ -709,7 +729,7 @@ local function drop_test_loot(world, id, b)
   -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear";
   -- 0.15.161: "it leaves the corpse with junk in it no one wants") the game's own loot in the body (it comes 1.5-3 s
   -- after the death) is taken out and thrown away at 2, 3 and 5 s; the body goes at CORPSE_S (8 s)
-  for _, t in ipairs({ 120, 180, 300 }) do body_clear[#body_clear + 1] = { id = id, at = fx_steps + t } end
+  for _, t in ipairs({ 120, 180, 300 }) do after.clear[#after.clear + 1] = { id = id, at = fx_steps + t } end
   -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
   return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
     killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
@@ -871,6 +891,10 @@ local function bodies_tick(world)
           if not b.no_loot then okd, what = pcall(drop_test_loot, world, id, b) end  -- (0.15.182)
           -- (0.15.162, owner: "we dont want the corpse") (0.15.163: at the next check, 2 of 15 bodies stayed: the game
           -- changes a body soon after the death and it no longer read as killed) the body goes at once, in this check
+          pcall(function()  -- (0.15.186) its game loot pile, if it leaves one, goes 2 s later
+            local px, _, pz = world:position(id)
+            if px then after.piles[#after.piles + 1] = { id = id, x = px, z = pz, at = fx_steps + 120, many = many } end
+          end)
           drop_body(world, id, true)
           gone = gone + 1
           if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
@@ -1568,7 +1592,9 @@ end
 
 function F.tick(world)
   fx_steps = fx_steps + 1
-  if world:is_server() then pcall(body_clear_tick, world) end  -- (0.15.161) test monster bodies emptied
+  if world:is_server() then  -- (0.15.161) test monster bodies emptied; (0.15.186) their loot piles removed
+    pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
+  end
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
@@ -1902,16 +1928,17 @@ function F.window_rows(world)
     tooltip = "Shows or hides the PvP Leaderboard" .. (board_key ~= "" and (" (" .. board_key .. ")") or "") .. ". It ranks players by their kills of other players and shows how often each one was killed by another player." }
   rows[#rows + 1] = { heading = "Test monsters" }
   -- every monster under its group's heading, bosses in orange (0.15.73); `first` is put on top under its own heading
-  local function monster_options(prefix, chosen, first)
+  local function monster_options(prefix, chosen, first, no_bosses)
     local options = {}
     if first then
       if first[1] ~= first[2] then options[#options + 1] = { heading = true, text = first[1] } end  -- not "Random" twice
       options[#options + 1] = { key = prefix .. first[3], text = first[2], selected = first[3] == chosen }
     end
     for _, g in ipairs(MONSTER_GROUPS) do
-      options[#options + 1] = { heading = true, text = g }
+      local heading = { heading = true, text = g }  -- (0.15.187) only for a group with something left in it
       for _, m in ipairs(MONSTERS) do
-        if m[1] == g then
+        if m[1] == g and not (no_bosses and m[4]) then
+          if heading then options[#options + 1] = heading heading = nil end
           options[#options + 1] = { key = prefix .. m[3], text = m[2] .. (m[4] and "  (boss)" or ""),
             color = m[4] and "#ffb060" or nil, selected = m[3] == chosen }
         end
@@ -1923,7 +1950,7 @@ function F.window_rows(world)
   local in_pvp = v.pvp == true  -- (0.15.119, owner) no spawning while PvP is on: it could throw a fight
   local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
-  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
+  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN, true), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Anyone can hit it, PvP on or off." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn Dummy", selected = v.body == "dummy", disabled = in_pvp or nil,

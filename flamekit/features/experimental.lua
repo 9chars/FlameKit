@@ -386,7 +386,8 @@ local PLAYER_LIKE = {
   "b5f02f01-513e-4543-a6f1-d82c64d3194b",  -- Enemy_Scavenger_ColdHeights_Melee01-07
 }
 local function dummy_of(guid)
-  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
+  -- (0.15.187, owner: a boss dummy fought and hurt him: its attacks got past the rule) no boss as the dummy
+  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[guid][4] then return DUMMY_PLAIN end
   return MONSTER_BY_GUID[guid]
 end
 local DUMMY_LEVEL = 50  -- (0.15.129, owner: 100 was too high) about 6700 health
@@ -1927,16 +1928,17 @@ function F.window_rows(world)
     tooltip = "Shows or hides the PvP Leaderboard" .. (board_key ~= "" and (" (" .. board_key .. ")") or "") .. ". It ranks players by their kills of other players and shows how often each one was killed by another player." }
   rows[#rows + 1] = { heading = "Test monsters" }
   -- every monster under its group's heading, bosses in orange (0.15.73); `first` is put on top under its own heading
-  local function monster_options(prefix, chosen, first)
+  local function monster_options(prefix, chosen, first, no_bosses)
     local options = {}
     if first then
       if first[1] ~= first[2] then options[#options + 1] = { heading = true, text = first[1] } end  -- not "Random" twice
       options[#options + 1] = { key = prefix .. first[3], text = first[2], selected = first[3] == chosen }
     end
     for _, g in ipairs(MONSTER_GROUPS) do
-      options[#options + 1] = { heading = true, text = g }
+      local heading = { heading = true, text = g }  -- (0.15.187) only for a group with something left in it
       for _, m in ipairs(MONSTERS) do
-        if m[1] == g then
+        if m[1] == g and not (no_bosses and m[4]) then
+          if heading then options[#options + 1] = heading heading = nil end
           options[#options + 1] = { key = prefix .. m[3], text = m[2] .. (m[4] and "  (boss)" or ""),
             color = m[4] and "#ffb060" or nil, selected = m[3] == chosen }
         end
@@ -1948,7 +1950,7 @@ function F.window_rows(world)
   local in_pvp = v.pvp == true  -- (0.15.119, owner) no spawning while PvP is on: it could throw a fight
   local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
-  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
+  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN, true), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Anyone can hit it, PvP on or off." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn Dummy", selected = v.body == "dummy", disabled = in_pvp or nil,

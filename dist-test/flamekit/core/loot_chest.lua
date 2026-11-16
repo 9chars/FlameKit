@@ -22,6 +22,9 @@ M.MAX_CHESTS = 100  -- all owners together
 local PUT_WAIT = 30  -- steps (0.5 s) between a chest's spawn and the first put into it
 local RETRIES = 3    -- a refused put into a chest under 5 s old is tried again this often before the chest counts as full
 local FILE = "loot_chests.dat"
+-- (0.15.185, owner: "drop it down to 15 minutes if the timer starts when the last item enters the chest") a chest goes,
+-- with what is still in it, KEEP_S after the last item was put into it
+M.KEEP_S = 15 * 60
 -- (0.15.166, owner: "make the chests glow ... to make them stand out") an effect on each chest's spot, removed with it;
 -- untested what it looks like
 -- (0.15.168, owner: the chest was "not glowing": VFX_SubEntity_Prop_Light_Source_Glow, 04f1fbc2-..., shows nothing on
@@ -57,7 +60,8 @@ local function save()
   if not f then return end
   f:write("session ", tostring(emf.session()), "\n")
   for id, c in pairs(chests) do
-    f:write(string.format("%d %.2f %.2f %.2f %d %d %d\n", id, c.x, c.y, c.z, c.filled and 1 or 0, c.born or 0, c.fx or 0))
+    f:write(string.format("%d %.2f %.2f %.2f %d %d %d %d\n", id, c.x, c.y, c.z, c.filled and 1 or 0, c.born or 0, c.fx or 0,
+      c.last_put or 0))
   end
   f:close()
 end
@@ -70,13 +74,14 @@ local function load(world)
   if first ~= "session " .. tostring(emf.session()) then f:close() return end  -- another server run: those are gone
   local n = 0
   for line in f:lines() do
-    local id, x, y, z, filled, born, fx = line:match("^(%d+) (%S+) (%S+) (%S+) (%d) (%d+) ?(%d*)")
+    local id, x, y, z, filled, born, fx, last_put = line:match("^(%d+) (%S+) (%S+) (%S+) (%d) (%d+) ?(%d*) ?(%d*)")
     id = tonumber(id)
     if id and not chests[id] then
       local okp, px = pcall(world.position, world, id)
       if okp and px then
         chests[id] = { x = tonumber(x), y = tonumber(y), z = tonumber(z), filled = filled == "1", born = tonumber(born),
-                       fx = tonumber(fx) ~= 0 and tonumber(fx) or nil }
+                       fx = tonumber(fx) ~= 0 and tonumber(fx) or nil,
+                       last_put = tonumber(last_put) ~= 0 and tonumber(last_put) or nil }
         count, n = count + 1, n + 1
         guard(id)  -- a reload took the script's hit rules away
       end
@@ -159,7 +164,7 @@ into = function(world, p)
   local ok = pcall(emf.put, world, chest, p.item, p.n, function(w, added)
     added = tonumber(added) or 0
     local cc = chests[chest]
-    if added > 0 and cc and not cc.filled then cc.filled = true save() end
+    if added > 0 and cc then cc.filled, cc.last_put = true, os.time() save() end  -- (0.15.185) the 15 minutes start again
     if added >= p.n then
       if p.done then p.done(p.got + added, chest) end
       return
@@ -221,14 +226,16 @@ function M.tick(world, bag)
     local n = gone and 0 or #bag.entity_stacks(world, id)
     if n > 0 and not c.filled then c.filled, changed = true, true end
     local never = not c.filled and now - (c.born or now) >= 30
-    if gone or (c.filled and n == 0) or never then
+    local old = c.filled and now - (c.last_put or c.born or now) >= M.KEEP_S  -- (0.15.185) 15 min after its last item
+    if gone or (c.filled and n == 0) or never or old then
       unguard(c)
       if c.fx then pcall(emf.destroy, world, c.fx) end  -- (0.15.166) its glow goes with it
       chests[id], count, changed = nil, count - 1, true
       if not gone then
         local okd, r = pcall(emf.destroy, world, id)
         removed[id] = now
-        emf.log(string.format("loot chest: chest %s %s: destroy %s", tostring(id), never and "never got items" or "empty",
+        emf.log(string.format("loot chest: chest %s %s: destroy %s", tostring(id),
+          never and "never got items" or (n > 0 and string.format("%d min after its last item, %d stack(s) still in it", M.KEEP_S // 60, n)) or "empty",
           okd and tostring(r) or ("error " .. tostring(r))))
       else
         emf.log(string.format("loot chest: chest %s gone (removed by the game or a player)", tostring(id)))

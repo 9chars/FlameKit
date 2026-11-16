@@ -1,3 +1,6 @@
+0.15.187 Nov 15, 2026
+- Experimental window, test monsters: the Dummy drop-down has no bosses any more, and the server gives the plain dummy for a boss asked for by an older game (a boss dummy could still hurt players).
+
 0.15.186 Nov 15, 2026
 - Test monsters: the game's own loot pile some of them leave where they die (separate from the body) is removed 2 s after the death, Reward loot on or off. Server only: no game update.
 
