@@ -45,6 +45,12 @@ local M = {
   CROUCH = false,
   CROUCH_AT = 15,
   SNEAK = 1 << 55,
+  -- (0.15.229, TEST) land crouched: at the landing of a free-fall dive the server sets the game's InSneakMode state
+  -- (keen::actor::StateFlag 21) once. Input probe (2026-11-16): crouch is a toggle that sets that state, only on the
+  -- ground; a jump or another crouch press clears it, so it cannot stay stuck. A state set by the server does reach the
+  -- player's animation (0.15.224: HeadDiving made the character roll on the ground).
+  LAND_CROUCHED = true,
+  SNEAK_STATE = 1 << 21,
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -139,6 +145,10 @@ function M.step(world, entity, s, opts)
       if s.diving then
         s.diving = nil
         landing(world, entity, s.landing)
+        if M.LAND_CROUCHED and not s.from_glider then
+          local a = world:get("Actor", entity)
+          if a then a.currentState = (math.tointeger(a.currentState) or 0) | M.SNEAK_STATE end
+        end
         result = "landed"
       end
       s.first = nil

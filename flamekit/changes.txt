@@ -1,3 +1,6 @@
+0.15.229 Nov 16, 2026
+- Fast Dive (server, test): a free-fall dive lands crouched (as if you pressed crouch; jump or crouch again to stand up).
+
 0.15.228 Nov 16, 2026
 - Fast Dive speed: 6x, 7x, 8x and 10x added.
 - Fast Dive (test): your own game tries the head-first dive pose while you fall and a crouch when you land.
