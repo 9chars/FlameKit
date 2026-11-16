@@ -1,3 +1,8 @@
+0.15.195 Nov 15, 2026
+- Minimap tab: the "Size" title is gone; "Shape" is the section's title. "What it shows" is now "Display".
+- Experimental tab: the "Fast Travel, PvP and the test monsters..." line is gone.
+- The key that opens FlameKit's window moved from the Settings tab to the Windows tab: "FlameKit Menu", at the top of "Keys and pointer", set like the other keys there.
+
 0.15.194 Nov 15, 2026
 - F4 menu, Windows tab: "Press the pointer key once instead of holding it" is now "Pointer key behavior": Press & Hold (the pointer is out while the key is held; the default) or Toggle (one press shows it, the next hides it). Your earlier choice is kept. The pointer key is still Right Alt by default.
 - Windows tab: the help text at the bottom is gone.

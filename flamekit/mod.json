@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.194",
+  "version": "0.15.195",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -16,10 +16,10 @@
       "key": "window_key",
       "type": "keybind",
       "default": "F4",
-      "label": "Key that opens FlameKit's window",
-      "help": "FlameKit's own window: the Auto Junk List, the other features' tabs, Settings and What's New. The same key or Esc closes it.",
+      "label": "FlameKit Menu",
+      "help": "The key that opens FlameKit's own window (F4 menu): the Auto Junk List, the other features' tabs and Settings. The same key or Esc closes it. Set it in the Windows tab.",
       "live": true,
-      "group": "FlameKit"
+      "group": "Windows"
     },
     {
       "key": "pointer_key",

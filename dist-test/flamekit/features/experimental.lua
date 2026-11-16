@@ -1859,8 +1859,6 @@ local function panel_rows(world)
   local v = my_view(world)
   local rows = {
     { color = "#ffb060", text = "Experimental: these bend the game's rules for you only. Every player has their own." },
-    { dim = true, text = "Fast Travel, PvP and the test monsters are in the Experimental window (F4 > Windows shows and hides it; "
-      .. "its key is a setting)." },
   }
   if not v then
     rows[#rows + 1] = { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."

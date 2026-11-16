@@ -1221,7 +1221,9 @@ do  -- (0.15.139, owner) the Minimap tab has no Location section any more: its R
   local loc, reset, size = false, false, false
   for _, r in ipairs(okp and rows or {}) do
     if r.heading == "Location" then loc = true end
-    if r.heading == "Size" then size = true end
+    if r.heading == "Shape" then size = true end  -- (0.15.195) "Shape" heads the section, "Size" is gone
+    if r.heading == "Size" then loc = true end
+    if r.heading == "What it shows" then loc = true end
     if r.button == "reset" or r.text == "Reset Default Position" then reset = true end
   end
   check(okp and size and not loc and not reset, "the Minimap tab: no Location section, no Reset Default Position (" .. tostring(okp and "" or rows) .. ")")

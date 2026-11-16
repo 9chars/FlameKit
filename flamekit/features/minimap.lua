@@ -144,9 +144,11 @@ local ZOOM_STEPS = 7  -- the setting map_zoom: 0 closest .. 6 farthest
 function F.panel(world)
   local rows = {}
   -- (0.15.139, owner) the Location section is gone: Show/Hide and "Reset place" are in the Windows tab; the shape
-  -- setting that was in it is now under Size
-  rows[#rows + 1] = { heading = "Size" }
-  for _, r in ipairs(require("features.settings").rows({ "map_shape" })) do rows[#rows + 1] = r end
+  -- setting that was in it is now under Size. (0.15.195, owner) no "Size" heading: the Shape setting's own title heads it
+  rows[#rows + 1] = { heading = "Shape" }
+  for i, r in ipairs(require("features.settings").rows({ "map_shape" })) do
+    if not (i == 1 and r.text and not r.button) then rows[#rows + 1] = r end  -- the setting's own "Shape" line: the heading
+  end
   local size = tonumber(kit.setting("map_size", 300)) or 300
   for i, z in ipairs(SIZES) do
     rows[#rows + 1] = { button = "size:" .. z[1], text = z[2], same_line = i > 1, selected = size == z[1],
@@ -161,7 +163,7 @@ function F.panel(world)
                       tooltip = "Shows a bigger piece of the world." }
   rows[#rows + 1] = { text = string.format("Zoom level %d of %d", ZOOM_STEPS - zoom, ZOOM_STEPS), same_line = true }
   rows[#rows + 1] = { separator = true }
-  rows[#rows + 1] = { heading = "What it shows" }
+  rows[#rows + 1] = { heading = "Display" }  -- (0.15.195, owner) was "What it shows"
   for _, s in ipairs(SWITCHES) do
     local is_on = on(s[1])
     rows[#rows + 1] = { button = "sw:" .. s[1], text = (is_on and "On    " or "Off   ") .. s[2], selected = is_on, tooltip = s[4] }

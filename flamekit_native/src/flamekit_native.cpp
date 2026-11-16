@@ -4628,12 +4628,14 @@ struct WindowLayer : Layer {
         const wchar_t* label;
         const char* key;
     };
-    static constexpr int kWinKeyCount = 4;
-    static constexpr WinKey kWinKeys[kWinKeyCount] = {{L"Key that shows and hides the PvP Leaderboard", "board_window_key"},
+    static constexpr int kWinKeyCount = 5;
+    static constexpr WinKey kWinKeys[kWinKeyCount] = {{L"FlameKit Menu", "window_key"},  // (0.15.195, owner) was in the Settings tab
+                                           {L"Key that shows and hides the PvP Leaderboard", "board_window_key"},
                                            {L"Key that shows and hides the Experimental window", "exp_window_key"},
                                            {L"Key that shows and hides the Party window", "party_window_key"},
                                            {L"Key that shows and hides the Messages window", "messages_window_key"}};
     int capture_win = -1;  // the key setting of the Windows tab waiting for a key (-1: none)
+    uint64_t capture_end = 0;  // (0.15.195) when a key was taken: the window key pressed for it does not close the window
     bool capture_ptr = false;  // (0.15.190) Set Pointer Key waits for any key or mouse button (update() looks)
     std::unordered_set<uint32_t> ptr_seen_down;  // keys already down when the wait began: taken only once let go and pressed
     void stop_capture() {  // the Lua part's Settings waits too: the same click again ends it there
@@ -4687,7 +4689,7 @@ struct WindowLayer : Layer {
             text.draw(canvas, kPad, y, L"Keys and pointer", 255, 210, 122);
             y += 34;
             const Settings st = settings();
-            const uint32_t vks[kWinKeyCount] = {st.board_vk, st.exp_vk, st.party_vk, st.messages_vk};
+            const uint32_t vks[kWinKeyCount] = {st.window_vk, st.board_vk, st.exp_vk, st.party_vk, st.messages_vk};
             for (int i = 0; i < kWinKeyCount; ++i) {
                 text.draw(canvas, kPad, y + 5, kWinKeys[i].label, 230, 230, 235);
                 const std::wstring k = key_label(vks[i]);
@@ -5005,6 +5007,7 @@ struct WindowLayer : Layer {
             key_toggle_pending = false;
             want_toggle = true;
         }
+        if (want_toggle && open && (capture_win >= 0 || f.now - capture_end < 600)) want_toggle = false;  // a key being set
         if (want_toggle) {
             if (f.now - last_toggle < 400) {
                 // the same press, seen a second time
@@ -5084,6 +5087,14 @@ struct WindowLayer : Layer {
         const uint32_t wk = settings().window_vk;
         if (vk == VK_ESCAPE) {
             close_asked = true;
+            return;
+        }
+        if (current == "windows" && capture_win >= 0) {  // (0.15.195) waiting for a key: even the window key is the answer
+            capture_win = -1;
+            capture_end = GetTickCount64();
+            std::string name = emf::keys::detail::key_name(static_cast<uint32_t>(vk));
+            if (name.rfind("key ", 0) == 0) name = name.substr(4);
+            act("key", name);
             return;
         }
         if (wk && vk == wk) {  // the window key: the same toggle as the game thread's key check (deduplicated in update)
