@@ -630,8 +630,27 @@ end
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
 local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }  -- (0.15.162, owner: "we want cosmetics too")
 local fx_steps = 0    -- server steps (F.tick)
-local body_clear = {}  -- (0.15.161) test monster bodies to empty: { id, at }
-local function body_clear_tick(world)
+-- (0.15.186) what happens after a test monster's death, in one table (the file is at Lua's limit of 200 locals)
+local after = { clear = {}, piles = {}, spots = require("core.loot_spots") }
+-- (0.15.186, owner: Reward loot off, 50 killed, "quite a few of them still left loot") many monsters leave their game
+-- loot in a separate loot pile where they died (core/loot_spots.lua); the body is removed at the kill, the pile stayed.
+-- 2 s after a test monster's death its pile is looked for (within 4 m) and removed, Reward loot on or off.
+after.piles_tick = function(world)  -- after.piles: { id, x, z, at, many }
+  if #after.piles == 0 then return end
+  local keep = {}
+  for _, p in ipairs(after.piles) do
+    if p.at > fx_steps then keep[#keep + 1] = p
+    else
+      after.spots.find(p.id, p.x, p.z, nil, function(w, ids)
+        for _, cid in ipairs(ids) do pcall(emf.destroy, w, cid) end
+        if #ids > 0 and not p.many then emf.log(string.format("experimental: test monster %s: its loot pile removed (%d)", tostring(p.id), #ids)) end
+      end)
+    end
+  end
+  after.piles = keep
+end
+after.clear_tick = function(world)  -- (0.15.161) test monster bodies to empty: { id, at }
+  local body_clear = after.clear
   if #body_clear == 0 then return end
   local keep = {}
   for _, d in ipairs(body_clear) do
@@ -642,7 +661,7 @@ local function body_clear_tick(world)
       end
     end
   end
-  body_clear = keep
+  after.clear = keep
 end
 
 local not_legendary = {}  -- (0.15.168) debug names that came out of the chest below legendary
@@ -709,7 +728,7 @@ local function drop_test_loot(world, id, b)
   -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear";
   -- 0.15.161: "it leaves the corpse with junk in it no one wants") the game's own loot in the body (it comes 1.5-3 s
   -- after the death) is taken out and thrown away at 2, 3 and 5 s; the body goes at CORPSE_S (8 s)
-  for _, t in ipairs({ 120, 180, 300 }) do body_clear[#body_clear + 1] = { id = id, at = fx_steps + t } end
+  for _, t in ipairs({ 120, 180, 300 }) do after.clear[#after.clear + 1] = { id = id, at = fx_steps + t } end
   -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
   return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
     killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
@@ -871,6 +890,10 @@ local function bodies_tick(world)
           if not b.no_loot then okd, what = pcall(drop_test_loot, world, id, b) end  -- (0.15.182)
           -- (0.15.162, owner: "we dont want the corpse") (0.15.163: at the next check, 2 of 15 bodies stayed: the game
           -- changes a body soon after the death and it no longer read as killed) the body goes at once, in this check
+          pcall(function()  -- (0.15.186) its game loot pile, if it leaves one, goes 2 s later
+            local px, _, pz = world:position(id)
+            if px then after.piles[#after.piles + 1] = { id = id, x = px, z = pz, at = fx_steps + 120, many = many } end
+          end)
           drop_body(world, id, true)
           gone = gone + 1
           if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
@@ -1568,7 +1591,9 @@ end
 
 function F.tick(world)
   fx_steps = fx_steps + 1
-  if world:is_server() then pcall(body_clear_tick, world) end  -- (0.15.161) test monster bodies emptied
+  if world:is_server() then  -- (0.15.161) test monster bodies emptied; (0.15.186) their loot piles removed
+    pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
+  end
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
