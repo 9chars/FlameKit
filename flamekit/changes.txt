@@ -1,3 +1,6 @@
+0.15.254 Nov 16, 2026
+- Fast Dive glider tip: now the server sees you open the glider and tells your game (0.15.253's tip never showed on a joined server). Not shown when you open it lower than your Fast Dive minimum height above where you last stood. Needs FlameKit 0.15.254 on the server and in your game.
+
 0.15.253 Nov 16, 2026
 - Fast Dive: each time you open the glider, a light blue notice says "Quickly double tap forward to initiate Fast Dive!" for 5 seconds (gone when the glider closes or the dive starts). Not when you open it lower than your Fast Dive minimum height above where you last stood.
 - Fast Dive tooltip: a free-fall dive's landing kills you (since 0.15.249 on the server); a glider dive is survived.

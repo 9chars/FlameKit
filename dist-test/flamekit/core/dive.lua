@@ -188,10 +188,14 @@ function M.step(world, entity, s, opts)
     if not move then return end
     local t = world:tick()
     local st = n(move.state)
+    s.st = st  -- (0.15.254) for the glider tip (features/experimental.lua)
     local down = forward_down(world, entity)
     local pressed = down and not s.down
     s.down = down
     local _, y = world:position(entity)
+    -- (0.15.254, glider tip) the last height the player stood or swam at: the game knows the ground below only about
+    -- 1 m before a landing, so the tip counts the height above this
+    if y and (st == ON_GROUND or st == 9 or st == 10) then s.ground_y = y end
     if st == ON_GROUND then
       if s.diving then
         s.diving = nil
@@ -215,6 +219,7 @@ function M.step(world, entity, s, opts)
     end
     -- (0.15.248) the highest point of this time in the air, and whether the glider was just closed
     if st == GLIDING then
+      if not s.was_gliding and not s.diving then s.glider_opened = true end  -- (0.15.254) the glider tip
       s.was_gliding, s.top = true, nil
     elseif s.was_gliding then
       s.was_gliding, s.glider_closed, s.top = nil, true, y

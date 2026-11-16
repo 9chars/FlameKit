@@ -248,6 +248,47 @@ function glide.fall_probe(world, p, what)
   if what == "cancel" then q.dive, q.next = nil, nil end
   q.prev = r
 end
+-- (0.15.253/254, owner: "when the player pops open their glider ... a notice message ... telling them to double tap
+-- the bound key", "every time", "like 5 seconds", "light blue is good", "if you're below the minimum height it shouldn't
+-- show that") the server sees the glider open (core/dive.lua: the game's copy in a joined player's game did not, 0.15.253)
+-- and tells the player's game (op "tip"; older games ignore it). The height counts from the last place the player stood
+-- or swam (the game knows the ground below only about 1 m before a landing). Taken back when the glider closes, at a
+-- landing (the dive start takes it back in the player's game).
+function glide.glider_tip(world, p, o, what)
+  local d = p.dive
+  local function say(on)
+    local m = { op = "tip", on = on }
+    if kit.is_host() and emf.local_player() == p.entity then
+      pcall(glide.tip_notice, m)
+    else
+      pcall(emf.net.send_to, world, p.entity, CHANNEL, emf.json.encode(m))
+    end
+  end
+  if d.glider_opened then
+    d.glider_opened = nil
+    local _, y = world:position(p.entity)
+    local min = tonumber(o.min) or glide.dive.MIN_HEIGHT
+    local above = y and d.ground_y and y - d.ground_y or nil
+    local high = not (min > 0 and above and above < min)
+    emf.log(string.format("experimental: fast dive: player %s opened the glider at %.1f m, %s above where they last stood: tip %s",
+      tostring(p.entity), y or 0, above and string.format("%.1f m", above) or "unknown height",
+      high and "shown" or string.format("not shown (minimum %s m)", tostring(min))))
+    if high then
+      say(true)
+      d.tip_shown = true
+    end
+  elseif d.tip_shown and (what == "dive" or d.st ~= 4) then
+    d.tip_shown = nil
+    if what ~= "dive" then say(false) end
+  end
+end
+function glide.tip_notice(msg)
+  if msg.on == true then
+    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff", 5)
+  else
+    kit.notice("fastdive_tip")
+  end
+end
 -- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
 -- landing's word never comes), taken back at the landing
 function glide.dive_notice(msg)
@@ -1509,6 +1550,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
                   protected = (is_on(account, "fall") or is_on(account, "immortal")) and true or nil }  -- (0.15.251)
       local what = glide.dive.step(world, p.entity, p.dive, o)
       p.dive.landed_now = what == "landed" or nil
+      pcall(glide.glider_tip, world, p, o, what)  -- (0.15.254)
       pcall(glide.fall_probe, world, p, what)  -- (0.15.250, probe)
       -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
       -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
@@ -2043,56 +2085,7 @@ local function ask(msg)
   return ok and sent == true
 end
 
--- (0.15.253, owner: "when the player pops open their glider ... a notice message ... telling them to double tap the bound
--- key", "every time", "like 5 seconds", "use blue for the color", "light blue is good") in your own game, each time you open the glider with Fast Dive on.
--- The game's key bindings cannot be read: it says forward (owner's words). Gone when the glider closes or a dive
--- starts (glide.dive_notice).
-function glide.glider_tip(world)
-  local player = emf.local_player()
-  if not player or player == 0 then return end
-  local on
-  if kit.is_host() then
-    local account = me(world)
-    on = account ~= nil and is_on(account, "fastdive")
-  else
-    on = shown ~= nil and shown.fastdive == true
-  end
-  local gliding = false
-  local ok = pcall(function()
-    local m = world:get("DynamicLocomotion", player)
-    local st = m and tonumber(m.state)
-    -- (owner: "if you're below the minimum height it shouldn't show that") the game knows the ground below only about
-    -- 1 m before a landing, so the height counted is above the last place you stood (or swam): a glider opened from a
-    -- jump on flat ground is low, one opened off a cliff is not
-    if st == 0 or st == 9 or st == 10 then
-      local _, y = world:position(player)
-      glide.tip_ground = y
-    end
-    if st ~= nil then gliding = st == 4 return end
-    local a = world:get("Actor", player)
-    gliding = a ~= nil and ((math.tointeger(a.currentState) or 0) >> 37) & 1 == 1
-  end)
-  if not ok then
-    if not glide.tip_broken then emf.log("experimental: the glider cannot be seen in your game (no Fast Dive tip)") end
-    glide.tip_broken = true
-    return
-  end
-  local high = true
-  if gliding and not glide.tip_gliding and on and glide.tip_ground then
-    local min = kit.is_host() and glide.sbj(me(world), "divemin") or (shown and tonumber(shown.sbj_divemin)) or glide.dive.MIN_HEIGHT
-    local _, y = world:position(player)
-    high = not (min and min > 0 and y and y - glide.tip_ground < min)
-  end
-  if gliding and not glide.tip_gliding and on and high then
-    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff", 5)
-  elseif not gliding and glide.tip_gliding then
-    kit.notice("fastdive_tip")
-  end
-  glide.tip_gliding = gliding
-end
-
 function F.client_tick(world)
-  if not glide.tip_broken then pcall(glide.glider_tip, world) end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
@@ -2858,6 +2851,7 @@ function F.setup(k)
     on_player = kit.guard(F, function(world, from, data)
       local msg = emf.json.decode(data)
       if type(msg) == "table" and msg.op == "dive" then pcall(glide.dive_notice, msg) return end  -- (0.15.241)
+      if type(msg) == "table" and msg.op == "tip" then pcall(glide.tip_notice, msg) return end  -- (0.15.254)
       if type(msg) == "table" and msg.op == "state" then
         shown = msg
         if msg.note then note = msg.note end
