@@ -36,6 +36,7 @@ local SWITCHES = {
   { "stamina", "Unlimited Stamina", nil, "Unlimited Stamina" },  -- no hit rule: topped up every server step
   { "fly", "Enhanced Glider Mode" },  -- on by default; see lift()
   { "pvp", "PvP (free-for-all)", nil, "PvP" },  -- no hit rule of its own: see pvp() (0.15.65)
+  { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -70,6 +71,7 @@ local TIPS = {
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
+  superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -103,7 +105,7 @@ end
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -147,6 +149,36 @@ function glide.damage(account)
 end
 function glide.damage_allowed(d)
   for _, s in ipairs(glide.DAMAGE) do if s == d then return true end end
+  return false
+end
+
+-- (0.15.209, owner: "every player should be able to tune this for themselves") Super B Jump's own settings per player:
+-- factors of core/leap.lua's tuned values (1x: about 50 m up, the forward arc and air steering as tested 2026-11-16).
+-- experimental.json keys sbj_height, sbj_forward, sbj_steer (1x is not kept).
+glide.SBJ = {
+  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 },
+    tip = "How high the leap goes: 1.0x is about 50 m (a double jump is about 4 m). Only for you." },
+  { which = "forward", key = "sbj_forward", label = "Super B Jump forward", steps = { 0, 0.25, 0.5, 0.75, 1, 1.5, 2 },
+    tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },
+  { which = "steer", key = "sbj_steer", label = "Super B Jump air steering", steps = { 0, 1, 2, 3, 4, 5, 7, 10, 15 },
+    tip = "How much left and right moves you while in the air after a leap: 0x is the game's own steering only. Only for you." },
+}
+function glide.sbj(account, which)
+  for _, d in ipairs(glide.SBJ) do
+    if d.which == which or d.key == which then
+      local f = tonumber(((saved or {})[account] or {})[d.key])
+      return f and f >= 0 and f or 1, d
+    end
+  end
+  return 1
+end
+function glide.sbj_label(f) return f == 0 and "Off (0x)" or glide.label(f) end
+function glide.sbj_allowed(key, f)
+  for _, d in ipairs(glide.SBJ) do
+    if d.key == key then
+      for _, s in ipairs(d.steps) do if s == f then return true end end
+    end
+  end
   return false
 end
 
@@ -238,6 +270,8 @@ local body_of  -- forward: the PvP test bodies, below
 local function view(account)
   local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
               glide_speed = glide.factor(account), damage_pct = glide.damage(account),
+              sbj_height = glide.sbj(account, "height"), sbj_forward = glide.sbj(account, "forward"),
+              sbj_steer = glide.sbj(account, "steer"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
@@ -1137,6 +1171,17 @@ local function handle(world, account, entity, msg)
     end
     return view(account)
   end
+  if msg.op == "set" and type(msg.key) == "string" and msg.key:sub(1, 4) == "sbj_" then  -- (0.15.209) Super B Jump settings
+    local f = tonumber(msg.value)
+    if f and glide.sbj_allowed(msg.key, f) then
+      local set = saved[account] or {}
+      set[msg.key] = f ~= 1 and f or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      emf.log(string.format("experimental: player %s set %s to %s", tostring(entity), msg.key, glide.sbj_label(f)))
+    end
+    return view(account)
+  end
   if msg.op == "set" and msg.key == "glide_speed" then  -- (0.15.200) the glider speed
     local f = tonumber(msg.value)
     if f and glide.allowed(f) then
@@ -1342,7 +1387,7 @@ end
 local stamina_broken = false
 
 local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
-  if stamina_broken and glide.mana_broken then return end
+  if stamina_broken and glide.mana_broken and glide.fall_guard.broken and glide.leap.broken then return end
   for account, p in pairs(online) do
     if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
@@ -1352,6 +1397,27 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       if not ok then
         stamina_broken = true
         emf.log("experimental: stamina cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
+    -- (0.15.208, owner: with No Fall Damage a deadly fall showed the player dead for a moment and told the server they
+    -- died: the hit rule gives the health back only after the game took it) the game's fall start height is set to
+    -- where the player is now, every step while they fall, so the landing is never a long fall. The rule stays too.
+    -- (0.15.209) the reset itself is core/fall_guard.lua, shared with Super Jump.
+    if is_on(account, "fall") or is_on(account, "immortal") then glide.fall_guard.step(world, p.entity) end
+    -- (0.15.209, owner) Super B Jump: a quick double tap of jump leaps high (core/leap.lua), with the player's own
+    -- height, forward and air steering factors
+    if is_on(account, "superbjump") then
+      p.leap = p.leap or {}
+      local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer") }
+      local what = glide.leap.step(world, p.entity, p.leap, o)
+      if what == "leap" then
+        emf.log(string.format("experimental: super b jump: player %s leaps (height %sx, forward %sx at input %.2f, steering %sx)",
+          tostring(p.entity), tostring(o.height), tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
+      elseif what == "tired" then  -- (owner: a yellow line in the Notices window)
+        pcall(function()
+          require("features.chat").notice_to(world, p.entity,
+            string.format("Not enough stamina for Super B Jump (needs %d).", glide.leap.STAMINA_NEEDED), "#ffe14d", 4)
+        end)
       end
     end
     -- (0.15.207, owner: "Invincible Mode also needs to keep the mana bar full like it does the HP bar")
@@ -2000,6 +2066,16 @@ local function panel_rows(world)
     rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
       tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times. Only for you; off while you are in PvP." }
   end
+  rows[#rows + 1] = { separator = true }
+  for _, d in ipairs(glide.SBJ) do  -- (0.15.209, owner) Super B Jump's own settings: drop-downs, per player
+    local cur = tonumber(v[d.key]) or 1
+    local opts = {}
+    for _, f in ipairs(d.steps) do
+      opts[#opts + 1] = { key = "sbj:" .. d.key .. ":" .. tostring(f), text = glide.sbj_label(f), selected = f == cur }
+    end
+    rows[#rows + 1] = { label = true, text = d.label }
+    rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur), same_line = true, tooltip = d.tip }
+  end
   return debug_rows(world, rows)
 end
 
@@ -2252,6 +2328,21 @@ function F.click(world, key)
     end
     return
   end
+  if key:sub(1, 4) == "sbj:" then  -- (0.15.209) Super B Jump settings: "sbj:<setting key>:<factor>"
+    local k, f = key:match("^sbj:(sbj_%a+):([%d%.]+)$")
+    f = tonumber(f)
+    if not (k and f) then return end
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = k, value = f }).note
+    elseif shown then
+      shown[k] = f  -- at once on screen; the server's answer follows
+      ask({ op = "set", key = k, value = f })
+    end
+    return
+  end
   if key:sub(1, 3) == "gs:" then  -- (0.15.200) the glider speed
     local f = tonumber(key:sub(4))
     if not f then return end
@@ -2339,6 +2430,40 @@ function F.setup(k)
         tostring(test.rule ~= nil), why or "spawned"))
       emf.reply("pvptest: on")
     end, "the pvptest command"))
+  -- (0.15.209) Super B Jump from the server console (emf\commands.txt), to try it before the games have the switch and
+  -- to tune the push: "superbjump <player entity> on|off", "superbjump push <up> [seconds] [forward] [forward seconds] [sideways] [sign]"
+  -- (until a reload)
+  pcall(emf.command, "superbjump", "<player entity> on|off, or push <up> [seconds] [forward] [forward seconds] [sideways] [sideways sign]: Super B Jump for that player, or its push (a test)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      load_saved()
+      if args[1] == "push" then
+        glide.leap.STRENGTH = tonumber(args[2]) or glide.leap.STRENGTH
+        glide.leap.SECONDS = tonumber(args[3]) or glide.leap.SECONDS
+        glide.leap.FORWARD = tonumber(args[4]) or glide.leap.FORWARD
+        glide.leap.FORWARD_SECONDS = tonumber(args[5]) or glide.leap.FORWARD_SECONDS
+        glide.leap.SIDE = tonumber(args[6]) or glide.leap.SIDE
+        glide.leap.SIDE_SIGN = tonumber(args[7]) or glide.leap.SIDE_SIGN
+        local line = string.format("superbjump: push up %s for %s s, forward %s for %s s, sideways %s (sign %s)",
+          tostring(glide.leap.STRENGTH), tostring(glide.leap.SECONDS), tostring(glide.leap.FORWARD),
+          tostring(glide.leap.FORWARD_SECONDS), tostring(glide.leap.SIDE), tostring(glide.leap.SIDE_SIGN))
+        emf.log("experimental: " .. line)
+        emf.reply(line)
+        return
+      end
+      local player = tonumber(args[1])
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("superbjump: no player with entity " .. tostring(args[1])) return end
+      account = tostring(account)
+      seen(account, player)
+      local set = saved[account] or {}
+      set.superbjump = args[2] ~= "off" or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      emf.log(string.format("experimental: superbjump: %s for player %s", set.superbjump and "on" or "off", tostring(player)))
+      emf.reply("superbjump: " .. (set.superbjump and "on" or "off"))
+    end, "the superbjump command"))
   -- the game event that points monsters at PvP players (see pvp_aggro); EMF wants it named in the mod's first run
   local okx, said = pcall(emf.emits, { "AddThreatTargetEvent" }, "server")
   if not okx or said == false then emf.log("experimental: AddThreatTargetEvent cannot be sent (" .. tostring(said) .. "): monsters may ignore PvP players") end
