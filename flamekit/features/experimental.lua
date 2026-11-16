@@ -2486,6 +2486,17 @@ function F.setup(k)
       if a1 == "shield" then d.LANDING_SHIELD = tonumber(a2) or d.LANDING_SHIELD say("fastdive: landing shield " .. d.LANDING_SHIELD .. " s") return end
       if a1 == "kick" then d.KICK_GLIDER = a2 ~= "off" say("fastdive: kick out of the glider " .. tostring(d.KICK_GLIDER)) return end
       if a1 == "effect" then d.EFFECT = a2 or d.EFFECT say("fastdive: landing effect " .. tostring(d.EFFECT)) return end
+      if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID>": the effect 3 m in front of them
+        local id, guid = tonumber(a2), args[3]
+        local x, y, z = id and world:position(id)
+        if not (x and guid) then emf.reply("fastdive boom <player entity> <template GUID>") return end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local e = d.boom(world, x + fx / len * 3, y, z + fz / len * 3, guid)
+        say("fastdive boom: " .. tostring(guid) .. " -> " .. tostring(e))
+        return
+      end
       if a1 == "ground" then
         local id = tonumber(a2)
         say("fastdive: ground distance of " .. tostring(id) .. ": " .. tostring(id and d.ground_distance(world, id)))

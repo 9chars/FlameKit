@@ -17,7 +17,8 @@ local M = {
   WINDOW = 11,           -- steps: the default tap speed (the player's own comes in opts.window)
   STICK = 0.5,           -- forward on the stick at least this far counts as a press of W
   SPEED = 80,            -- the push down (the impulse's y, negative); the game's own top fall speed is 20 m/s
-  SECONDS = 10,          -- the push lasts this long at most (it ends at the landing anyway)
+  SECONDS = 10,          -- each push lasts this long; renewed every RENEW steps until the landing (0.15.221)
+  RENEW = 300,           -- steps (5 s)
   MIN_HEIGHT = 10,       -- metres above the ground (groundDistance) before a dive is allowed; 0 = anywhere
   KICK_GLIDER = false,   -- a dive from the glider writes the locomotion state to Falling (2): did nothing (0.15.219)
   EFFECT = "3b874eb5-bae2-4b6d-a63e-17bdd35b11c4",  -- Explosion_Player_Skill_Shockwave
@@ -52,12 +53,14 @@ function M.ground_distance(world, entity)
   return ok and d or nil
 end
 
-local function push_down(world, entity, gliding)
+local function push_down(world, entity, gliding, renew)
   local imp = world:get("Impulse", entity)
   if not imp then return false end
   local now = world:tick() * 50000000 // 3
-  for k = 1, 4 do  -- end every push still running: straight down, nothing else
-    if imp.impulses[k].endTime > now then imp.impulses[k].endTime = now end
+  if not renew then
+    for k = 1, 4 do  -- end every push still running: straight down, nothing else
+      if imp.impulses[k].endTime > now then imp.impulses[k].endTime = now end
+    end
   end
   local slot = imp.impulses[1]
   slot.impulse.x, slot.impulse.y, slot.impulse.z = 0, -M.SPEED * (M.speed_factor or 1), 0
@@ -76,10 +79,16 @@ local function landing(world, entity)
       M.shields[#M.shields + 1] = { rule = rule, until_tick = world:tick() + math.floor(M.LANDING_SHIELD * 60) }
     end
   end
-  if M.EFFECT and M.EFFECT ~= "" and M.EFFECT ~= "off" then
-    local ok, err = pcall(emf.spawn, world, M.EFFECT, x, y + 0.2, z)
-    if not ok then emf.log("fast dive: the landing effect cannot be spawned (" .. tostring(err) .. ")") end
-  end
+  M.boom(world, x, y, z, M.EFFECT)
+end
+
+-- (0.15.221) one of the game's explosion templates at a place: the landing effect, and the console test
+function M.boom(world, x, y, z, guid)
+  if not guid or guid == "" or guid == "off" then return nil end
+  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z)
+  emf.log(string.format("fast dive: effect %s at %.1f %.1f %.1f: %s", tostring(guid), x, y, z,
+    ok and ("spawned entity " .. tostring(id)) or ("refused: " .. tostring(id))))
+  return ok and id or nil
 end
 
 -- the shields of earlier landings run out (every step, any player)
@@ -129,9 +138,10 @@ function M.step(world, entity, s, opts)
           t - s.dive_t, y or -1, tostring(st), sl and string.format("%.1f", sl.impulse.y) or "?",
           sl and tostring(sl.endTime > now) or "?", imp and string.format("%.1f", imp.impulse.y) or "?"))
       end
-      -- (0.15.219) a dive whose push ran out lets a new double tap dive again (before: only after the landing)
-      if t - s.dive_t > math.floor(M.SECONDS * 60) then s.diving = nil end
-      if s.diving then return end
+      -- (0.15.221, owner: the dive slowed down before the ground: its 10 s push ran out about 1000 m down) the push is
+      -- renewed every RENEW steps until the landing; its kind follows the glider (open or closed)
+      if (t - s.dive_t) % M.RENEW == 0 then push_down(world, entity, st == GLIDING, true) end
+      return
     end
     if not pressed then return end
     local window = (opts and opts.window) or M.WINDOW

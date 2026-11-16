@@ -1,3 +1,6 @@
+0.15.221 Nov 16, 2026
+- Fast Dive (server, test): the dive keeps its speed all the way to the ground; the landing effect is logged; a console test for landing effects.
+
 0.15.220 Nov 16, 2026
 - Fast Dive (server, test): the push down now lasts (the game had ended it at once); from the glider it dives with the glider open.
 
