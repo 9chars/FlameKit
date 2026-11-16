@@ -98,12 +98,12 @@ local function load_saved()
 end
 
 -- (0.15.200, owner: "control my glider speed ... a slider so I can set myself to go slower or faster") each player's
--- own glider speed, 0.5x to 3x (experimental.json glide_speed; 1x is not kept). Measured on G-Portal (0.15.200 probe):
+-- own glider speed, 0.1x to 3x (0.15.202, owner: "even more slower speeds": 0.1x and 0.25x) (experimental.json glide_speed; 1x is not kept). Measured on G-Portal (0.15.200 probe):
 -- the game pulls a gliding player's horizontal speed to about 18.7 m/s (sinking 4.5 m/s) whatever it was, so the
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { CRUISE = 18.7, STEPS = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3 }, broken = false }
+local glide = { CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -1930,7 +1930,7 @@ local function panel_rows(world)
       end
     end
   end
-  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.5x to 3x
+  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 3x
     local gs = tonumber(v.glide_speed) or 1
     local opts = {}
     for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end

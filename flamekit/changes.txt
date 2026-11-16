@@ -1,3 +1,6 @@
+0.15.202 Nov 15, 2026
+- Glider speed: two slower choices, 0.1x and 0.25x. Needs FlameKit 0.15.202 on the server.
+
 0.15.201 Nov 15, 2026
 - Experimental tab: "Glider speed", from 0.5x to 3x (1.0x is the game's own speed). Each player sets their own and it is kept. Faster or slower forward flight; sinking, climbing with S and the updraft burst stay as they were. Needs FlameKit 0.15.201 on the server.
 - The glider test logging of 0.15.200 is gone.
