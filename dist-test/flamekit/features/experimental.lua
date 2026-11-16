@@ -180,6 +180,9 @@ glide.SBJ = {
   { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 4 },
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
     tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
+  { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
+    name = function(k) return k == 1 and "Crater" or "Boom only" end,  -- (0.15.232, owner: per player, their responsibility)
+    tip = "Landing inside a base (a flame altar's area, yours or anyone's): Boom only makes the sound without damage; Crater blasts it like anywhere else and can destroy what is built there. Only for you." },
   { which = "divemin", key = "sbj_divemin", label = "Fast Dive minimum height", default = 10, steps = { 0, 5, 10, 15, 20, 30 },
     name = function(m) return m == 0 and "Off" or (m .. " m") end,
     tip = "No dive this close above the ground (the game only knows the distance to the ground when it is near). Only for you." },
@@ -297,7 +300,7 @@ local function view(account)
               sbj_height = glide.sbj(account, "height"), sbj_forward = glide.sbj(account, "forward"),
               sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
               sbj_divespeed = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
-              sbj_divemin = glide.sbj(account, "divemin"),
+              sbj_divemin = glide.sbj(account, "divemin"), sbj_divebase = glide.sbj(account, "divebase"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
@@ -1438,7 +1441,8 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     if is_on(account, "fastdive") then
       p.dive = p.dive or {}
       local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed"),
-                  landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin") }
+                  landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
+                  base = glide.sbj(account, "divebase") }
       local what = glide.dive.step(world, p.entity, p.dive, o)
       if what == "dive" then
         emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (speed %sx, landing %s)",
@@ -1449,7 +1453,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
           tostring(p.entity), p.dive.ground or 0, tostring(o.min)))
       elseif what == "landed" then
         local _, y = world:position(p.entity)
-        emf.log(string.format("experimental: fast dive: player %s landed at %.1f m", tostring(p.entity), y or 0))
+        emf.log(string.format("experimental: fast dive: player %s landed at %.1f m, %s, blast %s", tostring(p.entity), y or 0,
+          p.dive.in_base == nil and "base unknown" or p.dive.in_base and "inside a base" or "outside bases",
+          tostring(p.dive.landed_with)))
       end
     end
     if is_on(account, "superbjump") then

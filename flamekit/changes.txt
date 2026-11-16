@@ -1,3 +1,6 @@
+0.15.232 Nov 16, 2026
+- Experimental tab: Fast Dive inside bases, Boom only (the default: no damage inside a base, yours or anyone's) or Crater. Only for you. Needs FlameKit 0.15.232 on the server.
+
 0.15.231 Nov 16, 2026
 - Fast Dive: the head-first pose and crouched landing tests are gone (they could not work: the game decides both itself). Fast Dive itself is unchanged.
 

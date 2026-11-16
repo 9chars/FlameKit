@@ -37,6 +37,11 @@ local M = {
     [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50" },     -- Explosion_Player_Tool_TNT_T4
     [4] = { name = "Boom only (no crater)", guid = "896758dd-f2d5-4e26-89f0-a4856f489e77" },  -- ..._MeteoricDescent
   },
+  -- (0.15.232, owner: "an option not to blow up stuff inside someones base", per player) a landing inside a base (the
+  -- game's InSaveZone actor state, keen::actor::StateFlag 14: a flame altar's area) uses BOOM_ONLY unless the player
+  -- chose craters there too (opts.base == 1)
+  SAVE_ZONE = 1 << 14,
+  BOOM_ONLY = 4,
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -85,9 +90,21 @@ function M.boom(world, x, y, z, guid)
   return ok and id or nil
 end
 
-local function landing(world, entity, kind)
+-- true when the player stands inside a base (a flame altar's area), nil when it cannot be read
+function M.in_base(world, entity)
+  local ok, inside = pcall(function()
+    local a = world:get("Actor", entity)
+    return a ~= nil and (math.tointeger(a.currentState) or 0) & M.SAVE_ZONE ~= 0
+  end)
+  return ok and inside or nil
+end
+
+local function landing(world, entity, kind, s)
   local x, y, z = world:position(entity)
   if not x then return end
+  s.in_base = M.in_base(world, entity)
+  if s.in_base and (kind or 1) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
+  s.landed_with = kind
   local l = M.LANDINGS[kind or 1]
   if not (l and l.guid) then return end
   if M.LANDING_SHIELD > 0 then
@@ -113,7 +130,7 @@ function M.tick(world)
 end
 
 -- Every server step for each player with Fast Dive on. `s` is that player's own table, `opts` the player's own
--- settings: window (steps), speed (factor), landing (a LANDINGS key), min (metres).
+-- settings: window (steps), speed (factor), landing (a LANDINGS key), min (metres), base (1: craters inside bases too).
 -- Returns "dive", "low" (asked for below the minimum height), "landed" or nil.
 function M.step(world, entity, s, opts)
   if M.broken then return nil end
@@ -130,7 +147,7 @@ function M.step(world, entity, s, opts)
     if st == ON_GROUND then
       if s.diving then
         s.diving = nil
-        landing(world, entity, s.landing)
+        landing(world, entity, s.landing, s)
         result = "landed"
       end
       s.first = nil
@@ -156,7 +173,7 @@ function M.step(world, entity, s, opts)
       return
     end
     if push_down(world, entity, st == GLIDING, opts.speed or 1) then
-      s.diving, s.from_glider, s.landing = true, st == GLIDING, opts.landing or 1
+      s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or 1, opts.base or 0
       local _, y = world:position(entity)
       s.dive_y = y
       result = "dive"
