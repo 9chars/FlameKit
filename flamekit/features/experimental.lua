@@ -200,6 +200,54 @@ function glide.sbj(account, which)
   end
   return 1
 end
+-- (0.15.250, probe, owner: "I would like it to be real fall damage if possible") what the game's fall damage sees for a
+-- player with Fast Dive on: during a dive every half second, and around every landing (the step before, the landing
+-- and 5 steps after), DynamicFallDamage (wasFalling, fallStartAltitude, detectedFallDistance, detectedFallDamagePercentage),
+-- the Falling state bit, the movement state, height and vertical speed. Fall hits are logged in the on_hit below.
+function glide.fall_snap(world, entity)
+  local r = {}
+  pcall(function()
+    local fd = world:get("DynamicFallDamage", entity)
+    if fd then
+      r.was, r.start = fd.wasFalling, tonumber(fd.fallStartAltitude)
+      r.dist, r.pct = tonumber(fd.detectedFallDistance), tonumber(fd.detectedFallDamagePercentage)
+    end
+    local a = world:get("Actor", entity)
+    r.falling = a and ((math.tointeger(a.currentState) or 0) >> 32) & 1 == 1 or nil
+    local m = world:get("DynamicLocomotion", entity)
+    r.st = m and tonumber(m.state)
+    local _, y = world:position(entity)
+    r.y = y
+    local v = world:get("Velocity", entity)
+    r.vy = v and tonumber(v.velocity.y)
+  end)
+  return r
+end
+function glide.fall_line(what, entity, r)
+  emf.log(string.format("fall probe: player %s %s: y %.1f vy %.1f state %s Falling %s | wasFalling %s start %s dist %s pct %s",
+    tostring(entity), what, r.y or 0, r.vy or 0, tostring(r.st), tostring(r.falling), tostring(r.was),
+    r.start and string.format("%.1f", r.start) or "nil", r.dist and string.format("%.2f", r.dist) or "nil",
+    r.pct and string.format("%.3f", r.pct) or "nil"))
+end
+function glide.fall_probe(world, p, what)
+  local q = p.fall_probe or {}
+  p.fall_probe = q
+  local r = glide.fall_snap(world, p.entity)
+  local t = world:tick()
+  if what == "dive" then q.dive = true q.next = t end
+  if q.dive and q.next and t >= q.next then glide.fall_line("diving", p.entity, r) q.next = t + 30 end
+  local landed = what == "landed" or (q.prev and q.prev.st ~= 0 and r.st == 0)
+  if landed then
+    if q.prev then glide.fall_line("step before landing", p.entity, q.prev) end
+    glide.fall_line(what == "landed" and "LANDED (fast dive)" or "landed (normal)", p.entity, r)
+    q.after, q.dive, q.next = 5, nil, nil
+  elseif q.after then
+    glide.fall_line("after landing", p.entity, r)
+    q.after = q.after > 1 and q.after - 1 or nil
+  end
+  if what == "cancel" then q.dive, q.next = nil, nil end
+  q.prev = r
+end
 -- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
 -- landing's word never comes), taken back at the landing
 function glide.dive_notice(msg)
@@ -1459,6 +1507,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
                   base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto") }
       local what = glide.dive.step(world, p.entity, p.dive, o)
       p.dive.landed_now = what == "landed" or nil
+      pcall(glide.fall_probe, world, p, what)  -- (0.15.250, probe)
       -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
       -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
       if what == "dive" or what == "landed" or what == "cancel" then
@@ -2713,6 +2762,13 @@ function F.setup(k)
     end
     if tell_player then tell_player(world, d.player, account, "You died: PvP is off. Switch it on again to fight.") end
   end, "a player's death"))
+  -- (0.15.250, probe) every fall damage hit on a player: how much, health before and after
+  pcall(emf.on_hit, kit.guard(F, function(world, hit)
+    if not hit or hit.kind ~= "fall" then return end
+    local _, y = world:position(hit.target)
+    emf.log(string.format("fall probe: FALL HIT on %s: amount %s, health %s -> %s, at y %.1f", tostring(hit.target),
+      tostring(hit.amount), tostring(hit.health_before), tostring(hit.health_after), y or 0))
+  end, "a fall hit"), { kinds = { "fall" } })
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
