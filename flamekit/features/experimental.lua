@@ -1504,7 +1504,8 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       p.dive = p.dive or {}
       local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed"),
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
-                  base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto") }
+                  base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto"),
+                  protected = (is_on(account, "fall") or is_on(account, "immortal")) and true or nil }  -- (0.15.251)
       local what = glide.dive.step(world, p.entity, p.dive, o)
       p.dive.landed_now = what == "landed" or nil
       pcall(glide.fall_probe, world, p, what)  -- (0.15.250, probe)
