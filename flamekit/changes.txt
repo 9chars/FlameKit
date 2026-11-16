@@ -1,3 +1,6 @@
+0.15.191 Nov 15, 2026
+- Fixed: setting the pointer key (0.15.190) took no key or mouse button: the setting was left out of the list the key capture looks in.
+
 0.15.190 Nov 15, 2026
 - The pointer key can be any key or mouse button (but the left one): F4 menu, Windows tab, "Pointer key": click it, then press the key or mouse button you want (the middle or right button, side buttons, left or right Shift/Ctrl/Alt, any key); Esc stops waiting. Right Alt stays the default; a key chosen before is kept.
 - The "Show the pointer while you stand still" option is gone.
