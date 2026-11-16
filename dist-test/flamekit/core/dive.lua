@@ -21,6 +21,7 @@
 --   height only stops a dive just above the ground.
 
 local fall_guard = require("core.fall_guard")
+local bases = require("core.bases")
 
 local M = {
   WINDOW = 11,           -- steps: the default tap speed (the player's own comes in opts.window)
@@ -28,20 +29,32 @@ local M = {
   SPEED = 80,            -- the push down at 1x (the impulse's y, negative)
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
   MIN_HEIGHT = 10,       -- metres to the ground at 1x default (opts.min); 0 = anywhere
-  LANDING_SHIELD = 1.5,  -- seconds the diver takes no hits after the landing (their own blast)
+  LANDING_SHIELD = 1.5,
+  DEFAULT_LANDING = 3,   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
   -- the landing blasts a player can choose (opts.landing): the game's own explosion templates
   LANDINGS = {
     [0] = { name = "Off" },
     [1] = { name = "Small crater", guid = "3ed869e3-c65b-4751-98da-4ce3c6242bac" },   -- Explosion_Player_Tool_TNT_T1
     [2] = { name = "Medium crater", guid = "93ee028c-2fa7-4d31-bfc6-1e7b5ef4ac70" },  -- Explosion_Player_Tool_TNT_T3
-    [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50" },     -- Explosion_Player_Tool_TNT_T4
+    [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", down = 1 },  -- ..._TNT_T4 (0.15.240: 1 m down)
     [4] = { name = "Boom only (no crater)", guid = "896758dd-f2d5-4e26-89f0-a4856f489e77" },  -- ..._MeteoricDescent
+    -- (0.15.237, owner: "that one was good ... call it huge crater") the big TNT in the middle and 4 more 1.5 m around
+    -- it (a ScaleComponent does not make a blast bigger: 1x, 3x and 6x looked the same, 0.15.235 test; the game's boss
+    -- blasts did nothing when spawned alone, 0.15.236 test)
+    -- (0.15.239, owner, ring tests 14:46-15:00) going off below the ground digs a deeper, rounder crater: Huge 2 m down;
+    -- Massive ("Massive crater is good"): 21 big TNTs, 8 at 1.5 m and 12 at 4 m (turned half a step), 3 m down
+    [5] = { name = "Huge crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", rings = { { 4, 1.5 } }, down = 2 },
+    [6] = { name = "Massive crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50",
+            rings = { { 8, 1.5 }, { 12, 4, math.pi / 12 } }, down = 3 },
   },
   -- (0.15.232, owner: "an option not to blow up stuff inside someones base", per player) a landing inside a base (the
   -- game's InSaveZone actor state, keen::actor::StateFlag 14: a flame altar's area) uses BOOM_ONLY unless the player
   -- chose craters there too (opts.base == 1)
   SAVE_ZONE = 1 << 14,
   BOOM_ONLY = 4,
+  -- (0.15.233, owner: a crater just outside a base still damaged it near the border) also boom only within this many
+  -- metres around a base's build zone (core/bases.lua), by the size of the blast; tuned with flamekit.fastdive margin
+  MARGIN = { [1] = 10, [2] = 15, [3] = 25, [5] = 30, [6] = 40 },
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -83,9 +96,12 @@ local function push_down(world, entity, gliding, factor)
 end
 
 -- one of the game's explosion templates at a place: the landing blast, and the console test
-function M.boom(world, x, y, z, guid)
+-- `scale` (0.15.235, owner: "is there any way to make the blast even bigger", TEST): the game's ScaleComponent
+-- (uniformScale), as FlameKit's test monsters are spawned with; whether it makes a blast bigger is what the test shows
+function M.boom(world, x, y, z, guid, scale)
   if not guid or guid == "" or guid == "off" then return nil end
-  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z)
+  local comps = scale and scale ~= 1 and { ScaleComponent = { uniformScale = scale } } or nil
+  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, comps)
   if not ok then emf.log("fast dive: the landing blast cannot be spawned (" .. tostring(id) .. ")") end
   return ok and id or nil
 end
@@ -103,9 +119,13 @@ local function landing(world, entity, kind, s)
   local x, y, z = world:position(entity)
   if not x then return end
   s.in_base = M.in_base(world, entity)
-  if s.in_base and (kind or 1) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
+  s.near_base = nil
+  if not s.in_base and s.base ~= 1 and M.MARGIN[kind or M.DEFAULT_LANDING] then
+    s.near_base = bases.near(x, z, M.MARGIN[kind or M.DEFAULT_LANDING])
+  end
+  if (s.in_base or s.near_base) and (kind or M.DEFAULT_LANDING) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
   s.landed_with = kind
-  local l = M.LANDINGS[kind or 1]
+  local l = M.LANDINGS[kind or M.DEFAULT_LANDING]
   if not (l and l.guid) then return end
   if M.LANDING_SHIELD > 0 then
     local ok, rule = pcall(emf.hit_rule, { to = entity, cancel = true })
@@ -114,11 +134,24 @@ local function landing(world, entity, kind, s)
       M.shields[#M.shields + 1] = { rule = rule, until_tick = world:tick() + math.floor(M.LANDING_SHIELD * 60) }
     end
   end
-  M.boom(world, x, y, z, l.guid)
+  M.blast(world, x, y - (l.down or 0), z, l.guid, l.rings)
+end
+
+-- (0.15.237) one blast in the middle and rings around it: rings = { {count, radius}, ... }; returns how many spawned
+function M.blast(world, x, y, z, guid, rings)
+  local made = M.boom(world, x, y, z, guid) and 1 or 0
+  for _, r in ipairs(rings or {}) do
+    for k = 1, r[1] do
+      local a = 2 * math.pi * k / r[1] + (r[3] or 0)
+      if M.boom(world, x + math.cos(a) * r[2], y, z + math.sin(a) * r[2], guid) then made = made + 1 end
+    end
+  end
+  return made
 end
 
 -- the shields of earlier landings run out (every step, any player)
 function M.tick(world)
+  if world:is_server() then pcall(bases.tick, world) end  -- (0.15.233) the list of bases, made in the background
   if not M.shields then return end
   local t = world:tick()
   for i = #M.shields, 1, -1 do
@@ -173,7 +206,7 @@ function M.step(world, entity, s, opts)
       return
     end
     if push_down(world, entity, st == GLIDING, opts.speed or 1) then
-      s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or 1, opts.base or 0
+      s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or M.DEFAULT_LANDING, opts.base or 0
       local _, y = world:position(entity)
       s.dive_y = y
       result = "dive"

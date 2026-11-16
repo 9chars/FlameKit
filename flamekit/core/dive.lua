@@ -29,13 +29,14 @@ local M = {
   SPEED = 80,            -- the push down at 1x (the impulse's y, negative)
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
   MIN_HEIGHT = 10,       -- metres to the ground at 1x default (opts.min); 0 = anywhere
-  LANDING_SHIELD = 1.5,  -- seconds the diver takes no hits after the landing (their own blast)
+  LANDING_SHIELD = 1.5,
+  DEFAULT_LANDING = 3,   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
   -- the landing blasts a player can choose (opts.landing): the game's own explosion templates
   LANDINGS = {
     [0] = { name = "Off" },
     [1] = { name = "Small crater", guid = "3ed869e3-c65b-4751-98da-4ce3c6242bac" },   -- Explosion_Player_Tool_TNT_T1
     [2] = { name = "Medium crater", guid = "93ee028c-2fa7-4d31-bfc6-1e7b5ef4ac70" },  -- Explosion_Player_Tool_TNT_T3
-    [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50" },     -- Explosion_Player_Tool_TNT_T4
+    [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", down = 1 },  -- ..._TNT_T4 (0.15.240: 1 m down)
     [4] = { name = "Boom only (no crater)", guid = "896758dd-f2d5-4e26-89f0-a4856f489e77" },  -- ..._MeteoricDescent
     -- (0.15.237, owner: "that one was good ... call it huge crater") the big TNT in the middle and 4 more 1.5 m around
     -- it (a ScaleComponent does not make a blast bigger: 1x, 3x and 6x looked the same, 0.15.235 test; the game's boss
@@ -119,12 +120,12 @@ local function landing(world, entity, kind, s)
   if not x then return end
   s.in_base = M.in_base(world, entity)
   s.near_base = nil
-  if not s.in_base and s.base ~= 1 and M.MARGIN[kind or 1] then
-    s.near_base = bases.near(x, z, M.MARGIN[kind or 1])
+  if not s.in_base and s.base ~= 1 and M.MARGIN[kind or M.DEFAULT_LANDING] then
+    s.near_base = bases.near(x, z, M.MARGIN[kind or M.DEFAULT_LANDING])
   end
-  if (s.in_base or s.near_base) and (kind or 1) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
+  if (s.in_base or s.near_base) and (kind or M.DEFAULT_LANDING) ~= 0 and s.base ~= 1 then kind = M.BOOM_ONLY end
   s.landed_with = kind
-  local l = M.LANDINGS[kind or 1]
+  local l = M.LANDINGS[kind or M.DEFAULT_LANDING]
   if not (l and l.guid) then return end
   if M.LANDING_SHIELD > 0 then
     local ok, rule = pcall(emf.hit_rule, { to = entity, cancel = true })
@@ -205,7 +206,7 @@ function M.step(world, entity, s, opts)
       return
     end
     if push_down(world, entity, st == GLIDING, opts.speed or 1) then
-      s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or 1, opts.base or 0
+      s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or M.DEFAULT_LANDING, opts.base or 0
       local _, y = world:position(entity)
       s.dive_y = y
       result = "dive"

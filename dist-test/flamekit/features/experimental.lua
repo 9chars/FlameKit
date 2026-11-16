@@ -177,7 +177,7 @@ glide.SBJ = {
   { which = "divespeed", key = "sbj_divespeed", label = "Fast Dive speed", sep = true,
     steps = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10 },  -- (0.15.228, owner: faster options)
     tip = "How fast the dive goes down: 1.0x is about 60 m/s, three times the game's fastest fall. Only for you." },
-  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 4 },
+  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 3, steps = { 0, 1, 2, 3, 5, 6, 4 },  -- (0.15.240) Big crater by default
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
     tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
@@ -1454,7 +1454,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       elseif what == "landed" then
         local _, y = world:position(p.entity)
         emf.log(string.format("experimental: fast dive: player %s landed at %.1f m, %s, blast %s", tostring(p.entity), y or 0,
-          p.dive.in_base == nil and "base unknown" or p.dive.in_base and "inside a base" or "outside bases",
+          p.dive.in_base == nil and "base unknown" or p.dive.in_base and "inside a base"
+            or p.dive.near_base and string.format("near the base at %.0f %.0f", p.dive.near_base.x, p.dive.near_base.z)
+            or "away from bases",
           tostring(p.dive.landed_with)))
       end
     end
@@ -2502,16 +2504,71 @@ function F.setup(k)
       local d, a1, a2 = glide.dive, args[1], args[2]
       local function say(line) emf.log("experimental: " .. line) emf.reply(line) end
       if a1 == "speed" then d.SPEED = tonumber(a2) or d.SPEED say("fastdive: speed at 1x " .. d.SPEED) return end
-      if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID>": the effect 3 m in front of them
-        local id, guid = tonumber(a2), args[3]
+      if a1 == "margin" then  -- (0.15.233) "fastdive margin <small> [medium] [big]": metres around bases, boom only
+        d.MARGIN[1] = tonumber(a2) or d.MARGIN[1]
+        d.MARGIN[2] = tonumber(args[3]) or d.MARGIN[2]
+        d.MARGIN[3] = tonumber(args[4]) or d.MARGIN[3]
+        say(string.format("fastdive: margin around bases %s / %s / %s m", d.MARGIN[1], d.MARGIN[2], d.MARGIN[3]))
+        return
+      end
+      if a1 == "bases" then  -- (0.15.233) the bases core/bases.lua knows
+        local b = require("core.bases")
+        say(string.format("fastdive: %d base(s) known", #b.list))
+        for _, e in ipairs(b.list) do say(string.format("  base at %.1f %.1f, zone reaches %.1f x %.1f m from %.1f %.1f", e.ax, e.az, e.hx, e.hz, e.x, e.z)) end
+        return
+      end
+      if a1 == "rings" then  -- (0.15.237, test) "fastdive rings <player entity> <template GUID> <metres in front>
+        -- <count>:<radius> [<count>:<radius> ...]": one in the middle and each ring around it (each next ring turned by
+        -- half a step, so its blasts sit between the last one's)
+        local id, guid, ahead = tonumber(a2), args[3], tonumber(args[4]) or 10
+        local x, y, z
+        if id then x, y, z = world:position(id) end
+        if not (x and guid) then emf.reply("fastdive rings <player entity> <template GUID> <metres in front> <count>:<radius> ...") return end
+        local rings, total, down = {}, 1, 0
+        for i = 5, #args do
+          local c, r = tostring(args[i]):match("^(%d+):([%d%.]+)$")
+          local dn = tostring(args[i]):match("^down:([%d%.]+)$")  -- (0.15.238) "down:<m>": the blasts this far below the feet
+          if dn then down = tonumber(dn) or 0 end
+          if c then
+            rings[#rings + 1] = { tonumber(c), tonumber(r), #rings % 2 == 1 and math.pi / tonumber(c) or 0 }
+            total = total + tonumber(c)
+          end
+        end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local made = d.blast(world, x + fx / len * ahead, y - down, z + fz / len * ahead, guid, rings)
+        say(string.format("fastdive rings: %s, %d of %d spawned, %d ring(s), %s m in front, %s m down", tostring(guid), made, total, #rings, tostring(ahead), tostring(down)))
+        return
+      end
+      if a1 == "ring" then  -- (0.15.236, test) "fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]":
+        -- one in the middle and <count> around it, <radius> m out (a bigger blast from the game's own explosion)
+        local id, guid, count, radius, ahead = tonumber(a2), args[3], tonumber(args[4]) or 4, tonumber(args[5]) or 6, tonumber(args[6]) or 10
+        local x, y, z
+        if id then x, y, z = world:position(id) end
+        if not (x and guid) then emf.reply("fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]") return end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local cx, cz = x + fx / len * ahead, z + fz / len * ahead
+        local made = d.boom(world, cx, y, cz, guid) and 1 or 0
+        for k = 1, count do
+          local a = 2 * math.pi * k / count
+          if d.boom(world, cx + math.cos(a) * radius, y, cz + math.sin(a) * radius, guid) then made = made + 1 end
+        end
+        say(string.format("fastdive ring: %s, %d of %d spawned, %s m around a point %s m in front", tostring(guid), made, count + 1, tostring(radius), tostring(ahead)))
+        return
+      end
+      if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID> [scale] [metres in front]"
+        local id, guid, scale, ahead = tonumber(a2), args[3], tonumber(args[4]), tonumber(args[5]) or 3
         local x, y, z
         if id then x, y, z = world:position(id) end  -- (0.15.222) "id and world:position(id)" kept only x: z was nil
         if not (x and guid) then emf.reply("fastdive boom <player entity> <template GUID>") return end
         local q = world:get("CurrentTransform", id).transform.orientation
         local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
         local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
-        local e = d.boom(world, x + fx / len * 3, y, z + fz / len * 3, guid)
-        say("fastdive boom: " .. tostring(guid) .. " -> " .. tostring(e))
+        local e = d.boom(world, x + fx / len * ahead, y, z + fz / len * ahead, guid, scale)
+        say(string.format("fastdive boom: %s scale %s, %s m in front -> %s", tostring(guid), tostring(scale or 1), tostring(ahead), tostring(e)))
         return
       end
       if a1 == "ground" then

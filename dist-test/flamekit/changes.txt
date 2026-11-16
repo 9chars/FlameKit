@@ -1,3 +1,29 @@
+0.15.240 Nov 16, 2026
+- Fast Dive landing: Big crater goes off 1 m below the ground and is the new default. Huge crater and Massive crater are in the Experimental tab.
+- Needs FlameKit 0.15.240 on the server.
+
+0.15.239 Nov 16, 2026
+- Fast Dive landing: Huge crater goes off 2 m below the ground (a deeper, rounder crater); Massive crater added (21 big TNTs, 3 m below the ground). The choices come to the Experimental tab with a later game update.
+
+0.15.238 Nov 16, 2026
+- Server (test): the ring explosion test can set the blasts off below the ground. Server only: no game update.
+
+0.15.237 Nov 16, 2026
+- Fast Dive landing: Huge crater (five big TNTs at once, close together). The choice comes to the Experimental tab with a later game update.
+- Server (test): a console test with several rings of explosions.
+
+0.15.236 Nov 16, 2026
+- Server (test): a console test that sets off several explosions at once in a ring. Server only: no game update.
+
+0.15.235 Nov 16, 2026
+- Server (test): the Fast Dive effect test can set off an explosion at a bigger scale. Server only: no game update.
+
+0.15.234 Nov 16, 2026
+- Server: the size of a base is read from its flame altar's trigger area (its build zone size reads 0). Server only: no game update.
+
+0.15.233 Nov 16, 2026
+- Fast Dive (server): with "Boom only" inside bases, a landing near a base is boom only too (10 m around it for the small crater, 15 m medium, 25 m big), so the blast cannot reach in. Server only: no game update.
+
 0.15.232 Nov 16, 2026
 - Experimental tab: Fast Dive inside bases, Boom only (the default: no damage inside a base, yours or anyone's) or Crater. Only for you. Needs FlameKit 0.15.232 on the server.
 
