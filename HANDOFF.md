@@ -48,23 +48,25 @@ on its own: no feature calls into or reads another feature's code or data (for e
 be able to change how another works. Keep the code clean, reusable and well factored, without dependencies between
 systems.
 
-## Where things stand (end of the conversation of 2026-11-15..16; the owner starts a new one)
+## Where things stand (updated 2026-11-16 07:23, start of the conversation of 2026-11-16)
 
 - Versions (2026-11-16 07:20): **Development and Stable 0.15.207** (game). **Servers 0.15.208** (local and G-Portal;
   0.15.208 is server only: the fall fix). The DLL was last built at 0.15.195; 0.15.196..0.15.207 reuse that DLL
   (Lua-only changes: `make_dist.py` with the staged DLL `/mnt/user-data/uploads/enshrouded mod shit/flamekit_native/out/flamekit_native/flamekit_native.dll`; re-stage it in a new session).
-- `C:\enshrouded mod shit\outbox` holds the last G-Portal upload (0.15.208: features/experimental.lua, changes.txt,
-  mod.json). The upload tool sends everything in it: replace its files before the next G-Portal upload.
-- G-Portal needs a server restart for Loot Drop: the server started at 4:10 on 2026-11-15 with 0.15.141, so
-  `EntityDiedEvent`, `LootInteractionEvent`, `InteractionAcceptedEvent`, `TransformedToLootEvent` were "new since the
-  game started" (emf_core.log) and Loot Drop did nothing there. The nightly restart (about 4:10) should have fixed it
-  on 2026-11-16: check the G-Portal log for those "restart the game" lines before trusting Loot Drop there.
-  "Monsters drop their loot on the ground" is ON on G-Portal and on the local server.
-- Waiting for the owner's test (built, not seen in game): 0.15.208 fall fix (first falls log
-  "experimental: no fall damage: fall start X, height now Y": check X and Y are the same unit, metres; if not, the
-  fix does nothing), 0.15.207 mana kept full by Invincible Mode, damage bonus, join/leave lines, the Change Log window,
-  the About tab, Pointer key behavior, the FlameKit Menu key in the Windows tab, 0.15.198 Loot Drop queue fix (a group
-  of monsters dying together), 0.15.197 sparkle following sliding loot.
+- `C:\enshrouded mod shit\outbox` is empty: the 0.15.208 upload (2026-11-16 00:10: features/experimental.lua,
+  changes.txt, mod.json) sent and removed its files.
+- Loot Drop works on G-Portal (checked 2026-11-16): the server restarted at 00:16 on 2026-11-16 with 0.15.208, its
+  emf_core.log has no "restart the game" lines, and Loot Drop put loot on the ground all night (e.g. 03:24, body
+  774627: 2 stacks). "Monsters drop their loot on the ground" is ON on G-Portal and on the local server.
+- Tested by the owner, all good (2026-11-16 07:22: "all your fixes were good. I tested them already"): 0.15.208 fall
+  fix, 0.15.207 mana kept full by Invincible Mode, damage bonus, join/leave lines, the Change Log window, the About
+  tab, Pointer key behavior, the FlameKit Menu key in the Windows tab, 0.15.198 Loot Drop queue fix (a group of
+  monsters dying together), 0.15.197 sparkle following sliding loot. (The fall fix's log line "experimental: no fall
+  damage: fall start X, height now Y" was not in the logs Claude could read at 07:22: the G-Portal log since the
+  04:10 restart was not fetched yet.)
+- Folder access in a new conversation: ask for `C:\enshrouded mod shit`, `D:\SteamLibrary\steamapps\common\Enshrouded\emf`
+  and `C:\Program Files\Steam\SteamApps\common\EnshroudedServer\emf` (device_request_folder_access; the owner said
+  2026-11-16: "request access to C:\enshrouded mod shit and anything else you need").
 - Held (owner said "going to make some more changes"; not built): the Dump Key taking mouse buttons (same capture as
   the pointer key: the DLL watches the key and sends act("dump","-")).
 - Debug code still in (remove when the owner agrees): loot_drop.lua `flamekit.loottest`, `flamekit.fx <1-10>` preview,
