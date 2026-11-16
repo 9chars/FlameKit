@@ -134,8 +134,16 @@ function M.step(world, entity, s, opts)
     local down = jump_down(world, entity)
     local pressed = down and not s.down
     s.down = down
+    if s.leapt and s.base then  -- (0.15.212) the highest point of the leap, for the log
+      local _, y = world:position(entity)
+      if y and y > (s.top or -1e9) then s.top = y end
+    end
     if st == ON_GROUND then
-      s.jumped_at, s.leapt = nil, nil
+      if s.leapt and s.base and s.top then
+        s.rise = s.top - s.base
+        result = "landed"
+      end
+      s.jumped_at, s.leapt, s.base, s.top = nil, nil, nil, nil
     elseif st == IN_AIR and count == 1 and not s.jumped_at then
       s.jumped_at = t  -- the jump (a fall from a ledge has jumpCount 0: no leap from a fall)
     end
@@ -149,6 +157,8 @@ function M.step(world, entity, s, opts)
           result = "tired"
         elseif push(world, entity, s) then
           s.leapt = true
+          local _, y = world:position(entity)
+          s.base, s.top = y, y
           result = "leap"
         end
       end

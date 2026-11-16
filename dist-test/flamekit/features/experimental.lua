@@ -156,8 +156,8 @@ end
 -- factors of core/leap.lua's tuned values (1x: about 50 m up, the forward arc and air steering as tested 2026-11-16).
 -- experimental.json keys sbj_height, sbj_forward, sbj_steer (1x is not kept).
 glide.SBJ = {
-  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10 },
-    tip = "How high the leap goes: 1.0x is about 50 m (a double jump is about 4 m). Only for you." },  -- (0.15.210, owner: up to 10x)
+  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20 },
+    tip = "How high the leap goes: 1.0x is about 50 m (a double jump is about 4 m). Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.212: 20x, to find the game's height limit)
   { which = "forward", key = "sbj_forward", label = "Super B Jump forward", steps = { 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10 },
     tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },  -- (0.15.210, owner: up to 10x)
   { which = "steer", key = "sbj_steer", label = "Super B Jump air steering", steps = { 0, 1, 2, 3, 4, 5, 7, 10, 15 },
@@ -1413,6 +1413,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       if what == "leap" then
         emf.log(string.format("experimental: super b jump: player %s leaps (height %sx, forward %sx at input %.2f, steering %sx)",
           tostring(p.entity), tostring(o.height), tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
+      elseif what == "landed" then  -- (0.15.212) how high the leap went, for tuning
+        emf.log(string.format("experimental: super b jump: player %s landed: highest %.1f m above the leap (%.1f m, ground %.1f m)",
+          tostring(p.entity), p.leap.rise or 0, p.leap.top or 0, p.leap.base or 0))
       elseif what == "tired" then  -- (owner: a yellow line in the Notices window)
         pcall(function()
           require("features.chat").notice_to(world, p.entity,
