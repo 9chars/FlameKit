@@ -249,7 +249,7 @@ function glide.fall_probe(world, p, what)
   q.prev = r
 end
 -- (0.15.253/254, owner: "when the player pops open their glider ... a notice message ... telling them to double tap
--- the bound key", "every time", "like 5 seconds", "light blue is good", "if you're below the minimum height it shouldn't
+-- the bound key", "every time", "like 5 seconds" (10 since 0.15.255), "light blue is good", "if you're below the minimum height it shouldn't
 -- show that") the server sees the glider open (core/dive.lua: the game's copy in a joined player's game did not, 0.15.253)
 -- and tells the player's game (op "tip"; older games ignore it). The height counts from the last place the player stood
 -- or swam (the game knows the ground below only about 1 m before a landing). Taken back when the glider closes, at a
@@ -257,7 +257,7 @@ end
 function glide.glider_tip(world, p, o, what)
   local d = p.dive
   local function say(on)
-    local m = { op = "tip", on = on }
+    local m = { op = "tip", on = on, seconds = on and 10 or nil }  -- (0.15.255) how long the tip stays up
     if kit.is_host() and emf.local_player() == p.entity then
       pcall(glide.tip_notice, m)
     else
@@ -284,7 +284,10 @@ function glide.glider_tip(world, p, o, what)
 end
 function glide.tip_notice(msg)
   if msg.on == true then
-    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff", 5)
+    -- (0.15.255, owner: "lets make the message stay up for 10 seconds") the server says how long (older servers: 10 s)
+    local secs = tonumber(msg.seconds)
+    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff",
+      secs and secs >= 1 and secs <= 60 and secs or 10)
   else
     kit.notice("fastdive_tip")
   end
