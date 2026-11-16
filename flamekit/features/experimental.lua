@@ -715,7 +715,7 @@ local function drop_test_loot(world, id, b)
     killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
 end
 
-local function spawn_body(world, account, player, kind, level, what, count)
+local function spawn_body(world, account, player, kind, level, what, count, no_loot)
   if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
   spawn_queue = {}  -- a new spawn or Remove also stops a spawn under way
   if kind ~= "dummy" and kind ~= "duel" then  -- Remove: all of them, anywhere (0.15.136)
@@ -752,7 +752,7 @@ local function spawn_body(world, account, player, kind, level, what, count)
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2],
-              level = level, boss = boss }
+              level = level, boss = boss, no_loot = no_loot or nil }  -- (0.15.182) Reward loot off
   bodies[id] = b
   to_ground(id, sx, y, sz)  -- (0.15.140) put on the ground a moment later
   if level then
@@ -867,7 +867,8 @@ local function bodies_tick(world)
         b.dead_at = os.time()
         killed = killed + 1
         if b.kind == "duel" then  -- (0.15.142, owner) its loot on the ground
-          local okd, what = pcall(drop_test_loot, world, id, b)
+          local okd, what = true, "none (Reward loot off)"
+          if not b.no_loot then okd, what = pcall(drop_test_loot, world, id, b) end  -- (0.15.182)
           -- (0.15.162, owner: "we dont want the corpse") (0.15.163: at the next check, 2 of 15 bodies stayed: the game
           -- changes a body soon after the death and it no longer read as killed) the body goes at once, in this check
           drop_body(world, id, true)
@@ -1016,7 +1017,7 @@ local function handle(world, account, entity, msg)
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
     local what = type(msg.what) == "string" and msg.what or nil
-    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count)
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count, msg.loot == false)
     if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
     local v = view(account)
     v.note = not ok and "That did not work on this game version." or why
@@ -1616,6 +1617,7 @@ local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = RANDOM_KEY, 1  -- (0.15.139) Random is the default  -- the Debug section's duelist choice, this session (0.15.70)
 local duel_count = 1  -- (0.15.134, owner) how many duelists one Spawn makes
+local duel_loot = true  -- (0.15.182, owner) Reward loot: runes and a legendary item for a kill; off: nothing at all
 local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
@@ -1947,6 +1949,11 @@ function F.window_rows(world)
     rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
       disabled = in_pvp or nil, tooltip = "How many monsters one Spawn makes, in rows of up to 10." }
   end
+  rows[#rows + 1] = { label = true, text = "Reward loot" }  -- (0.15.182, owner)
+  local loot_tip = "On: a kill gives runes and legendary runes into your bag and one legendary item into a loot chest. "
+    .. "Off: a kill gives nothing at all. For the monsters you spawn next."
+  rows[#rows + 1] = { button = "dbg:loot:on", text = "On", same_line = true, selected = duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
+  rows[#rows + 1] = { button = "dbg:loot:off", text = "Off", same_line = true, selected = not duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn Monsters",
     selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
@@ -2001,11 +2008,14 @@ function F.click(world, key)
   if set then duel_level = math.max(1, math.min(MAX_LEVEL, tonumber(set))) return end
   local cset = key:match("^dbg:cnt:(%d+)$")
   if cset then duel_count = math.max(1, math.min(MAX_DUELISTS, tonumber(cset))) return end
+  if key == "dbg:loot:on" then duel_loot = true return end  -- (0.15.182)
+  if key == "dbg:loot:off" then duel_loot = false return end
   local kind = key:match("^dbg:body:(%a+)$")
   if kind then
     note = nil
     local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or kind == "dummy" and dummy_what or nil,
-      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil }
+      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil,
+      loot = kind == "duel" and duel_loot or nil }  -- (0.15.182) an older server ignores it: reward loot stays on
     if hosting(world) then
       local account, player = me(world)
       if account then note = handle(world, account, player, msg).note end

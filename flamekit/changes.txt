@@ -1,3 +1,6 @@
+0.15.182 Nov 15, 2026
+- Experimental window, test monsters: new "Reward loot" switch (On / Off). On: a kill gives runes and legendary runes into your bag and one legendary item into a loot chest, as before. Off: a kill gives nothing at all. It applies to the monsters you spawn next; each player has their own. An older server ignores it (reward loot stays on).
+
 0.15.181 Nov 15, 2026
 - Items Loot Drop puts on the ground are marked with the Flame Altar's essence effect (picked from the preview) until picked up; the fireflies did not show. Server only: no game update.
 

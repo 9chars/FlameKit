@@ -1,3 +1,98 @@
+0.15.182 Nov 15, 2026
+- Experimental window, test monsters: new "Reward loot" switch (On / Off). On: a kill gives runes and legendary runes into your bag and one legendary item into a loot chest, as before. Off: a kill gives nothing at all. It applies to the monsters you spawn next; each player has their own. An older server ignores it (reward loot stays on).
+
+0.15.181 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the Flame Altar's essence effect (picked from the preview) until picked up; the fireflies did not show. Server only: no game update.
+
+0.15.180 Nov 15, 2026
+- Server console "flamekit.fx <1-10>": shows one of 10 candidate effects for the ground-loot mark 3 m in front of the player for 10 s, to pick one. Server only: no game update.
+
+0.15.179 Nov 15, 2026
+- Loot Drop: a body whose loot the game makes only when it is opened (pressing E on one gave loot) is opened by FlameKit as the nearest player would, then its loot goes on the ground. Needs one server restart. Server only: no game update.
+
+0.15.178 Nov 15, 2026
+- Loot Drop: a body or loot spot that holds only a loot table (the game rolls it when someone opens it) is opened with the game's own loot event into a small chest hidden under the ground, and that chest's items go on the ground at the body; the chest is then removed. 0.15.176 opened it into itself, which did nothing. Server only: no game update.
+
+0.15.177 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the game's fireflies over loot instead of the glowing specks. Server only: no game update.
+
+0.15.176 Nov 15, 2026
+- Loot Drop: a body or loot spot that stays empty (the game fills some only when they are opened) gets the game's own loot event, as pressing E does, and is looked at again; its loot then goes on the ground. Server only: no game update.
+
+0.15.175 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the game's glowing specks effect until picked up. The "turned to loot" event experiment is off (no sparkle was seen). Server only: no game update.
+
+0.15.174 Nov 15, 2026
+- Experiment: for every item Loot Drop puts on the ground, the server sends the game's "turned to loot" event, which makes a player's game put the sparkle on a dead body, in case it sparkles the item too. Needs one server restart. Server only: no game update.
+
+0.15.173 Nov 15, 2026
+- Items Loot Drop puts on the ground have no mark for now (0.15.172's was the loot pile, not the sparkle). The server's log shows the effect components of the first 3 looted bodies, to find the sparkle the game puts on a dead body. Server only: no game update.
+
+0.15.172 Nov 15, 2026
+- Items Loot Drop puts on the ground are marked with the game's glowing loot-spot sparkle (the one on a dead body) instead of fireflies. Server only: no game update.
+
+0.15.171 Nov 15, 2026
+- Loot Drop: a monster's separate loot spot is also found when the game gives its death no time (it gives 0): any monster loot spot within 4 m of the death counts.
+- Items Loot Drop puts on the ground get the game's fireflies made for loot pickups, until they are picked up. Server only: no game update.
+
+0.15.170 Nov 15, 2026
+- Monsters drop their loot on the ground: also the many monsters (Scavengers and others) whose loot is not in their body but in a separate loot spot the game puts where they died (their body fades). FlameKit finds that spot (near the death, appeared at or after it, as EMF's Loot Magnet does), puts its items on the ground and removes the empty spot. Server only: no game update.
+
+0.15.169 Nov 15, 2026
+- Loot Drop: the server's log says for every body what happened to it (queued, skipped and why, gone, what was in it), up to 20 lines a minute; before, only the first 10 bodies of a run. Server only: no game update.
+
+0.15.168 Nov 15, 2026
+- Test monsters: rings and gems come only from the ones that are legendary by type (5 rings, 5 gems: the others keep a lower rarity whatever FlameKit gives them); weapons and armour as before. As a safety, an item that shows up below legendary in the chest is taken out again and another one picked.
+- Loot chests carry the grave flame effect (the glow effect showed nothing). Server only: no game update.
+
+0.15.167 Nov 15, 2026
+- Server console "flamekit.chests": writes what every loot chest holds (item, count, rarity, level) into the server's log. Server only: no game update.
+
+0.15.166 Nov 15, 2026
+- Loot chests glow (the game's light glow effect on each new chest), removed with the chest. Server only: no game update.
+
+0.15.165 Nov 15, 2026
+- Loot chests cannot be damaged: every hit on them is cancelled (up to 24 chests at once). Server only: no game update.
+
+0.15.164 Nov 15, 2026
+- Loot chests: a new chest is never put on top of another of FlameKit's chests; it takes the first free spot (at least 2.5 m from every chest) in rings around the body. Server only: no game update.
+
+0.15.163 Nov 15, 2026
+- Test monsters: a killed one's body is removed in the same moment its kill is seen (2 of 15 bodies stayed with 0.15.162, which waited for the next check). Server only: no game update.
+
+0.15.162 Nov 15, 2026
+- Test monsters: no body is left behind (it is removed right after the kill instead of 8 s later). Server only: no game update.
+
+0.15.161 Nov 15, 2026
+- Test monsters: the game's own loot in their bodies is taken out and thrown away (2, 3 and 5 s after the death), so a body never holds anything; they give only their runes and their legendary item. Server only: no game update.
+
+0.15.160 Nov 15, 2026
+- Test monsters give only their runes (into the killer's bag) and their one legendary item (into the loot chest); the game's own loot in their bodies is no longer put into the chest (it goes with the body).
+- Loot chests: a new chest is given half a second before items go into it (it refused them at once, and FlameKit then put a second chest beside it), and no hidden tag any more (a chest spawned with it refused every item). FlameKit remembers its chests in loot_chests.dat, so an update does not make it forget them. Server only: no game update.
+
+0.15.159 Nov 15, 2026
+- Test monsters' loot chests: a storage chest that looks like a chest (Prop_Decoration_T5_Storage_40_Chest, 40 slots); the game's treasure chest refused the loot. A chest now counts as used as soon as items are seen in it (emptied chests stayed before), and a chest the game would not put items into is removed after 30 s. The server's log says whether a removed chest is really gone. Server only: no game update.
+
+0.15.158 Nov 15, 2026
+- No more flame effect on items put on the ground. Server only: no game update.
+
+0.15.157 Nov 15, 2026
+- Test monsters' loot chests are the game's treasure chest instead of a base storage chest.
+- Loot chests carry an invisible tag, so FlameKit finds them again after an update or reload; before, those chests were forgotten and never removed. A chest is still only removed once it is emptied. Server only: no game update.
+
+0.15.156 Nov 15, 2026
+- Test monsters: the game's own loot in their bodies goes into the loot chest too (looked for 3 and 6 s after the death), and the server's Loot Drop no longer puts their loot on the ground.
+- An emptied loot chest goes within 2 s (was 10 s). Server only: no game update.
+
+0.15.155 Nov 15, 2026
+- Test monsters' loot chests: the legendary item goes into the nearest of FlameKit's chests that is not full, from any player's kills, within 50 m of the body; if there is none, a new chest is put beside the body. Server only: no game update.
+
+0.15.154 Nov 15, 2026
+- Test monsters: their runes and legendary runes go straight into the bag of the player who killed them (the last player who hit them; else whoever spawned them), and their legendary item into a large storage chest FlameKit puts beside the body. Nothing of theirs lies on the ground any more. One chest per player while within 30 m; a full chest gets a new one beside it; a chest is removed once it is emptied. Chests are not kept over a server restart. Server only: no game update.
+
+0.15.153 Nov 15, 2026
+- Server: every item put on the ground (monsters' loot from Loot Drop and all of the test monsters' loot) gets the grave flame on its spot until it is picked up (or 10 minutes), at most 300 flames at once. Server only: no game update.
+
 0.15.152 Nov 15, 2026
 - Test monsters: the legendary item they drop is a plain item on the ground again, with the game's grave flame effect on its spot; the flame goes away when the item is picked up (or after 10 minutes).
 

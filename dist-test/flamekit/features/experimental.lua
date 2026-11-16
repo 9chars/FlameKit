@@ -348,6 +348,8 @@ local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 local MONSTERS = require("core.monsters")
 local item_db = require("core.item_db")      -- (0.15.142) the items test monsters drop
 local ground = require("core.ground_loot")
+local loot_chest = require("core.loot_chest")  -- (0.15.154) test monsters' loot in chests
+local bag = require("core.bag")
 local MONSTER_BY_GUID, MONSTER_GROUPS = {}, {}
 for _, m in ipairs(MONSTERS) do
   MONSTER_BY_GUID[m[3]] = m
@@ -437,7 +439,7 @@ end
 -- with a ScaleComponent of TAG_SCALE (0.1% smaller than normal: not visible) so it can be found again, also after a
 -- reload of FlameKit (which forgets `bodies`). Older ones: a duelist has faction 1 (no game monster has it); a dead
 -- dummy from before 0.15.134 has faction 7. Players are never touched (they have an account).
-local TAG_SCALE = 0.999
+local TAG_SCALE = require("core.test_tag").SCALE  -- 0.999 (0.15.156: shared, core/test_tag.lua)
 local function is_test_monster(world, id)
   local oka, acc = pcall(world.account, world, id)
   if oka and acc then return false end
@@ -626,52 +628,94 @@ end
 -- all legendary: regular runes (10 or 15) and legendary runes (5 or 10), a boss twice as many; and one more item with
 -- equal chances of a cosmetic, a weapon, an armour piece, a ring or a gem, the gear of the tier for the monster's level
 -- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
-local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }
-
--- (0.15.152) an effect on a dropped legendary item's spot, removed once the item is gone (picked up) or after
--- LOOT_FX_S at the latest. Not saved: after a FlameKit reload a flame still burning is no longer tracked.
-local LOOT_FX = "2c2c4511-0173-40ee-85a3-2f9383d14b72"  -- VFX_SubEntity_Player_LootCorpse_Tombstone_Flame
-local LOOT_FX_S = 600
-local loot_fx = {}  -- effect id -> { item = pickup id, at = os.time() }
-local mark_loot = function(world, pickup)
-  local ok, x, y, z = pcall(world.position, world, pickup)
-  if not ok or not x then return "item not found" end
-  local oks, id = pcall(emf.spawn, world, LOOT_FX, x, y, z)
-  if not oks or not id or id == 0 then return "refused (" .. tostring(id) .. ")" end
-  loot_fx[id] = { item = pickup, at = os.time() }
-  return "placed (entity " .. tostring(id) .. ")"
-end
-local function loot_fx_tick(world)
-  for id, m in pairs(loot_fx) do
-    local ok, x = pcall(world.position, world, m.item)
-    if not ok or not x or os.time() - m.at >= LOOT_FX_S then
-      loot_fx[id] = nil
-      pcall(emf.destroy, world, id)
-      emf.log(string.format("experimental: loot effect %s removed (%s)", tostring(id), (ok and x) and "time" or "the item was picked up"))
+local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }  -- (0.15.162, owner: "we want cosmetics too")
+local fx_steps = 0    -- server steps (F.tick)
+local body_clear = {}  -- (0.15.161) test monster bodies to empty: { id, at }
+local function body_clear_tick(world)
+  if #body_clear == 0 then return end
+  local keep = {}
+  for _, d in ipairs(body_clear) do
+    if d.at > fx_steps then keep[#keep + 1] = d
+    else
+      for _, st in ipairs(bag.entity_stacks(world, d.id)) do
+        pcall(emf.take, world, st.owner, st.item, st.count, function() end, { slot = st.slot, exact = true })
+      end
     end
   end
+  body_clear = keep
 end
+
+local not_legendary = {}  -- (0.15.168) debug names that came out of the chest below legendary
+local PICK_TRIES = 5
+local give_legendary
+give_legendary = function(world, key, x, y, z, name, level, tries)
+  loot_chest.put(world, key, x, y, z, name, 1, level, "legendary", function(added, chest)
+    if not added or added < 1 or not chest then return end
+    local okn, iid = pcall(emf.item, name)
+    for _, st in ipairs(bag.entity_stacks(world, chest)) do
+      if okn and st.item == iid and st.rarity ~= nil and st.rarity < 4 then
+        not_legendary[name] = true
+        emf.log(string.format("experimental: test loot %s came out rarity %s, not legendary: taken back, another one picked", name, tostring(st.rarity)))
+        pcall(emf.take, world, st.owner, st.item, 1, function() end, { slot = st.slot, exact = true })
+        if tries > 1 then
+          local nxt
+          for _ = 1, 20 do
+            local k = LOOT_KINDS[math.random(#LOOT_KINDS)]
+            nxt = k == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(k, level)
+            if nxt and not not_legendary[nxt] then break end
+          end
+          if nxt then give_legendary(world, key, x, y, z, nxt, level, tries - 1) end
+        end
+        return
+      end
+    end
+  end)
+end
+
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
-  if not ok or not x then return end
+  if not ok or not x then return "no position" end
   local twice = b.boss and 2 or 1
   local level = tonumber(b.level) or 1
   local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
-  local r1 = ground.drop(world, item_db.RUNE, runes, x, y, z, 0, 0, 2)  -- runes are materials:
-  local r2 = ground.drop(world, item_db.LEGENDARY_RUNE, lrunes, x, y, z, 0, 0, 2)  -- no quality of their own
-  local kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
-  local name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
-  local r3, pid = 0, nil
-  if name then r3, pid = ground.drop(world, name, 1, x, y, z, level, "legendary", 2.5) end
-  -- (0.15.152, owner: "put a sparkle particle effect on them") 0.15.150/151's pickups with an effect showed a bright orb
-  -- and only the model: the plain pickup again, with the game's grave flame on its spot until it is picked up
-  local fx = pid and mark_loot(world, pid) or "no item"
-  -- (0.15.148) one line per kill, so the drop can be checked in the log (summed when there are many: see the caller)
-  return string.format("%d runes (%s), %d legendary runes (%s), %s %s level %d legendary (%s), effect: %s", runes, r1 > 0 and "ok" or "FAILED",
-    lrunes, r2 > 0 and "ok" or "FAILED", kind, tostring(name), level, r3 > 0 and "ok" or "FAILED", fx)
+  -- (0.15.154, owner: too much loot on the ground) runes straight into the killer's bag (the last player who hit it;
+  -- else whoever spawned it); what does not fit there, and the legendary item, into a chest beside the body
+  -- (core/loot_chest.lua: a new chest when one is full)
+  local killer = b.last_hitter
+  if not killer and online[b.owner] then killer = online[b.owner].entity end
+  local key = killer or ("owner:" .. tostring(b.owner))
+  local function to_bag(item, n)
+    local iid = item
+    if type(iid) == "string" then local okn, v = pcall(emf.item, iid) iid = okn and v or nil end
+    if not killer or not iid then loot_chest.put(world, key, x, y, z, item, n, 0, 0) return end
+    local okp = pcall(emf.put, world, killer, iid, n, function(w, added)
+      added = tonumber(added) or 0
+      if added < n then loot_chest.put(w, key, x, y, z, iid, n - added, 0, 0) end  -- the bag is full: the rest in the chest
+    end)
+    if not okp then loot_chest.put(world, key, x, y, z, iid, n, 0, 0) end
+  end
+  to_bag(item_db.RUNE, runes)
+  to_bag(item_db.LEGENDARY_RUNE, lrunes)
+  -- (0.15.168, owner: "it also dropped uncommon gems and rings") some items keep a rarity of their own whatever is
+  -- asked: the item is read back from the chest; not legendary: taken out again, remembered (not_legendary) and another
+  -- one picked, at most PICK_TRIES times
+  local kind, name
+  for _ = 1, 20 do
+    kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
+    name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
+    if name and not not_legendary[name] then break end
+  end
+  if name then give_legendary(world, key, x, y, z, name, level, PICK_TRIES) end
+  -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear";
+  -- 0.15.161: "it leaves the corpse with junk in it no one wants") the game's own loot in the body (it comes 1.5-3 s
+  -- after the death) is taken out and thrown away at 2, 3 and 5 s; the body goes at CORPSE_S (8 s)
+  for _, t in ipairs({ 120, 180, 300 }) do body_clear[#body_clear + 1] = { id = id, at = fx_steps + t } end
+  -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
+  return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
+    killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
 end
 
-local function spawn_body(world, account, player, kind, level, what, count)
+local function spawn_body(world, account, player, kind, level, what, count, no_loot)
   if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
   spawn_queue = {}  -- a new spawn or Remove also stops a spawn under way
   if kind ~= "dummy" and kind ~= "duel" then  -- Remove: all of them, anywhere (0.15.136)
@@ -708,7 +752,7 @@ local function spawn_body(world, account, player, kind, level, what, count)
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
   local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2],
-              level = level, boss = boss }
+              level = level, boss = boss, no_loot = no_loot or nil }  -- (0.15.182) Reward loot off
   bodies[id] = b
   to_ground(id, sx, y, sz)  -- (0.15.140) put on the ground a moment later
   if level then
@@ -823,13 +867,20 @@ local function bodies_tick(world)
         b.dead_at = os.time()
         killed = killed + 1
         if b.kind == "duel" then  -- (0.15.142, owner) its loot on the ground
-          local okd, what = pcall(drop_test_loot, world, id, b)
+          local okd, what = true, "none (Reward loot off)"
+          if not b.no_loot then okd, what = pcall(drop_test_loot, world, id, b) end  -- (0.15.182)
+          -- (0.15.162, owner: "we dont want the corpse") (0.15.163: at the next check, 2 of 15 bodies stayed: the game
+          -- changes a body soon after the death and it no longer read as killed) the body goes at once, in this check
+          drop_body(world, id, true)
+          gone = gone + 1
           if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
         end
-        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end
+        local when = b.kind == "duel" and "its body removed" or string.format("its body goes in %d s", CORPSE_S)  -- (0.15.163)
+        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: %s", b.kind, tostring(id), when)) end
         local o = online[b.owner]
         if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many
-          tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
+          tell_player(world, o.entity, b.owner, b.kind == "duel" and "Your test monster was killed."
+            or string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
         end
       elseif os.time() - b.dead_at >= CORPSE_S then
         gone = gone + 1
@@ -966,7 +1017,7 @@ local function handle(world, account, entity, msg)
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
     local what = type(msg.what) == "string" and msg.what or nil
-    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count)
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count, msg.loot == false)
     if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
     local v = view(account)
     v.note = not ok and "That did not work on this game version." or why
@@ -1515,10 +1566,10 @@ local function pvp(world)
   end
 end
 
-local fx_steps = 0
 function F.tick(world)
   fx_steps = fx_steps + 1
-  if fx_steps % 30 == 0 and next(loot_fx) and world:is_server() then pcall(loot_fx_tick, world) end  -- (0.15.152)
+  if world:is_server() then pcall(body_clear_tick, world) end  -- (0.15.161) test monster bodies emptied
+  if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)
@@ -1566,6 +1617,7 @@ local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = RANDOM_KEY, 1  -- (0.15.139) Random is the default  -- the Debug section's duelist choice, this session (0.15.70)
 local duel_count = 1  -- (0.15.134, owner) how many duelists one Spawn makes
+local duel_loot = true  -- (0.15.182, owner) Reward loot: runes and a legendary item for a kill; off: nothing at all
 local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
@@ -1897,6 +1949,11 @@ function F.window_rows(world)
     rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
       disabled = in_pvp or nil, tooltip = "How many monsters one Spawn makes, in rows of up to 10." }
   end
+  rows[#rows + 1] = { label = true, text = "Reward loot" }  -- (0.15.182, owner)
+  local loot_tip = "On: a kill gives runes and legendary runes into your bag and one legendary item into a loot chest. "
+    .. "Off: a kill gives nothing at all. For the monsters you spawn next."
+  rows[#rows + 1] = { button = "dbg:loot:on", text = "On", same_line = true, selected = duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
+  rows[#rows + 1] = { button = "dbg:loot:off", text = "Off", same_line = true, selected = not duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn Monsters",
     selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
@@ -1951,11 +2008,14 @@ function F.click(world, key)
   if set then duel_level = math.max(1, math.min(MAX_LEVEL, tonumber(set))) return end
   local cset = key:match("^dbg:cnt:(%d+)$")
   if cset then duel_count = math.max(1, math.min(MAX_DUELISTS, tonumber(cset))) return end
+  if key == "dbg:loot:on" then duel_loot = true return end  -- (0.15.182)
+  if key == "dbg:loot:off" then duel_loot = false return end
   local kind = key:match("^dbg:body:(%a+)$")
   if kind then
     note = nil
     local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or kind == "dummy" and dummy_what or nil,
-      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil }
+      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil,
+      loot = kind == "duel" and duel_loot or nil }  -- (0.15.182) an older server ignores it: reward loot stays on
     if hosting(world) then
       local account, player = me(world)
       if account then note = handle(world, account, player, msg).note end
@@ -2069,6 +2129,12 @@ function F.setup(k)
       local why = spawn_body(world, tostring(account), player, "duel", level, args[3])
       emf.reply("duelist: " .. (why or "spawned"))
     end, "the duelist command"))
+  pcall(emf.command, "chests", "what every loot chest holds (item, count, rarity, level), in emf_core.log",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      for _, line in ipairs(loot_chest.describe(world, bag)) do emf.log("loot chest: " .. line) end
+      emf.reply("chests: see emf_core.log")
+    end, "the chests command"))
   pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
@@ -2146,6 +2212,12 @@ function F.setup(k)
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
+    -- (0.15.154) a test monster remembers the last player who hit it: its runes go into that player's bag
+    if bodies[hit.target] then
+      for _, p in pairs(online) do
+        if p.entity == hit.attacker then bodies[hit.target].last_hitter = hit.attacker break end
+      end
+    end
     -- (0.15.136, owner: heals, buffs and regeneration reset it) only damage counts: a hit that did damage (also over
     -- time, from a debuff), or an attack that was blocked or parried; never a heal or a hit of 0 (a buff)
     local amount = tonumber(hit.amount) or 0
