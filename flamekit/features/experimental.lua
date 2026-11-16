@@ -1017,7 +1017,7 @@ local function handle(world, account, entity, msg)
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
     local what = type(msg.what) == "string" and msg.what or nil
-    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count, msg.loot == false)
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count, msg.loot == "off" or msg.loot == false)
     if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
     local v = view(account)
     v.note = not ok and "That did not work on this game version." or why
@@ -1617,7 +1617,7 @@ local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = RANDOM_KEY, 1  -- (0.15.139) Random is the default  -- the Debug section's duelist choice, this session (0.15.70)
 local duel_count = 1  -- (0.15.134, owner) how many duelists one Spawn makes
-local duel_loot = true  -- (0.15.182, owner) Reward loot: runes and a legendary item for a kill; off: nothing at all
+local duel_loot = false  -- (0.15.182, owner) Reward loot: runes and a legendary item for a kill; off: nothing at all. (0.15.183, owner) off by default
 local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
@@ -2015,7 +2015,8 @@ function F.click(world, key)
     note = nil
     local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or kind == "dummy" and dummy_what or nil,
       level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil,
-      loot = kind == "duel" and duel_loot or nil }  -- (0.15.182) an older server ignores it: reward loot stays on
+      loot = kind == "duel" and (duel_loot and "on" or "off") or nil }  -- (0.15.182) an older server ignores it: reward loot stays on
+      -- (0.15.183) a word, not true/false: `duel_loot or nil` turned false into nil, which the server read as on
     if hosting(world) then
       local account, player = me(world)
       if account then note = handle(world, account, player, msg).note end

@@ -988,6 +988,9 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   SW.position = function(self, id) if id == kid then return 2, 0, 2 end return pos_before(self, id) end
   comps.Faction[kid] = { faction = 6 }
   comps.NetworkHealth[kid] = { health = 100 }
+  check(find_row("^Off$", "dbg:loot:off").selected, "(0.15.183, owner) Reward loot is off by default")
+  click(find_row("^On$", "dbg:loot:on").button)  -- the reward loot test below
+  step(3)
   click(find_row("^Spawn Monsters$").button)
   step(40)
   local puts, put_before = {}, emf.put  -- (0.15.154) the loot goes into bags and chests: record the puts
@@ -1014,6 +1017,26 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
     check(runes and (runes.n == 10 or runes.n == 15) and lruns and (lruns.n == 5 or lruns.n == 10)
       and runes.ent == lruns.ent and item and item.n == 1 and item.ent ~= runes.ent and chest,
       "a killed test monster: 10 or 15 runes and 5 or 10 legendary runes into the bag, one legendary item into a spawned chest")
+  end
+  do  -- (0.15.183, owner) Reward loot off: a kill gives nothing
+    click(find_row("^Off$", "dbg:loot:off").button)
+    step(3)
+    local oid = 950 + #spawned + 1
+    local pos_b = SW.position
+    SW.position = function(self, id) if id == oid then return 3, 0, 3 end return pos_b(self, id) end
+    comps.Faction[oid] = { faction = 6 }
+    comps.NetworkHealth[oid] = { health = 100 }
+    click(find_row("^Spawn Monsters$").button)
+    step(40)
+    local puts2, pb = {}, emf.put
+    emf.put = function(w, ent, item, n, fn, opts) puts2[#puts2 + 1] = item if type(fn) == "function" then fn(w, n) end return true end
+    comps.NetworkHealth[oid].health = 0
+    step(65)
+    emf.put = pb
+    SW.position = pos_b
+    local gone = false
+    for _, d in ipairs(destroyed) do if d == oid then gone = true end end
+    check(#puts2 == 0 and gone, "Reward loot off: a killed test monster gives nothing (its body goes)")
   end
   -- (0.15.141, production log) a fresh monster reads as dead until the game sets its health: not killed, kept
   local fid = 950 + #spawned + 1
