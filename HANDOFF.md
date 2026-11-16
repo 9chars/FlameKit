@@ -28,6 +28,16 @@ words why (e.g. "Restart: none: EMF reloaded the server's Lua by itself"). Owner
 while to read all your shit to figure out if I need to restart or not ... I have to keep telling and asking you this."
 No exceptions, also for small changes, probes and test copies.
 
+## Rule 0p: CORE DIRECTIVE, the owner picks the next action (owner, 2026-11-16 13:14)
+
+Always let the owner pick the next action before rolling out any test or any change to the mod. After each result,
+say what was found and offer the possible next steps, then STOP and wait for the owner to choose. Never chain on to
+the next step on Claude's own initiative (2026-11-16: after "the crater blast definitely worked" Claude built and
+published 0.15.226 with Fast Dive's settings unasked; the owner wanted to test the big TNT first: "you're jumping the
+gun here per usual"). Owner: "This simple ask makes the work flow move smoother and prevents unnecessary changes until
+the plan has been perfectly dialed in." This sharpens rule 1 (confirm before changing anything), which Claude kept
+breaking by treating an earlier general request ("give me all the settings") as a yes for every step after it.
+
 ## Rule 0a: CORE DIRECTIVE, tests and requests (owner, 2026-11-15 14:46)
 
 Every time Claude needs a new test, it says so. Never ask the owner to do anything without first giving a short, brief
