@@ -87,9 +87,12 @@ local function push_down(world, entity, gliding, factor)
 end
 
 -- one of the game's explosion templates at a place: the landing blast, and the console test
-function M.boom(world, x, y, z, guid)
+-- `scale` (0.15.235, owner: "is there any way to make the blast even bigger", TEST): the game's ScaleComponent
+-- (uniformScale), as FlameKit's test monsters are spawned with; whether it makes a blast bigger is what the test shows
+function M.boom(world, x, y, z, guid, scale)
   if not guid or guid == "" or guid == "off" then return nil end
-  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z)
+  local comps = scale and scale ~= 1 and { ScaleComponent = { uniformScale = scale } } or nil
+  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, comps)
   if not ok then emf.log("fast dive: the landing blast cannot be spawned (" .. tostring(id) .. ")") end
   return ok and id or nil
 end

@@ -2517,16 +2517,16 @@ function F.setup(k)
         for _, e in ipairs(b.list) do say(string.format("  base at %.1f %.1f, zone reaches %.1f x %.1f m from %.1f %.1f", e.ax, e.az, e.hx, e.hz, e.x, e.z)) end
         return
       end
-      if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID>": the effect 3 m in front of them
-        local id, guid = tonumber(a2), args[3]
+      if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID> [scale] [metres in front]"
+        local id, guid, scale, ahead = tonumber(a2), args[3], tonumber(args[4]), tonumber(args[5]) or 3
         local x, y, z
         if id then x, y, z = world:position(id) end  -- (0.15.222) "id and world:position(id)" kept only x: z was nil
         if not (x and guid) then emf.reply("fastdive boom <player entity> <template GUID>") return end
         local q = world:get("CurrentTransform", id).transform.orientation
         local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
         local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
-        local e = d.boom(world, x + fx / len * 3, y, z + fz / len * 3, guid)
-        say("fastdive boom: " .. tostring(guid) .. " -> " .. tostring(e))
+        local e = d.boom(world, x + fx / len * ahead, y, z + fz / len * ahead, guid, scale)
+        say(string.format("fastdive boom: %s scale %s, %s m in front -> %s", tostring(guid), tostring(scale or 1), tostring(ahead), tostring(e)))
         return
       end
       if a1 == "ground" then
