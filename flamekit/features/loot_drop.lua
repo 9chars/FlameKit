@@ -25,7 +25,7 @@ local LOOKS = { 30, 90, 180, 360 }
 local BODY_S, BOSS_BODY_S = 8, 45
 local PER_STEP = 20            -- bodies handled per step (a big fight stays within EMF's time per step)
 
-local queue, head = {}, 1      -- deaths waiting: { id, at, look, x, y, z, t }
+local queue = {}               -- deaths waiting: { id, at, look, x, y, z, t, creature }
 local retry = {}               -- (0.15.170) loot spots to look at again: { d, at }
 local bodies = {}              -- body id -> step to remove it at
 local steps = 0
@@ -46,7 +46,7 @@ local function get(world, c, id)
 end
 
 local diag = 0  -- (0.15.169) detail lines this minute (at most DIAG_MAX; was 10 for the whole run)
-local DIAG_MAX = 20
+local DIAG_MAX = 60  -- (0.15.198) 60: a fight of 10 monsters fits in it
 local function note(fmt, ...)
   if diag < DIAG_MAX then diag = diag + 1 emf.log(string.format("loot drop: " .. fmt, ...)) end
 end
@@ -65,8 +65,9 @@ local function died(world, e)
   local okp, x, y, z = pcall(world.position, world, id)
   local t = spots.death_time(e)
   note("body %s died: queued (time %s)", tostring(id), tostring(t))
+  -- (0.15.198) whether it is a creature is told here, at the death: a later look may come after the body lost its Faction
   queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1, x = okp and x or nil, y = okp and y or nil,
-                        z = okp and z or nil, t = t }
+                        z = okp and z or nil, t = t, creature = get(world, "Faction", id) ~= nil }
 end
 
 local FX_CANDIDATES = {  -- (0.15.180) for flamekit.fx
@@ -99,11 +100,11 @@ local function dump(v, depth)
   return "{" .. table.concat(parts, ", ") .. "}"
 end
 
-local function handle(world, id, look)
+local function handle(world, id, look, creature)
   -- players never; a creature is known by its Faction at the first look only (0.15.147: the body loses it about when
   -- the game fills it with loot, 1.5-3 s after the death, and later looks skipped the body with its loot in it)
   if get(world, "PlayerState", id) then note("body %s: a player, skipped", tostring(id)) return "skip" end
-  if look == 1 and not get(world, "Faction", id) then note("body %s, look 1: no Faction (not a creature), skipped", tostring(id)) return "skip" end
+  if look == 1 and not creature and not get(world, "Faction", id) then note("body %s, look 1: no Faction (not a creature), skipped", tostring(id)) return "skip" end
   local x, y, z = world:position(id)
   if not x then
     note("body %s, look %d: gone (no position)", tostring(id), look)
@@ -324,7 +325,7 @@ end
 
 body_again = function(world, r)
   local d = r.d
-  local okh, res = pcall(handle, world, d.id, #LOOKS)
+  local okh, res = pcall(handle, world, d.id, #LOOKS, true)
   if okh and res == "empty" then pcall(from_spot, world, d)
   elseif okh and res == "gone" then pcall(from_spot, world, d) end
 end
@@ -352,34 +353,40 @@ function F.tick(world)
   end
   local okt, why = pcall(test_tick, world)
   if not okt then emf.log("loottest: error: " .. tostring(why)) test.id = nil end
-  local n = 0
-  while head <= #queue and n < PER_STEP do
-    local d = queue[head]
-    if d.at > steps then break end
-    head, n = head + 1, n + 1
-    local ok, r = pcall(handle, world, d.id, d.look)
-    if not ok then
-      kit.debug("warn", "loot drop: body %s: %s", tostring(d.id), tostring(r))
-    elseif r == "empty" then
-      if d.look < #LOOKS then
-        queue[#queue + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1,
-                              x = d.x, y = d.y, z = d.z, t = d.t }
-      elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
-        -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
-        d.poked = true
-        if open_as_player(world, d.id, "body " .. tostring(d.id)) then
-          retry[#retry + 1] = { body = true, d = d, at = steps + 30 }  -- looked at again: its loot to the ground
-        elseif not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id)) then
-          pcall(from_spot, world, d)
+  -- (0.15.198, owner: in a fight some monsters' loot stayed in them) every death whose time has come is looked at, not
+  -- only those before the first one still waiting: later looks of an earlier death are queued behind a new death and
+  -- kept it waiting (2-3 s), until its body had lost its Faction and was skipped as "not a creature"
+  local n, waiting, due = 0, {}, queue
+  queue = {}
+  for _, d in ipairs(due) do
+    if d.at > steps or n >= PER_STEP then waiting[#waiting + 1] = d
+    else
+      n = n + 1
+      local ok, r = pcall(handle, world, d.id, d.look, d.creature)
+      if not ok then
+        kit.debug("warn", "loot drop: body %s: %s", tostring(d.id), tostring(r))
+      elseif r == "empty" then
+        if d.look < #LOOKS then
+          waiting[#waiting + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1,
+                                    x = d.x, y = d.y, z = d.z, t = d.t, creature = d.creature }
+        elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
+          -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
+          d.poked = true
+          if open_as_player(world, d.id, "body " .. tostring(d.id)) then
+            retry[#retry + 1] = { body = true, d = d, at = steps + 30 }  -- looked at again: its loot to the ground
+          elseif not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id)) then
+            pcall(from_spot, world, d)
+          end
+        else
+          pcall(from_spot, world, d)  -- (0.15.170) empty at every look: its loot may be in a separate spot
         end
-      else
-        pcall(from_spot, world, d)  -- (0.15.170) empty at every look: its loot may be in a separate spot
+      elseif r == "gone" then
+        pcall(from_spot, world, d)  -- (0.15.170) the body went (it faded): its loot is in a separate spot
       end
-    elseif r == "gone" then
-      pcall(from_spot, world, d)  -- (0.15.170) the body went (it faded): its loot is in a separate spot
     end
   end
-  if head > #queue then queue, head = {}, 1 end
+  for _, d in ipairs(queue) do waiting[#waiting + 1] = d end  -- (deaths that came during this step)
+  queue = waiting
   if steps % 30 == 0 then
     for id, at in pairs(bodies) do
       if steps >= at then

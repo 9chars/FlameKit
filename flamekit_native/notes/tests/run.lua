@@ -1816,6 +1816,26 @@ do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the 
   local b3_gone = false
   for i = d1b + 1, #destroyed do if destroyed[i] == B3 then b3_gone = true end end
   check(not b3_gone, "Loot Drop: a body that stays empty is never removed (left to the game)")
+  -- (0.15.198, owner: in a fight some monsters kept their loot) a death after another one's first look is not kept
+  -- waiting behind that one's later looks; and its body losing its Faction after the death does not skip it
+  local B4, B5 = 7004, 7005
+  for _, b in ipairs({ B4, B5 }) do
+    comps.Faction[b] = { faction = 6 }
+    comps.InventorySetup[b] = { linksEntities = { b, 0 }, linksCategories = { 4, 0 } }
+    comps.Inventory[b] = inv({})
+  end
+  SW.position = function(self, id) if id == B4 or id == B5 then return 7, 0, 7 end return pos_before(self, id) end
+  local n2 = #spawned
+  events["EntityDiedEvent"](SW, { deadEntityId = B4 })  -- stays empty: looked at at 0.5, 1.5, 3 and 6 s
+  step(35)
+  events["EntityDiedEvent"](SW, { deadEntityId = B5 })  -- its first look is due at 0.5 s, before B4's second (1.5 s)
+  comps.Faction[B5] = nil  -- the game takes the Faction as it fills the body
+  comps.Inventory[B5].slots[1] = stack(0x44, 2)
+  step(40)
+  local b5 = false
+  for i = n2 + 1, #spawned do local p = spawned[i].c and spawned[i].c.PickupItem; if p and p.itemId == 0x44 and p.pickupAmount == 2 then b5 = true end end
+  check(b5, "Loot Drop: a death right after another one has its loot on the ground in time")
+  step(600)
   SW.position = pos_before
 end
 print("ALL PASSED (" .. MODE .. ")")
