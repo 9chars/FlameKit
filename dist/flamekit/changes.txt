@@ -1,3 +1,34 @@
+0.15.207 Nov 16, 2026
+- Damage bonus: up to +1000% (+250%, +300%, +350%, +400%, +450%, +500%, +600%, +700%, +800%, +900%, +1000% added).
+- Glider speed: 0.05x is gone (too slow).
+- Experimental tab: a line between "Enhanced Glider Mode" and "Glider speed".
+- Invincible Mode keeps your mana full too.
+- Needs FlameKit 0.15.207 on the server.
+
+0.15.206 Nov 15, 2026
+- "<name> joined the server!" and "<name> left the server!" are also in the Messages window (yellow), not only in the Notices window. Needs FlameKit 0.15.206 on the server.
+
+0.15.205 Nov 15, 2026
+- Experimental tab: "Damage bonus", from +10% to +200% (Off is the game's own damage). More damage to creatures with every hit; each player sets their own and it is kept. Off while you are in PvP.
+- Notices window: "<name> joined the server!" and "<name> left the server!", in yellow, for everyone with FlameKit.
+- Both need FlameKit 0.15.205 on the server.
+
+0.15.204 Nov 15, 2026
+- Glider speed: an even slower choice, 0.05x. Needs FlameKit 0.15.204 on the server.
+
+0.15.203 Nov 15, 2026
+- Glider speed: faster choices, 3.5x, 4x, 4.5x and 5x. Needs FlameKit 0.15.203 on the server.
+
+0.15.202 Nov 15, 2026
+- Glider speed: two slower choices, 0.1x and 0.25x. Needs FlameKit 0.15.202 on the server.
+
+0.15.201 Nov 15, 2026
+- Experimental tab: "Glider speed", from 0.5x to 3x (1.0x is the game's own speed). Each player sets their own and it is kept. Faster or slower forward flight; sinking, climbing with S and the updraft burst stay as they were. Needs FlameKit 0.15.201 on the server.
+- The glider test logging of 0.15.200 is gone.
+
+0.15.200 Nov 15, 2026
+- (server, test) Glider: the server logs the glider's speed values while you glide, to build the glider speed setting.
+
 0.15.199 Nov 15, 2026
 - Messages window: the line now says "Press F4 for FlameKit Main Menu" (with your FlameKit Menu key); Esc does not open it.
 

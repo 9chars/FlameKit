@@ -97,6 +97,59 @@ local function load_saved()
   end
 end
 
+-- (0.15.200, owner: "control my glider speed ... a slider so I can set myself to go slower or faster") each player's
+-- own glider speed, 0.1x to 5x (0.15.204: 0.05x, gone again in 0.15.207: too slow; 0.15.202, owner: "even more slower speeds": 0.1x and 0.25x; 0.15.203: up to 5x) (experimental.json glide_speed; 1x is not kept). Measured on G-Portal (0.15.200 probe):
+-- the game pulls a gliding player's horizontal speed to about 18.7 m/s (sinking 4.5 m/s) whatever it was, so the
+-- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
+-- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
+-- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
+local glide = { CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+function glide.factor(account)
+  local f = tonumber(((saved or {})[account] or {}).glide_speed)
+  return f and f > 0 and f or 1
+end
+function glide.label(f)
+  return (string.format("%.2f", f):gsub("0+$", ""):gsub("%.$", ".0")) .. "x"
+end
+function glide.allowed(f)
+  for _, s in ipairs(glide.STEPS) do if s == f then return true end end
+  return false
+end
+function glide.apply(world, account, p)
+  local f = glide.factor(account)
+  if f == 1 or p.climb or glide.broken then return end
+  local ok, err = pcall(function()
+    local move = world:get("DynamicLocomotion", p.entity)
+    if not move or tonumber(tostring(move.state)) ~= HANG_GLIDING then return end
+    local v = world:get("Velocity", p.entity).velocity
+    local h = math.sqrt(v.x * v.x + v.z * v.z)
+    local target = glide.CRUISE * f
+    if h < 0.5 then return end
+    if f > 1 and (h < glide.CRUISE * 0.6 or h >= target) then return end
+    if f < 1 and h <= target then return end
+    v.x, v.z = v.x / h * target, v.z / h * target
+  end)
+  if not ok then
+    glide.broken = true
+    emf.log("experimental: the glider speed cannot be set on this game version (" .. tostring(err) .. ")")
+  end
+end
+
+-- (0.15.205, owner: "a huge damage multiplier ... up to 200% more than my usual damage ... a drop down") each player's
+-- own damage bonus against creatures, +0% to +1000% (0.15.207; +200% before) (experimental.json damage_pct; 0 is not kept): an EMF hit rule
+-- {from = the player, to = "creatures", scale = 1 + bonus}. Off while the player is in PvP (the PvP duelists and the
+-- leaderboard stay fair). Kept in this table with the glider speed (Lua's limit of 200 locals in this file).
+glide.DAMAGE = { 0, 10, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 600, 700,
+  800, 900, 1000 }  -- (0.15.207, owner: up to 1000%)
+function glide.damage(account)
+  local d = tonumber(((saved or {})[account] or {}).damage_pct)
+  return d and d > 0 and d or 0
+end
+function glide.damage_allowed(d)
+  for _, s in ipairs(glide.DAMAGE) do if s == d then return true end end
+  return false
+end
+
 -- What the player switched, PvP or not.
 local function wants(account, key)
   if SESSION_ONLY[key] then return online[account] ~= nil and online[account][key] == true end
@@ -117,6 +170,7 @@ end
 local function drop_rules(p)
   for key, id in pairs(p.rules) do pcall(emf.hit_rule_remove, id) end
   p.rules = {}
+  p.dmg_scale = nil  -- (0.15.205) the damage bonus rule is made again
 end
 
 -- Makes the rules match the switches of the players who are here. Cheap: called every server step, so a reload puts
@@ -148,6 +202,18 @@ local function apply()
           p.rules[key] = nil
         end
       end
+      -- (0.15.205) the damage bonus: a rule with this player's scale (made again when the bonus changes; none in PvP)
+      local bonus = glide.damage(account)
+      local scale = (bonus > 0 and not wants(account, "pvp")) and (1 + bonus / 100) or false
+      if p.dmg_scale ~= scale then
+        if p.rules.damage then pcall(emf.hit_rule_remove, p.rules.damage) p.rules.damage = nil end
+        p.dmg_scale = scale
+        if scale then
+          local ok, id = pcall(emf.hit_rule, { from = p.entity, to = "creatures", scale = scale })
+          if ok and id then p.rules.damage = id
+          else emf.log("experimental: the damage bonus rule was refused (" .. tostring(id) .. ")") end
+        end
+      end
     end
   end
 end
@@ -170,7 +236,9 @@ local input_broken = false  -- the game's own input cannot be read: players' gam
 
 local body_of  -- forward: the PvP test bodies, below
 local function view(account)
-  local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil }
+  local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
+              glide_speed = glide.factor(account), damage_pct = glide.damage(account),
+              damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -1057,6 +1125,29 @@ local function handle(world, account, entity, msg)
       return v
     end
   end
+  if msg.op == "set" and msg.key == "damage_pct" then  -- (0.15.205) the damage bonus
+    local d = tonumber(msg.value)
+    if d and glide.damage_allowed(d) then
+      local set = saved[account] or {}
+      set.damage_pct = d > 0 and d or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      emf.log(string.format("experimental: player %s set the damage bonus to +%d%%", tostring(entity), d))
+    end
+    return view(account)
+  end
+  if msg.op == "set" and msg.key == "glide_speed" then  -- (0.15.200) the glider speed
+    local f = tonumber(msg.value)
+    if f and glide.allowed(f) then
+      local set = saved[account] or {}
+      set.glide_speed = f ~= 1 and f or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      emf.log(string.format("experimental: player %s set the glider speed to %s", tostring(entity), glide.label(f)))
+    end
+    return view(account)
+  end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
       if s[1] == msg.key and held_by_pvp(account, s[1]) then
@@ -1174,6 +1265,7 @@ local function lift(world)
   if lift_broken then return end
   for account, p in pairs(online) do
     read_input(world, account, p)
+    glide.apply(world, account, p)  -- (0.15.200) the player's glider speed
     -- The updraft burst. The game gives one per flight: it notes the used burst in the glider's flags (bit 64) and
     -- lifts the player with two impulses. With the switch on, the note is taken away (so the game's own display
     -- shows a burst ready) and every later press of the burst key gets the same two impulses from here.
@@ -1249,10 +1341,10 @@ end
 
 local stamina_broken = false
 
-local function keep_stamina_full(world)
-  if stamina_broken then return end
+local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
+  if stamina_broken and glide.mana_broken then return end
   for account, p in pairs(online) do
-    if is_on(account, "stamina") then
+    if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
         local now, full = emf.attribute(world, p.entity, "stamina"), emf.attribute(world, p.entity, "max_stamina")
         if now and full and now < full then emf.attribute_add(world, p.entity, "stamina", full - now) end
@@ -1260,6 +1352,17 @@ local function keep_stamina_full(world)
       if not ok then
         stamina_broken = true
         emf.log("experimental: stamina cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
+    -- (0.15.207, owner: "Invincible Mode also needs to keep the mana bar full like it does the HP bar")
+    if is_on(account, "immortal") and not glide.mana_broken then
+      local ok, err = pcall(function()
+        local now, full = emf.attribute(world, p.entity, "mana"), emf.attribute(world, p.entity, "max_mana")
+        if now and full and now < full then emf.attribute_add(world, p.entity, "mana", math.ceil(full - now)) end
+      end)
+      if not ok then
+        glide.mana_broken = true
+        emf.log("experimental: mana cannot be kept full on this game version (" .. tostring(err) .. ")")
       end
     end
   end
@@ -1879,6 +1982,24 @@ local function panel_rows(world)
       end
     end
   end
+  rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line between Enhanced Glider Mode and the glider speed
+  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x
+    local gs = tonumber(v.glide_speed) or 1
+    local opts = {}
+    for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
+    rows[#rows + 1] = { label = true, text = "Glider speed" }
+    rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
+      tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
+  end
+  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +1000% (0.15.207)
+    local dp = tonumber(v.damage_pct) or 0
+    local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
+    local opts = {}
+    for _, d in ipairs(glide.DAMAGE) do opts[#opts + 1] = { key = "dmg:" .. tostring(d), text = name(d), selected = d == dp } end
+    rows[#rows + 1] = { label = true, text = "Damage bonus" }
+    rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
+      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times. Only for you; off while you are in PvP." }
+  end
   return debug_rows(world, rows)
 end
 
@@ -2115,6 +2236,34 @@ function F.click(world, key)
   if key == "waypoint" then
     note = nil
     want_waypoint = true
+    return
+  end
+  if key:sub(1, 4) == "dmg:" then  -- (0.15.205) the damage bonus
+    local d = tonumber(key:sub(5))
+    if not d then return end
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = "damage_pct", value = d }).note
+    elseif shown then
+      shown.damage_pct = d  -- at once on screen; the server's answer follows
+      ask({ op = "set", key = "damage_pct", value = d })
+    end
+    return
+  end
+  if key:sub(1, 3) == "gs:" then  -- (0.15.200) the glider speed
+    local f = tonumber(key:sub(4))
+    if not f then return end
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = "glide_speed", value = f }).note
+    elseif shown then
+      shown.glide_speed = f  -- at once on screen; the server's answer follows
+      ask({ op = "set", key = "glide_speed", value = f })
+    end
     return
   end
   if key:sub(1, 3) ~= "sw:" then return end

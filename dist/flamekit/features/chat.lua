@@ -7,13 +7,18 @@
 --    in the Party window (0.15.82).
 -- 2. FlameKit's own announcements (for example "Ninechars joined PvP!", in orange): no longer chat lines, only the Messages
 --    window of every player with FlameKit (F.announce). Players without FlameKit do not see them.
--- The Notices window is not touched here.
+-- 3. (0.15.205, owner) "Player joined the server!" and "Player left the server!" in yellow in everyone's Notices
+--    window and (0.15.206, owner) their Messages window too, as an announcement (kind "a" with a notice). A join is told 3 s after it (the character name is there by
+--    then); the joins EMF reports again when FlameKit reloads are not told (the first second after the setup).
 
 local players = require("core.players")
 
 local F = { id = "chat", title = "Chat" }
 local CHANNEL = "chat"
 local CHAT_COLOUR, ANNOUNCE_COLOUR = "#c8d2ec", "#ffd27a"
+local JOIN_COLOUR = "#ffe14d"  -- (0.15.205, owner) joins and leaves: yellow
+local steps = 0
+local joining, names = {}, {}  -- joins to tell (entity id -> step to tell it at); entity id -> name told at the join
 local kit
 
 -- A player's chat line goes to the Messages window with the player's name (kit.note's `who`): FlameKit's DLL draws it in
@@ -22,6 +27,12 @@ local kit
 local announce_n = 0  -- (0.15.134) each announcement notice has its own tag
 local function show(msg)
   if type(msg) ~= "table" or type(msg.t) ~= "string" or msg.t == "" then return end
+  if msg.c == "n" then  -- (0.15.205) a notice only
+    announce_n = announce_n + 1
+    local c = type(msg.nc) == "string" and msg.nc:match("^#%x%x%x%x%x%x$") and msg.nc or JOIN_COLOUR
+    kit.notice("announce_" .. announce_n, msg.t:sub(1, 200), c, math.max(2, math.min(300, tonumber(msg.ns) or 10)))
+    return
+  end
   local colour = msg.c == "a" and ANNOUNCE_COLOUR or CHAT_COLOUR
   if msg.c == "a" and type(msg.k) == "string" and msg.k:match("^#%x%x%x%x%x%x$") then colour = msg.k end  -- (0.15.121) its own colour
   local who = msg.c ~= "a" and type(msg.n) == "string" and msg.n ~= "" and msg.n or nil
@@ -66,9 +77,33 @@ function F.announce(world, text, colour, notice)
   to_all(world, msg)
 end
 
+-- (0.15.205) joins are told a moment later, with the character name; the name is kept for the leave
+function F.tick(world)
+  steps = steps + 1
+  for id, at in pairs(joining) do
+    if steps >= at then
+      joining[id] = nil
+      local name = name_of(world, id)
+      names[id] = name
+      to_all(world, { t = name .. " joined the server!", c = "a", k = JOIN_COLOUR, nc = JOIN_COLOUR, ns = 10 })
+    end
+  end
+end
+
 function F.setup(k)
   kit = k
   players.setup(k)
+  pcall(emf.on_player_joined, kit.guard(F, function(world, p)
+    if type(p) ~= "table" or not p.player or p.player == 0 then return end
+    if steps < 60 then names[p.player] = name_of(world, p.player) return end  -- here already (FlameKit reloaded)
+    joining[p.player] = steps + 180
+  end, "a player joining"))
+  pcall(emf.on_player_left, kit.guard(F, function(world, p)
+    if type(p) ~= "table" or not p.player then return end
+    local name = names[p.player] or name_of(world, p.player)
+    names[p.player], joining[p.player] = nil, nil
+    to_all(world, { t = name .. " left the server!", c = "a", k = JOIN_COLOUR, nc = JOIN_COLOUR, ns = 10 })
+  end, "a player leaving"))
   local ok = emf.net.channel(CHANNEL, {
     version = 1, to = "players", max = 1024, per_10s = 100,
     on_player = kit.guard(F, function(world, from, data) show(emf.json.decode(data)) end, "a chat line from the server"),
