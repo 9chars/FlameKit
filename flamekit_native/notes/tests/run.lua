@@ -1325,7 +1325,7 @@ held_key = nil
 step(5)
 do  -- (0.15.200, owner) the glider speed: a drop-down in the Experimental tab, kept for the player
   local gl = find_row("^1%.0x$")
-  check(gl and gl.options and #gl.options == 14, "the Experimental tab has the glider speed drop-down at 1.0x")
+  check(gl and gl.options and #gl.options == 15, "the Experimental tab has the glider speed drop-down at 1.0x")
   local function glide_at(choice)
     click("W:gs:" .. choice)  -- (a drop-down entry's click reaches the feature's click as its key)
     step(JOINED and 10 or 3)

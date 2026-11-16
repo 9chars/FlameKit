@@ -1,3 +1,6 @@
+0.15.204 Nov 15, 2026
+- Glider speed: an even slower choice, 0.05x. Needs FlameKit 0.15.204 on the server.
+
 0.15.203 Nov 15, 2026
 - Glider speed: faster choices, 3.5x, 4x, 4.5x and 5x. Needs FlameKit 0.15.203 on the server.
 
