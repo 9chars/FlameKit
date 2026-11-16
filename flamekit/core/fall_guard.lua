@@ -3,7 +3,7 @@
 -- The game measures a fall from DynamicFallDamage.fallStartAltitude (the height where the fall began) to the landing.
 -- step() sets that start to where the player is now, every server step while they fall, so the game never sees a long
 -- fall. Moved here from experimental.lua's No Fall Damage (0.15.208) so every feature that needs it uses this one copy
--- (owner, 2026-11-16: No Fall Damage, Invincible Mode and Super Jump). Server world only.
+-- (owner, 2026-11-16: No Fall Damage, Invincible Mode and Super B Jump). Server world only.
 
 local M = { broken = false }
 

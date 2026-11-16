@@ -1,7 +1,8 @@
--- core/leap.lua (0.15.209): Super Jump, the leap. Used by features/experimental.lua (the "Super Jump" option);
+-- core/leap.lua (0.15.209): Super B Jump, the leap (owner: named after SuperB, the player who asked for it). Used by
+-- features/experimental.lua (the "Super B Jump" option);
 -- kept apart because experimental.lua is at Lua's limit of 200 top-level locals. Server world only.
 --
--- A quick double tap of jump sends the player straight up, high. Measured on the local server (2026-11-16, jump probe):
+-- A quick double tap of jump sends the player straight up, high (about 50 m at 1x height; a double jump is 3.8 m). Measured on the local server (2026-11-16, jump probe):
 -- a jump sets DynamicLocomotion.state 2 (in the air; 0 = on the ground) and jumpCount 1, upward 9.58 m/s; the game's own
 -- double jump (jumpCount 2) comes only for a second press while the player is no longer rising fast; a second press
 -- 6-9 steps (0.1-0.15 s) after the first was ignored by the game in 9 of 9 tries. So a second press within WINDOW steps
@@ -16,10 +17,10 @@ local fall_guard = require("core.fall_guard")
 
 local M = {
   WINDOW = 20,       -- steps (1/3 s): the second press must come this soon after the jump
-  STRENGTH = 60,     -- the push upward (the impulse's y); tuned in game with flamekit.superjump
+  STRENGTH = 60,     -- the push upward (the impulse's y); tuned in game with flamekit.superbjump
   SECONDS = 0.9,     -- how long the push lasts (60 for 0.9 s: about 50 m up; a double jump is 3.8 m)
   -- (owner, 2026-11-16: "a nice arc up and over", only while the player pushes forward, the way the character faces)
-  FORWARD = 25,      -- the forward push at full forward input (tuned in game with flamekit.superjump)
+  FORWARD = 25,      -- the forward push at full forward input (tuned in game with flamekit.superbjump)
   FORWARD_SECONDS = 3,  -- how long the forward push lasts (it ends at the landing anyway: KEEP)
   -- (owner, 08:52: "too much forward momentum" near the landing) the forward push fades out over its time: ImpulseType
   -- FadeOut (1) instead of S_Curve (0); the push up stays S_Curve
@@ -36,6 +37,8 @@ local M = {
   -- keepAliveMask: the actor states (keen::actor::StateFlag bits, game's types.json) the push lives in: Jumping (1)
   -- and Falling (32). The glider's burst uses HangGliding (37): with that the game dropped the leap at once (0.15.209 test).
   KEEP = (1 << 1) | (1 << 32),
+  -- (owner, 2026-11-16) like the game's double jump, which needs 10 stamina but takes none: a leap needs this much
+  STAMINA_NEEDED = 50,
   broken = false,
 }
 
@@ -102,21 +105,25 @@ local function push(world, entity, s)
   if not imp then return false end
   local now = world:tick() * 50000000 // 3  -- the game's clock in nanoseconds: 60 steps a second
   local up = free_slot(imp, now, nil)
-  put(imp.impulses[up], 0, M.STRENGTH, 0, now, M.SECONDS)
+  local o = s.opts or {}
+  put(imp.impulses[up], 0, M.STRENGTH * (o.height or 1), 0, now, M.SECONDS)
   s.fx, s.fz = facing(world, entity)
   local f = forward_input(world, entity)
   M.last_forward = 0
-  if f > 0 and M.FORWARD > 0 and s.fx then
+  local fw = M.FORWARD * (o.forward or 1)
+  if f > 0 and fw > 0 and s.fx then
     local k = free_slot(imp, now, up)
-    put(imp.impulses[k], s.fx * M.FORWARD * f, 0, s.fz * M.FORWARD * f, now, M.FORWARD_SECONDS, M.FORWARD_TYPE)
+    put(imp.impulses[k], s.fx * fw * f, 0, s.fz * fw * f, now, M.FORWARD_SECONDS, M.FORWARD_TYPE)
     M.last_forward = f
   end
   return true
 end
 
--- Every server step for each player with Super Jump on. `s` is that player's own table (kept by the caller).
--- Returns "leap" in the step a leap starts (for the log), else nil.
-function M.step(world, entity, s)
+-- Every server step for each player with Super B Jump on. `s` is that player's own table (kept by the caller); `opts`
+-- the player's own factors from the Experimental tab: height, forward, steer (1 = the tuned values above).
+-- Returns "leap" in the step a leap starts (for the log), "tired" when a leap was asked for without enough stamina.
+function M.step(world, entity, s, opts)
+  s.opts = opts or {}
   if M.broken then return nil end
   local result
   local ok, err = pcall(function()
@@ -134,14 +141,22 @@ function M.step(world, entity, s)
     end
     if pressed and st == IN_AIR and count == 1 and s.jumped_at and not s.leapt
         and t - s.jumped_at >= 2 and t - s.jumped_at <= M.WINDOW then
-      if skills.has(world, entity, skills.DOUBLE_JUMP) == true and push(world, entity, s) then
-        s.leapt = true
-        result = "leap"
+      if skills.has(world, entity, skills.DOUBLE_JUMP) == true then
+        local okst, stamina = pcall(emf.attribute, world, entity, "stamina")
+        stamina = okst and tonumber(stamina) or nil
+        if stamina and stamina < M.STAMINA_NEEDED then
+          s.leapt = true  -- one try per jump: no second notice in the same jump
+          result = "tired"
+        elseif push(world, entity, s) then
+          s.leapt = true
+          result = "leap"
+        end
       end
     end
     -- air steering: sideways pushes while the leap is in the air (right = the facing AT THE LEAP turned a quarter
     -- clockwise)
-    if s.leapt and st == IN_AIR and M.SIDE > 0 and t >= (s.side_next or 0) then
+    local side = M.SIDE * (s.opts.steer or 1)
+    if s.leapt and s.fx and st == IN_AIR and side > 0 and t >= (s.side_next or 0) then
       local x = side_input(world, entity)
       if x ~= 0 then
         local fx, fz = s.fx, s.fz
@@ -149,7 +164,7 @@ function M.step(world, entity, s)
         if fx and imp then
           local now = t * 50000000 // 3
           s.side_slot = s.side_slot or free_slot(imp, now, nil)
-          put(imp.impulses[s.side_slot], fz * M.SIDE * x * M.SIDE_SIGN, 0, -fx * M.SIDE * x * M.SIDE_SIGN, now, M.SIDE_SECONDS)
+          put(imp.impulses[s.side_slot], fz * side * x * M.SIDE_SIGN, 0, -fx * side * x * M.SIDE_SIGN, now, M.SIDE_SECONDS)
           s.side_next = t + M.SIDE_EVERY
         end
       end
@@ -160,7 +175,7 @@ function M.step(world, entity, s)
   end)
   if not ok then
     M.broken = true
-    emf.log("super jump: does not work on this game version (" .. tostring(err) .. ")")
+    emf.log("super b jump: does not work on this game version (" .. tostring(err) .. ")")
   end
   return result
 end

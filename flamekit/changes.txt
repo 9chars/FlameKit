@@ -1,7 +1,8 @@
 0.15.209 Nov 16, 2026
 - Minimap: your grave is drawn on top of every other marker, flame altars included, so it is never hidden.
-- New Experimental option: Super Jump. Tap jump twice quickly to leap high into the air. Needs the Double Jump skill; a slow double tap is still a normal double jump. Falling after a leap does not hurt you. Off in PvP.
-- No Fall Damage and Invincible Mode use the same fall protection as Super Jump (no change in the game).
+- New Experimental option: Super B Jump (named after SuperB, who asked for it). Tap jump twice quickly to leap high into the air (about 50 m); hold forward to leap up and over, and steer left and right in the air. Needs the Double Jump skill and at least 50 stamina (a yellow notice says so when you have less). A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Off in PvP.
+- Experimental tab: Super B Jump height, forward and air steering, each a drop-down, only for you.
+- No Fall Damage and Invincible Mode use the same fall protection as Super B Jump (no change in the game).
 
 0.15.208 Nov 16, 2026
 - No Fall Damage and Invincible Mode (server): a deadly fall no longer shows you dead for a moment or tells the server you died. Your fall height is reset while you fall, so the game never sees a deadly fall.
