@@ -104,7 +104,9 @@ local function options()
   return {
     auto = emf.setting("lf_auto") == true,
     action = emf.setting("lf_action") == "delete" and "delete" or "drop",
-    keep_hotbar = emf.setting("lf_keep_hotbar") ~= false,
+    -- (0.15.189, owner: "the game is always dumping junk into these bars") the action bar is wiped too: the setting
+    -- Exclude Action Bar is gone; false is still sent, so an older server wipes it as well
+    keep_hotbar = false,
     show_all = show_all(),
   }
 end
@@ -249,7 +251,6 @@ end
 
 local function removable(stack)
   if not junk_ids[stack.item] then return false end
-  if stack.hotbar and emf.setting("lf_keep_hotbar") then return false end
   if not show_all() and (stack.gear or items.is_keeper(junk_ids[stack.item])) then return false end
   return true
 end

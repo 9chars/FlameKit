@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.140",
+  "version": "0.15.199",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -16,42 +16,19 @@
       "key": "window_key",
       "type": "keybind",
       "default": "F4",
-      "label": "Key that opens FlameKit's window",
-      "help": "FlameKit's own window: the Auto Junk List, the other features' tabs, Settings and What's New. The same key or Esc closes it.",
+      "label": "FlameKit Menu",
+      "help": "The key that opens FlameKit's own window (F4 menu): the Auto Junk List, the other features' tabs and Settings. The same key or Esc closes it. Set it in the Windows tab.",
       "live": true,
-      "group": "FlameKit"
+      "group": "Windows"
     },
     {
       "key": "pointer_key",
-      "type": "select",
-      "default": "right_alt",
-      "label": "Hold this key to get the mouse pointer for FlameKit's pinned windows",
-      "help": "While it is held the pinned windows (Party, Messages) can be moved, resized, collapsed and hidden, and the game gets no input. Caps Lock also switches capital letters on and off each time.",
+      "type": "text",
+      "default": "RightAlt",
+      "label": "Pointer key",
+      "help": "Hold it (or press it once, with Pointer key behavior set to Toggle) to get the mouse pointer for FlameKit's windows and the minimap. Any key or mouse button but the left one; set it with the button in FlameKit's window, Windows tab.",
       "live": true,
-      "group": "FlameKit",
-      "options": [
-        {
-          "value": "right_alt",
-          "label": "Right Alt"
-        },
-        {
-          "value": "right_ctrl",
-          "label": "Right Ctrl"
-        },
-        {
-          "value": "caps_lock",
-          "label": "Caps Lock"
-        }
-      ]
-    },
-    {
-      "key": "open_on_start",
-      "type": "bool",
-      "default": false,
-      "label": "Open FlameKit's window when you enter a world",
-      "help": "It opens on the What's New tab. After an update it opens once by itself anyway.",
-      "live": true,
-      "group": "FlameKit"
+      "group": "Windows"
     },
     {
       "key": "lf_enabled",
@@ -104,19 +81,6 @@
       "label": "Dump Key",
       "help": "No key by default, so nothing is deleted by a stray key press.",
       "live": true,
-      "group": "Auto Junk List",
-      "enabledWhen": {
-        "setting": "lf_enabled",
-        "equals": true
-      }
-    },
-    {
-      "key": "lf_keep_hotbar",
-      "type": "bool",
-      "default": true,
-      "label": "Exclude Action Bar",
-      "live": true,
-      "help": "On: items on your action bar are never junked, even if they are on your junk list. Weapons, armour, rings, tools and summoning items are never junked wherever they are (unless Show All Bag Items is on).",
       "group": "Auto Junk List",
       "enabledWhen": {
         "setting": "lf_enabled",
@@ -297,8 +261,8 @@
       "key": "pointer_toggle",
       "type": "bool",
       "default": false,
-      "label": "Press the pointer key once instead of holding it",
-      "help": "On: one press of the pointer key shows the mouse pointer for FlameKit's windows and the minimap, the next press (or Esc) puts it away. Off: the pointer is out only while the key is held.",
+      "label": "Pointer key behavior: Toggle (off: Press & Hold)",
+      "help": "Press & Hold (off): the mouse pointer is out only while the pointer key is held. Toggle (on): one press of the pointer key shows the pointer, the next press (or Esc) puts it away.",
       "live": true,
       "group": "Windows"
     },
@@ -362,15 +326,6 @@
       "label": "Size (pixels)",
       "live": true,
       "group": "Minimap"
-    },
-    {
-      "key": "show_label",
-      "type": "bool",
-      "default": true,
-      "label": "Show the FlameKit version on the game's main screen",
-      "help": "On by default: \"FlameKit vX\" in the lower right corner of the game's main screen. Switch it off to take it away; FlameKit keeps working.",
-      "live": true,
-      "group": "FlameKit label"
     }
   ]
 }

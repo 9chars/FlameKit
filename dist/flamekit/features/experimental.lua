@@ -346,6 +346,10 @@ local DUEL_GUID = "d5d05217-52dc-467a-9192-26b4f661d8d9"   -- Enemy_Vukah_Melee
 -- the game's own data (189 of them, in groups). The client sends the template GUID; the server spawns only GUIDs on that
 -- list. Before 0.15.72 there were seven, taken from EMF's own mods (all seven fought, 2026-11-14).
 local MONSTERS = require("core.monsters")
+local item_db = require("core.item_db")      -- (0.15.142) the items test monsters drop
+local ground = require("core.ground_loot")
+local loot_chest = require("core.loot_chest")  -- (0.15.154) test monsters' loot in chests
+local bag = require("core.bag")
 local MONSTER_BY_GUID, MONSTER_GROUPS = {}, {}
 for _, m in ipairs(MONSTERS) do
   MONSTER_BY_GUID[m[3]] = m
@@ -382,7 +386,8 @@ local PLAYER_LIKE = {
   "b5f02f01-513e-4543-a6f1-d82c64d3194b",  -- Enemy_Scavenger_ColdHeights_Melee01-07
 }
 local function dummy_of(guid)
-  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] then return DUMMY_PLAIN end
+  -- (0.15.187, owner: a boss dummy fought and hurt him: its attacks got past the rule) no boss as the dummy
+  if guid == DUMMY_GUID or not MONSTER_BY_GUID[guid] or MONSTER_BY_GUID[guid][4] then return DUMMY_PLAIN end
   return MONSTER_BY_GUID[guid]
 end
 local DUMMY_LEVEL = 50  -- (0.15.129, owner: 100 was too high) about 6700 health
@@ -397,8 +402,8 @@ local SHIELD_STEPS = 180  -- how often the duelists' building rule is checked
 -- (0.15.134, owner: how many to spawn) MAX_DUELISTS: the most one request may ask for (the server refuses more, so a
 -- bug or a modified game cannot ask for 100,000); owner, 0.15.139: 1000. Measured on the production server
 -- (2026-11-14): 200 level-1 monsters fighting one player put the game server at its limit per step (~17 ms of 16.7).
-local MAX_DUELISTS = 5000  -- (0.15.140, owner) 5000
-local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000, 5000 }
+local MAX_DUELISTS = 1000  -- (0.15.141, owner) back to 1000: 5000 crushed the production server (steps ~165 ms)
+local DUEL_COUNTS = { 1, 15, 50, 100, 200, 500, 1000 }
 local bodies = {}    -- entity id -> { kind, owner = account, session, rules = { key -> id }, guard = { entity -> rule id } }
 local CORPSE_S = 8
 local body_steps = 0
@@ -435,7 +440,7 @@ end
 -- with a ScaleComponent of TAG_SCALE (0.1% smaller than normal: not visible) so it can be found again, also after a
 -- reload of FlameKit (which forgets `bodies`). Older ones: a duelist has faction 1 (no game monster has it); a dead
 -- dummy from before 0.15.134 has faction 7. Players are never touched (they have an account).
-local TAG_SCALE = 0.999
+local TAG_SCALE = require("core.test_tag").SCALE  -- 0.999 (0.15.156: shared, core/test_tag.lua)
 local function is_test_monster(world, id)
   local oka, acc = pcall(world.account, world, id)
   if oka and acc then return false end
@@ -593,50 +598,144 @@ local function calm_tick(world)
 end
 local spawn_queue = {}  -- { account, fn }: each spawns one queued test monster (spawn_tick)
 
--- (0.15.140, owner: "too clustered on top of each other") Where the monsters of a spawn stand, as { side, ahead } in
--- metres from 3 m in front of the player: one alone right there; more scattered at random over a disc around the
--- player (owner, 0.15.140: centred on me, 200 m), about SPOT_AREA m2 each, the radius at most SPOT_R m (15: about 11 m,
--- 200: about 40 m, 1000: about 90 m, 5000: 200 m), none within SPOT_MIN m of the player, never
--- closer than SPOT_MIN m to each other (a grid of cells makes each check look at 9 cells only, not at every monster:
--- 1000 monsters take a few ms). Before: a grid 2 m apart, where big monsters stood inside each other.
-local SPOT_AREA, SPOT_MIN, SPOT_TRIES, SPOT_R = 25, 3, 30, 200
+-- Where the monsters of a spawn stand, as { side, ahead } in metres from 3 m in front of the player (spawn_body adds
+-- the 3 m): one alone right there. More: (0.15.141, owner: "packed as tight as possible", "do a hexagonal grid") a
+-- hexagonal grid SPOT_MIN m apart (each monster 2 m from its six neighbours, about 3.5 m2 each: the tightest packing),
+-- centred on the player and filled from the inside out, so the spawn is round; no monster within SPOT_MIN m of the
+-- player. 15: within about 5 m, 200: about 16 m, 1000: about 34 m. (0.15.140 had a random scatter, 0.15.139 a square
+-- grid.) Each monster is then put on the ground (to_ground).
+local SPOT_MIN = 2
 scatter = function(count)
   if count <= 1 then return { { 0, 0 } } end
-  local r = math.min(SPOT_R, math.sqrt(count * SPOT_AREA / math.pi + SPOT_MIN * SPOT_MIN))
-  local cells, spots = {}, {}
-  local function cell(a, b) return math.floor(a / SPOT_MIN) .. ":" .. math.floor(b / SPOT_MIN) end
-  local function free(a, b)
-    local ca, cb = math.floor(a / SPOT_MIN), math.floor(b / SPOT_MIN)
-    for i = ca - 1, ca + 1 do
-      for j = cb - 1, cb + 1 do
-        local c = cells[i .. ":" .. j]
-        if c then
-          for _, q in ipairs(c) do
-            if (q[1] - a) ^ 2 + (q[2] - b) ^ 2 < SPOT_MIN * SPOT_MIN then return false end
-          end
-        end
-      end
+  local row = SPOT_MIN * math.sqrt(3) / 2  -- the distance between two rows of a hexagonal grid
+  local r = math.sqrt(count * SPOT_MIN * row / math.pi) + 2 * SPOT_MIN  -- a little more than the area they need
+  local cells = {}
+  for j = -math.ceil(r / row), math.ceil(r / row) do
+    local b = j * row
+    local shift = (j % 2 == 0) and 0 or SPOT_MIN / 2
+    for i = -math.ceil(r / SPOT_MIN) - 1, math.ceil(r / SPOT_MIN) + 1 do
+      local a = i * SPOT_MIN + shift
+      local d2 = a * a + b * b
+      if d2 >= SPOT_MIN * SPOT_MIN - 0.01 and d2 <= r * r then cells[#cells + 1] = { a, b, d2 } end
     end
-    return true
   end
-  for _ = 1, count do
-    local a, b
-    for _ = 1, SPOT_TRIES do  -- a free place; if none is found, the last one tried (still on the disc)
-      -- evenly over the ring from SPOT_MIN to r around the player
-      local ang = math.random() * 2 * math.pi
-      local dist = math.sqrt(SPOT_MIN * SPOT_MIN + math.random() * (r * r - SPOT_MIN * SPOT_MIN))
-      a, b = math.cos(ang) * dist, math.sin(ang) * dist
-      if free(a, b) then break end
-    end
-    local k = cell(a, b)
-    cells[k] = cells[k] or {}
-    table.insert(cells[k], { a, b })
-    spots[#spots + 1] = { a, b - 3 }  -- (spawn_body adds the 3 m in front again: the disc's centre is the player)
-  end
+  table.sort(cells, function(p, q) return p[3] < q[3] end)  -- nearest first: a round spawn
+  local spots = {}
+  for k = 1, math.min(count, #cells) do spots[k] = { cells[k][1], cells[k][2] - 3 } end
   return spots
 end
 
-local function spawn_body(world, account, player, kind, level, what, count)
+-- (0.15.142, owner) What a killed test monster (Spawn Monsters, not the dummy) drops on the ground beside its body,
+-- all legendary: regular runes (10 or 15) and legendary runes (5 or 10), a boss twice as many; and one more item with
+-- equal chances of a cosmetic, a weapon, an armour piece, a ring or a gem, the gear of the tier for the monster's level
+-- (core/item_db.lua). Through core/ground_loot.lua (a loose item keeps quality and level).
+local LOOT_KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }  -- (0.15.162, owner: "we want cosmetics too")
+local fx_steps = 0    -- server steps (F.tick)
+-- (0.15.186) what happens after a test monster's death, in one table (the file is at Lua's limit of 200 locals)
+local after = { clear = {}, piles = {}, spots = require("core.loot_spots") }
+-- (0.15.186, owner: Reward loot off, 50 killed, "quite a few of them still left loot") many monsters leave their game
+-- loot in a separate loot pile where they died (core/loot_spots.lua); the body is removed at the kill, the pile stayed.
+-- 2 s after a test monster's death its pile is looked for (within 4 m) and removed, Reward loot on or off.
+after.piles_tick = function(world)  -- after.piles: { id, x, z, at, many }
+  if #after.piles == 0 then return end
+  local keep = {}
+  for _, p in ipairs(after.piles) do
+    if p.at > fx_steps then keep[#keep + 1] = p
+    else
+      after.spots.find(p.id, p.x, p.z, nil, function(w, ids)
+        for _, cid in ipairs(ids) do pcall(emf.destroy, w, cid) end
+        if #ids > 0 and not p.many then emf.log(string.format("experimental: test monster %s: its loot pile removed (%d)", tostring(p.id), #ids)) end
+      end)
+    end
+  end
+  after.piles = keep
+end
+after.clear_tick = function(world)  -- (0.15.161) test monster bodies to empty: { id, at }
+  local body_clear = after.clear
+  if #body_clear == 0 then return end
+  local keep = {}
+  for _, d in ipairs(body_clear) do
+    if d.at > fx_steps then keep[#keep + 1] = d
+    else
+      for _, st in ipairs(bag.entity_stacks(world, d.id)) do
+        pcall(emf.take, world, st.owner, st.item, st.count, function() end, { slot = st.slot, exact = true })
+      end
+    end
+  end
+  after.clear = keep
+end
+
+local not_legendary = {}  -- (0.15.168) debug names that came out of the chest below legendary
+local PICK_TRIES = 5
+local give_legendary
+give_legendary = function(world, key, x, y, z, name, level, tries)
+  loot_chest.put(world, key, x, y, z, name, 1, level, "legendary", function(added, chest)
+    if not added or added < 1 or not chest then return end
+    local okn, iid = pcall(emf.item, name)
+    for _, st in ipairs(bag.entity_stacks(world, chest)) do
+      if okn and st.item == iid and st.rarity ~= nil and st.rarity < 4 then
+        not_legendary[name] = true
+        emf.log(string.format("experimental: test loot %s came out rarity %s, not legendary: taken back, another one picked", name, tostring(st.rarity)))
+        pcall(emf.take, world, st.owner, st.item, 1, function() end, { slot = st.slot, exact = true })
+        if tries > 1 then
+          local nxt
+          for _ = 1, 20 do
+            local k = LOOT_KINDS[math.random(#LOOT_KINDS)]
+            nxt = k == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(k, level)
+            if nxt and not not_legendary[nxt] then break end
+          end
+          if nxt then give_legendary(world, key, x, y, z, nxt, level, tries - 1) end
+        end
+        return
+      end
+    end
+  end)
+end
+
+local function drop_test_loot(world, id, b)
+  local ok, x, y, z = pcall(world.position, world, id)
+  if not ok or not x then return "no position" end
+  local twice = b.boss and 2 or 1
+  local level = tonumber(b.level) or 1
+  local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
+  -- (0.15.154, owner: too much loot on the ground) runes straight into the killer's bag (the last player who hit it;
+  -- else whoever spawned it); what does not fit there, and the legendary item, into a chest beside the body
+  -- (core/loot_chest.lua: a new chest when one is full)
+  local killer = b.last_hitter
+  if not killer and online[b.owner] then killer = online[b.owner].entity end
+  local key = killer or ("owner:" .. tostring(b.owner))
+  local function to_bag(item, n)
+    local iid = item
+    if type(iid) == "string" then local okn, v = pcall(emf.item, iid) iid = okn and v or nil end
+    if not killer or not iid then loot_chest.put(world, key, x, y, z, item, n, 0, 0) return end
+    local okp = pcall(emf.put, world, killer, iid, n, function(w, added)
+      added = tonumber(added) or 0
+      if added < n then loot_chest.put(w, key, x, y, z, iid, n - added, 0, 0) end  -- the bag is full: the rest in the chest
+    end)
+    if not okp then loot_chest.put(world, key, x, y, z, iid, n, 0, 0) end
+  end
+  to_bag(item_db.RUNE, runes)
+  to_bag(item_db.LEGENDARY_RUNE, lrunes)
+  -- (0.15.168, owner: "it also dropped uncommon gems and rings") some items keep a rarity of their own whatever is
+  -- asked: the item is read back from the chest; not legendary: taken out again, remembered (not_legendary) and another
+  -- one picked, at most PICK_TRIES times
+  local kind, name
+  for _ = 1, 20 do
+    kind = LOOT_KINDS[math.random(#LOOT_KINDS)]
+    name = kind == "cosmetic" and item_db.pick_cosmetic() or item_db.pick(kind, level)
+    if name and not not_legendary[name] then break end
+  end
+  if name then give_legendary(world, key, x, y, z, name, level, PICK_TRIES) end
+  -- (0.15.160, owner: "I don't want these spawned monsters dropping anything other than the runes and the gear";
+  -- 0.15.161: "it leaves the corpse with junk in it no one wants") the game's own loot in the body (it comes 1.5-3 s
+  -- after the death) is taken out and thrown away at 2, 3 and 5 s; the body goes at CORPSE_S (8 s)
+  for _, t in ipairs({ 120, 180, 300 }) do after.clear[#after.clear + 1] = { id = id, at = fx_steps + t } end
+  -- (0.15.148) one line per kill, so it can be checked in the log (none when there are many: see the caller)
+  return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
+    killer and ("player entity " .. tostring(killer)) or "a chest (no killer known)", kind, tostring(name), level)
+end
+
+local function spawn_body(world, account, player, kind, level, what, count, no_loot)
   if kind == "dummy" or kind == "duel" then drop_bodies_of(world, account, true) end
   spawn_queue = {}  -- a new spawn or Remove also stops a spawn under way
   if kind ~= "dummy" and kind ~= "duel" then  -- Remove: all of them, anywhere (0.15.136)
@@ -665,14 +764,15 @@ local function spawn_body(world, account, player, kind, level, what, count)
     jobs[i] = (function(world)
   local d = d0
   if d[3] == RANDOM_KEY then d = RANDOM_POOL[math.random(#RANDOM_POOL)] end  -- a different one each time
-  local guid = d[3]
+  local guid, boss = d[3], d[4] == true
   if kind ~= "duel" and guid == DUMMY_GUID then guid = PLAYER_LIKE[math.random(#PLAYER_LIKE)] end  -- a random player-like body
   local sx, sz = x + fx * (3 + ahead) - fz * side, z + fz * (3 + ahead) + fx * side
   local ok, id = pcall(emf.spawn, world, guid, sx, y, sz, { ScaleComponent = { uniformScale = TAG_SCALE } })  -- the tag
   if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, guid, sx, y, sz) end  -- without it
   d = { d[1], d[1] .. ": " .. d[2] }
   if not ok or not id or id == 0 then return "The game refused the spawn (see the server's emf_core.log)." end
-  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2] }
+  local b = { kind = kind, owner = account, session = emf.session(), rules = {}, guard = {}, what = d[2],
+              level = level, boss = boss, no_loot = no_loot or nil }  -- (0.15.182) Reward loot off
   bodies[id] = b
   to_ground(id, sx, y, sz)  -- (0.15.140) put on the ground a moment later
   if level then
@@ -770,7 +870,12 @@ local function bodies_tick(world)
         local hp = world:get("NetworkHealth", id)
         local placed = world:position(id) ~= nil
         alive = placed and (hp == nil or hp.health > 0)
-        b.why = not placed and "no longer in the world (removed by the game)" or (hp and hp.health <= 0 and "killed") or nil
+        if alive then b.seen_alive = true end
+        -- (0.15.141, production log: the first 20 of every big spawn "killed" 0.3 s after the spawn, and their
+        -- bodies removed 8 s later) a creature reads as dead until the game sets its health (EMF docs): it counts
+        -- as killed only once it was seen alive
+        if placed and hp and hp.health <= 0 and not b.seen_alive then alive = true end
+        b.why = not placed and "no longer in the world (removed by the game)" or (hp and hp.health <= 0 and b.seen_alive and "killed") or nil
       end)
     end
     -- (measured: a duelist spawned right after a long move was "gone" half a second later and lived on, untracked; a
@@ -781,10 +886,25 @@ local function bodies_tick(world)
       if not b.dead_at then
         b.dead_at = os.time()
         killed = killed + 1
-        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: its body goes in %d s", b.kind, tostring(id), CORPSE_S)) end
+        if b.kind == "duel" then  -- (0.15.142, owner) its loot on the ground
+          local okd, what = true, "none (Reward loot off)"
+          if not b.no_loot then okd, what = pcall(drop_test_loot, world, id, b) end  -- (0.15.182)
+          -- (0.15.162, owner: "we dont want the corpse") (0.15.163: at the next check, 2 of 15 bodies stayed: the game
+          -- changes a body soon after the death and it no longer read as killed) the body goes at once, in this check
+          pcall(function()  -- (0.15.186) its game loot pile, if it leaves one, goes 2 s later
+            local px, _, pz = world:position(id)
+            if px then after.piles[#after.piles + 1] = { id = id, x = px, z = pz, at = fx_steps + 120, many = many } end
+          end)
+          drop_body(world, id, true)
+          gone = gone + 1
+          if not many then emf.log(string.format("experimental: test monster %s loot: %s", tostring(id), okd and tostring(what) or ("error: " .. tostring(what)))) end
+        end
+        local when = b.kind == "duel" and "its body removed" or string.format("its body goes in %d s", CORPSE_S)  -- (0.15.163)
+        if not many then emf.log(string.format("experimental: the PvP test %s (entity %s) was killed: %s", b.kind, tostring(id), when)) end
         local o = online[b.owner]
         if o and tell_player and not many then  -- (0.15.137) not a message per monster when there are many
-          tell_player(world, o.entity, b.owner, string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
+          tell_player(world, o.entity, b.owner, b.kind == "duel" and "Your test monster was killed."
+            or string.format("Your test monster was killed: its body goes in %d seconds.", CORPSE_S))
         end
       elseif os.time() - b.dead_at >= CORPSE_S then
         gone = gone + 1
@@ -921,7 +1041,7 @@ local function handle(world, account, entity, msg)
     local level = tonumber(msg.level)
     if level then level = math.max(1, math.min(MAX_LEVEL, math.floor(level))) end
     local what = type(msg.what) == "string" and msg.what or nil
-    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count)
+    local ok, why = pcall(spawn_body, world, account, entity, msg.kind, level, what, msg.count, msg.loot == "off" or msg.loot == false)
     if not ok then emf.log("experimental: the PvP test body failed: " .. tostring(why)) end
     local v = view(account)
     v.note = not ok and "That did not work on this game version." or why
@@ -1471,6 +1591,11 @@ local function pvp(world)
 end
 
 function F.tick(world)
+  fx_steps = fx_steps + 1
+  if world:is_server() then  -- (0.15.161) test monster bodies emptied; (0.15.186) their loot piles removed
+    pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
+  end
+  if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)
@@ -1518,6 +1643,7 @@ local burst_down = false
 local want_spire = false  -- the spire button was pressed: looked up on the next step of your own screen's world
 local duel_what, duel_level = RANDOM_KEY, 1  -- (0.15.139) Random is the default  -- the Debug section's duelist choice, this session (0.15.70)
 local duel_count = 1  -- (0.15.134, owner) how many duelists one Spawn makes
+local duel_loot = false  -- (0.15.182, owner) Reward loot: runes and a legendary item for a kill; off: nothing at all. (0.15.183, owner) off by default
 local dummy_what = DUMMY_GUID               -- and the dummy's (0.15.81)
 local want_waypoint = false  -- the waypoint button was pressed: read on the next step of your own screen's world
 
@@ -1733,8 +1859,6 @@ local function panel_rows(world)
   local v = my_view(world)
   local rows = {
     { color = "#ffb060", text = "Experimental: these bend the game's rules for you only. Every player has their own." },
-    { dim = true, text = "Fast Travel, PvP and the test monsters are in the Experimental window (F4 > Windows shows and hides it; "
-      .. "its key is a setting)." },
   }
   if not v then
     rows[#rows + 1] = { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."
@@ -1802,16 +1926,17 @@ function F.window_rows(world)
     tooltip = "Shows or hides the PvP Leaderboard" .. (board_key ~= "" and (" (" .. board_key .. ")") or "") .. ". It ranks players by their kills of other players and shows how often each one was killed by another player." }
   rows[#rows + 1] = { heading = "Test monsters" }
   -- every monster under its group's heading, bosses in orange (0.15.73); `first` is put on top under its own heading
-  local function monster_options(prefix, chosen, first)
+  local function monster_options(prefix, chosen, first, no_bosses)
     local options = {}
     if first then
       if first[1] ~= first[2] then options[#options + 1] = { heading = true, text = first[1] } end  -- not "Random" twice
       options[#options + 1] = { key = prefix .. first[3], text = first[2], selected = first[3] == chosen }
     end
     for _, g in ipairs(MONSTER_GROUPS) do
-      options[#options + 1] = { heading = true, text = g }
+      local heading = { heading = true, text = g }  -- (0.15.187) only for a group with something left in it
       for _, m in ipairs(MONSTERS) do
-        if m[1] == g then
+        if m[1] == g and not (no_bosses and m[4]) then
+          if heading then options[#options + 1] = heading heading = nil end
           options[#options + 1] = { key = prefix .. m[3], text = m[2] .. (m[4] and "  (boss)" or ""),
             color = m[4] and "#ffb060" or nil, selected = m[3] == chosen }
         end
@@ -1823,7 +1948,7 @@ function F.window_rows(world)
   local in_pvp = v.pvp == true  -- (0.15.119, owner) no spawning while PvP is on: it could throw a fight
   local no_spawn = "Off while you are in PvP, so nobody can throw a fight with a monster. Spawn the dummy before you switch PvP on."
   local dpick = dummy_of(dummy_what)
-  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN), text = dpick[1] .. ": " .. dpick[2],
+  rows[#rows + 1] = { options = monster_options("dbg:dwhat:", dpick[3], DUMMY_PLAIN, true), text = dpick[1] .. ": " .. dpick[2],
     color = dpick[4] and "#ffb060" or nil, disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "The dummy never hurts anyone and is level " .. DUMMY_LEVEL .. ": beat on it as long as you like. Anyone can hit it, PvP on or off." }
   rows[#rows + 1] = { button = "dbg:body:dummy", text = "Spawn Dummy", selected = v.body == "dummy", disabled = in_pvp or nil,
@@ -1849,6 +1974,11 @@ function F.window_rows(world)
     rows[#rows + 1] = { button = "dbg:cnt:" .. c, text = tostring(c), same_line = true, selected = duel_count == c,
       disabled = in_pvp or nil, tooltip = "How many monsters one Spawn makes, in rows of up to 10." }
   end
+  rows[#rows + 1] = { label = true, text = "Reward loot" }  -- (0.15.182, owner)
+  local loot_tip = "On: a kill gives runes and legendary runes into your bag and one legendary item into a loot chest. "
+    .. "Off: a kill gives nothing at all. For the monsters you spawn next."
+  rows[#rows + 1] = { button = "dbg:loot:on", text = "On", same_line = true, selected = duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
+  rows[#rows + 1] = { button = "dbg:loot:off", text = "Off", same_line = true, selected = not duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
   rows[#rows + 1] = { button = "dbg:body:duel", text = "Spawn Monsters",
     selected = v.body == "duel", disabled = in_pvp or nil,
     tooltip = in_pvp and no_spawn or "Spawns " .. (duel_count > 1 and (duel_count .. " of ") or "") .. pick[2] .. " at level " .. duel_level .. " 3 m in front of you. It attacks everyone with full damage, PvP on "
@@ -1903,11 +2033,15 @@ function F.click(world, key)
   if set then duel_level = math.max(1, math.min(MAX_LEVEL, tonumber(set))) return end
   local cset = key:match("^dbg:cnt:(%d+)$")
   if cset then duel_count = math.max(1, math.min(MAX_DUELISTS, tonumber(cset))) return end
+  if key == "dbg:loot:on" then duel_loot = true return end  -- (0.15.182)
+  if key == "dbg:loot:off" then duel_loot = false return end
   local kind = key:match("^dbg:body:(%a+)$")
   if kind then
     note = nil
     local msg = { op = "body", kind = kind, what = kind == "duel" and duel_what or kind == "dummy" and dummy_what or nil,
-      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil }
+      level = kind == "duel" and duel_level or nil, count = kind == "duel" and duel_count or nil,
+      loot = kind == "duel" and (duel_loot and "on" or "off") or nil }  -- (0.15.182) an older server ignores it: reward loot stays on
+      -- (0.15.183) a word, not true/false: `duel_loot or nil` turned false into nil, which the server read as on
     if hosting(world) then
       local account, player = me(world)
       if account then note = handle(world, account, player, msg).note end
@@ -2021,6 +2155,12 @@ function F.setup(k)
       local why = spawn_body(world, tostring(account), player, "duel", level, args[3])
       emf.reply("duelist: " .. (why or "spawned"))
     end, "the duelist command"))
+  pcall(emf.command, "chests", "what every loot chest holds (item, count, rarity, level), in emf_core.log",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      for _, line in ipairs(loot_chest.describe(world, bag)) do emf.log("loot chest: " .. line) end
+      emf.reply("chests: see emf_core.log")
+    end, "the chests command"))
   pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
@@ -2098,6 +2238,12 @@ function F.setup(k)
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
+    -- (0.15.154) a test monster remembers the last player who hit it: its runes go into that player's bag
+    if bodies[hit.target] then
+      for _, p in pairs(online) do
+        if p.entity == hit.attacker then bodies[hit.target].last_hitter = hit.attacker break end
+      end
+    end
     -- (0.15.136, owner: heals, buffs and regeneration reset it) only damage counts: a hit that did damage (also over
     -- time, from a debuff), or an attack that was blocked or parried; never a heal or a hit of 0 (a buff)
     local amount = tonumber(hit.amount) or 0

@@ -289,9 +289,7 @@ local function hud_tick(world)
   write_notices()
   local label = ""
   local connected = kit.connected(world)
-  if kit.setting("show_label", true) then  -- only whether it is on counts now (the DLL's main screen line)
-    label = string.format("%s v%s", kit.name, kit.version)
-  end
+  label = string.format("%s v%s", kit.name, kit.version)  -- (0.15.196, owner) always: the show_label setting is gone
   local lines = { "label " .. label }
   server_messages(world, connected)
   update_message()

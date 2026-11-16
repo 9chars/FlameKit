@@ -32,7 +32,10 @@ local function load_list()
   local data = emf.json.decode((text:gsub("^\239\187\191", "")))
   if type(data) == "table" and type(data.settings) == "table" then
     for _, s in ipairs(data.settings) do
-      if type(s) == "table" and type(s.key) == "string" and s.type ~= "text" then list[#list + 1] = s end
+      -- (0.15.191) pointer_key is text since 0.15.190 (it takes mouse buttons, which EMF's keybind type refuses) and
+      -- is set by a key capture like the keybinds; it was left out with the other text settings, so the capture
+      -- never started
+      if type(s) == "table" and type(s.key) == "string" and (s.type ~= "text" or s.key == "pointer_key") then list[#list + 1] = s end
     end
   end
   kit.debug("info", "settings: %d setting(s) read from mod.json", #list)
