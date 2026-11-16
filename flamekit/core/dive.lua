@@ -19,10 +19,14 @@ local M = {
   SPEED = 80,            -- the push down (the impulse's y, negative); the game's own top fall speed is 20 m/s
   SECONDS = 10,          -- the push lasts this long at most (it ends at the landing anyway)
   MIN_HEIGHT = 10,       -- metres above the ground (groundDistance) before a dive is allowed; 0 = anywhere
-  KICK_GLIDER = true,    -- a dive from the glider writes the locomotion state to Falling (2)
+  KICK_GLIDER = false,   -- a dive from the glider writes the locomotion state to Falling (2): did nothing (0.15.219)
   EFFECT = "3b874eb5-bae2-4b6d-a63e-17bdd35b11c4",  -- Explosion_Player_Skill_Shockwave
   LANDING_SHIELD = 1.5,  -- seconds the diver takes no hits after the landing (their own shockwave)
-  KEEP = (1 << 1) | (1 << 32) | (1 << 37),  -- Jumping, Falling, HangGliding: also a dive the glider kept
+  -- keepAliveMask: (0.15.220) the game ended a push naming Jumping, Falling and HangGliding at once within 1/4 s
+  -- (0.15.219 test): the player must be in every state named. So only the state the player is in: Falling (32), or
+  -- HangGliding (37) when the glider stays open
+  KEEP_FALLING = 1 << 32,
+  KEEP_GLIDING = 1 << 37,
   JUMP_BIT = 137438953472,
   broken = false,
 }
@@ -48,7 +52,7 @@ function M.ground_distance(world, entity)
   return ok and d or nil
 end
 
-local function push_down(world, entity)
+local function push_down(world, entity, gliding)
   local imp = world:get("Impulse", entity)
   if not imp then return false end
   local now = world:tick() * 50000000 // 3
@@ -57,7 +61,8 @@ local function push_down(world, entity)
   end
   local slot = imp.impulses[1]
   slot.impulse.x, slot.impulse.y, slot.impulse.z = 0, -M.SPEED * (M.speed_factor or 1), 0
-  slot.type, slot.startTime, slot.endTime, slot.keepAliveMask = 0, now, now + math.floor(M.SECONDS * 1e9), M.KEEP
+  slot.type, slot.startTime, slot.endTime, slot.keepAliveMask = 0, now, now + math.floor(M.SECONDS * 1e9),
+    gliding and M.KEEP_GLIDING or M.KEEP_FALLING
   return true
 end
 
@@ -141,8 +146,9 @@ function M.step(world, entity, s, opts)
       result = "low"
       return
     end
+    -- (0.15.220) writing the state did not close the glider (0.15.219 test: state 4 stayed); kept off by default
     if st == GLIDING and M.KICK_GLIDER then move.state = IN_AIR end
-    if push_down(world, entity) then
+    if push_down(world, entity, st == GLIDING and not M.KICK_GLIDER) then
       s.diving, s.from_glider, s.dive_t, s.diag = true, st == GLIDING, t, t + 180
       local _, y = world:position(entity)
       s.dive_y = y
