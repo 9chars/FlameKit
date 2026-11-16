@@ -30,7 +30,8 @@ local M = {
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
   MIN_HEIGHT = 10,       -- metres to the ground at 1x default (opts.min); 0 = anywhere
   LANDING_SHIELD = 1.5,
-  DEFAULT_LANDING = 3,   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
+  DEFAULT_LANDING = 3,
+  RISING = 2,            -- m/s upward (Velocity.y) during a dive: the player pulls up (0.15.247)   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
   -- the landing blasts a player can choose (opts.landing): the game's own explosion templates
   LANDINGS = {
     [0] = { name = "Off" },
@@ -88,12 +89,14 @@ function M.ground_distance(world, entity)
   return ok and d or nil
 end
 
-local function push_down(world, entity, gliding, factor)
+local function push_down(world, entity, gliding, factor, keep_others)
   local imp = world:get("Impulse", entity)
   if not imp then return false end
   local now = world:tick() * 50000000 // 3
-  for k = 1, 4 do  -- end every push still running (a leap's): straight down, nothing else
-    if imp.impulses[k].endTime > now then imp.impulses[k].endTime = now end
+  if not keep_others then
+    for k = 1, 4 do  -- end every push still running (a leap's): straight down, nothing else
+      if imp.impulses[k].endTime > now then imp.impulses[k].endTime = now end
+    end
   end
   local slot = imp.impulses[1]
   slot.impulse.x, slot.impulse.y, slot.impulse.z = 0, -M.SPEED * factor, 0
@@ -173,7 +176,7 @@ end
 
 -- Every server step for each player with Fast Dive on. `s` is that player's own table, `opts` the player's own
 -- settings: window (steps), speed (factor), landing (a LANDINGS key), min (metres), base (1: craters inside bases too).
--- Returns "dive", "low" (asked for below the minimum height), "landed" or nil.
+-- Returns "dive", "low" (asked for below the minimum height), "landed", "cancel" (pulled up) or nil.
 function M.step(world, entity, s, opts)
   if M.broken then return nil end
   opts = opts or {}
@@ -198,6 +201,27 @@ function M.step(world, entity, s, opts)
     if st ~= IN_AIR and st ~= GLIDING then s.first = nil return end
     if s.diving then
       fall_guard.step(world, entity)
+      -- (0.15.247, owner: pulling up while gliding "drops the fast descent" but the blast still came) the dive watches its
+      -- own push: when the glider's updraft burst replaced it, or the player climbs (rising), the dive is cancelled:
+      -- no blast, the notice goes, and a new double tap dives again. Opening or closing the glider during a dive is not a
+      -- pull-up: the push is put back with the keep-alive of the new state (its old one ended it).
+      local glide_now = st == GLIDING
+      if glide_now ~= s.dive_gliding then
+        s.dive_gliding = glide_now
+        push_down(world, entity, glide_now, s.factor, true)
+        return
+      end
+      local imp = world:get("Impulse", entity)
+      local slot = imp and imp.impulses[1]
+      local now = t * 50000000 // 3
+      local mine = slot and slot.endTime > now and math.abs((tonumber(slot.impulse.y) or 0) + M.SPEED * s.factor) < 0.01
+      local v = world:get("Velocity", entity)
+      local rising = v and (tonumber(v.velocity.y) or 0) > M.RISING
+      if not mine or rising then
+        s.diving = nil
+        result = "cancel"
+        s.cancel_why = not mine and "its push was replaced (the updraft burst)" or "the player rose (climbing)"
+      end
       return
     end
     if not pressed then return end
@@ -216,6 +240,7 @@ function M.step(world, entity, s, opts)
     end
     if push_down(world, entity, st == GLIDING, opts.speed or 1) then
       s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or M.DEFAULT_LANDING, opts.base or 0
+      s.factor, s.dive_gliding, s.cancel_why = opts.speed or 1, st == GLIDING, nil
       local _, y = world:position(entity)
       s.dive_y = y
       result = "dive"

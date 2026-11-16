@@ -1,3 +1,6 @@
+0.15.247 Nov 16, 2026
+- Fast Dive: pulling up while gliding (the updraft burst or climbing) cancels the dive: no blast at the landing, the notice goes away, and a new double tap dives again. Opening or closing the glider during a dive keeps it going. Server only: no game update.
+
 0.15.246 Nov 16, 2026
 - Fast Dive landing: Gigantic crater (228 big TNTs in 4 rings and 4 layers, a pit about 15 m deep). Kept 30 m away from bases with Boom only. Needs FlameKit 0.15.246 on the server.
 - Server (test): the ring test can stack layers (since 0.15.245); small and medium crater keep 2 m from bases (0.15.243, 0.15.244).

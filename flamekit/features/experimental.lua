@@ -1455,7 +1455,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       local what = glide.dive.step(world, p.entity, p.dive, o)
       -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
       -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
-      if what == "dive" or what == "landed" then
+      if what == "dive" or what == "landed" or what == "cancel" then
         local m = { op = "dive", on = what == "dive" }
         if kit.is_host() and emf.local_player() == p.entity then
           pcall(glide.dive_notice, m)
@@ -1467,6 +1467,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
         emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (speed %sx, landing %s)",
           tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or "",
           tostring(o.speed), tostring(o.landing)))
+      elseif what == "cancel" then  -- (0.15.247)
+        emf.log(string.format("experimental: fast dive: player %s pulled up: dive cancelled (%s)", tostring(p.entity),
+          tostring(p.dive.cancel_why)))
       elseif what == "low" then
         emf.log(string.format("experimental: fast dive: player %s too low (ground %.1f m below, minimum %s m)",
           tostring(p.entity), p.dive.ground or 0, tostring(o.min)))
