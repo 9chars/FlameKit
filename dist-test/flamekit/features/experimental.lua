@@ -73,7 +73,7 @@ local TIPS = {
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
-  fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing does not hurt you and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
+  fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing from a free-fall dive kills you unless No Fall Damage is on (a dive started in the glider is survived), and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -200,11 +200,60 @@ function glide.sbj(account, which)
   end
   return 1
 end
+-- (0.15.250, probe, owner: "I would like it to be real fall damage if possible") what the game's fall damage sees for a
+-- player with Fast Dive on: during a dive every half second, and around every landing (the step before, the landing
+-- and 5 steps after), DynamicFallDamage (wasFalling, fallStartAltitude, detectedFallDistance, detectedFallDamagePercentage),
+-- the Falling state bit, the movement state, height and vertical speed. Fall hits are logged in the on_hit below.
+function glide.fall_snap(world, entity)
+  local r = {}
+  pcall(function()
+    local fd = world:get("DynamicFallDamage", entity)
+    if fd then
+      r.was, r.start = fd.wasFalling, tonumber(fd.fallStartAltitude)
+      r.dist, r.pct = tonumber(fd.detectedFallDistance), tonumber(fd.detectedFallDamagePercentage)
+    end
+    local a = world:get("Actor", entity)
+    r.falling = a and ((math.tointeger(a.currentState) or 0) >> 32) & 1 == 1 or nil
+    local m = world:get("DynamicLocomotion", entity)
+    r.st = m and tonumber(m.state)
+    local _, y = world:position(entity)
+    r.y = y
+    local v = world:get("Velocity", entity)
+    r.vy = v and tonumber(v.velocity.y)
+  end)
+  return r
+end
+function glide.fall_line(what, entity, r)
+  emf.log(string.format("fall probe: player %s %s: y %.1f vy %.1f state %s Falling %s | wasFalling %s start %s dist %s pct %s",
+    tostring(entity), what, r.y or 0, r.vy or 0, tostring(r.st), tostring(r.falling), tostring(r.was),
+    r.start and string.format("%.1f", r.start) or "nil", r.dist and string.format("%.2f", r.dist) or "nil",
+    r.pct and string.format("%.3f", r.pct) or "nil"))
+end
+function glide.fall_probe(world, p, what)
+  local q = p.fall_probe or {}
+  p.fall_probe = q
+  local r = glide.fall_snap(world, p.entity)
+  local t = world:tick()
+  if what == "dive" then q.dive = true q.next = t end
+  if q.dive and q.next and t >= q.next then glide.fall_line("diving", p.entity, r) q.next = t + 30 end
+  local landed = what == "landed" or (q.prev and q.prev.st ~= 0 and r.st == 0)
+  if landed then
+    if q.prev then glide.fall_line("step before landing", p.entity, q.prev) end
+    glide.fall_line(what == "landed" and "LANDED (fast dive)" or "landed (normal)", p.entity, r)
+    q.after, q.dive, q.next = 5, nil, nil
+  elseif q.after then
+    glide.fall_line("after landing", p.entity, r)
+    q.after = q.after > 1 and q.after - 1 or nil
+  end
+  if what == "cancel" then q.dive, q.next = nil, nil end
+  q.prev = r
+end
 -- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
 -- landing's word never comes), taken back at the landing
 function glide.dive_notice(msg)
   if msg.on == true then
     kit.notice("fastdive", "Fast Dive in progress! Prepare for impact!", "#ff9632", 120)  -- (0.15.242, owner's words)
+    kit.notice("fastdive_tip")  -- (0.15.253) the glider tip goes when the dive starts
   else
     kit.notice("fastdive")
   end
@@ -1456,8 +1505,11 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       p.dive = p.dive or {}
       local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed"),
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
-                  base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto") }
+                  base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto"),
+                  protected = (is_on(account, "fall") or is_on(account, "immortal")) and true or nil }  -- (0.15.251)
       local what = glide.dive.step(world, p.entity, p.dive, o)
+      p.dive.landed_now = what == "landed" or nil
+      pcall(glide.fall_probe, world, p, what)  -- (0.15.250, probe)
       -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
       -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
       if what == "dive" or what == "landed" or what == "cancel" then
@@ -1473,7 +1525,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
           tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or p.dive.auto and ", automatic" or "",
           tostring(o.speed), tostring(o.landing)))
       elseif what == "cancel" then  -- (0.15.247)
-        emf.log(string.format("experimental: fast dive: player %s pulled up: dive cancelled (%s)", tostring(p.entity),
+        emf.log(string.format("experimental: fast dive: player %s: dive cancelled (%s)", tostring(p.entity),
           tostring(p.dive.cancel_why)))
       elseif what == "low" then
         emf.log(string.format("experimental: fast dive: player %s too low (ground %.1f m below, minimum %s m)",
@@ -1490,7 +1542,9 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     if is_on(account, "superbjump") then
       p.leap = p.leap or {}
       local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer"),
-                  window = glide.sbj(account, "window") }
+                  window = glide.sbj(account, "window"),
+                  -- (0.15.249) a free-fall Fast Dive is deadly: the leap's fall protection waits until that landing is done
+                  no_guard = p.dive ~= nil and not p.dive.from_glider and (p.dive.diving or p.dive.landed_now) or nil }
       local what = glide.leap.step(world, p.entity, p.leap, o)
       if what == "leap" then
         local cap = glide.leap.last_cap
@@ -1989,7 +2043,56 @@ local function ask(msg)
   return ok and sent == true
 end
 
+-- (0.15.253, owner: "when the player pops open their glider ... a notice message ... telling them to double tap the bound
+-- key", "every time", "like 5 seconds", "use blue for the color", "light blue is good") in your own game, each time you open the glider with Fast Dive on.
+-- The game's key bindings cannot be read: it says forward (owner's words). Gone when the glider closes or a dive
+-- starts (glide.dive_notice).
+function glide.glider_tip(world)
+  local player = emf.local_player()
+  if not player or player == 0 then return end
+  local on
+  if kit.is_host() then
+    local account = me(world)
+    on = account ~= nil and is_on(account, "fastdive")
+  else
+    on = shown ~= nil and shown.fastdive == true
+  end
+  local gliding = false
+  local ok = pcall(function()
+    local m = world:get("DynamicLocomotion", player)
+    local st = m and tonumber(m.state)
+    -- (owner: "if you're below the minimum height it shouldn't show that") the game knows the ground below only about
+    -- 1 m before a landing, so the height counted is above the last place you stood (or swam): a glider opened from a
+    -- jump on flat ground is low, one opened off a cliff is not
+    if st == 0 or st == 9 or st == 10 then
+      local _, y = world:position(player)
+      glide.tip_ground = y
+    end
+    if st ~= nil then gliding = st == 4 return end
+    local a = world:get("Actor", player)
+    gliding = a ~= nil and ((math.tointeger(a.currentState) or 0) >> 37) & 1 == 1
+  end)
+  if not ok then
+    if not glide.tip_broken then emf.log("experimental: the glider cannot be seen in your game (no Fast Dive tip)") end
+    glide.tip_broken = true
+    return
+  end
+  local high = true
+  if gliding and not glide.tip_gliding and on and glide.tip_ground then
+    local min = kit.is_host() and glide.sbj(me(world), "divemin") or (shown and tonumber(shown.sbj_divemin)) or glide.dive.MIN_HEIGHT
+    local _, y = world:position(player)
+    high = not (min and min > 0 and y and y - glide.tip_ground < min)
+  end
+  if gliding and not glide.tip_gliding and on and high then
+    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff", 5)
+  elseif not gliding and glide.tip_gliding then
+    kit.notice("fastdive_tip")
+  end
+  glide.tip_gliding = gliding
+end
+
 function F.client_tick(world)
+  if not glide.tip_broken then pcall(glide.glider_tip, world) end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
@@ -2710,6 +2813,13 @@ function F.setup(k)
     end
     if tell_player then tell_player(world, d.player, account, "You died: PvP is off. Switch it on again to fight.") end
   end, "a player's death"))
+  -- (0.15.250, probe) every fall damage hit on a player: how much, health before and after
+  pcall(emf.on_hit, kit.guard(F, function(world, hit)
+    if not hit or hit.kind ~= "fall" then return end
+    local _, y = world:position(hit.target)
+    emf.log(string.format("fall probe: FALL HIT on %s: amount %s, health %s -> %s, at y %.1f", tostring(hit.target),
+      tostring(hit.amount), tostring(hit.health_before), tostring(hit.health_after), y or 0))
+  end, "a fall hit"), { kinds = { "fall" } })
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end

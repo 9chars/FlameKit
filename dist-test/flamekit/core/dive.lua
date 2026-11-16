@@ -201,7 +201,18 @@ function M.step(world, entity, s, opts)
       s.first, s.top, s.glider_closed, s.was_gliding = nil, nil, nil, nil
       return
     end
-    if st ~= IN_AIR and st ~= GLIDING then s.first, s.top = nil, nil return end
+    if st ~= IN_AIR and st ~= GLIDING then
+      -- (0.15.252, owner: a dive into water kept the notice up and blew up on the next landing, out of the water)
+      -- water (swimming 9, under water 10) ends a dive at once: no blast, the notice goes. Other states (sliding on a
+      -- slope) keep it: the landing on the ground comes next.
+      if s.diving and (st == 9 or st == 10) then
+        s.diving = nil
+        result = "cancel"
+        s.cancel_why = "landed in water"
+      end
+      s.first, s.top = nil, nil
+      return
+    end
     -- (0.15.248) the highest point of this time in the air, and whether the glider was just closed
     if st == GLIDING then
       s.was_gliding, s.top = true, nil
@@ -210,7 +221,19 @@ function M.step(world, entity, s, opts)
     end
     if y and (not s.top or y > s.top) then s.top = y end
     if s.diving then
-      fall_guard.step(world, entity)
+      -- (0.15.249, owner: "the impact should kill you", "let the natural fall kill the player", "let the glider dive
+      -- bomb survive") only a dive started in the glider keeps the fall short; a free-fall dive lands as the game's own
+      -- fall (No Fall Damage and Invincible Mode still protect: features/experimental.lua)
+      if s.from_glider then fall_guard.step(world, entity) end
+      -- (0.15.251, fall probe: the game takes a fall's start height once, when the fall begins; a Super B Jump leap is a
+      -- fall from the takeoff on, so the start stayed at the ground and a 516 m dive landed as a 3 m fall) a free-fall
+      -- dive holds the game's fall start at the highest point of this time in the air, so the game's own fall damage
+      -- sees the whole drop. Not for a player whose fall is protected (opts.protected: No Fall Damage, Invincible Mode).
+      if not s.from_glider and not opts.protected and s.top then
+        local fd = world:get("DynamicFallDamage", entity)
+        local start = fd and tonumber(fd.fallStartAltitude)
+        if start and start < s.top then fd.fallStartAltitude = s.top end
+      end
       -- (0.15.248, owner) an automatic dive (free fall) is cancelled only by opening the glider
       if s.auto and st == GLIDING then
         s.diving = nil

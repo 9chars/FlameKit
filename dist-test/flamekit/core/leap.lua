@@ -216,7 +216,9 @@ function M.step(world, entity, s, opts)
     end
     if st == ON_GROUND then s.side_slot, s.side_next = nil, nil end
     -- fall protection from the leap until the landing; the glider has none of its own to fear
-    if s.leapt and st ~= GLIDING then fall_guard.step(world, entity) end
+    -- (0.15.249, owner: a Fast Dive impact kills) not during a deadly Fast Dive (opts.no_guard): the leap's protection
+    -- stays for everything else
+    if s.leapt and st ~= GLIDING and not s.opts.no_guard then fall_guard.step(world, entity) end
   end)
   if not ok then
     M.broken = true

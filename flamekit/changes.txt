@@ -1,3 +1,8 @@
+0.15.253 Nov 16, 2026
+- Fast Dive: each time you open the glider, a light blue notice says "Quickly double tap forward to initiate Fast Dive!" for 5 seconds (gone when the glider closes or the dive starts). Not when you open it lower than your Fast Dive minimum height above where you last stood.
+- Fast Dive tooltip: a free-fall dive's landing kills you (since 0.15.249 on the server); a glider dive is survived.
+- Includes the server changes of 0.15.249 to 0.15.252 (deadly free-fall landing, water ends a dive, fall probe).
+
 0.15.252 Nov 16, 2026
 - Fast Dive: landing in water ends the dive: no blast, and the notice goes away (before, it stayed up and the blast came at the next landing on ground). Server only: no game update.
 

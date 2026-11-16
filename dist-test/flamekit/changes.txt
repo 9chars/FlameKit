@@ -1,3 +1,20 @@
+0.15.253 Nov 16, 2026
+- Fast Dive: each time you open the glider, a light blue notice says "Quickly double tap forward to initiate Fast Dive!" for 5 seconds (gone when the glider closes or the dive starts). Not when you open it lower than your Fast Dive minimum height above where you last stood.
+- Fast Dive tooltip: a free-fall dive's landing kills you (since 0.15.249 on the server); a glider dive is survived.
+- Includes the server changes of 0.15.249 to 0.15.252 (deadly free-fall landing, water ends a dive, fall probe).
+
+0.15.252 Nov 16, 2026
+- Fast Dive: landing in water ends the dive: no blast, and the notice goes away (before, it stayed up and the blast came at the next landing on ground). Server only: no game update.
+
+0.15.251 Nov 16, 2026
+- Fast Dive: the landing of a free-fall dive is now a real fall from your highest point, so the game's own fall damage kills you (before, after a Super B Jump the game measured the fall from where you took off). Glider dives, No Fall Damage and Invincible Mode still keep you alive. The fall probe stays for now. Server only: no game update.
+
+0.15.250 Nov 16, 2026
+- Server (test): a fall probe logs what the game's fall damage sees during a Fast Dive and around landings, and every fall damage hit. Server only: no game update.
+
+0.15.249 Nov 16, 2026
+- Fast Dive: the landing of a free-fall dive now kills you, as the game's own fall would. A dive started in the glider is survived. No Fall Damage (and Invincible Mode) still protect you. Super B Jump still protects every other landing. Server only: no game update (the new tooltip comes with the next game update).
+
 0.15.248 Nov 16, 2026
 - Fast Dive: falling without the glider above a height (default 1000 m, the game's altitude) starts the dive by itself, once you have fallen 20 m, or at once when you close the glider. Opening the glider cancels it (no blast).
 - Fast Dive: tapping forward twice now only works while gliding (the nose dive).

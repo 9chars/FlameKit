@@ -253,6 +253,7 @@ end
 function glide.dive_notice(msg)
   if msg.on == true then
     kit.notice("fastdive", "Fast Dive in progress! Prepare for impact!", "#ff9632", 120)  -- (0.15.242, owner's words)
+    kit.notice("fastdive_tip")  -- (0.15.253) the glider tip goes when the dive starts
   else
     kit.notice("fastdive")
   end
@@ -2042,7 +2043,56 @@ local function ask(msg)
   return ok and sent == true
 end
 
+-- (0.15.253, owner: "when the player pops open their glider ... a notice message ... telling them to double tap the bound
+-- key", "every time", "like 5 seconds", "use blue for the color", "light blue is good") in your own game, each time you open the glider with Fast Dive on.
+-- The game's key bindings cannot be read: it says forward (owner's words). Gone when the glider closes or a dive
+-- starts (glide.dive_notice).
+function glide.glider_tip(world)
+  local player = emf.local_player()
+  if not player or player == 0 then return end
+  local on
+  if kit.is_host() then
+    local account = me(world)
+    on = account ~= nil and is_on(account, "fastdive")
+  else
+    on = shown ~= nil and shown.fastdive == true
+  end
+  local gliding = false
+  local ok = pcall(function()
+    local m = world:get("DynamicLocomotion", player)
+    local st = m and tonumber(m.state)
+    -- (owner: "if you're below the minimum height it shouldn't show that") the game knows the ground below only about
+    -- 1 m before a landing, so the height counted is above the last place you stood (or swam): a glider opened from a
+    -- jump on flat ground is low, one opened off a cliff is not
+    if st == 0 or st == 9 or st == 10 then
+      local _, y = world:position(player)
+      glide.tip_ground = y
+    end
+    if st ~= nil then gliding = st == 4 return end
+    local a = world:get("Actor", player)
+    gliding = a ~= nil and ((math.tointeger(a.currentState) or 0) >> 37) & 1 == 1
+  end)
+  if not ok then
+    if not glide.tip_broken then emf.log("experimental: the glider cannot be seen in your game (no Fast Dive tip)") end
+    glide.tip_broken = true
+    return
+  end
+  local high = true
+  if gliding and not glide.tip_gliding and on and glide.tip_ground then
+    local min = kit.is_host() and glide.sbj(me(world), "divemin") or (shown and tonumber(shown.sbj_divemin)) or glide.dive.MIN_HEIGHT
+    local _, y = world:position(player)
+    high = not (min and min > 0 and y and y - glide.tip_ground < min)
+  end
+  if gliding and not glide.tip_gliding and on and high then
+    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff", 5)
+  elseif not gliding and glide.tip_gliding then
+    kit.notice("fastdive_tip")
+  end
+  glide.tip_gliding = gliding
+end
+
 function F.client_tick(world)
+  if not glide.tip_broken then pcall(glide.glider_tip, world) end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
