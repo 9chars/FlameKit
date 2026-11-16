@@ -40,7 +40,11 @@ local M = {
     -- (0.15.237, owner: "that one was good ... call it huge crater") the big TNT in the middle and 4 more 1.5 m around
     -- it (a ScaleComponent does not make a blast bigger: 1x, 3x and 6x looked the same, 0.15.235 test; the game's boss
     -- blasts did nothing when spawned alone, 0.15.236 test)
-    [5] = { name = "Huge crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", rings = { { 4, 1.5 } } },
+    -- (0.15.239, owner, ring tests 14:46-15:00) going off below the ground digs a deeper, rounder crater: Huge 2 m down;
+    -- Massive ("Massive crater is good"): 21 big TNTs, 8 at 1.5 m and 12 at 4 m (turned half a step), 3 m down
+    [5] = { name = "Huge crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50", rings = { { 4, 1.5 } }, down = 2 },
+    [6] = { name = "Massive crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50",
+            rings = { { 8, 1.5 }, { 12, 4, math.pi / 12 } }, down = 3 },
   },
   -- (0.15.232, owner: "an option not to blow up stuff inside someones base", per player) a landing inside a base (the
   -- game's InSaveZone actor state, keen::actor::StateFlag 14: a flame altar's area) uses BOOM_ONLY unless the player
@@ -49,7 +53,7 @@ local M = {
   BOOM_ONLY = 4,
   -- (0.15.233, owner: a crater just outside a base still damaged it near the border) also boom only within this many
   -- metres around a base's build zone (core/bases.lua), by the size of the blast; tuned with flamekit.fastdive margin
-  MARGIN = { [1] = 10, [2] = 15, [3] = 25, [5] = 30 },
+  MARGIN = { [1] = 10, [2] = 15, [3] = 25, [5] = 30, [6] = 40 },
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -129,7 +133,7 @@ local function landing(world, entity, kind, s)
       M.shields[#M.shields + 1] = { rule = rule, until_tick = world:tick() + math.floor(M.LANDING_SHIELD * 60) }
     end
   end
-  M.blast(world, x, y, z, l.guid, l.rings)
+  M.blast(world, x, y - (l.down or 0), z, l.guid, l.rings)
 end
 
 -- (0.15.237) one blast in the middle and rings around it: rings = { {count, radius}, ... }; returns how many spawned
