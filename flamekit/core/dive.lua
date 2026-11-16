@@ -21,7 +21,14 @@ local M = {
   RENEW = 300,           -- steps (5 s)
   MIN_HEIGHT = 10,       -- metres above the ground (groundDistance) before a dive is allowed; 0 = anywhere
   KICK_GLIDER = false,   -- a dive from the glider writes the locomotion state to Falling (2): did nothing (0.15.219)
-  EFFECT = "3b874eb5-bae2-4b6d-a63e-17bdd35b11c4",  -- Explosion_Player_Skill_Shockwave
+  -- (0.15.223, owner: "the second one was good and the damage on the ground was good too") the game's Meteoric Descent
+  -- landing (Explosion_Player_WeaponGem_MeteoricDescent): its boom and a crater. Before: Explosion_Player_Skill_Shockwave
+  -- (3b874eb5-...), which made no sound of its own when spawned
+  EFFECT = "896758dd-f2d5-4e26-89f0-a4856f489e77",
+  -- (0.15.223, owner: "try the head-first dive pose") TEST: while diving out of the glider, "input" adds the game's
+  -- HeadDive input (PlayerInputType 33, bit 33 of digitalInput) to what the player's game sent; "flag" sets the
+  -- HeadDiving state (keen::actor::StateFlag 33) in Actor.currentState; "off" neither
+  POSE = "input",
   LANDING_SHIELD = 1.5,  -- seconds the diver takes no hits after the landing (their own shockwave)
   -- keepAliveMask: (0.15.220) the game ended a push naming Jumping, Falling and HangGliding at once within 1/4 s
   -- (0.15.219 test): the player must be in every state named. So only the state the player is in: Falling (32), or
@@ -67,6 +74,18 @@ local function push_down(world, entity, gliding, renew)
   slot.type, slot.startTime, slot.endTime, slot.keepAliveMask = 0, now, now + math.floor(M.SECONDS * 1e9),
     gliding and M.KEEP_GLIDING or M.KEEP_FALLING
   return true
+end
+
+local HEAD_DIVE = 1 << 33  -- the same bit number in the input (PlayerInputType HeadDive) and the state (StateFlag HeadDiving)
+
+local function pose(world, entity)
+  if M.POSE == "input" then
+    local inp = world:get("PlayerInput", entity)
+    if inp then inp.fromClient.digitalInput = (math.tointeger(inp.fromClient.digitalInput) or 0) | HEAD_DIVE end
+  elseif M.POSE == "flag" then
+    local a = world:get("Actor", entity)
+    if a then a.currentState = (math.tointeger(a.currentState) or 0) | HEAD_DIVE end
+  end
 end
 
 local function landing(world, entity)
@@ -128,15 +147,18 @@ function M.step(world, entity, s, opts)
     if st ~= IN_AIR and st ~= GLIDING then s.first = nil return end
     if s.diving then
       fall_guard.step(world, entity)
+      if st == IN_AIR and M.POSE ~= "off" then pcall(pose, world, entity) end
       -- (0.15.219, test) what the dive does: every 15 steps for 3 s, the height, state and the push
       if s.diag and t <= s.diag and (t - s.dive_t) % 15 == 0 then
         local _, y = world:position(entity)
         local imp = world:get("Impulse", entity)
         local sl = imp and imp.impulses[1]
         local now = t * 50000000 // 3
-        emf.log(string.format("fast dive test: +%d steps y %.1f state %s push y %s alive %s total %s",
+        local a = world:get("Actor", entity)
+        local cs = a and math.tointeger(a.currentState) or 0
+        emf.log(string.format("fast dive test: +%d steps y %.1f state %s push y %s alive %s; pose %s, HeadDiving %s, Falling %s",
           t - s.dive_t, y or -1, tostring(st), sl and string.format("%.1f", sl.impulse.y) or "?",
-          sl and tostring(sl.endTime > now) or "?", imp and string.format("%.1f", imp.impulse.y) or "?"))
+          sl and tostring(sl.endTime > now) or "?", M.POSE, tostring(cs & HEAD_DIVE ~= 0), tostring(cs & (1 << 32) ~= 0)))
       end
       -- (0.15.221, owner: the dive slowed down before the ground: its 10 s push ran out about 1000 m down) the push is
       -- renewed every RENEW steps until the landing; its kind follows the glider (open or closed)

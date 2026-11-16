@@ -2484,6 +2484,7 @@ function F.setup(k)
       if a1 == "min" then d.MIN_HEIGHT = tonumber(a2) or d.MIN_HEIGHT say("fastdive: minimum height " .. d.MIN_HEIGHT .. " m") return end
       if a1 == "seconds" then d.SECONDS = tonumber(a2) or d.SECONDS say("fastdive: push lasts " .. d.SECONDS .. " s") return end
       if a1 == "shield" then d.LANDING_SHIELD = tonumber(a2) or d.LANDING_SHIELD say("fastdive: landing shield " .. d.LANDING_SHIELD .. " s") return end
+      if a1 == "pose" then d.POSE = a2 or d.POSE say("fastdive: pose " .. tostring(d.POSE)) return end  -- (0.15.223) input|flag|off
       if a1 == "kick" then d.KICK_GLIDER = a2 ~= "off" say("fastdive: kick out of the glider " .. tostring(d.KICK_GLIDER)) return end
       if a1 == "effect" then d.EFFECT = a2 or d.EFFECT say("fastdive: landing effect " .. tostring(d.EFFECT)) return end
       if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID>": the effect 3 m in front of them
