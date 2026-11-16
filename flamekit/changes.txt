@@ -1,3 +1,6 @@
+0.15.209 Nov 16, 2026
+- Minimap: your grave is drawn on top of every other marker, flame altars included, so it is never hidden.
+
 0.15.208 Nov 16, 2026
 - No Fall Damage and Invincible Mode (server): a deadly fall no longer shows you dead for a moment or tells the server you died. Your fall height is reset while you fall, so the game never sees a deadly fall.
 

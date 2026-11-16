@@ -1923,10 +1923,14 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
     static TextPainter names;
     const int name_px = std::max(11, letter_px(s, n) * 7 / 10);
     const bool labels = s.labels && mpp < 2.5f && names.ready(nullptr, name_px);
-    for (int pass = 0; pass < 2; ++pass) {  // flame altars last, on top of everything else
+    // three passes: other markers, then flame altars, then graves (owner, 0.15.209: your grave is never hidden under
+    // another marker)
+    constexpr uint32_t kGraveId = 450427246u;  // mapmarker_player_corpse
+    for (int pass = 0; pass < 3; ++pass) {
         for (const Marker& k : ov.markers) {
             const Style& st = kStyles[k.kind];
-            if ((st.shape == kAltar) != (pass == 1)) continue;
+            const int want = st.id == kGraveId ? 2 : st.shape == kAltar ? 1 : 0;
+            if (want != pass) continue;
             const float q = u * st.size, a = k.state == 3 ? 0.55f : k.state < 2 ? 0.45f : 1.0f;  // dimmer once completed or not found yet
             if (!place(k.x, k.z, std::max(q + 1.0f, icon_px * 0.45f), false, sx, sy, outside)) continue;
             const int ipx = static_cast<int>(icon_px * kIcons[k.kind].scale + 0.5f);
