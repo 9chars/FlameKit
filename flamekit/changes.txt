@@ -1,3 +1,7 @@
+0.15.190 Nov 15, 2026
+- The pointer key can be any key or mouse button (but the left one): F4 menu, Windows tab, "Pointer key": click it, then press the key or mouse button you want (the middle or right button, side buttons, left or right Shift/Ctrl/Alt, any key); Esc stops waiting. Right Alt stays the default; a key chosen before is kept.
+- The "Show the pointer while you stand still" option is gone.
+
 0.15.189 Nov 15, 2026
 - Auto Junk List: the "Exclude Action Bar" setting is gone; junk on the action bar is removed too (the game keeps putting junk there). An older server is told the same.
 - Auto Junk List: the "Set Dump Key" button sits between "Auto" and "Drop / Delete" at the top.

@@ -12,7 +12,6 @@
 // atomics. A thread of this mod owns the overlay window and redraws it about 30 times a second.
 #define NOMINMAX
 #include <windows.h>
-#include <xinput.h>  // (0.15.184) the controller's state for the auto pointer: XInputGetState, loaded at run time
 
 #include <algorithm>
 #include <functional>
@@ -54,6 +53,35 @@ constexpr float kPi = 3.14159265358979f;
 
 // ---- settings (in the flamekit mod's mod.json, group Minimap; changed in EMF's Mods tab) ----
 
+// (0.15.190) The pointer key: names FlameKit gives the keys EMF's key names leave out (mouse buttons, and the left and
+// right Shift, Ctrl and Alt: emf::keys::parse_key refuses those), the rest as EMF names them.
+struct PointerKeyName {
+    uint32_t vk;
+    const char* name;
+};
+static const PointerKeyName kPointerKeyNames[] = {
+    {VK_RBUTTON, "MouseRight"}, {VK_MBUTTON, "MouseMiddle"}, {VK_XBUTTON1, "Mouse4"}, {VK_XBUTTON2, "Mouse5"},
+    {VK_LSHIFT, "LeftShift"},   {VK_RSHIFT, "RightShift"},   {VK_LCONTROL, "LeftCtrl"}, {VK_RCONTROL, "RightCtrl"},
+    {VK_LMENU, "LeftAlt"},      {VK_RMENU, "RightAlt"},
+};
+inline std::string pointer_key_name(uint32_t vk) {
+    for (const auto& k : kPointerKeyNames)
+        if (k.vk == vk) return k.name;
+    std::string name = emf::keys::detail::key_name(vk);
+    if (name.rfind("key ", 0) == 0) name = name.substr(4);  // "key 0xba": written "0xba"
+    return name;
+}
+inline uint32_t pointer_key_vk(const std::string& text) {
+    if (text == "right_alt" || text.empty()) return VK_RMENU;  // the old choices (0.15.189 and before)
+    if (text == "right_ctrl") return VK_RCONTROL;
+    if (text == "caps_lock") return VK_CAPITAL;
+    const std::wstring w(text.begin(), text.end());
+    for (const auto& k : kPointerKeyNames)
+        if (emf::keys::detail::same_ignoring_case(w, k.name)) return k.vk;
+    const uint32_t vk = emf::keys::parse_key(w);
+    return vk ? vk : VK_RMENU;
+}
+
 struct Settings {
     bool show = true;
     bool hide_build = true;  // ui_hide_build: all of FlameKit's UI hides in build mode (switched in the Windows tab)
@@ -67,7 +95,6 @@ struct Settings {
     uint32_t messages_vk = VK_F8; // shows and hides the Messages window (setting messages_window_key, 0.15.123)
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     bool pointer_toggle = false;  // pointer_toggle (0.15.79): one press shows the pointer, the next (or Esc) puts it away
-    bool pointer_auto = false;    // pointer_auto (0.15.184): the pointer is out while no key or controller input comes
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
     int zoom = 2;            // index into kRanges
     bool markers = true;     // altars and the map markers you have found
@@ -133,10 +160,11 @@ void read_settings() {
     s.messages_vk = mkey.empty() ? 0 : emf::keys::parse_key(std::wstring(mkey.begin(), mkey.end()));
     const std::string bkey = emf::setting_text(kKit, "board_window_key", "F5");
     s.board_vk = bkey.empty() ? 0 : emf::keys::parse_key(std::wstring(bkey.begin(), bkey.end()));
-    const std::string pkey = emf::setting_text(kKit, "pointer_key", "right_alt");
-    s.pointer_vk = pkey == "caps_lock" ? VK_CAPITAL : pkey == "right_ctrl" ? VK_RCONTROL : VK_RMENU;
+    // (0.15.190, owner: "bind any key to it that I want (including mouse buttons)") the pointer key is any key or
+    // mouse button but the left one, by FlameKit's own names (pointer_key_vk); 0.15.189 and before: right_alt,
+    // right_ctrl or caps_lock, still read
+    s.pointer_vk = pointer_key_vk(emf::setting_text(kKit, "pointer_key", "RightAlt"));
     s.pointer_toggle = emf::setting_bool(kKit, "pointer_toggle", false);
-    s.pointer_auto = emf::setting_bool(kKit, "pointer_auto", false);
     s.markers = true;  // its own switch is gone: the marker filters (map_hide) decide
     s.water = true;  // its own switch is gone: the marker filters (map_hide) decide
     s.players = emf::setting_bool(kKit, "map_players", true);
@@ -2230,7 +2258,6 @@ struct Frame {  // what a layer gets to know about this moment
 // says otherwise (Layer::stays_in_build). Owner, 0.15.61: ALL of FlameKit's UI on screen hides in build mode, the lower
 // left lines too; only FlameKit's window (F4, opened on purpose) stays, and a future build mode feature may opt out.
 std::atomic<bool> g_build_hide{false};
-bool g_menu_open_last = false;  // (0.15.184) a game menu was open at the last look (the auto pointer stays away then)
 
 struct Layer {
     virtual ~Layer() = default;
@@ -3863,7 +3890,7 @@ struct WindowLayer : Layer {
         std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinAuto };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kAbout, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey };
     struct Hit {
         RECT r;
         Kind kind;
@@ -4456,6 +4483,8 @@ struct WindowLayer : Layer {
                                            {L"Key that shows and hides the Party window", "party_window_key"},
                                            {L"Key that shows and hides the Messages window", "messages_window_key"}};
     int capture_win = -1;  // the key setting of the Windows tab waiting for a key (-1: none)
+    bool capture_ptr = false;  // (0.15.190) Set Pointer Key waits for any key or mouse button (update() looks)
+    std::unordered_set<uint32_t> ptr_seen_down;  // keys already down when the wait began: taken only once let go and pressed
     void stop_capture() {  // the Lua part's Settings waits too: the same click again ends it there
         if (capture_win < 0) return;
         act("opt", std::string("k:") + kWinKeys[capture_win].key + ":c");
@@ -4515,17 +4544,21 @@ struct WindowLayer : Layer {
                        static_cast<size_t>(i));
                 y += 40;
             }
+            // (0.15.190, owner) the pointer key: any key or mouse button (but the left one)
+            text.draw(canvas, kPad, y + 5, L"Pointer key (any key or mouse button)", 230, 230, 235);
+            {
+                const std::string pn = pointer_key_name(st.pointer_vk);
+                button(kPad + 430, y, 150, capture_ptr ? L"press one" : std::wstring(pn.begin(), pn.end()), capture_ptr, kWinPtrKey);
+            }
+            y += 40;
             text.draw(canvas, kPad, y + 5, L"Press the pointer key once instead of holding it", 230, 230, 235);
             button(kPad + 430, y, 150, st.pointer_toggle ? L"ON" : L"OFF", st.pointer_toggle, kWinToggle);
             y += 40;
-            // (0.15.184, owner) the pointer comes out by itself while you give no keyboard or controller input
-            text.draw(canvas, kPad, y + 5, L"Show the pointer while you stand still", 230, 230, 235);
-            button(kPad + 430, y, 150, st.pointer_auto ? L"ON" : L"OFF", st.pointer_auto, kWinAuto);
-            y += 40;
+
         }
         y += 10;
         static const wchar_t* kHelp[] = {
-            L"Hold the pointer key (Right Alt unless changed in Settings) to get",
+            L"Hold the pointer key (Right Alt unless changed above) to get",
             L"the pointer while you play. Then a pinned window can be dragged by",
             L"its title bar, resized from its lower right corner,",
             L"collapsed with \u2013 or hidden with \u00D7. Let go of the key to play on.",
@@ -4769,6 +4802,31 @@ struct WindowLayer : Layer {
     }
 
     void update(const Frame& f) override {
+        // (0.15.190) Set Pointer Key: the first key or mouse button pressed now (not the left button: it clicks; not the
+        // window's key; Esc stops waiting) becomes the pointer key. The plain Shift/Ctrl/Alt codes are left out: their
+        // left or right one is taken. A key already down when the wait began counts only after it was let go.
+        if (capture_ptr) {
+            if (!open || current != "windows") {
+                capture_ptr = false;
+                act("opt", "k:pointer_key:c");
+            } else {
+                const uint32_t wk = settings().window_vk;
+                for (uint32_t vk = 0x02; vk <= 0xFE && capture_ptr; ++vk) {
+                    if (vk == 0x03 || (vk >= 0x10 && vk <= 0x12) || vk == wk) continue;
+                    const bool down = (GetAsyncKeyState(static_cast<int>(vk)) & 0x8000) != 0;
+                    if (!down) { ptr_seen_down.erase(vk); continue; }
+                    if (ptr_seen_down.count(vk)) continue;
+                    if (vk == VK_ESCAPE) {
+                        capture_ptr = false;
+                        act("opt", "k:pointer_key:c");
+                        break;
+                    }
+                    capture_ptr = false;
+                    act("key", pointer_key_name(vk));  // the Lua part's Settings takes it as pointer_key
+                    FK_LOG(fklog::kInfo, "window: pointer key set to %s", pointer_key_name(vk).c_str());
+                }
+            }
+        }
         // the Lua part asks for the window on a tab (after an update: What's New; features/changes.lua): ui_open.dat
         // holds the tab's id; opened once, the file is deleted
         if (!open && f.now >= next_open_check) {
@@ -5007,8 +5065,12 @@ struct WindowLayer : Layer {
             case kWinToggle:
                 act("opt", "b:pointer_toggle");
                 break;
-            case kWinAuto:  // (0.15.184)
-                act("opt", "b:pointer_auto");
+            case kWinPtrKey:  // (0.15.190) wait for any key or mouse button (update() takes it); the same click again: stop
+                act("opt", "k:pointer_key:c");  // the Lua part's Settings waits for it too
+                capture_ptr = !capture_ptr;
+                ptr_seen_down.clear();
+                for (uint32_t vk = 0x02; capture_ptr && vk <= 0xFE; ++vk)  // what is down now is not the answer
+                    if ((GetAsyncKeyState(static_cast<int>(vk)) & 0x8000) != 0) ptr_seen_down.insert(vk);
                 break;
             case kScrollThumb:
                 thumb_drag = true;
@@ -6625,50 +6687,6 @@ void ui_thread_body() {
             }
             key_was = raw;
         }
-        // (0.15.184, owner) pointer_auto: the pointer comes out once no keyboard or controller input came for
-        // kAutoIdleMs while you are in the world (not in a game menu, not in build mode), and goes away with the next
-        // key or controller input, which then goes to the game as usual. Mouse buttons do not count (they click
-        // FlameKit's windows); the mouse itself moves the pointer while it is out. The pointer key works as before.
-        {
-            static uint64_t last_input = 0;
-            static bool auto_on = false;
-            constexpr uint64_t kAutoIdleMs = 750;
-            if (ps.pointer_auto) {
-                bool input = false;
-                for (int vk = 0x08; vk <= 0xFE && !input; ++vk) {  // 0x01-0x06 are the mouse buttons
-                    if (vk == pointer_vk) continue;
-                    if ((GetAsyncKeyState(vk) & 0x8000) != 0) input = true;
-                }
-                if (!input) {  // a controller: sticks past their dead zones, triggers, any button (XInput, loaded once)
-                    using GetStateFn = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
-                    static GetStateFn get_state = []() -> GetStateFn {
-                        HMODULE m = LoadLibraryW(L"xinput1_4.dll");
-                        if (!m) m = LoadLibraryW(L"xinput9_1_0.dll");
-                        return m ? reinterpret_cast<GetStateFn>(GetProcAddress(m, "XInputGetState")) : nullptr;
-                    }();
-                    for (DWORD i = 0; get_state && i < 4 && !input; ++i) {
-                        XINPUT_STATE st{};
-                        if (get_state(i, &st) != ERROR_SUCCESS) continue;
-                        const XINPUT_GAMEPAD& g = st.Gamepad;
-                        input = g.wButtons != 0 || g.bLeftTrigger > 30 || g.bRightTrigger > 30 ||
-                                std::abs(static_cast<int>(g.sThumbLX)) > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE ||
-                                std::abs(static_cast<int>(g.sThumbLY)) > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE ||
-                                std::abs(static_cast<int>(g.sThumbRX)) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE ||
-                                std::abs(static_cast<int>(g.sThumbRY)) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE;
-                    }
-                }
-                if (input || last_input == 0) last_input = f.now;
-                const bool want = f.ours_front && f.in_world && !g_menu_open_last && !g_build_hide.load() &&
-                                  f.now - last_input >= kAutoIdleMs;
-                if (want != auto_on) {
-                    auto_on = want;
-                    FK_LOG(fklog::kDebug, "pointer: %s by itself", auto_on ? "out (no input)" : "away (input)");
-                }
-                hold = hold || auto_on;
-            } else {
-                auto_on = false;
-            }
-        }
         if (hold != g_pointer_hold) {
             g_pointer_hold = hold;
             FK_LOG(fklog::kInfo, "pointer: the pointer key (vk %02x) %s", pointer_vk, hold ? "held: the pinned windows take the mouse" : "let go");
@@ -6758,7 +6776,6 @@ void ui_thread_body() {
             }
             f.in_menu = pointer && !chat_open;
             menu_was = f.in_menu;
-            g_menu_open_last = f.in_menu;
         } else if (!f.ours_front) {
             f.in_menu = menu_was;
         } else if (g_pointer_mode) {
