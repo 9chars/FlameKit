@@ -48,37 +48,70 @@ on its own: no feature calls into or reads another feature's code or data (for e
 be able to change how another works. Keep the code clean, reusable and well factored, without dependencies between
 systems.
 
-## Open: Loot Drop for the game's own monsters (2026-11-15, 0.15.143)
+## Where things stand (end of the conversation of 2026-11-15..16; the owner starts a new one)
 
-Built as "read the body after the death, move its loot to the ground": does NOT work for normal monsters. The game
-fills a body only when it is first opened (ecs program `random_loot_on_interaction`, EMF docs ecs_programs.md and
-re_content.md: "fills a container when it is first opened"); FlameKit saw every body empty (some with no inventory).
-This was in EMF's docs and should have been checked before building. features/loot_drop.lua stays harmless (it only
-removes a body after moving loot out of it). Next route (owner, 2026-11-15 14:14: "can't you just call the same process that pressing 'E' calls"): send
-the game's own `LootInteractionEvent {guestId, hostId = body, offerId 0, lootAll 1, bypassInteraction 1}` right after
-the death (emf.emits / emf.emit in Lua; EMF's runtime test harvested a plant into a chest with it: the game created
-the loot and moved it in the same step, real items). The guest needs an inventory, so the owner must choose first:
-(1) guest = the killer: the loot goes straight into their bag as if they pressed E (simplest), or (2) loot into a
-hidden temporary container, then drop it on the ground with core/ground_loot.lua (needs a container FlameKit can
-spawn: untested). Before building: test that the event works for a monster body; explain the test first (Rule 0).
-Feature 1 is NOT dead: only the first way of building it was. Proven parts kept: core/ground_loot.lua (a ground item keeps quality and
-level), the test monsters' legendary loot, the Server tab.
+- Versions (2026-11-16 07:20): **Development and Stable 0.15.207** (game). **Servers 0.15.208** (local and G-Portal;
+  0.15.208 is server only: the fall fix). The DLL was last built at 0.15.195; 0.15.196..0.15.207 reuse that DLL
+  (Lua-only changes: `make_dist.py` with the staged DLL `/mnt/user-data/uploads/enshrouded mod shit/flamekit_native/out/flamekit_native/flamekit_native.dll`; re-stage it in a new session).
+- `C:\enshrouded mod shit\outbox` holds the last G-Portal upload (0.15.208: features/experimental.lua, changes.txt,
+  mod.json). The upload tool sends everything in it: replace its files before the next G-Portal upload.
+- G-Portal needs a server restart for Loot Drop: the server started at 4:10 on 2026-11-15 with 0.15.141, so
+  `EntityDiedEvent`, `LootInteractionEvent`, `InteractionAcceptedEvent`, `TransformedToLootEvent` were "new since the
+  game started" (emf_core.log) and Loot Drop did nothing there. The nightly restart (about 4:10) should have fixed it
+  on 2026-11-16: check the G-Portal log for those "restart the game" lines before trusting Loot Drop there.
+  "Monsters drop their loot on the ground" is ON on G-Portal and on the local server.
+- Waiting for the owner's test (built, not seen in game): 0.15.208 fall fix (first falls log
+  "experimental: no fall damage: fall start X, height now Y": check X and Y are the same unit, metres; if not, the
+  fix does nothing), 0.15.207 mana kept full by Invincible Mode, damage bonus, join/leave lines, the Change Log window,
+  the About tab, Pointer key behavior, the FlameKit Menu key in the Windows tab, 0.15.198 Loot Drop queue fix (a group
+  of monsters dying together), 0.15.197 sparkle following sliding loot.
+- Held (owner said "going to make some more changes"; not built): the Dump Key taking mouse buttons (same capture as
+  the pointer key: the DLL watches the key and sends act("dump","-")).
+- Debug code still in (remove when the owner agrees): loot_drop.lua `flamekit.loottest`, `flamekit.fx <1-10>` preview,
+  the effect-component `dump()`; DIAG_MAX 60 lines a minute of Loot Drop notes.
+- Restart helper `server` request restarts the GAME CLIENT too (Close-Client, Stop-Server, Start-Server, Start-Client):
+  ask the owner before any server restart (he was annoyed once).
 
-## Where things stand (end of the conversation of 2026-11-13..15; the owner starts a new one)
+## Built 2026-11-15..16 (0.15.143 .. 0.15.208), in short
 
-- Versions (2026-11-16 00:19): servers (local and G-Portal) 0.15.208 (server only); Development and Stable 0.15.207.
-- `C:\enshrouded mod shit\outbox` still holds the 0.15.142 Lua files (from before the owner stopped the G-Portal
-  upload): never upload them unless the owner asks for G-Portal; replace them with the right files when he does.
-- The Server tab's "Monsters drop their loot on the ground" is ON on the local server (server_settings.json); with
-  the current loot_drop.lua it does nothing harmful (bodies are empty when looked at, so none is removed).
-- Not yet tried in the game: the test monsters' legendary loot (0.15.142: runes, legendary runes, one legendary
-  item). The ground drop itself was proven in game (a legendary sword level 10 came out as given).
-- Nightly log fetch (restart helper, 3:55 AM, logs only) first runs on 2026-11-16: check
-  `<work folder>\production_stable_logs\emf_core_2026-11-16.log` and a "nightly:" line in restart.log.
-- Lessons the owner insisted on (all in the rules above): check the docs and everything checkable before building or
-  asking for a test; explain a test before asking for it; full paths in every step; never G-Portal or Stable without
-  his word for that version; Development and the local server always together; features never depend on each other;
-  stage every file version under a new path and verify md5 on the PC; say plainly what is and is not tested.
+- **Loot Drop** (Server tab "Monsters drop their loot on the ground", server-wide, off by default):
+  features/loot_drop.lua. Monster loot arrives three ways: the body fills itself 2-3 s after the death; a separate
+  loot pile `LootContainer_Enemy_*` appears near the body (core/loot_spots.lua finds it within 4 m in a budgeted world
+  walk); or the body fills only when opened (`random_loot_on_interaction`): FlameKit opens it as the nearest player
+  (`InteractionAcceptedEvent {guestEntityId = player, hostEntityId = body, offerId = 0}`), fallback a hidden chest
+  3 m under ground with `LootInteractionEvent`. The items go to the ground with core/ground_loot.lua (0.25 m up), each
+  with a VFX_Altar_FlameEssence mark (`MARK_FX eb3633fc-...`, chosen by the owner) that follows a sliding item
+  (0.15.197: a new mark when the item moved 0.6 m). Whether a body is a creature is read at the death (0.15.198: the
+  Faction goes when the body fills; the queue no longer waits in order).
+- **Test monsters' reward loot** (experimental.lua, Experimental tab "Reward loot" switch, default off): runes and
+  legendary runes into the killer's bag (`emf.put`, overflow to the chest), one legendary item (weapon, armour, ring,
+  gem, cosmetic; rings and gems from `db.LEGENDARY_BY_TYPE`) into a spawned `Prop_Decoration_T5_Storage_40_Chest`
+  (core/loot_chest.lua: nearest non-full chest within 50 m else a new one 2.5 m apart, a hit rule per chest so it takes
+  no damage, a grave-flame glow, removed when emptied or 15 min after its last item; `flamekit.chests` lists them).
+  No corpse and no other loot: the body is removed at the kill and the game's loot piles 2 s later. Bosses are not
+  offered as dummies (0.15.187).
+- **Glider speed** (0.15.200..0.15.207): Experimental tab drop-down 0.1x..5x (`glide.STEPS`), per player in
+  experimental.json `glide_speed`. Measured on G-Portal: the game pulls a glider to 18.7 m/s horizontal, sinking
+  4.5 m/s, so the horizontal speed is SET every step to 18.7 x factor along the game's own direction (not scaled:
+  scaling is pulled back). Faster only while not much slower than cruising; slower never above the target.
+- **Damage bonus** (0.15.205, 0.15.207): drop-down Off..+1000% (`glide.DAMAGE`), per player `damage_pct`; one EMF hit
+  rule `{from = player, to = "creatures", scale = 1 + bonus}`, none while the player is in PvP.
+- **Invincible Mode keeps mana full** (0.15.207) and **No Fall Damage / Invincible reset the fall start height**
+  every step while falling (0.15.208; DynamicFallDamage.fallStartAltitude), because the cancel rule gives the health
+  back only after the game took it (a moment dead + a death message).
+- experimental.lua is at Lua's limit of 200 top-level locals: new things go into the `glide` table (or `after`).
+- **Join/leave lines** (chat.lua, 0.15.205..206): "<name> joined the server!" / "left the server!" in yellow
+  (#ffe14d) in Notices and Messages, told 3 s after the join; joins EMF reports again at a reload are not told.
+- **Window (DLL)**: tabs end with Windows and About. About (0.15.192): the update line and "Check for updates" at the
+  top, README.md from GitHub below (Readme helper, fetched each time the tab opens), a "Change Log" button (0.15.193)
+  that opens ChangeLogDialog with changes.txt (12 versions) and OK. The What's New tab and the About window are gone;
+  What's New no longer opens after an update (0.15.188); the first time FlameKit is used the window opens on About
+  (changes.lua, seen_version absent). Windows tab: "FlameKit Menu" key at the top of Keys and pointer (window_key,
+  0.15.195; while a key is being set the menu key does not close the window), Pointer key behavior Press & Hold /
+  Toggle (pointer_toggle, 0.15.194), the pointer key takes any key or mouse button (pointer_key, text setting).
+- Settings removed: show_label (the version label always shows), open_on_start, lf_keep_hotbar ("Exclude Action
+  Bar"), pointer_auto. Minimap sizes: Small 220, Medium 300 (default), Large 380, Extra Large 480. Messages line at every
+  world: "Press <menu key> for FlameKit Main Menu".
 
 ## What FlameKit is
 
@@ -143,6 +176,8 @@ Runtime files that are never deployed, diffed or overwritten (all in `emf\mods\f
 4. Lua part for the local server: copy the changed files into `<server folder>\emf\mods\flamekit`, `mod.json` last (EMF reloads Lua live on the server; check `reloaded` in `emf\emf_core.log`). Same files into `<work folder>\flamekit`.
 5. Make the list: `python3 flamekit_native/notes/make_dist.py . dist-test <built dll> flamekit_native/mod.json`.
 6. Sign it (since 0.15.45; an unsigned list is refused by every client): copy `dist-test/update.txt` to `<work folder>\restart_helper\signing\update.txt`, restart helper request `sign`, read `signing\update.sig` (128 hex digits) into `dist-test/update.sig`, run `python3 tools/check_sig.py dist-test` (must say `update.sig is good`).
+8. G-Portal (only with the owner's word for it): put the changed server files in `<work folder>\outbox\` (same layout as `emf\mods\flamekit`, replace what is there), restart helper request `upload`; it uploads, waits for EMF's reload and fetches the logs into `<work folder>\production_stable_logs\` (an `upload` with an empty outbox just fetches the logs). Check `production_stable_logs\emf_core.log` for "reloaded" and for "is new since the game started: restart the game" lines (then the server needs a restart for that event).
+9. Stable (only with the owner's yes for that exact version): `rm -rf dist && cp -r dist-test dist`, `check_sig.py dist`, commit, push.
 7. Commit `dist-test/` (list and signature together) and push. The client's log (`emf\mods\flamekit\logs\`, newest file) shows `update: vX is ready` within about a minute; `update_status.txt` says `ready|...`. Nothing changes in a running game: everything switches at the next game start.
 
 ## How the updater works
@@ -251,12 +286,9 @@ most 500; Messages 4 px (21‱) from the left, 3 px above the bottom, 548 x 138 
 wide; Leaderboard centred, 246 (2278‱), 640 wide, at most 361, hidden at first; F4 window 569,11 (2964, 102‱), 895 wide,
 9852‱ of the height. Saved places (ui_layout.txt) always win; Reset place goes back to these.
 
-## Labels and About (0.15.103)
-Main screen line: "FlameKit vX". In-world label (kit.lua hud_tick): "FlameKit vX is Connected|Not Connected" from
-kit.connected(); the not-connected orange notice is gone (the older-server notice stays). About: WindowLayer kAbout
-(What's New tab) sets g_about_request; AboutDialog fetches /9chars/FlameKit/main/README.md from raw.githubusercontent.com
-on a thread (web_update::fetch) each time it opens and shows it cleaned (headings gold, ** and ` dropped, bullets, table
-rows as cells) in a scroll box; OK / Esc / Enter close; it takes pointer and keys like the update dialog.
+## Labels and About (0.15.103, changed 0.15.192..196)
+Main screen line: "FlameKit vX" (always; show_label is gone). In-world label (kit.lua hud_tick): "FlameKit vX is
+Connected|Not Connected" from kit.connected(). README.md and changes.txt: see the About tab above.
 
 ## Minimap (0.15.101)
 map_corner and map_margin settings removed (owner: never asked for them): corner fixed lower right, margin 24, map_x/map_y
@@ -337,6 +369,9 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
 - Never hide eternal arrows or spells from protection: they are high-end items and stay un-junkable. Runes and Legendary Runes are never junkable (those two items only).
 - Windows macros `far` and `small` cannot be used as C++ names.
 - The restart helper: Ctrl+C to the server does not work (save-then-kill instead); the client window is found by skipping FlameKit's own `FlameKitOverlay` class; `Start-Process -Wait` hangs on the build (mspdbsrv), so it uses `WaitForExit`.
+- EMF on a running server: a new `emf.on_event` or `emf.emits` name (one the script did not use when the server started) only works after a server restart; the log says so. A Lua upload alone does not fix it.
+- Restart helper request `server` restarts the game client too: ask the owner first.
+- A drop-down row in a Lua panel: `{ options = { {key, text, selected}, ... }, text = <shown choice>, same_line = true }` after a `{ label = true, text = ... }` row; the click comes back to the feature's `click` as the entry's key (tests: `click("W:<key>")`).
 - `git revert` takes no `-q`: check that the push really happened (`git log --oneline -1`) before waiting on the client.
 
 More detail: `flamekit_native/notes/STATUS.md` (to-do list), `memory_layouts.md`, `EMF_REQUESTS.md`.
