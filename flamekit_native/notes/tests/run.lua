@@ -1325,7 +1325,7 @@ held_key = nil
 step(5)
 do  -- (0.15.200, owner) the glider speed: a drop-down in the Experimental tab, kept for the player
   local gl = find_row("^1%.0x$")
-  check(gl and gl.options and #gl.options == 15, "the Experimental tab has the glider speed drop-down at 1.0x")
+  check(gl and gl.options and #gl.options == 14, "the Experimental tab has the glider speed drop-down at 1.0x")
   local function glide_at(choice)
     click("W:gs:" .. choice)  -- (a drop-down entry's click reaches the feature's click as its key)
     step(JOINED and 10 or 3)
@@ -1345,7 +1345,7 @@ do  -- (0.15.200, owner) the glider speed: a drop-down in the Experimental tab, 
 end
 do  -- (0.15.205, owner) the damage bonus: a drop-down, a hit rule against creatures with the player's scale
   local dr = find_row("^Off %(%+0%%%)$")
-  check(dr and dr.options and #dr.options == 15, "the Experimental tab has the damage bonus drop-down, off")
+  check(dr and dr.options and #dr.options == 26, "the Experimental tab has the damage bonus drop-down, off")
   local function rule()
     for _, r in pairs(hit_rules) do if r.from == PLAYER and r.to == "creatures" and r.scale then return r end end
   end

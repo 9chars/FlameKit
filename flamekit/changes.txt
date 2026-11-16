@@ -1,3 +1,10 @@
+0.15.207 Nov 16, 2026
+- Damage bonus: up to +1000% (+250%, +300%, +350%, +400%, +450%, +500%, +600%, +700%, +800%, +900%, +1000% added).
+- Glider speed: 0.05x is gone (too slow).
+- Experimental tab: a line between "Enhanced Glider Mode" and "Glider speed".
+- Invincible Mode keeps your mana full too.
+- Needs FlameKit 0.15.207 on the server.
+
 0.15.206 Nov 15, 2026
 - "<name> joined the server!" and "<name> left the server!" are also in the Messages window (yellow), not only in the Notices window. Needs FlameKit 0.15.206 on the server.
 

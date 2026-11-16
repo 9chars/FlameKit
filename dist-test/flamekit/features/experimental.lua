@@ -98,12 +98,12 @@ local function load_saved()
 end
 
 -- (0.15.200, owner: "control my glider speed ... a slider so I can set myself to go slower or faster") each player's
--- own glider speed, 0.05x to 5x (0.15.204: 0.05x; 0.15.202, owner: "even more slower speeds": 0.1x and 0.25x; 0.15.203: up to 5x) (experimental.json glide_speed; 1x is not kept). Measured on G-Portal (0.15.200 probe):
+-- own glider speed, 0.1x to 5x (0.15.204: 0.05x, gone again in 0.15.207: too slow; 0.15.202, owner: "even more slower speeds": 0.1x and 0.25x; 0.15.203: up to 5x) (experimental.json glide_speed; 1x is not kept). Measured on G-Portal (0.15.200 probe):
 -- the game pulls a gliding player's horizontal speed to about 18.7 m/s (sinking 4.5 m/s) whatever it was, so the
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { CRUISE = 18.7, STEPS = { 0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+local glide = { CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -136,10 +136,11 @@ function glide.apply(world, account, p)
 end
 
 -- (0.15.205, owner: "a huge damage multiplier ... up to 200% more than my usual damage ... a drop down") each player's
--- own damage bonus against creatures, +0% to +200% (experimental.json damage_pct; 0 is not kept): an EMF hit rule
+-- own damage bonus against creatures, +0% to +1000% (0.15.207; +200% before) (experimental.json damage_pct; 0 is not kept): an EMF hit rule
 -- {from = the player, to = "creatures", scale = 1 + bonus}. Off while the player is in PvP (the PvP duelists and the
 -- leaderboard stay fair). Kept in this table with the glider speed (Lua's limit of 200 locals in this file).
-glide.DAMAGE = { 0, 10, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200 }
+glide.DAMAGE = { 0, 10, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 600, 700,
+  800, 900, 1000 }  -- (0.15.207, owner: up to 1000%)
 function glide.damage(account)
   local d = tonumber(((saved or {})[account] or {}).damage_pct)
   return d and d > 0 and d or 0
@@ -1340,10 +1341,10 @@ end
 
 local stamina_broken = false
 
-local function keep_stamina_full(world)
-  if stamina_broken then return end
+local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
+  if stamina_broken and glide.mana_broken then return end
   for account, p in pairs(online) do
-    if is_on(account, "stamina") then
+    if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
         local now, full = emf.attribute(world, p.entity, "stamina"), emf.attribute(world, p.entity, "max_stamina")
         if now and full and now < full then emf.attribute_add(world, p.entity, "stamina", full - now) end
@@ -1351,6 +1352,17 @@ local function keep_stamina_full(world)
       if not ok then
         stamina_broken = true
         emf.log("experimental: stamina cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
+    -- (0.15.207, owner: "Invincible Mode also needs to keep the mana bar full like it does the HP bar")
+    if is_on(account, "immortal") and not glide.mana_broken then
+      local ok, err = pcall(function()
+        local now, full = emf.attribute(world, p.entity, "mana"), emf.attribute(world, p.entity, "max_mana")
+        if now and full and now < full then emf.attribute_add(world, p.entity, "mana", math.ceil(full - now)) end
+      end)
+      if not ok then
+        glide.mana_broken = true
+        emf.log("experimental: mana cannot be kept full on this game version (" .. tostring(err) .. ")")
       end
     end
   end
@@ -1970,7 +1982,8 @@ local function panel_rows(world)
       end
     end
   end
-  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.05x to 5x
+  rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line between Enhanced Glider Mode and the glider speed
+  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x
     local gs = tonumber(v.glide_speed) or 1
     local opts = {}
     for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
@@ -1978,14 +1991,14 @@ local function panel_rows(world)
     rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
       tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
   end
-  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +200%
+  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +1000% (0.15.207)
     local dp = tonumber(v.damage_pct) or 0
     local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
     local opts = {}
     for _, d in ipairs(glide.DAMAGE) do opts[#opts + 1] = { key = "dmg:" .. tostring(d), text = name(d), selected = d == dp } end
     rows[#rows + 1] = { label = true, text = "Damage bonus" }
     rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
-      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +200% three times. Only for you; off while you are in PvP." }
+      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times. Only for you; off while you are in PvP." }
   end
   return debug_rows(world, rows)
 end
