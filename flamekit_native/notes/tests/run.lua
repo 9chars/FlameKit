@@ -479,9 +479,9 @@ check(count(201, 0x11) == 37, "another player's pickup removes nothing of yours"
 pickup({ itemId = 0x11, itemCount = 3, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
 check(count(201, 0x11) == 0, "your pickup of junk empties the backpack of it")
-check(count(202, 0x11) == 5, "the action bar is untouched")
+check(count(202, 0x11) == 0, "(0.15.189, owner) the action bar is emptied of junk too")
 check(count(201, 0x22) == 50, "other items are untouched")
-check(hud.status == "Junk discarded: Twigs x37", "a status line says what was discarded: " .. tostring(hud.status))
+check(hud.status == "Junk discarded: Twigs x42", "a status line says what was discarded: " .. tostring(hud.status))
 check(hud.status_colour == "#ff4a3d", "the status line is red")
 check(hud.label == "FlameKit v9.9.9", "the label line carries the version while show_label is on (the DLL uses it for the main screen): " .. tostring(hud.label))
 step(500)
@@ -562,7 +562,8 @@ pickup({ itemId = 0x11, itemCount = 3, pickedUpByEntityId = PLAYER, pickedUpFrom
 step(10)
 local dropped = 0
 for _, g in ipairs(gives) do if g.item == 0x11 then dropped = dropped + g.count end end
-check(dropped == 37 and count(201, 0x11) == 0 and #gives == 2, "drop mode hands the taken stacks to emf.give")
+-- (0.15.189) the 5 on the action bar go too: 42 in 3 stacks
+check(dropped == 42 and count(201, 0x11) == 0 and count(202, 0x11) == 0 and #gives == 3, "drop mode hands the taken stacks to emf.give")
 local n_gives = #gives
 comps.Inventory[201].slots[1] = stack(0x11, 30)
 pickup({ itemId = 0x11, itemCount = 30, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = gives[1].id })
@@ -1504,16 +1505,19 @@ do
   local f = io.open(TMP .. "\\ui_list.dat", "r")
   local list_text = f and f:read("a") or ""
   if f then f:close() end
-  check(list_text:find("\nP b:lf_keep_hotbar 1 Exclude Action Bar: ON\t", 1, true) ~= nil, "the Auto Junk List's view has its action bar switch")
+  -- (0.15.189, owner) Exclude Action Bar is gone; Show All Bag Items is still a button
+  check(not list_text:find("lf_keep_hotbar", 1, true) and list_text:find("\nP b:lf_show_all ", 1, true) ~= nil,
+    "the Auto Junk List's view has no action bar switch any more, and still its Show All Bag Items switch")
   local b_line = list_text:match("\n(B\t[^\n]*)")
   local _, n_tabs = (b_line or ""):gsub("\t", "")
   check(n_tabs == 7 and b_line:find("\tMaterial, tier %d\t") ~= nil, "a bag item comes as an item tile: id, count, command name, rarity, level, type, name")
-  ui_action("opt", "b:lf_keep_hotbar")
+  local was = settings.lf_show_all == true
+  ui_action("opt", "b:lf_show_all")
   step(6)
-  check(settings.lf_keep_hotbar == false, "clicking it switches the setting")
-  ui_action("opt", "b:lf_keep_hotbar")
+  check((settings.lf_show_all == true) ~= was, "clicking it switches the setting")
+  ui_action("opt", "b:lf_show_all")
   step(6)
-  check(settings.lf_keep_hotbar == true, "and back")
+  check((settings.lf_show_all == true) == was, "and back")
   toggle_panel()
   local tab
   for _, r in ipairs(window.def.rows) do if r.text == "Experimental" then tab = r.button end end

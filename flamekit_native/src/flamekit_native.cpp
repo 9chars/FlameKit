@@ -4542,7 +4542,7 @@ struct WindowLayer : Layer {
                                               L"OFF: junk stays in your bag until you press Dump Junk or your Dump Key.";
         static const std::wstring kDumpTip = L"Drops or deletes every stack of junk in your bag now (see Drop / Delete).\n"
                                               L"Weapons, armour, rings, tools, summoning items and trophies are left alone unless Show All Bag Items "
-                                              L"is on; the action bar too while Exclude Action Bar is on.";
+                                              L"is on. Junk on the action bar goes too.";
         static const std::wstring kDropTip = L"What happens to junk. Drop: it lands on the ground at your feet, and you can pick it up again. "
                                               L"Delete: it is destroyed for good.\n"
                                               L"\x01With Drop mode set, turn off the game's \"Auto-Collect Scattered Loot\" setting or the junk comes straight "
@@ -4559,11 +4559,23 @@ struct WindowLayer : Layer {
         const int drop_x = dump_x - 8 - drop_w;
         button(drop_x, by, drop_w, drop_label, false, kDrop);
         hits.back().tip = &kDropTip;
+        // (0.15.189, owner) the Dump Key button sits between Auto and Drop / Delete, in this row
+        int left_x = drop_x;
+        size_t key_opt = opts.size();
+        for (size_t i = 0; i < opts.size(); ++i)
+            if (opts[i].key.rfind("k:lf_dump_key", 0) == 0) key_opt = i;
+        if (key_opt < opts.size()) {
+            const int w = text.width(opts[key_opt].label) + 22;
+            left_x = drop_x - 8 - w;
+            button(left_x, by, w, opts[key_opt].label, opts[key_opt].lit, kOpt, key_opt);
+            if (!opts[key_opt].tip.empty()) hits.back().tip = &opts[key_opt].tip;
+        }
         const int auto_w = text.width(L"Auto: OFF") + 28;
-        button(drop_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
+        button(left_x - 8 - auto_w, by, auto_w, auto_on ? L"Auto: ON" : L"Auto: OFF", auto_on, kAuto);
         hits.back().tip = &kAutoTip;
         int ox = kPad;  // the feature's other settings
         for (size_t i = 0; i < opts.size(); ++i) {
+            if (i == key_opt) continue;  // (0.15.189) drawn in the row above
             const int w = text.width(opts[i].label) + 22;
             button(ox, opts_y, w, opts[i].label, opts[i].lit, kOpt, i);
             if (!opts[i].tip.empty()) hits.back().tip = &opts[i].tip;

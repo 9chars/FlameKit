@@ -186,7 +186,7 @@ local early = {}  -- account -> the latest "sync" message
 
 local function removable(st, stack)
   if not st.ids[stack.item] then return false end
-  if stack.hotbar and st.opts.keep_hotbar then return false end
+  -- (0.15.189, owner) the action bar is wiped too, whatever an older game sends as keep_hotbar
   -- a piece with its own level and perks, and the kept kinds (weapons, armour, rings, tools, summoning items, trophies),
   -- are junk only while the player has switched on Show all bag items
   if not st.opts.show_all and (stack.gear or items.is_keeper(st.ids[stack.item])) then return false end

@@ -13,7 +13,7 @@
 --                     P <click key> <0|1 lit> <label><tab><tooltip>         one of the feature's settings, as a button
 --                     W <tab><text>                                          a warning over the bag, in red (0.15.49: Auto-Collect
 --                                                                            Scattered Loot is on while junk is dropped)
---                                                                           (features/settings.lua: "b:lf_keep_hotbar")
+--                                                                           (features/settings.lua: "b:lf_show_all")
 --                   (B and J are item tiles: core/items.lua items.tip; the DLL draws every item tile and its tooltip the same
 --                   way: the name in its rarity's colour, item level, rarity, type, carried, command name)
 --   ui_actions.txt  written by the DLL (replaced whole): the last clicks, a line "<number> <what> <argument>":
@@ -68,7 +68,6 @@ local function write_list(world)
   local function opt(click, lit, label, key)  -- a button, and its tooltip: the setting's help from mod.json
     lines[#lines + 1] = string.format("P %s %d %s\t%s", click, lit and 1 or 0, label, one_line(settings.help(key)))
   end
-  opt("b:lf_keep_hotbar", kit.setting("lf_keep_hotbar", true), "Exclude Action Bar: " .. settings.value_text("lf_keep_hotbar"), "lf_keep_hotbar")
   opt("b:lf_show_all", kit.setting("lf_show_all", false), "Show All Bag Items: " .. settings.value_text("lf_show_all"), "lf_show_all")
   opt("k:lf_dump_key:c", settings.capturing() == "lf_dump_key", "Set Dump Key: " .. settings.value_text("lf_dump_key"), "lf_dump_key")
   local items = kit.items
