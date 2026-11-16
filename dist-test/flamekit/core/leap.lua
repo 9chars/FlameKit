@@ -143,7 +143,7 @@ function M.step(world, entity, s, opts)
         s.rise = s.top - s.base
         result = "landed"
       end
-      s.jumped_at, s.leapt, s.base, s.top = nil, nil, nil, nil
+      s.jumped_at, s.leapt = nil, nil  -- base and top stay for the log until the next leap
     elseif st == IN_AIR and count == 1 and not s.jumped_at then
       s.jumped_at = t  -- the jump (a fall from a ledge has jumpCount 0: no leap from a fall)
     end
