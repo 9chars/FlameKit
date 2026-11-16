@@ -73,7 +73,7 @@ local TIPS = {
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
-  fastdive = "In the air or gliding, tap forward twice quickly to dive straight down, fast; from the glider it is a nose dive. Landing does not hurt you and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
+  fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing does not hurt you and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -183,6 +183,10 @@ glide.SBJ = {
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
     name = function(k) return k == 1 and "Crater" or "Boom only" end,  -- (0.15.232, owner: per player, their responsibility)
     tip = "Landing inside a base (a flame altar's area, yours or anyone's): Boom only makes the sound without damage; Crater blasts it like anywhere else and can destroy what is built there. Only for you." },
+  { which = "diveauto", key = "sbj_diveauto", label = "Fast Dive automatic above", default = 1000,
+    steps = { 0, 500, 750, 1000, 1500, 2000 },  -- (0.15.248, owner: default about 1000)
+    name = function(m) return m == 0 and "Off" or (m .. " m") end,
+    tip = "Falling without the glider above this height (the game's altitude) starts a Fast Dive by itself, once you have fallen 20 m, or at once when you close the glider. Open the glider to cancel it. Only for you." },
   { which = "divemin", key = "sbj_divemin", label = "Fast Dive minimum height", default = 10, steps = { 0, 5, 10, 15, 20, 30 },
     name = function(m) return m == 0 and "Off" or (m .. " m") end,
     tip = "No dive this close above the ground (the game only knows the distance to the ground when it is near). Only for you." },
@@ -310,6 +314,7 @@ local function view(account)
               sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
               sbj_divespeed = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
               sbj_divemin = glide.sbj(account, "divemin"), sbj_divebase = glide.sbj(account, "divebase"),
+              sbj_diveauto = glide.sbj(account, "diveauto"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
@@ -1451,11 +1456,11 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       p.dive = p.dive or {}
       local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed"),
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
-                  base = glide.sbj(account, "divebase") }
+                  base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto") }
       local what = glide.dive.step(world, p.entity, p.dive, o)
       -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
       -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
-      if what == "dive" or what == "landed" then
+      if what == "dive" or what == "landed" or what == "cancel" then
         local m = { op = "dive", on = what == "dive" }
         if kit.is_host() and emf.local_player() == p.entity then
           pcall(glide.dive_notice, m)
@@ -1465,8 +1470,11 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       end
       if what == "dive" then
         emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (speed %sx, landing %s)",
-          tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or "",
+          tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or p.dive.auto and ", automatic" or "",
           tostring(o.speed), tostring(o.landing)))
+      elseif what == "cancel" then  -- (0.15.247)
+        emf.log(string.format("experimental: fast dive: player %s pulled up: dive cancelled (%s)", tostring(p.entity),
+          tostring(p.dive.cancel_why)))
       elseif what == "low" then
         emf.log(string.format("experimental: fast dive: player %s too low (ground %.1f m below, minimum %s m)",
           tostring(p.entity), p.dive.ground or 0, tostring(o.min)))

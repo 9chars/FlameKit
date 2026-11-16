@@ -1,3 +1,9 @@
+0.15.248 Nov 16, 2026
+- Fast Dive: falling without the glider above a height (default 1000 m, the game's altitude) starts the dive by itself, once you have fallen 20 m, or at once when you close the glider. Opening the glider cancels it (no blast).
+- Fast Dive: tapping forward twice now only works while gliding (the nose dive).
+- Experimental tab: Fast Dive automatic above, Off or 500 to 2000 m, only for you.
+- Needs FlameKit 0.15.248 on the server.
+
 0.15.247 Nov 16, 2026
 - Fast Dive: pulling up while gliding (the updraft burst or climbing) cancels the dive: no blast at the landing, the notice goes away, and a new double tap dives again. Opening or closing the glider during a dive keeps it going. Server only: no game update.
 

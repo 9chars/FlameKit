@@ -31,7 +31,9 @@ local M = {
   MIN_HEIGHT = 10,       -- metres to the ground at 1x default (opts.min); 0 = anywhere
   LANDING_SHIELD = 1.5,
   DEFAULT_LANDING = 3,
-  RISING = 2,            -- m/s upward (Velocity.y) during a dive: the player pulls up (0.15.247)   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
+  RISING = 2,            -- m/s upward (Velocity.y) during a dive: the player pulls up (0.15.247)
+  AUTO_ABOVE = 1000,     -- (0.15.248) metres above sea level: a free fall above it dives by itself (opts.auto; 0 = never)
+  AUTO_FALL = 20,        -- metres fallen from the highest point first (not after closing the glider)   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
   -- the landing blasts a player can choose (opts.landing): the game's own explosion templates
   LANDINGS = {
     [0] = { name = "Off" },
@@ -189,22 +191,37 @@ function M.step(world, entity, s, opts)
     local down = forward_down(world, entity)
     local pressed = down and not s.down
     s.down = down
+    local _, y = world:position(entity)
     if st == ON_GROUND then
       if s.diving then
         s.diving = nil
         landing(world, entity, s.landing, s)
         result = "landed"
       end
-      s.first = nil
+      s.first, s.top, s.glider_closed, s.was_gliding = nil, nil, nil, nil
       return
     end
-    if st ~= IN_AIR and st ~= GLIDING then s.first = nil return end
+    if st ~= IN_AIR and st ~= GLIDING then s.first, s.top = nil, nil return end
+    -- (0.15.248) the highest point of this time in the air, and whether the glider was just closed
+    if st == GLIDING then
+      s.was_gliding, s.top = true, nil
+    elseif s.was_gliding then
+      s.was_gliding, s.glider_closed, s.top = nil, true, y
+    end
+    if y and (not s.top or y > s.top) then s.top = y end
     if s.diving then
       fall_guard.step(world, entity)
+      -- (0.15.248, owner) an automatic dive (free fall) is cancelled only by opening the glider
+      if s.auto and st == GLIDING then
+        s.diving = nil
+        result = "cancel"
+        s.cancel_why = "the glider was opened"
+        return
+      end
       -- (0.15.247, owner: pulling up while gliding "drops the fast descent" but the blast still came) the dive watches its
       -- own push: when the glider's updraft burst replaced it, or the player climbs (rising), the dive is cancelled:
-      -- no blast, the notice goes, and a new double tap dives again. Opening or closing the glider during a dive is not a
-      -- pull-up: the push is put back with the keep-alive of the new state (its old one ended it).
+      -- no blast, the notice goes, and a new dive can start. Closing the glider during a dive is not a pull-up: the push
+      -- is put back with the keep-alive of the new state (its old one ended it).
       local glide_now = st == GLIDING
       if glide_now ~= s.dive_gliding then
         s.dive_gliding = glide_now
@@ -224,24 +241,40 @@ function M.step(world, entity, s, opts)
       end
       return
     end
-    if not pressed then return end
-    local window = opts.window or M.WINDOW
-    if not (s.first and t - s.first >= 2 and t - s.first <= window) then
-      s.first = t
-      return
+    local start, auto = false, false
+    if st == GLIDING then
+      -- (0.15.248, owner: "the W double tap would really only work while you're gliding") the nose dive
+      if not pressed then return end
+      local window = opts.window or M.WINDOW
+      if not (s.first and t - s.first >= 2 and t - s.first <= window) then
+        s.first = t
+        return
+      end
+      s.first = nil
+      local gd = M.ground_distance(world, entity)
+      s.ground = gd
+      local min = opts.min or M.MIN_HEIGHT
+      if min > 0 and gd and gd > 0 and gd < min then
+        result = "low"
+        return
+      end
+      start = true
+    else
+      -- (0.15.248, owner: "if you're free falling above a certain height you're going to leave a crater") automatic:
+      -- falling above the player's height (the game's altitude, metres above sea level), after a fall of AUTO_FALL m
+      -- from the highest point (so jumps and small drops on high ground never start one), or at once when the glider
+      -- was just closed (owner: "if you close the glider and you start falling, it should be enough")
+      local above = opts.auto or M.AUTO_ABOVE
+      if not (above and above > 0 and y and y > above) then return end
+      local v = world:get("Velocity", entity)
+      local falling = v and (tonumber(v.velocity.y) or 0) < -1
+      if not falling then return end
+      if not (s.glider_closed or (s.top and s.top - y >= M.AUTO_FALL)) then return end
+      start, auto = true, true
     end
-    s.first = nil
-    local gd = M.ground_distance(world, entity)
-    s.ground = gd
-    local min = opts.min or M.MIN_HEIGHT
-    if min > 0 and gd and gd > 0 and gd < min then
-      result = "low"
-      return
-    end
-    if push_down(world, entity, st == GLIDING, opts.speed or 1) then
+    if start and push_down(world, entity, st == GLIDING, opts.speed or 1) then
       s.diving, s.from_glider, s.landing, s.base = true, st == GLIDING, opts.landing or M.DEFAULT_LANDING, opts.base or 0
-      s.factor, s.dive_gliding, s.cancel_why = opts.speed or 1, st == GLIDING, nil
-      local _, y = world:position(entity)
+      s.factor, s.dive_gliding, s.cancel_why, s.auto, s.glider_closed = opts.speed or 1, st == GLIDING, nil, auto, nil
       s.dive_y = y
       result = "dive"
     end
