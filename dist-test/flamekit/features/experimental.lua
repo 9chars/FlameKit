@@ -107,7 +107,7 @@ end
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), dive = require("core.dive"), CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), dive = require("core.dive"), CRUISE = 18.7, DIVE_PUSH = 10, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -174,9 +174,12 @@ glide.SBJ = {
     end,
     tip = "How quickly you must tap twice: jump for a Super B Jump, forward for a Fast Dive. Shorter: fewer by accident, but you must tap faster. Longer: easier, but a quick normal double jump may become a leap (from about 217 ms on). Only for you." },
   -- (0.15.226, owner: "give me all the settings to tweak it like the other features") Fast Dive's own settings
-  { which = "divespeed", key = "sbj_divespeed", label = "Fast Dive speed", sep = true,
-    steps = { 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10 },  -- (0.15.228, owner: faster options)
-    tip = "How fast the dive goes down: 1.0x is about 60 m/s, three times the game's fastest fall. Only for you." },
+  -- (0.15.256, owner: "the default should be 10x so whatever 10x is should be the 1x value ... the range goes up from
+  -- there", "I don't want slower as that ruins the effect") a new setting (a saved "10x" of the old one would be 100x):
+  -- 1x pushes as hard as the old 10x (glide.DIVE_PUSH)
+  { which = "divespeed", key = "sbj_divespd", label = "Fast Dive speed", sep = true,
+    steps = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5 },
+    tip = "How hard the dive pushes you down: you keep speeding up all the way to the ground (1.0x reaches about 180 m/s on a 500 m dive, nine times the game's fastest fall). Only for you." },
   { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 3, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
     tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
@@ -405,7 +408,7 @@ local function view(account)
               glide_speed = glide.factor(account), damage_pct = glide.damage(account),
               sbj_height = glide.sbj(account, "height"), sbj_forward = glide.sbj(account, "forward"),
               sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
-              sbj_divespeed = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
+              sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
               sbj_divemin = glide.sbj(account, "divemin"), sbj_divebase = glide.sbj(account, "divebase"),
               sbj_diveauto = glide.sbj(account, "diveauto"),
               damage_pvp = wants(account, "pvp") or nil }
@@ -1547,7 +1550,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     -- (0.15.218, owner) Fast Dive: a quick double tap of forward in the air dives straight down (core/dive.lua)
     if is_on(account, "fastdive") then
       p.dive = p.dive or {}
-      local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed"),
+      local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed") * glide.DIVE_PUSH,
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
                   base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto"),
                   protected = (is_on(account, "fall") or is_on(account, "immortal")) and true or nil }  -- (0.15.251)
@@ -1566,7 +1569,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
         end
       end
       if what == "dive" then
-        emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (speed %sx, landing %s)",
+        emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (push %sx, landing %s)",
           tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or p.dive.auto and ", automatic" or "",
           tostring(o.speed), tostring(o.landing)))
       elseif what == "cancel" then  -- (0.15.247)
