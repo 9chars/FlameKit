@@ -196,6 +196,15 @@ function glide.sbj(account, which)
   end
   return 1
 end
+-- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
+-- landing's word never comes), taken back at the landing
+function glide.dive_notice(msg)
+  if msg.on == true then
+    kit.notice("fastdive", "Fast Dive in progress!", "#ff9632", 120)
+  else
+    kit.notice("fastdive")
+  end
+end
 function glide.sbj_label(f, d)
   if d and d.name then return d.name(f) end
   return f == 0 and "Off (0x)" or glide.label(f)
@@ -1444,6 +1453,16 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
                   landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
                   base = glide.sbj(account, "divebase") }
       local what = glide.dive.step(world, p.entity, p.dive, o)
+      -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
+      -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
+      if what == "dive" or what == "landed" then
+        local m = { op = "dive", on = what == "dive" }
+        if kit.is_host() and emf.local_player() == p.entity then
+          pcall(glide.dive_notice, m)
+        else
+          pcall(emf.net.send_to, world, p.entity, CHANNEL, emf.json.encode(m))
+        end
+      end
       if what == "dive" then
         emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (speed %sx, landing %s)",
           tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or "",
@@ -2711,6 +2730,7 @@ function F.setup(k)
     end, "a message from a player"),
     on_player = kit.guard(F, function(world, from, data)
       local msg = emf.json.decode(data)
+      if type(msg) == "table" and msg.op == "dive" then pcall(glide.dive_notice, msg) return end  -- (0.15.241)
       if type(msg) == "table" and msg.op == "state" then
         shown = msg
         if msg.note then note = msg.note end
