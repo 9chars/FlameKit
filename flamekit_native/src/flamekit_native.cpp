@@ -4702,22 +4702,14 @@ struct WindowLayer : Layer {
                 button(kPad + 430, y, 150, capture_ptr ? L"press one" : std::wstring(pn.begin(), pn.end()), capture_ptr, kWinPtrKey);
             }
             y += 40;
-            text.draw(canvas, kPad, y + 5, L"Press the pointer key once instead of holding it", 230, 230, 235);
-            button(kPad + 430, y, 150, st.pointer_toggle ? L"ON" : L"OFF", st.pointer_toggle, kWinToggle);
+            // (0.15.194, owner) Pointer key behavior: Press & Hold (pointer_toggle off, the default) or Toggle (on); a click
+            // switches between the two
+            text.draw(canvas, kPad, y + 5, L"Pointer key behavior", 230, 230, 235);
+            button(kPad + 430, y, 150, st.pointer_toggle ? L"Toggle" : L"Press & Hold", false, kWinToggle);
             y += 40;
 
         }
-        y += 10;
-        static const wchar_t* kHelp[] = {
-            L"Hold the pointer key (Right Alt unless changed above) to get",
-            L"the pointer while you play. Then a pinned window can be dragged by",
-            L"its title bar, resized from its lower right corner,",
-            L"collapsed with \u2013 or hidden with \u00D7. Let go of the key to play on.",
-        };
-        for (const wchar_t* l : kHelp) {
-            text.draw(canvas, kPad, y, l, 190, 195, 205);
-            y += 24;
-        }
+        // (0.15.194, owner) the help text under the settings is gone
     }
 
     void draw_junk() {

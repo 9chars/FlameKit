@@ -1,3 +1,7 @@
+0.15.194 Nov 15, 2026
+- F4 menu, Windows tab: "Press the pointer key once instead of holding it" is now "Pointer key behavior": Press & Hold (the pointer is out while the key is held; the default) or Toggle (one press shows it, the next hides it). Your earlier choice is kept. The pointer key is still Right Alt by default.
+- Windows tab: the help text at the bottom is gone.
+
 0.15.193 Nov 15, 2026
 - F4 menu, About tab: a "Change Log" button left of "Check for updates". It opens a "Change Log" window with the list of changes (what What's New showed) and an OK button that closes it.
 - The What's New tab is gone. "Open FlameKit's window when you enter a world" now opens it on the first tab.
