@@ -156,8 +156,8 @@ end
 -- factors of core/leap.lua's tuned values (1x: about 50 m up, the forward arc and air steering as tested 2026-11-16).
 -- experimental.json keys sbj_height, sbj_forward, sbj_steer (1x is not kept).
 glide.SBJ = {
-  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30 },
-    tip = "How high the leap goes: 1.0x is about 50 m (a double jump is about 4 m). Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.212: 20x, to find the game's height limit; 0.15.214: 30x, measured 2026-11-16: 1x = about 54 m, 20x = 1075 m, so 30x is about 1600 m: from low ground just under the game's limit (its "strayed too far" warning, about 2560 m above sea level: a 20x leap from 2220 m reached 3295 m and was sent back))
+  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 35, 40 },
+    tip = "How high the leap goes: 1.0x is about 54 m (a double jump is about 4 m), 40x about 2150 m. A leap never goes above 2480 m (the game sends you back a little higher up), so from high ground it is shorter. Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.212: 20x, to find the game's height limit; 0.15.214: 30x, measured 2026-11-16: 1x = about 54 m, 20x = 1075 m, so 30x is about 1600 m: from low ground just under the game's limit (its "strayed too far" warning, about 2560 m above sea level: a 20x leap from 2220 m reached 3295 m and was sent back))
   { which = "forward", key = "sbj_forward", label = "Super B Jump forward", steps = { 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20 },
     tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.213: 20x)
   { which = "steer", key = "sbj_steer", label = "Super B Jump air steering", steps = { 0, 1, 2, 3, 4, 5, 7, 10, 15 },
@@ -1411,8 +1411,13 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer") }
       local what = glide.leap.step(world, p.entity, p.leap, o)
       if what == "leap" then
-        emf.log(string.format("experimental: super b jump: player %s leaps (height %sx, forward %sx at input %.2f, steering %sx)",
-          tostring(p.entity), tostring(o.height), tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
+        local cap = glide.leap.last_cap
+        emf.log(string.format("experimental: super b jump: player %s leaps (height %sx%s, forward %sx at input %.2f, steering %sx)",
+          tostring(p.entity), tostring(o.height),
+          cap and string.format(", capped to %.1fx from %.0f m: the ceiling is %d m", cap.got, cap.from or 0, glide.leap.CEILING) or "",
+          tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
+      elseif what == "ceiling" then
+        emf.log(string.format("experimental: super b jump: player %s passed %d m: the push up ended", tostring(p.entity), glide.leap.CEILING))
       elseif what == "landed" then  -- (0.15.212) how high the leap went, for tuning
         emf.log(string.format("experimental: super b jump: player %s landed: highest %.1f m above the leap (%.1f m, ground %.1f m)",
           tostring(p.entity), p.leap.rise or 0, p.leap.top or 0, p.leap.base or 0))

@@ -1,3 +1,6 @@
+0.15.215 Nov 16, 2026
+- Super B Jump height: 35x and 40x added. A leap never goes above 2480 m, so the game never sends you back for flying too high: from high ground a leap is shorter. Needs FlameKit 0.15.215 on the server.
+
 0.15.214 Nov 16, 2026
 - Super B Jump height: 25x and 30x added (30x is about 1600 m up). Needs FlameKit 0.15.214 on the server for the new steps.
 

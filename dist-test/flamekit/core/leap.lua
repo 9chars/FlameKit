@@ -39,6 +39,13 @@ local M = {
   KEEP = (1 << 1) | (1 << 32),
   -- (owner, 2026-11-16) like the game's double jump, which needs 10 stamina but takes none: a leap needs this much
   STAMINA_NEEDED = 50,
+  -- (0.15.215, owner: the full range for everyone, never "you strayed too far") the game sends a player above about
+  -- 2560 m back to safety (a 20x leap from 2220 m reached 3295 m and was sent back; 30x from 618 m reached 2233 m, no
+  -- warning). A leap is measured at 53.8 m per 1x (10x 535-538 m, 20x 1075-1079 m, 30x 1615 m), so at the leap its
+  -- height factor is cut to what reaches CEILING from where the player stands; and in the air its push up ends at once
+  -- once the player passes CEILING (lag, a leap from a slope). The same ceiling as the glider's climb (experimental.lua).
+  CEILING = 2480,
+  PER_X = 53.8,
   broken = false,
 }
 
@@ -106,7 +113,17 @@ local function push(world, entity, s)
   local now = world:tick() * 50000000 // 3  -- the game's clock in nanoseconds: 60 steps a second
   local up = free_slot(imp, now, nil)
   local o = s.opts or {}
-  put(imp.impulses[up], 0, M.STRENGTH * (o.height or 1), 0, now, M.SECONDS)
+  local want = o.height or 1
+  local _, y = world:position(entity)
+  local height = want
+  if y then height = math.min(want, (M.CEILING - y) / M.PER_X) end
+  if height < 0.05 then  -- at the ceiling already: no leap, the normal jump stays
+    M.last_cap = { want = want, got = 0, from = y }
+    return false
+  end
+  M.last_cap = height < want and { want = want, got = height, from = y } or nil
+  s.up_slot = up
+  put(imp.impulses[up], 0, M.STRENGTH * height, 0, now, M.SECONDS)
   s.fx, s.fz = facing(world, entity)
   local f = forward_input(world, entity)
   M.last_forward = 0
@@ -161,6 +178,20 @@ function M.step(world, entity, s, opts)
           s.base, s.top = y, y
           result = "leap"
         end
+      end
+    end
+    -- (0.15.215) the safety net: a rising leap above CEILING loses its push up at once
+    if s.leapt and s.up_slot and st == IN_AIR then
+      local _, y = world:position(entity)
+      if y and y > M.CEILING then
+        local imp = world:get("Impulse", entity)
+        local slot = imp and imp.impulses[s.up_slot]
+        local now = t * 50000000 // 3
+        if slot and slot.endTime > now and slot.impulse.y > 0 then
+          slot.endTime = now
+          result = result or "ceiling"
+        end
+        s.up_slot = nil
       end
     end
     -- air steering: sideways pushes while the leap is in the air (right = the facing AT THE LEAP turned a quarter
