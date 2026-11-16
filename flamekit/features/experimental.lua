@@ -2544,10 +2544,14 @@ function F.setup(k)
         if id then x, y, z = world:position(id) end
         if not (x and guid) then emf.reply("fastdive rings <player entity> <template GUID> <metres in front> <count>:<radius> ...") return end
         local rings, total, down = {}, 1, 0
+        local stack_m, stack_n = 0, 0
         for i = 5, #args do
           local c, r = tostring(args[i]):match("^(%d+):([%d%.]+)$")
           local dn = tostring(args[i]):match("^down:([%d%.]+)$")  -- (0.15.238) "down:<m>": the blasts this far below the feet
           if dn then down = tonumber(dn) or 0 end
+          -- (0.15.245) "stack:<m>[:<layers>]": more copies of the whole pattern, each <m> metres above the last
+          local sm, sl = tostring(args[i]):match("^stack:([%d%.]+):?(%d*)$")
+          if sm then stack_m, stack_n = tonumber(sm) or 2, tonumber(sl) or 1 end
           if c then
             rings[#rings + 1] = { tonumber(c), tonumber(r), #rings % 2 == 1 and math.pi / tonumber(c) or 0 }
             total = total + tonumber(c)
@@ -2556,8 +2560,13 @@ function F.setup(k)
         local q = world:get("CurrentTransform", id).transform.orientation
         local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
         local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
-        local made = d.blast(world, x + fx / len * ahead, y - down, z + fz / len * ahead, guid, rings)
-        say(string.format("fastdive rings: %s, %d of %d spawned, %d ring(s), %s m in front, %s m down", tostring(guid), made, total, #rings, tostring(ahead), tostring(down)))
+        local made = 0
+        for layer = 0, stack_n do
+          made = made + d.blast(world, x + fx / len * ahead, y - down + layer * stack_m, z + fz / len * ahead, guid, rings)
+        end
+        total = total * (stack_n + 1)
+        say(string.format("fastdive rings: %s, %d of %d spawned, %d ring(s), %d layer(s) %s m apart, %s m in front, %s m down",
+          tostring(guid), made, total, #rings, stack_n + 1, tostring(stack_m), tostring(ahead), tostring(down)))
         return
       end
       if a1 == "ring" then  -- (0.15.236, test) "fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]":

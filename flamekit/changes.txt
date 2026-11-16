@@ -1,3 +1,6 @@
+0.15.245 Nov 16, 2026
+- Server (test): the ring explosion test can stack layers of explosions on top of each other. Server only: no game update.
+
 0.15.244 Nov 16, 2026
 - Fast Dive near bases (with Boom only): small and medium crater keep 2 m away from a base. Server only: no game update.
 
