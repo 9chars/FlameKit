@@ -114,7 +114,19 @@ function M.step(world, entity, s, opts)
     if st ~= IN_AIR and st ~= GLIDING then s.first = nil return end
     if s.diving then
       fall_guard.step(world, entity)
-      return
+      -- (0.15.219, test) what the dive does: every 15 steps for 3 s, the height, state and the push
+      if s.diag and t <= s.diag and (t - s.dive_t) % 15 == 0 then
+        local _, y = world:position(entity)
+        local imp = world:get("Impulse", entity)
+        local sl = imp and imp.impulses[1]
+        local now = t * 50000000 // 3
+        emf.log(string.format("fast dive test: +%d steps y %.1f state %s push y %s alive %s total %s",
+          t - s.dive_t, y or -1, tostring(st), sl and string.format("%.1f", sl.impulse.y) or "?",
+          sl and tostring(sl.endTime > now) or "?", imp and string.format("%.1f", imp.impulse.y) or "?"))
+      end
+      -- (0.15.219) a dive whose push ran out lets a new double tap dive again (before: only after the landing)
+      if t - s.dive_t > math.floor(M.SECONDS * 60) then s.diving = nil end
+      if s.diving then return end
     end
     if not pressed then return end
     local window = (opts and opts.window) or M.WINDOW
@@ -131,7 +143,7 @@ function M.step(world, entity, s, opts)
     end
     if st == GLIDING and M.KICK_GLIDER then move.state = IN_AIR end
     if push_down(world, entity) then
-      s.diving, s.from_glider = true, st == GLIDING
+      s.diving, s.from_glider, s.dive_t, s.diag = true, st == GLIDING, t, t + 180
       local _, y = world:position(entity)
       s.dive_y = y
       result = "dive"

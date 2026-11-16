@@ -1,3 +1,6 @@
+0.15.219 Nov 16, 2026
+- Fast Dive (server, test): a second dive in the same fall works; each dive logs its height for 3 s (testing).
+
 0.15.218 Nov 16, 2026
 - New Experimental option (server, first test): Fast Dive. In the air or gliding, tap forward twice quickly to dive straight down, fast; landing does not hurt you and lands with a shockwave. Off in PvP. The switch comes to the Experimental tab with a later game update.
 
