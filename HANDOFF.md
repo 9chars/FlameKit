@@ -1,6 +1,6 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Written 2026-11-13, at version 0.15.143 on Development and the local server only (owner, 2026-11-15 13:51: "I didn't say anything about touching g-portal or publishing to stable"); production: 0.15.141; Stable: 0.15.140.
+Read this first when starting a new conversation about FlameKit. Updated 2026-11-16 17:55 (versions: "Where things stand" below). First written 2026-11-13, at version 0.15.143 on Development and the local server only (owner, 2026-11-15 13:51: "I didn't say anything about touching g-portal or publishing to stable"); production: 0.15.141; Stable: 0.15.140.
 
 ## Rule 0: instructions to the owner (read before every message that tells him to do something)
 
@@ -66,31 +66,61 @@ on its own: no feature calls into or reads another feature's code or data (for e
 be able to change how another works. Keep the code clean, reusable and well factored, without dependencies between
 systems.
 
-## Where things stand (updated 2026-11-16 07:23, start of the conversation of 2026-11-16)
+## Where things stand (updated 2026-11-16 17:55, end of the conversation of 2026-11-16)
 
-- Versions (2026-11-16 07:20): **Development and Stable 0.15.207** (game). **Servers 0.15.208** (local and G-Portal;
-  0.15.208 is server only: the fall fix). The DLL was last built at 0.15.195; 0.15.196..0.15.207 reuse that DLL
-  (Lua-only changes: `make_dist.py` with the staged DLL `/mnt/user-data/uploads/enshrouded mod shit/flamekit_native/out/flamekit_native/flamekit_native.dll`; re-stage it in a new session).
-- `C:\enshrouded mod shit\outbox` is empty: the 0.15.208 upload (2026-11-16 00:10: features/experimental.lua,
-  changes.txt, mod.json) sent and removed its files.
-- Loot Drop works on G-Portal (checked 2026-11-16): the server restarted at 00:16 on 2026-11-16 with 0.15.208, its
-  emf_core.log has no "restart the game" lines, and Loot Drop put loot on the ground all night (e.g. 03:24, body
-  774627: 2 stacks). "Monsters drop their loot on the ground" is ON on G-Portal and on the local server.
-- Tested by the owner, all good (2026-11-16 07:22: "all your fixes were good. I tested them already"): 0.15.208 fall
-  fix, 0.15.207 mana kept full by Invincible Mode, damage bonus, join/leave lines, the Change Log window, the About
-  tab, Pointer key behavior, the FlameKit Menu key in the Windows tab, 0.15.198 Loot Drop queue fix (a group of
-  monsters dying together), 0.15.197 sparkle following sliding loot. (The fall fix's log line "experimental: no fall
-  damage: fall start X, height now Y" was not in the logs Claude could read at 07:22: the G-Portal log since the
-  04:10 restart was not fetched yet.)
-- Folder access in a new conversation: ask for `C:\enshrouded mod shit`, `D:\SteamLibrary\steamapps\common\Enshrouded\emf`
-  and `C:\Program Files\Steam\SteamApps\common\EnshroudedServer\emf` (device_request_folder_access; the owner said
-  2026-11-16: "request access to C:\enshrouded mod shit and anything else you need").
-- Held (owner said "going to make some more changes"; not built): the Dump Key taking mouse buttons (same capture as
-  the pointer key: the DLL watches the key and sends act("dump","-")).
-- Debug code still in (remove when the owner agrees): loot_drop.lua `flamekit.loottest`, `flamekit.fx <1-10>` preview,
-  the effect-component `dump()`; DIAG_MAX 60 lines a minute of Loot Drop notes.
-- Restart helper `server` request restarts the GAME CLIENT too (Close-Client, Stop-Server, Start-Server, Start-Client):
-  ask the owner before any server restart (he was annoyed once).
+- Versions (2026-11-16 17:55): **Development 0.15.256** (game; the owner's client runs it). **Local server 0.15.257**
+  (0.15.257 is server only: the fall probe trimmed). **Stable 0.15.207. G-Portal 0.15.208.** Nothing of today went to
+  Stable or G-Portal (owner, morning: "don't push any updates ... keep the stable channel out from updates for now");
+  both only when the owner names them. Before a G-Portal upload: rule 8a (all of today's server code works with the
+  0.15.207 Stable game: the new messages "dive" and "tip" are ignored by older games; Fast Dive/Super B Jump settings
+  are only drawn by games from 0.15.209 on).
+- Every Development version today rebuilt the DLL (flamekit_native/mod.json bumped with flamekit/mod.json, restart
+  helper `build`, then stage `out\flamekit_native\flamekit_native.dll` and run make_dist.py with it).
+- The container's git remote https://github.com/9chars/flamekit answers "This repository moved ... FlameKit.git";
+  pushes still go through.
+- `C:\enshrouded mod shit\outbox` is empty.
+- **Owner, 17:50: Fast Dive is "good until I test it more"**: no more Fast Dive changes unless he reports something.
+- Debug code kept ON PURPOSE (owner, 2026-11-16: "keep the loot drop debug code for now since I want more data in
+  case I find new problems"): loot_drop.lua `flamekit.loottest`, `flamekit.fx <1-10>`, the effect-component `dump()`,
+  DIAG_MAX 60 lines a minute of Loot Drop notes. Also kept: Fast Dive's console tests (`flamekit.fastdive ...`,
+  `boom`, `ring`, `rings`), the fall probe (one "fall probe: ... LANDED (fast dive)" line per dive landing and
+  "fall probe: FALL HIT" per fall damage hit), MOVEMENT.md and the probes in flamekit_native/notes/probes/.
+- Dropped by the owner: Revive on the spot (STATUS.md), the Fast Dive head-first pose and crouched landing (every route
+  failed, see MOVEMENT.md), the Dump Key mouse buttons ("not worried about that one for now").
+- Folder access in a new conversation: ask for `C:\enshrouded mod shit`, `D:\SteamLibrary\steamapps\common\Enshrouded\emf`,
+  `D:\SteamLibrary\steamapps\common\Enshrouded` and `C:\Program Files\Steam\SteamApps\common\EnshroudedServer\emf`.
+- Restart helper `server` request restarts the GAME CLIENT too: ask the owner before any server restart.
+
+## Built 2026-11-16 (0.15.209 .. 0.15.257), in short
+
+- **Super B Jump** (core/leap.lua, switch "superbjump", per player, off in PvP; owner named it after SuperB, the
+  tooltip ends "Named after SuperB, who requested the feature."): a quick double tap of Space leaps high (an Impulse
+  push, keepAliveMask Jumping|Falling), W held gives a forward arc, light air steering. Needs the Double Jump skill
+  (core/skills.lua, node 0xffd5f940) and 50 stamina (else a yellow notice). Settings (glide.SBJ): height and forward
+  up to 30x, steering, tap speed (window). Capped below the game's ~2560 m limit (CEILING 2480 m). Its own fall
+  protection (core/fall_guard.lua) from the leap to the landing, except during a free-fall Fast Dive.
+- **Fast Dive** (core/dive.lua, switch "fastdive", per player): a double tap of forward WHILE GLIDING is a nose dive;
+  falling without the glider above a per-player altitude (default 1000 m) dives by itself after a 20 m fall from the
+  highest point, or at once after closing the glider. Opening the glider cancels an automatic dive; the updraft burst
+  or climbing cancels a glider dive; landing in water ends a dive (0.15.252: no blast). Orange notice "Fast Dive in
+  progress! Prepare for impact!" until the landing (op "dive"). Landing blasts from TNT templates: Off, Small, Medium,
+  Big (default), Huge, Massive, Gigantic, Boom only; per player "Fast Dive inside bases" (Boom only / Crater) with
+  margins around bases (core/bases.lua). Speed 1x..5x (0.15.256: the new 1x = the old 10x, setting key `sbj_divespd`,
+  `glide.DIVE_PUSH` = 10; owner: nothing slower).
+  - **Deadly impact** (0.15.249..251; owner: "let the natural fall kill the player", "let the glider dive bomb
+    survive", "no fall damage should let them survive"; no setting: "the player can always just open the glider"):
+    a free-fall dive's landing is the game's OWN fall damage; a glider dive is protected; No Fall Damage and
+    Invincible Mode protect (opts.protected). The game takes a fall's start height ONCE, when the fall begins, and a
+    Super B Jump leap counts as falling from the takeoff (the probe: start stayed at 781 m, a 516 m dive landed as a
+    3 m fall). So dive.lua holds DynamicFallDamage.fallStartAltitude at the highest point of the fall during a
+    free-fall dive. Checked: 539 m fall, FALL HIT 2515 -> 0. A ~16 m fall already kills (FallDamage lethal distance).
+  - **Glider tip** (0.15.253..255): opening the glider with Fast Dive on shows "Quickly double tap forward to initiate
+    Fast Dive!" in light blue (#8cd2ff) for 10 s (owner's words). The SERVER sees the glider open (dive.lua
+    `s.glider_opened`) and sends op "tip" {on, seconds}; 0.15.253's check in the player's game never fired on the
+    joined server. Not shown below the minimum height, counted above the last place the player stood or swam
+    (`s.ground_y`: the game knows the ground below only ~1 m before a landing).
+- **Grave marker** drawn last on the minimap (flamekit_native.cpp, 3 passes).
+- Restart status line first in every report (Rule 0r) and the owner picks every next step (Rule 0p): both from today.
 
 ## Built 2026-11-15..16 (0.15.143 .. 0.15.208), in short
 
@@ -392,6 +422,8 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
 - EMF on a running server: a new `emf.on_event` or `emf.emits` name (one the script did not use when the server started) only works after a server restart; the log says so. A Lua upload alone does not fix it.
 - Restart helper request `server` restarts the game client too: ask the owner first.
 - A drop-down row in a Lua panel: `{ options = { {key, text, selected}, ... }, text = <shown choice>, same_line = true }` after a `{ label = true, text = ... }` row; the click comes back to the feature's `click` as the entry's key (tests: `click("W:<key>")`).
+- The game's fall damage takes the fall's start height once, when the fall begins (DynamicFallDamage.fallStartAltitude); a push that keeps the Falling state from the takeoff keeps that start at the ground. Write the start yourself when a fall must count from higher up (core/dive.lua), or every step to keep a fall short (core/fall_guard.lua).
+- What the player's own game sees of its movement state on a joined server was not enough to see the glider open (0.15.253): let the server see it and send a message.
 - `git revert` takes no `-q`: check that the push really happened (`git log --oneline -1`) before waiting on the client.
 
 More detail: `flamekit_native/notes/STATUS.md` (to-do list), `memory_layouts.md`, `EMF_REQUESTS.md`.
