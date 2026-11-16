@@ -55,7 +55,7 @@ local M = {
   -- (0.15.233, owner: a crater just outside a base still damaged it near the border) also boom only within this many
   -- metres around a base's build zone (core/bases.lua), by the size of the blast; tuned with flamekit.fastdive margin
   -- (0.15.242, owner: "too aggressive ... pull it in by 20 m") was 10, 15, 25, 30, 40; never below 0 (the base itself)
-  MARGIN = { [1] = 1, [2] = 1, [3] = 5, [5] = 10, [6] = 20 },  -- (0.15.243, owner: small and medium 1 m)
+  MARGIN = { [1] = 2, [2] = 2, [3] = 5, [5] = 10, [6] = 20 },  -- (0.15.244, owner: small and medium 2 m; 1 m in 0.15.243)
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
