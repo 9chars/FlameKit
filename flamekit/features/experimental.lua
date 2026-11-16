@@ -1412,8 +1412,8 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       local what = glide.leap.step(world, p.entity, p.leap, o)
       if what == "leap" then
         local cap = glide.leap.last_cap
-        emf.log(string.format("experimental: super b jump: player %s leaps (height %sx%s, forward %sx at input %.2f, steering %sx)",
-          tostring(p.entity), tostring(o.height),
+        emf.log(string.format("experimental: super b jump: player %s leaps (taps %s steps apart, window %s; height %sx%s, forward %sx at input %.2f, steering %sx)",
+          tostring(p.entity), tostring(glide.leap.last_gap), tostring(glide.leap.WINDOW), tostring(o.height),
           cap and string.format(", capped to %.1fx from %.0f m: the ceiling is %d m", cap.got, cap.from or 0, glide.leap.CEILING) or "",
           tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
       elseif what == "ceiling" then
@@ -2441,10 +2441,17 @@ function F.setup(k)
   -- (0.15.209) Super B Jump from the server console (emf\commands.txt), to try it before the games have the switch and
   -- to tune the push: "superbjump <player entity> on|off", "superbjump push <up> [seconds] [forward] [forward seconds] [sideways] [sign]"
   -- (until a reload)
-  pcall(emf.command, "superbjump", "<player entity> on|off, or push <up> [seconds] [forward] [forward seconds] [sideways] [sideways sign]: Super B Jump for that player, or its push (a test)",
+  pcall(emf.command, "superbjump", "<player entity> on|off, or push <up> [seconds] [forward] [forward seconds] [sideways] [sideways sign], or window <steps>: Super B Jump for that player, its push or its double tap window (a test)",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
       load_saved()
+      if args[1] == "window" then  -- (0.15.216) the double tap's window in server steps (60 a second)
+        glide.leap.WINDOW = math.tointeger(tonumber(args[2])) or glide.leap.WINDOW
+        local line = "superbjump: window " .. tostring(glide.leap.WINDOW) .. " steps"
+        emf.log("experimental: " .. line)
+        emf.reply(line)
+        return
+      end
       if args[1] == "push" then
         glide.leap.STRENGTH = tonumber(args[2]) or glide.leap.STRENGTH
         glide.leap.SECONDS = tonumber(args[3]) or glide.leap.SECONDS

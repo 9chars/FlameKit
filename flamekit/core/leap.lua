@@ -16,7 +16,10 @@ local skills = require("core.skills")
 local fall_guard = require("core.fall_guard")
 
 local M = {
-  WINDOW = 20,       -- steps (1/3 s): the second press must come this soon after the jump
+  -- steps: the second press must come this soon after the jump. (0.15.216, owner: accidental leaps when jumping) the
+  -- owner's quick double taps came 8-9 steps apart (probe, 2026-11-16); the game's own double jump only from 13 steps
+  -- on (earlier presses it ignores). 20 took slightly early double jumps as leaps; 11 keeps them apart.
+  WINDOW = 11,
   STRENGTH = 60,     -- the push upward (the impulse's y); tuned in game with flamekit.superbjump
   SECONDS = 0.9,     -- how long the push lasts (60 for 0.9 s: about 50 m up; a double jump is 3.8 m)
   -- (owner, 2026-11-16: "a nice arc up and over", only while the player pushes forward, the way the character faces)
@@ -174,6 +177,7 @@ function M.step(world, entity, s, opts)
           result = "tired"
         elseif push(world, entity, s) then
           s.leapt = true
+          M.last_gap = t - s.jumped_at
           local _, y = world:position(entity)
           s.base, s.top = y, y
           result = "leap"
