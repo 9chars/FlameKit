@@ -50,7 +50,8 @@ Untested by the user so far: undiscovered-places switches (0.8.3), focus behavio
 
 ## To-do added 2026-11-12
 - Minimap: draw the grave (death) marker on top of all other markers, so it is never hidden under another icon.
-- Experimental: when you die, offer an option to revive yourself on the spot (instead of respawning).
+- DROPPED by the owner (2026-11-16): revive on the spot. Respawn and fast travel already get the player back; no extra
+  complexity for it. (EMF's emf.teleport refuses a dead player; a true in-place revive has no EMF call.)
 - 0.9.2/0.9.3: shroud switch also keeps FogResistance.dataStorage[1] (seconds left) at dataStorage[5] (full, 900) every server
   step: cancelling damage alone still gave "The Shroud has consumed you". "immortal" is now kinds=all cancel=true (no damage
   at all; min_health=1 left the player at 1 hp with the red low-health flash). After a reload the server finds players by
