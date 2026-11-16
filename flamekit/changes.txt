@@ -1,3 +1,8 @@
+0.15.226 Nov 16, 2026
+- New Experimental option: Fast Dive. In the air or gliding, tap forward twice quickly to dive straight down, fast (from the glider: a nose dive). Landing does not hurt you and blasts a crater. Off in PvP.
+- Experimental tab: Fast Dive speed, landing (small, medium or big crater, a boom without a crater, or off) and minimum height, each a drop-down, only for you. The tap speed (now "Tap speed (Super B Jump, Fast Dive)") is shared.
+- Needs FlameKit 0.15.226 on the server.
+
 0.15.225 Nov 16, 2026
 - Fast Dive (server, test): no head-first pose test any more (it left the player rolling forward on the ground); a player stuck that way is freed on the ground.
 
