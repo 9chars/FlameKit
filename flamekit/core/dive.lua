@@ -49,7 +49,7 @@ local M = {
   -- (keen::actor::StateFlag 21) once. Input probe (2026-11-16): crouch is a toggle that sets that state, only on the
   -- ground; a jump or another crouch press clears it, so it cannot stay stuck. A state set by the server does reach the
   -- player's animation (0.15.224: HeadDiving made the character roll on the ground).
-  LAND_CROUCHED = true,
+  LAND_CROUCHED = false,  -- (0.15.230) the server's write was gone one step later; done in the player's own game
   SNEAK_STATE = 1 << 21,
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
@@ -198,15 +198,18 @@ function M.step(world, entity, s, opts)
   return result
 end
 
--- ---- the player's own game (0.15.228, owner: "the pose action would be great when falling, but the crouching would be
--- good when the player hits the ground") ----
--- The pose is chosen by the player's own game from its own input (ClientPlayerInput.data.digitalInput, the same bits
--- as PlayerInputType). The server tells the diver's game when a free-fall dive starts and when it lands (channel
--- flamekit/exp, op "dive"); while it falls the game adds HeadDive (33) to its own input, and from the landing for
--- CROUCH_STEPS steps Sneak (55). TEST: whether the game takes input written there.
-M.HEAD_DIVE_BIT = 1 << 33
-M.CROUCH_STEPS = 30
-local me = { on = false, crouch = 0, said = {} }
+-- ---- the player's own game (0.15.228..0.15.230, owner: "the pose action would be great when falling, but the crouching
+-- would be good when the player hits the ground") ----
+-- Found: pressing buttons for the player does nothing (0.15.228: HeadDive and Sneak written into the game's own
+-- ClientPlayerInput; 0.15.227: the server's copy). Sneak is bit 55 and a toggle that only works on the ground; it
+-- turns on the actor state InSneakMode (21), which stays until the next crouch press or a jump (input probe). Set by
+-- the server, that state was gone one step later (0.15.229): the player's own game keeps its movement states. So
+-- (0.15.230, TEST) the player's own game sets them in its own world: HeadDiving (33) while a free-fall dive falls,
+-- cleared at the landing (from the server, HeadDiving left the player rolling on the ground: 0.15.224), and
+-- InSneakMode (21) once at the landing. The server says when a free-fall dive starts and when it lands (channel
+-- flamekit/exp, op "dive").
+M.HEAD_STATE = 1 << 33
+local me = { on = false, head = false, crouch = false, said = {} }
 
 local function say_once(what, text)
   if me.said[what] then return end
@@ -217,43 +220,43 @@ end
 function M.client_msg(msg)
   if type(msg) ~= "table" then return end
   if msg.on == true and msg.free == true then
-    me.on, me.crouch = true, 0
-    say_once("on", "a free-fall dive started: pressing HeadDive while falling")
+    me.on, me.crouch = true, false
+    say_once("on", "a free-fall dive started: HeadDiving state while falling")
   elseif msg.on == false and me.on then
-    me.on = false
-    me.crouch = M.CROUCH_STEPS
-    say_once("off", "the dive landed: pressing Sneak for " .. M.CROUCH_STEPS .. " steps")
+    me.on, me.crouch = false, true
+    say_once("off", "the dive landed: InSneakMode state")
   end
 end
 
 function M.client_tick(world)
-  if not me.on and me.crouch <= 0 then return end
+  if not (me.on or me.head or me.crouch) then return end
   local id = emf.local_player and emf.local_player()
   if not id or id == 0 then return end
   local ok, err = pcall(function()
-    local input = world:get("ClientPlayerInput", id)
-    if not input then return end
-    local bits = math.tointeger(input.data.digitalInput) or 0
+    local a = world:get("Actor", id)
+    if not a then return end
+    local cs = math.tointeger(a.currentState) or 0
     local move = world:get("DynamicLocomotion", id)
     local st = move and n(move.state)
-    if me.on then
-      if st == ON_GROUND then  -- landed before the server's word came
-        me.on, me.crouch = false, M.CROUCH_STEPS
-      elseif st == IN_AIR then
-        input.data.digitalInput = bits | M.HEAD_DIVE_BIT
-        return
-      else
-        return  -- gliding: nothing
-      end
+    if me.on and st == ON_GROUND then me.on, me.crouch = false, true end  -- landed before the server's word came
+    if me.on and st == IN_AIR then
+      a.currentState = cs | M.HEAD_STATE
+      me.head = true
+      return
     end
-    if me.crouch > 0 then
-      me.crouch = me.crouch - 1
-      input.data.digitalInput = bits | M.SNEAK
+    if me.head then  -- never left on: off at once when the dive is over (landed, or the glider opened)
+      cs = cs & ~M.HEAD_STATE
+      a.currentState = cs
+      me.head = false
+    end
+    if me.crouch and st == ON_GROUND then
+      a.currentState = cs | M.SNEAK_STATE
+      me.crouch = false
     end
   end)
   if not ok then
-    me.on, me.crouch = false, 0
-    say_once("err", "the game's input cannot be written here (" .. tostring(err) .. ")")
+    me.on, me.head, me.crouch = false, false, false
+    say_once("err", "the game's states cannot be written here (" .. tostring(err) .. ")")
   end
 end
 
