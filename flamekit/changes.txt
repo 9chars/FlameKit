@@ -1,3 +1,6 @@
+0.15.227 Nov 16, 2026
+- Fast Dive (server, test): a free-fall dive tries to land crouched (the last 15 m).
+
 0.15.226 Nov 16, 2026
 - New Experimental option: Fast Dive. In the air or gliding, tap forward twice quickly to dive straight down, fast (from the glider: a nose dive). Landing does not hurt you and blasts a crater. Off in PvP.
 - Experimental tab: Fast Dive speed, landing (small, medium or big crater, a boom without a crater, or off) and minimum height, each a drop-down, only for you. The tap speed (now "Tap speed (Super B Jump, Fast Dive)") is shared.

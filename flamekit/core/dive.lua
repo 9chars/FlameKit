@@ -37,6 +37,12 @@ local M = {
     [3] = { name = "Big crater", guid = "9a216c97-1d52-4163-aee4-cb3eff129a50" },     -- Explosion_Player_Tool_TNT_T4
     [4] = { name = "Boom only (no crater)", guid = "896758dd-f2d5-4e26-89f0-a4856f489e77" },  -- ..._MeteoricDescent
   },
+  -- (0.15.227, owner: "would land better if the player hit the ground in a crouched position", TEST) in a free-fall
+  -- dive within CROUCH_AT metres of the ground, the server adds the game's Sneak input (PlayerInputType 55) to what the
+  -- player's game sent, until the landing. Input only (no saved state): the player's next input message overwrites it.
+  CROUCH = true,
+  CROUCH_AT = 15,  -- metres; at about 60 m/s that is the last 1/4 s
+  SNEAK = 1 << 55,
   KEEP_FALLING = 1 << 32,
   KEEP_GLIDING = 1 << 37,
   broken = false,
@@ -139,6 +145,17 @@ function M.step(world, entity, s, opts)
     if st ~= IN_AIR and st ~= GLIDING then s.first = nil return end
     if s.diving then
       fall_guard.step(world, entity)
+      if M.CROUCH and st == IN_AIR then
+        local gd = M.ground_distance(world, entity)
+        if gd and gd > 0 and gd < M.CROUCH_AT then
+          local inp = world:get("PlayerInput", entity)
+          if inp then inp.fromClient.digitalInput = (math.tointeger(inp.fromClient.digitalInput) or 0) | M.SNEAK end
+          if not s.crouched then
+            s.crouched = true
+            emf.log(string.format("fast dive: player %s crouches %.1f m above the ground (test)", tostring(entity), gd))
+          end
+        end
+      end
       return
     end
     if not pressed then return end
@@ -156,7 +173,7 @@ function M.step(world, entity, s, opts)
       return
     end
     if push_down(world, entity, st == GLIDING, opts.speed or 1) then
-      s.diving, s.from_glider, s.landing = true, st == GLIDING, opts.landing or 1
+      s.diving, s.from_glider, s.landing, s.crouched = true, st == GLIDING, opts.landing or 1, nil
       local _, y = world:position(entity)
       s.dive_y = y
       result = "dive"
