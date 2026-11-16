@@ -1,3 +1,6 @@
+0.15.211 Nov 16, 2026
+- Super B Jump: its tooltip ends with "Named after SuperB, who requested the feature."
+
 0.15.210 Nov 16, 2026
 - Super B Jump height and forward: up to 10x (2.5x, 3x, 4x, 5x, 6x, 7x, 8x, 9x, 10x added). Needs FlameKit 0.15.210 on the server for the new steps.
 
