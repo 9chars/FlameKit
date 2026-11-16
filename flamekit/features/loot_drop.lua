@@ -69,6 +69,19 @@ local function died(world, e)
                         z = okp and z or nil, t = t }
 end
 
+local FX_CANDIDATES = {  -- (0.15.180) for flamekit.fx
+  { "VFX_Consumable_LightWisp", "ba445d10-0b7b-402e-853b-e49b7ff50876" },
+  { "VFX_Altar_FlameEssence", "eb3633fc-6b5b-4cfa-b133-60b2c87ed66e" },
+  { "VFX_Player_LootCorpse_Tombstone_OnSpawn", "245f2b14-46ea-4893-bd6b-87b9fb240fdb" },
+  { "VFX_SubEntity_Prop_Door_Ancient_Stars_Top", "37350371-70e1-4955-8a33-95b825ad146c" },
+  { "VFX_Ability_Casting_Light", "fafcfdff-d2e7-4079-8c55-4c8add039ec6" },
+  { "Base_VFX_Light", "decde8fb-896a-4b21-8cce-8a2559c7ec44" },
+  { "VFX_Dummy_Light", "ab203251-703f-49aa-8ebf-11199ba135ba" },
+  { "VFX_SubEntity_Player_Glider_Light", "d7bb04a2-d06c-43ac-a156-6edc5d95d53e" },
+  { "Lootpickup_Scatter_VFX_Bait_T2_Moths_Above", "e1d055ad-d8d0-4d2e-b919-758607e2d4ba" },
+  { "VFX_Skill_Aura_SunFire_Trigger_OnPlayer", "4aa64338-ae74-4647-a501-d40cd73af2b6" },
+}
+local fx_shown = {}  -- { id, at }: preview effects to remove
 local fx_said = 0  -- (0.15.173) bodies whose effect components were logged (3 per run)
 local function dump(v, depth)
   depth = depth or 0
@@ -320,6 +333,13 @@ function F.tick(world)
   steps = steps + 1
   pcall(spots.tick, world)
   pcall(pull_tick, world)  -- (0.15.178) bodies and spots opened into a receiving chest
+  if #fx_shown > 0 then  -- (0.15.180) preview effects go after 10 s
+    local keep = {}
+    for _, f in ipairs(fx_shown) do
+      if f.at <= steps then pcall(emf.destroy, world, f.id) else keep[#keep + 1] = f end
+    end
+    fx_shown = keep
+  end
   if steps % 30 == 0 then pcall(ground.fx_tick, world) end  -- (0.15.171) fireflies off picked-up items
   if #retry > 0 then
     local keep = {}
@@ -383,6 +403,35 @@ function F.setup(k)
   if not ok then emf.log("loot drop: no death events: monsters keep their loot in their bodies") end
   local oke, said = pcall(emf.emits, { "LootInteractionEvent", "InteractionAcceptedEvent" }, "server")  -- (0.15.179)
   if not oke or said == false then emf.log("loot drop: LootInteractionEvent cannot be sent (" .. tostring(said) .. ")") end
+  -- (0.15.180, owner: "we need to try to find another one that works") console "flamekit.fx <1-10>": candidate effect N
+  -- for the ground-loot mark, 3 m in front of the nearest player for 10 s, so effects can be compared one after another
+  pcall(emf.command, "fx", "<1-10>: shows candidate effect N for the loot mark 3 m in front of the nearest player for 10 s",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      local n = tonumber(args[1])
+      local c = n and FX_CANDIDATES[n]
+      if not c then emf.reply("fx: give a number 1-" .. #FX_CANDIDATES) return end
+      local ok, ids = pcall(players.ids, world)
+      local pid = ok and ids and ids[1]
+      local okp, x, y, z = pcall(world.position, world, pid)
+      if not pid or not okp or not x then emf.reply("fx: no player") return end
+      local fx, fz = 0, 1
+      pcall(function()
+        local q = world:get("CurrentTransform", pid).transform.orientation
+        local ax, az = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.sqrt(ax * ax + az * az)
+        if len > 0.01 then fx, fz = ax / len, az / len end
+      end)
+      local oks, id = pcall(emf.spawn, world, c[2], x + fx * 3, y, z + fz * 3)
+      if oks and id and id ~= 0 then
+        fx_shown[#fx_shown + 1] = { id = id, at = steps + 600 }
+        emf.log(string.format("loot drop: fx %d (%s) shown as entity %s", n, c[1], tostring(id)))
+        emf.reply("fx " .. n .. ": " .. c[1])
+      else
+        emf.log(string.format("loot drop: fx %d (%s) refused (%s)", n, c[1], tostring(id)))
+        emf.reply("fx " .. n .. ": refused")
+      end
+    end, "the fx command"))
   pcall(emf.command, "loottest", "on|watch|off: (watch: only logs, no event) the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end

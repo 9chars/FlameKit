@@ -1,3 +1,6 @@
+0.15.180 Nov 15, 2026
+- Server console "flamekit.fx <1-10>": shows one of 10 candidate effects for the ground-loot mark 3 m in front of the player for 10 s, to pick one. Server only: no game update.
+
 0.15.179 Nov 15, 2026
 - Loot Drop: a body whose loot the game makes only when it is opened (pressing E on one gave loot) is opened by FlameKit as the nearest player would, then its loot goes on the ground. Needs one server restart. Server only: no game update.
 
