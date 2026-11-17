@@ -163,6 +163,21 @@ local function hold(world, id, h)
     local v = world:get("Velocity", id)
     if v then v.velocity.x, v.velocity.z = 0, 0 end
   end)
+  -- (owner: "he's walking in place") his AI still asks to walk: the wish to move and the walking speed are taken
+  -- away too (ActorInput: desiredLocalMoveInput, desiredWorldMoveInput, locomotionSpeed 0 = standing)
+  if not h.input_broken then
+    local ok, err = pcall(function()
+      local a = world:get("ActorInput", id)
+      if not a then return end
+      a.desiredLocalMoveInput.x, a.desiredLocalMoveInput.y, a.desiredLocalMoveInput.z = 0, 0, 0
+      a.desiredWorldMoveInput.x, a.desiredWorldMoveInput.y, a.desiredWorldMoveInput.z = 0, 0, 0
+      a.locomotionSpeed = 0
+    end)
+    if not ok then
+      h.input_broken = true
+      log("stay: his input cannot be changed (" .. tostring(err) .. ")")
+    end
+  end
   local x, y, z = world:position(id)
   if not x then return end
   if (x - h.x) ^ 2 + (z - h.z) ^ 2 > 1 and not h.busy then
