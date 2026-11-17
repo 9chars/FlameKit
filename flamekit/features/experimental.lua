@@ -1490,7 +1490,11 @@ local function lift(world)
           if height and height > CEILING then return end
           local now = world:tick() * 50000000 // 3   -- the game's clock in nanoseconds: 60 steps a second
           local one, two = push.impulses[1], push.impulses[2]
-          if one.endTime > now or two.endTime > now then return end  -- a burst is still lifting
+          -- a burst is still lifting (0.15.268, owner: "can you make updraft / space bar pull me out of the dive also?"
+          -- a Fast Dive's push down, -800 m/s and more, is not a burst: the burst replaces it, and core/dive.lua then
+          -- cancels the dive because its push is gone)
+          local function lifting(sl) return sl.endTime > now and (tonumber(sl.impulse.y) or 0) > -50 end
+          if lifting(one) or lifting(two) then return end
           one.impulse.x, one.impulse.y, one.impulse.z = 0, 3, 0
           one.type, one.startTime, one.endTime, one.keepAliveMask = 0, now, now + 1000000000, BURST_KEEP
           two.impulse.x, two.impulse.y, two.impulse.z = 0, 9.78, 0
