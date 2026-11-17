@@ -97,6 +97,20 @@ function M.above_ground(s, y)
   return y and s.ground_y and y - s.ground_y or nil
 end
 
+-- (0.15.267, owner: "the S key doesn't barely put enough pull back to stop the dive... the dive never slows down when
+-- I pull back") a cancelled dive also ends its push (slot 1, when it is still the dive's own), so the player is not
+-- pulled down at dive speed any more: before, only the blast and the notice were cancelled
+local function end_push(world, entity, factor)
+  pcall(function()
+    local imp = world:get("Impulse", entity)
+    local slot = imp and imp.impulses[1]
+    local now = world:tick() * 50000000 // 3
+    if slot and slot.endTime > now and math.abs((tonumber(slot.impulse.y) or 0) + M.SPEED * (factor or 1)) < 0.01 then
+      slot.endTime = now
+    end
+  end)
+end
+
 local function push_down(world, entity, gliding, factor, keep_others)
   local imp = world:get("Impulse", entity)
   if not imp then return false end
@@ -225,6 +239,7 @@ function M.step(world, entity, s, opts)
       if s.diving and (st == 9 or st == 10) then
         s.diving = nil
         result = "cancel"
+        end_push(world, entity, s.factor)
         s.cancel_why = "landed in water"
       end
       s.first, s.top = nil, nil
@@ -256,6 +271,7 @@ function M.step(world, entity, s, opts)
       if s.auto and st == GLIDING then
         s.diving = nil
         result = "cancel"
+        end_push(world, entity, s.factor)
         s.cancel_why = "the glider was opened"
         return
       end
@@ -278,6 +294,7 @@ function M.step(world, entity, s, opts)
       if not mine or rising then
         s.diving = nil
         result = "cancel"
+        end_push(world, entity, s.factor)
         s.cancel_why = not mine and "its push was replaced (the updraft burst)" or "the player rose (climbing)"
       end
       return

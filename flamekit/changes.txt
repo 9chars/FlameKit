@@ -1,3 +1,6 @@
+0.15.267 Nov 16, 2026
+- Fast Dive: pulling up (S), the updraft burst, opening the glider or landing in water now really stops the dive: the push down ends too, so you slow down to normal gliding or falling (before, only the blast and the notice were cancelled and you kept falling at dive speed). Server only: no game update.
+
 0.15.266 Nov 16, 2026
 - Fast Dive: after a glider dive lands, the drop into your own crater no longer hurts (5 seconds without fall damage). Server only: no game update.
 
