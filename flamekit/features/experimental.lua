@@ -207,7 +207,7 @@ glide.SBJ = {
   { which = "divespeed", key = "sbj_divespd", label = "Fast Dive speed", sep = true,
     steps = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5 },
     tip = "How hard the dive pushes you down: you keep speeding up all the way to the ground (1.0x reaches about 180 m/s on a 500 m dive, nine times the game's fastest fall). Only for you." },
-  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 3, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default
+  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default; (0.15.260, owner) Small crater
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
     tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
