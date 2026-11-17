@@ -155,6 +155,30 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                          EMF_REPLY("spawnplayer: entity %u", id);
                      });
 
-    EMF_LOG(kMod, "loaded (test commands: fkprobe.players, fkprobe.dump, fkprobe.spawnplayer)");
+    // (2026-11-17) a WRITE test: one value into a player-list slot (BasicPlayerInfos + slot * 0xA0 + offset), the old
+    // and the new value logged
+    emf::add_command("fkprobe.slotset", "<slot> <offset> <u8|u16|u32|u64> <value>: write one value into a player-list slot (test)",
+                     [](emf::World w, const std::vector<std::string>& args) {
+                         if (!w.is_server()) { EMF_REPLY("server world only"); return; }
+                         if (args.size() < 5) { EMF_REPLY("usage: fkprobe.slotset <slot> <offset> <u8|u16|u32|u64> <value>"); return; }
+                         const int slot = std::atoi(args[1].c_str());
+                         const uint64_t off = std::strtoull(args[2].c_str(), nullptr, 0);
+                         const std::string type = args[3];
+                         const uint64_t value = std::strtoull(args[4].c_str(), nullptr, 0);
+                         const size_t n = type == "u8" ? 1 : type == "u16" ? 2 : type == "u32" ? 4 : type == "u64" ? 8 : 0;
+                         if (slot < 0 || slot > 15 || off + n > 0xA0 || !n) { EMF_REPLY("bad slot, offset or type"); return; }
+                         const uint64_t base = find_singleton(w, "BasicPlayerInfos");
+                         if (!base) { EMF_REPLY("player list not found"); return; }
+                         const uint64_t at = base + uint64_t(slot) * 0xA0 + off;
+                         uint64_t before = 0, after = 0;
+                         peek(at, &before, n);
+                         const bool ok = emf::api()->write_memory && emf::api()->write_memory(reinterpret_cast<void*>(at), &value, n);
+                         peek(at, &after, n);
+                         EMF_LOG(kMod, "slotset: slot %d +0x%llx (%s): %llx -> %llx (%s)", slot, (unsigned long long)off, type.c_str(),
+                                 (unsigned long long)before, (unsigned long long)after, ok ? "written" : "NOT written");
+                         EMF_REPLY("slot %d +0x%llx: %llx -> %llx", slot, (unsigned long long)off, (unsigned long long)before, (unsigned long long)after);
+                     });
+
+    EMF_LOG(kMod, "loaded (test commands: fkprobe.players, fkprobe.dump, fkprobe.spawnplayer, fkprobe.slotset)");
     return true;
 }
