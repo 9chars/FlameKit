@@ -28,6 +28,7 @@ local M = {
   STICK = 0.5,           -- forward on the stick at least this far counts as a press of W
   SPEED = 80,            -- the push down at 1x (the impulse's y, negative)
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
+  CRATER_GUARD = 5,      -- (0.15.266) seconds after a glider dive's landing without fall damage (the drop into the crater)
   MIN_HEIGHT = 0,        -- (0.15.263: 10 m above where the player last stood; 0.15.264, owner: "there should just be no minimum for the glider") 0 = the glider dive and its tip at any height
   LANDING_SHIELD = 1.5,
   DEFAULT_LANDING = 1,  -- (0.15.260, owner: "lets make Fast Dive landing set to Small crater")
@@ -201,11 +202,18 @@ function M.step(world, entity, s, opts)
     -- (0.15.254, glider tip) the last height the player stood or swam at: the game knows the ground below only about
     -- 1 m before a landing, so the tip counts the height above this
     if y and (st == ON_GROUND or st == 9 or st == 10) then s.ground_y = y end
+    -- (0.15.266, owner: "I feel like im getting hurt a lot from the glider"; the log: a glider dive landed unhurt, then
+    -- the crater opened under the player and the ~14 m drop into it hit 2515 -> 531) after a glider dive's landing the
+    -- fall stays short for CRATER_GUARD seconds, so the drop into the player's own crater does not hurt
+    if s.after_guard then
+      if t < s.after_guard then fall_guard.step(world, entity) else s.after_guard = nil end
+    end
     if st == ON_GROUND then
       if s.diving then
         s.diving = nil
         landing(world, entity, s.landing, s)
         result = "landed"
+        if s.from_glider then s.after_guard = t + math.floor(M.CRATER_GUARD * 60) end
       end
       s.first, s.top, s.glider_closed, s.was_gliding = nil, nil, nil, nil
       return
