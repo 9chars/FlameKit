@@ -1,6 +1,25 @@
 # FlameKit: handoff note
 
-Read this first when starting a new conversation about FlameKit. Updated 2026-11-16 17:55 (versions: "Where things stand" below). First written 2026-11-13, at version 0.15.143 on Development and the local server only (owner, 2026-11-15 13:51: "I didn't say anything about touching g-portal or publishing to stable"); production: 0.15.141; Stable: 0.15.140.
+Read this first when starting a new conversation about FlameKit. Updated 2026-11-17 07:25 (versions: "Where things stand" below). First written 2026-11-13.
+
+## Start here (next conversation, written 2026-11-17 07:25)
+
+1. Read Rules 0r, 0p, 0a, 0d, 0c, 0b below before anything else. The two that went wrong most on 2026-11-16:
+   **0p** (the owner picks every next step; no change, test or "cleanup" he did not ask for) and reading his words
+   right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
+   removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
+   long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
+2. Versions: **0.15.277 on Development, Stable, the local server and G-Portal** (all the same, released 2026-11-16
+   21:29). Nothing is waiting to be published. The outbox is empty.
+3. Production after the release (nightly log `production_stable_logs\emf_core_2026-11-17.log`, 12,492 lines up to
+   03:55): no errors; Super B Jump and the glider tip in use there. Check it again at the start.
+4. Ask for folder access first (the four folders in "Where things stand").
+5. **Open, not settled:** at 21:17 the owner said "no something is wrong": a Fast Dive landing did not seem to damage
+   STRUCTURES any more. The explosions spawned normally (log), nothing in the explosion code changed since the
+   afternoon when "it definitely blows everything up"; Claude's guess: the Gigantic crater's bombs sit 3..12 m
+   underground and miss what stands on the surface (Small/Big go off at or 1 m under the surface). Not tested: the
+   owner stopped the session there. Ask him whether it still happens before touching anything.
+6. Next feature ideas: "To do (owner's list)" below (boss challenge/arena first), plus the open items in STATUS.md.
 
 ## Rule 0: instructions to the owner (read before every message that tells him to do something)
 
