@@ -130,11 +130,38 @@ end
 -- one of the game's explosion templates at a place: the landing blast, and the console test
 -- `scale` (0.15.235, owner: "is there any way to make the blast even bigger", TEST): the game's ScaleComponent
 -- (uniformScale), as FlameKit's test monsters are spawned with; whether it makes a blast bigger is what the test shows
+-- (0.15.273, test; owner: the blast does not hurt monsters, 0.15.272 measured no health change at all) the explosion is
+-- spawned with the player faction (M.BLAST_FACTION), so the game's enemy check lets its damage through to monsters as it
+-- does for a player's own TNT; when the game refuses the component it is spawned as before. The first few spawns log
+-- the explosion's Faction and OwnerRelationship as the game has them.
+M.BLAST_FACTION = nil  -- (0.15.274: faction 7 made no difference, the explosion still hurt no creature)
+M.boom_said = 0
 function M.boom(world, x, y, z, guid, scale)
   if not guid or guid == "" or guid == "off" then return nil end
-  local comps = scale and scale ~= 1 and { ScaleComponent = { uniformScale = scale } } or nil
-  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, comps)
+  local comps = {}
+  if scale and scale ~= 1 then comps.ScaleComponent = { uniformScale = scale } end
+  if M.BLAST_FACTION then comps.Faction = { faction = M.BLAST_FACTION } end
+  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, next(comps) and comps or nil)
+  if not ok and comps.Faction then
+    emf.log("fast dive: the blast cannot have a faction (" .. tostring(id) .. "): spawned without")
+    comps.Faction = nil
+    ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, next(comps) and comps or nil)
+  end
   if not ok then emf.log("fast dive: the landing blast cannot be spawned (" .. tostring(id) .. ")") end
+  if ok and id and M.boom_said < 3 then
+    M.boom_said = M.boom_said + 1
+    pcall(function()
+      local okf, f = pcall(world.get, world, "Faction", id)
+      local oko, o = pcall(world.get, world, "OwnerRelationship", id)
+      local owner = "none"
+      if oko and o then
+        local oke, txt = pcall(emf.json.encode, o)
+        owner = oke and txt or tostring(o)
+      end
+      emf.log(string.format("fast dive: blast entity %s: faction %s, owner %s", tostring(id),
+        okf and f and tostring(f.faction) or "none", owner))
+    end)
+  end
   return ok and id or nil
 end
 
