@@ -28,6 +28,7 @@ local M = {
   STICK = 0.5,           -- forward on the stick at least this far counts as a press of W
   SPEED = 80,            -- the push down at 1x (the impulse's y, negative)
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
+  CRATER_GUARD = 5,      -- (0.15.266) seconds after a glider dive's landing without fall damage (the drop into the crater)
   MIN_HEIGHT = 0,        -- (0.15.263: 10 m above where the player last stood; 0.15.264, owner: "there should just be no minimum for the glider") 0 = the glider dive and its tip at any height
   LANDING_SHIELD = 1.5,
   DEFAULT_LANDING = 1,  -- (0.15.260, owner: "lets make Fast Dive landing set to Small crater")
@@ -96,6 +97,20 @@ function M.above_ground(s, y)
   return y and s.ground_y and y - s.ground_y or nil
 end
 
+-- (0.15.267, owner: "the S key doesn't barely put enough pull back to stop the dive... the dive never slows down when
+-- I pull back") a cancelled dive also ends its push (slot 1, when it is still the dive's own), so the player is not
+-- pulled down at dive speed any more: before, only the blast and the notice were cancelled
+local function end_push(world, entity, factor)
+  pcall(function()
+    local imp = world:get("Impulse", entity)
+    local slot = imp and imp.impulses[1]
+    local now = world:tick() * 50000000 // 3
+    if slot and slot.endTime > now and math.abs((tonumber(slot.impulse.y) or 0) + M.SPEED * (factor or 1)) < 0.01 then
+      slot.endTime = now
+    end
+  end)
+end
+
 local function push_down(world, entity, gliding, factor, keep_others)
   local imp = world:get("Impulse", entity)
   if not imp then return false end
@@ -115,11 +130,38 @@ end
 -- one of the game's explosion templates at a place: the landing blast, and the console test
 -- `scale` (0.15.235, owner: "is there any way to make the blast even bigger", TEST): the game's ScaleComponent
 -- (uniformScale), as FlameKit's test monsters are spawned with; whether it makes a blast bigger is what the test shows
+-- (0.15.273, test; owner: the blast does not hurt monsters, 0.15.272 measured no health change at all) the explosion is
+-- spawned with the player faction (M.BLAST_FACTION), so the game's enemy check lets its damage through to monsters as it
+-- does for a player's own TNT; when the game refuses the component it is spawned as before. The first few spawns log
+-- the explosion's Faction and OwnerRelationship as the game has them.
+M.BLAST_FACTION = nil  -- (0.15.274: faction 7 made no difference, the explosion still hurt no creature)
+M.boom_said = 0
 function M.boom(world, x, y, z, guid, scale)
   if not guid or guid == "" or guid == "off" then return nil end
-  local comps = scale and scale ~= 1 and { ScaleComponent = { uniformScale = scale } } or nil
-  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, comps)
+  local comps = {}
+  if scale and scale ~= 1 then comps.ScaleComponent = { uniformScale = scale } end
+  if M.BLAST_FACTION then comps.Faction = { faction = M.BLAST_FACTION } end
+  local ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, next(comps) and comps or nil)
+  if not ok and comps.Faction then
+    emf.log("fast dive: the blast cannot have a faction (" .. tostring(id) .. "): spawned without")
+    comps.Faction = nil
+    ok, id = pcall(emf.spawn, world, guid, x, y + 0.2, z, next(comps) and comps or nil)
+  end
   if not ok then emf.log("fast dive: the landing blast cannot be spawned (" .. tostring(id) .. ")") end
+  if ok and id and M.boom_said < 3 then
+    M.boom_said = M.boom_said + 1
+    pcall(function()
+      local okf, f = pcall(world.get, world, "Faction", id)
+      local oko, o = pcall(world.get, world, "OwnerRelationship", id)
+      local owner = "none"
+      if oko and o then
+        local oke, txt = pcall(emf.json.encode, o)
+        owner = oke and txt or tostring(o)
+      end
+      emf.log(string.format("fast dive: blast entity %s: faction %s, owner %s", tostring(id),
+        okf and f and tostring(f.faction) or "none", owner))
+    end)
+  end
   return ok and id or nil
 end
 
@@ -201,11 +243,18 @@ function M.step(world, entity, s, opts)
     -- (0.15.254, glider tip) the last height the player stood or swam at: the game knows the ground below only about
     -- 1 m before a landing, so the tip counts the height above this
     if y and (st == ON_GROUND or st == 9 or st == 10) then s.ground_y = y end
+    -- (0.15.266, owner: "I feel like im getting hurt a lot from the glider"; the log: a glider dive landed unhurt, then
+    -- the crater opened under the player and the ~14 m drop into it hit 2515 -> 531) after a glider dive's landing the
+    -- fall stays short for CRATER_GUARD seconds, so the drop into the player's own crater does not hurt
+    if s.after_guard then
+      if t < s.after_guard then fall_guard.step(world, entity) else s.after_guard = nil end
+    end
     if st == ON_GROUND then
       if s.diving then
         s.diving = nil
         landing(world, entity, s.landing, s)
         result = "landed"
+        if s.from_glider then s.after_guard = t + math.floor(M.CRATER_GUARD * 60) end
       end
       s.first, s.top, s.glider_closed, s.was_gliding = nil, nil, nil, nil
       return
@@ -217,6 +266,7 @@ function M.step(world, entity, s, opts)
       if s.diving and (st == 9 or st == 10) then
         s.diving = nil
         result = "cancel"
+        end_push(world, entity, s.factor)
         s.cancel_why = "landed in water"
       end
       s.first, s.top = nil, nil
@@ -248,6 +298,7 @@ function M.step(world, entity, s, opts)
       if s.auto and st == GLIDING then
         s.diving = nil
         result = "cancel"
+        end_push(world, entity, s.factor)
         s.cancel_why = "the glider was opened"
         return
       end
@@ -270,6 +321,7 @@ function M.step(world, entity, s, opts)
       if not mine or rising then
         s.diving = nil
         result = "cancel"
+        end_push(world, entity, s.factor)
         s.cancel_why = not mine and "its push was replaced (the updraft burst)" or "the player rose (climbing)"
       end
       return

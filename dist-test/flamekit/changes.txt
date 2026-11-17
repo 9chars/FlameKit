@@ -1,3 +1,34 @@
+0.15.275 Nov 16, 2026
+- Tooltips: Fast Dive and Fast Dive landing say the blast damages monsters (by crater size); Fast Dive says pulling back or the updraft burst stops a dive; Glider Sprint says it also works while climbing.
+- Includes the server changes of 0.15.266 to 0.15.274 (no damage from falling into your own crater, cancelled dives really stop, the updraft burst pulls out of a dive, the blast damages monsters).
+
+0.15.274 Nov 16, 2026
+- Fast Dive: the landing blast now damages the monsters around it, as your hits (XP and loot when they die). The damage grows with the crater: Small 500, Medium 1000, Big 2000, Huge 4000, Massive 8000, Gigantic 15000 at the centre, fading to a fifth at the edge of the reach (10 m for Small up to 32 m for Gigantic). Bosses take it too. Not players, pets, tamed animals or villagers; nothing with Boom only or Off. (The game's explosion itself never hurts creatures: tested in 0.15.272 and 0.15.273.) Server only: no game update.
+
+0.15.273 Nov 16, 2026
+- Server (test): the Fast Dive blast is spawned with the player faction, to see whether it then hurts monsters (it did not before). FlameKit's own kill stays off; the monsters' health is still logged, with their distance from the landing. Server only: no game update.
+
+0.15.272 Nov 16, 2026
+- Server (test): the Fast Dive kill is off again; instead the health of the monsters around a landing is logged at the landing and 1, 2 and 4 seconds later, to see what the blast itself does to them. Server only: no game update.
+
+0.15.271 Nov 16, 2026
+- Fast Dive: the monsters around your landing's blast now really die (0.15.269 waited for the blast's own hits, which the server never sees): every monster within the crater's reach gets a killing hit from you. Server only: no game update.
+
+0.15.270 Nov 16, 2026
+- Server (test): logging of the hits after a Fast Dive blast (the monsters did not die). Server only: no game update.
+
+0.15.269 Nov 16, 2026
+- Fast Dive: monsters hit by your landing's blast die (bosses too), as your kill: XP and loot as usual. Not players, pets, tamed animals or villagers; not with Boom only or Off. Server only: no game update.
+
+0.15.268 Nov 16, 2026
+- Fast Dive: the updraft burst (Space, with Enhanced Glider Mode) now pulls you out of a glider dive every time: the burst lifts you and the dive stops (before, after the flight's first burst, Space did nothing during a dive). Server only: no game update.
+
+0.15.267 Nov 16, 2026
+- Fast Dive: pulling up (S), the updraft burst, opening the glider or landing in water now really stops the dive: the push down ends too, so you slow down to normal gliding or falling (before, only the blast and the notice were cancelled and you kept falling at dive speed). Server only: no game update.
+
+0.15.266 Nov 16, 2026
+- Fast Dive: after a glider dive lands, the drop into your own crater no longer hurts (5 seconds without fall damage). Server only: no game update.
+
 0.15.265 Nov 16, 2026
 - Fast Dive: the free-fall setting is now called "Free-fall Dive Minimum", with a new tooltip explaining it. Includes the server change of 0.15.264 (no minimum height for the glider dive).
 

@@ -1,3 +1,7 @@
+0.15.275 Nov 16, 2026
+- Tooltips: Fast Dive and Fast Dive landing say the blast damages monsters (by crater size); Fast Dive says pulling back or the updraft burst stops a dive; Glider Sprint says it also works while climbing.
+- Includes the server changes of 0.15.266 to 0.15.274 (no damage from falling into your own crater, cancelled dives really stop, the updraft burst pulls out of a dive, the blast damages monsters).
+
 0.15.274 Nov 16, 2026
 - Fast Dive: the landing blast now damages the monsters around it, as your hits (XP and loot when they die). The damage grows with the crater: Small 500, Medium 1000, Big 2000, Huge 4000, Massive 8000, Gigantic 15000 at the centre, fading to a fifth at the edge of the reach (10 m for Small up to 32 m for Gigantic). Bosses take it too. Not players, pets, tamed animals or villagers; nothing with Boom only or Off. (The game's explosion itself never hurts creatures: tested in 0.15.272 and 0.15.273.) Server only: no game update.
 
