@@ -74,8 +74,8 @@ local TIPS = {
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
-  glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
-  fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
+  glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster; let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
+  fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, or pulling up in it, cancels a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below). Tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -209,7 +209,7 @@ glide.SBJ = {
     tip = "How hard the dive pushes you down: you keep speeding up all the way to the ground (1.0x reaches about 180 m/s on a 500 m dive, nine times the game's fastest fall). Only for you." },
   { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default; (0.15.260, owner) Small crater
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
-    tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage, and it damages the monsters around it as your hits: Small 500 up to Gigantic 15000 at the centre, less toward the edge (10 m to 32 m). Boom only does no damage. Only for you." },
+    tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
     name = function(k) return k == 1 and "Crater" or "Boom only" end,  -- (0.15.232, owner: per player, their responsibility)
     tip = "Landing inside a base (a flame altar's area, yours or anyone's): Boom only makes the sound without damage; Crater blasts it like anywhere else and can destroy what is built there. Only for you." },
@@ -310,102 +310,6 @@ function glide.tip_notice(msg)
       secs and secs >= 1 and secs <= 60 and secs or 10)
   else
     kit.notice("fastdive_tip")
-  end
-end
--- (0.15.269, owner: "I want the blast damage from the blast when I crash from fast dive to kill monsters") every
--- monster within the landing's radius gets a killing hit FROM THE DIVER (emf.damage: kill credit, XP, loot as usual).
--- (0.15.271: 0.15.269 waited for the blast's own hits, but the server never saw one: 0.15.270's log of seven landings
--- among monsters had none. Now the world is searched around the landing instead, a budgeted walk over a few steps.)
--- A monster: not a player, has the enemy AI (DynamicEnemy01BehaviorState), a faction that is not player side (7
--- players, 8 companions, 11 summons). Pets, tamed animals and villagers are left alone. Bosses too are killed.
--- Not with Boom only or Off (no blast that hurts).
-glide.BLAST_KILL = true   -- (0.15.272 off for a test: the game's explosion itself never hurts creatures, 0.15.273 measured
--- monsters 1 m from the centre at full health, also with the player faction; it has no item behind it to work out damage)
--- (0.15.274, owner: "lets do B and the damage amount should scale with the crater size") not a kill any more: damage
--- by crater size (BLAST_DMG, at the centre), fading to a fifth of it at the edge of the reach (BLAST_R). Bosses too.
-glide.BLAST_DMG = { [1] = 500, [2] = 1000, [3] = 2000, [5] = 4000, [6] = 8000, [7] = 15000 }
-glide.BLAST_EDGE = 0.2
-glide.BLAST_WATCH = false  -- (0.15.272, test) the monsters' health logged after a landing
-glide.BLAST_R = { [1] = 10, [2] = 12, [3] = 15, [5] = 18, [6] = 24, [7] = 32 }  -- metres around the landing, by landing kind
-glide.scans = {}   -- { player, x, y, z, r, list, i, n }
-function glide.blast_zone(world, p)
-  local kind = p.dive.landed_with
-  local r = glide.BLAST_R[kind or 0]
-  if not r then return end
-  local x, y, z = world:position(p.entity)
-  if not x then return end
-  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0, started = world:tick(),
-    dmg = glide.BLAST_DMG[kind] or 0, total = 0 }
-end
-function glide.is_monster(world, id)
-  local oka, acc = pcall(world.account, world, id)
-  if oka and acc then return false end
-  local oke, ai = pcall(world.get, world, "DynamicEnemy01BehaviorState", id)
-  if not (oke and ai) then return false end
-  local okf, f = pcall(world.get, world, "Faction", id)
-  local fn = okf and f and tonumber(tostring(f.faction))
-  return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
-end
--- every server step while a landing's search is under way: part of the world's entities, within SCAN_BUDGET
-function glide.kill_tick(world)
-  local sc = glide.scans[1]
-  if not sc then return end
-  if not sc.list then sc.list = world:entities() return end  -- the list in one step, the walk in the next ones
-  local t0, done = now_s(), 0
-  local r2 = sc.r * sc.r
-  while sc.i <= #sc.list and not scan_over(t0, done) do
-    local id = sc.list[sc.i]
-    sc.i, done = sc.i + 1, done + 1
-    if id ~= sc.player then
-      local ok, x, y, z = pcall(world.position, world, id)
-      if ok and x and (x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2 <= r2 and glide.is_monster(world, id) then
-        sc.seen = sc.seen + 1
-        local okh, hp = pcall(world.get, world, "NetworkHealth", id)
-        -- (0.15.272, owner: "id like to try and see if theres another problem fix before just killing them off") the
-        -- kill is off (glide.BLAST_KILL); the health of each monster in reach is noted, and logged again later
-        sc.watch = sc.watch or {}
-        if glide.BLAST_WATCH and #sc.watch < 20 then
-          sc.watch[#sc.watch + 1] = { id = id, hp = okh and hp and tonumber(hp.health),
-            d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2) }
-        end
-        if glide.BLAST_KILL and sc.dmg > 0 and not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
-          local d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2)
-          local amount = math.floor(sc.dmg * math.max(glide.BLAST_EDGE, 1 - d / sc.r) + 0.5)
-          local okd, did = pcall(emf.damage, world, sc.player, id, amount)
-          if okd and did then sc.n, sc.total = sc.n + 1, sc.total + amount end
-        end
-      end
-    end
-  end
-  if sc.i > #sc.list then
-    emf.log(string.format("experimental: fast dive: player %s's blast (%d m, %d at the centre): %d monster(s) in reach, %d hit for %d in all (searched %d entities)",
-      tostring(sc.player), sc.r, sc.dmg, sc.seen, sc.n, sc.total, #sc.list))
-    if sc.watch and #sc.watch > 0 then
-      glide.watches[#glide.watches + 1] = { list = sc.watch, at = world:tick(), start = sc.started, step = 0 }
-    end
-    table.remove(glide.scans, 1)
-  end
-end
--- (0.15.272, test) the monsters' health at the search, then 1, 2 and 4 seconds after it
-glide.watches = {}
-function glide.watch_tick(world)
-  local t = world:tick()
-  for i = #glide.watches, 1, -1 do
-    local w = glide.watches[i]
-    local marks = { 0, 60, 120, 240 }
-    local due = marks[w.step + 1]
-    if due and t - w.at >= due then
-      local parts = {}
-      for _, m in ipairs(w.list) do
-        local okh, hp = pcall(world.get, world, "NetworkHealth", m.id)
-        local now = okh and hp and tonumber(hp.health)
-        parts[#parts + 1] = string.format("%s(%.0fm):%s", tostring(m.id), m.d or -1, now and string.format("%.0f", now) or "gone")
-      end
-      emf.log(string.format("experimental: fast dive: blast test: %.1f s after the search (%.1f s after the landing): %s",
-        (t - w.at) / 60, (t - (w.start or w.at)) / 60, table.concat(parts, " ")))
-      w.step = w.step + 1
-    end
-    if not marks[w.step + 1] then table.remove(glide.watches, i) end
   end
 end
 -- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
@@ -1706,7 +1610,6 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
             or p.dive.near_base and string.format("near the base at %.0f %.0f", p.dive.near_base.x, p.dive.near_base.z)
             or "away from bases",
           tostring(p.dive.landed_with)))
-        pcall(glide.blast_zone, world, p)  -- (0.15.269) the monsters this blast hits die
       end
     end
     if is_on(account, "superbjump") then
@@ -2079,8 +1982,6 @@ function F.tick(world)
     pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
   end
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
-  if world:is_server() then pcall(glide.kill_tick, world) end  -- (0.15.271) a Fast Dive blast kills the monsters around
-  if world:is_server() then pcall(glide.watch_tick, world) end  -- (0.15.272, test)
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)

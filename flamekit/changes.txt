@@ -1,3 +1,6 @@
+0.15.276 Nov 16, 2026
+- Fast Dive: the monster damage from the landing blast (0.15.269 to 0.15.274) is taken out again, at the owner's word; the dive and the explosion are exactly as in 0.15.268. Server only: no game update (the game's 0.15.275 tooltips still mention the damage).
+
 0.15.275 Nov 16, 2026
 - Tooltips: Fast Dive and Fast Dive landing say the blast damages monsters (by crater size); Fast Dive says pulling back or the updraft burst stops a dive; Glider Sprint says it also works while climbing.
 - Includes the server changes of 0.15.266 to 0.15.274 (no damage from falling into your own crater, cancelled dives really stop, the updraft burst pulls out of a dive, the blast damages monsters).
