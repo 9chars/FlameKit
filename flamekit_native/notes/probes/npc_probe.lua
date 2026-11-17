@@ -62,9 +62,27 @@ local function guard(world, npc, player, start)
   return ok and res ~= false
 end
 
+-- (owner: "he's still walking in place" while held by force) staying = guarding a still marker at his spot: the
+-- game's own guard behaviour stands him there with its own idle animation, nothing forced. The marker is an
+-- invisible effect entity (Base_VFX_Dummy). Without a marker: held by force as before.
+local MARKER = "bd93835e-5dd8-481c-9457-7ad5f3f516f9"
+local markers = {}   -- npc entity -> marker entity
+local function drop_marker(world, id)
+  if markers[id] then pcall(emf.destroy, world, markers[id]) markers[id] = nil end
+end
 local function stay_here(world, id)
   local x, y, z = world:position(id)
-  if x then stays[id] = { x = x, y = y, z = z, moved = 0 } end
+  if not x then return end
+  drop_marker(world, id)
+  local ok, m = pcall(emf.spawn, world, MARKER, x, y, z)
+  if ok and m and m ~= 0 then
+    markers[id] = m
+    local okg, res = pcall(emf.emit, "server", "StartGuardingEvent", { guardingEntityId = id, guardedEntityId = m })
+    log(string.format("stay: %s guards marker %s: %s", tostring(id), tostring(m), okg and tostring(res) or tostring(res)))
+    if okg then stays[id] = nil return end
+  end
+  log("stay: no marker (" .. tostring(m) .. "): held by force")
+  stays[id] = { x = x, y = y, z = z, moved = 0 }
 end
 
 -- (owner: "yes follow me and stay options") E switches between following the player who pressed it and staying put
@@ -78,6 +96,7 @@ local function on_talk(world, player, npc)
     say(world, player, "Staying here.")
   else
     stays[npc] = nil
+    drop_marker(world, npc)
     if guard(world, npc, player, true) then
       following[npc] = player
       say(world, player, "Following you.")
@@ -127,9 +146,8 @@ function F.setup(k)
           log("stay off for " .. tostring(id))
           emf.reply("npc: free again")
         elseif id then
-          local x, y, z = world:position(id)
-          if x then stays[id] = { x = x, y = y, z = z, moved = 0 } end
-          log(string.format("stay on for %s at %s", tostring(id), x and string.format("%.1f %.1f %.1f", x, y, z) or "?"))
+          stay_here(world, id)
+          log("stay on for " .. tostring(id))
           emf.reply("npc: holding " .. tostring(id))
         end
       elseif what == "here" then  -- here <npc> <player>: moved next to the player (1.5 m), then held there
@@ -137,8 +155,9 @@ function F.setup(k)
         local x, y, z = world:position(player or 0)
         if not (id and x) then emf.reply("npc: here <npc entity> <player entity>") return end
         stays[id] = { x = x + 1.5, y = y, z = z, moved = 0, busy = true }
-        local ok = pcall(emf.teleport, world, id, x + 1.5, y, z, { ground = true }, function(moved, nx, ny, nz)
-          if nx then stays[id] = { x = nx, y = ny, z = nz, moved = 0 } end
+        local ok = pcall(emf.teleport, world, id, x + 1.5, y, z, { ground = true }, function(moved, nx, ny, nz, info, w)  -- the teleport's own world (the command's world is gone by then)
+          stays[id] = nil
+          if nx and w then stay_here(w, id) end
           log(string.format("here: %s moved %s, now at %s", tostring(id), tostring(moved),
             nx and string.format("%.1f %.1f %.1f", nx, ny, nz) or "?"))
         end)
@@ -148,6 +167,7 @@ function F.setup(k)
         local ok, res = pcall(emf.destroy, world, id)
         log(string.format("remove %s: %s", tostring(id), tostring(ok and res)))
         pending[id or 0], stays[id or 0], following[id or 0] = nil, nil, nil
+        drop_marker(world, id or 0)
         emf.reply("npc: removed " .. tostring(ok and res))
       else
         emf.reply("npc: spawn <player> [m1..m3|f1..f3|fp|fr] | offer <npc> | look <npc> | remove <npc>")
