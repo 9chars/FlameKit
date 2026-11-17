@@ -326,7 +326,8 @@ function glide.blast_zone(world, p)
   if not r then return end
   local x, y, z = world:position(p.entity)
   if not x then return end
-  glide.zones[#glide.zones + 1] = { player = p.entity, x = x, y = y, z = z, r = r, killed = {}, n = 0,
+  emf.log(string.format("experimental: fast dive: blast zone open for player %s, %d m around %.0f %.0f %.0f", tostring(p.entity), r, x, y, z))
+  glide.zones[#glide.zones + 1] = { player = p.entity, x = x, y = y, z = z, r = r, killed = {}, n = 0, logged = 0,
     until_tick = world:tick() + glide.BLAST_KILL_S * 60 }
 end
 function glide.is_monster(world, id)
@@ -339,7 +340,11 @@ function glide.is_monster(world, id)
   return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
 end
 function glide.blast_hit(world, hit)
-  if #glide.zones == 0 or not hit or hit.kind ~= "hit" or hit.healing then return end
+  if #glide.zones == 0 or not hit or hit.healing then return end
+  if hit.kind ~= "hit" then
+    emf.log("experimental: fast dive: blast debug: a hit of kind " .. tostring(hit.kind) .. " on " .. tostring(hit.target))
+    return
+  end
   local t = world:tick()
   for i = #glide.zones, 1, -1 do
     local zn = glide.zones[i]
@@ -348,6 +353,16 @@ function glide.blast_hit(world, hit)
       table.remove(glide.zones, i)
     elseif hit.target ~= zn.player and not zn.killed[hit.target] then
       local x, y, z = world:position(hit.target)
+      -- (0.15.270, owner: "these monsters are not dying") every hit while a zone is open, for finding why
+      if zn.logged < 40 then
+        zn.logged = zn.logged + 1
+        local okf, f = pcall(world.get, world, "Faction", hit.target)
+        local oke, ai = pcall(world.get, world, "DynamicEnemy01BehaviorState", hit.target)
+        emf.log(string.format("experimental: fast dive: blast debug: hit on %s by %s (source %s, amount %s, kind %s) at %s m, faction %s, enemy AI %s, monster %s",
+          tostring(hit.target), tostring(hit.attacker), tostring(hit.source), tostring(hit.amount), tostring(hit.kind),
+          x and string.format("%.1f", math.sqrt((x - zn.x) ^ 2 + (y - zn.y) ^ 2 + (z - zn.z) ^ 2)) or "?",
+          okf and f and tostring(f.faction) or "none", tostring(oke and ai ~= nil), tostring(glide.is_monster(world, hit.target))))
+      end
       if x and (x - zn.x) ^ 2 + (y - zn.y) ^ 2 + (z - zn.z) ^ 2 <= zn.r * zn.r and glide.is_monster(world, hit.target) then
         zn.killed[hit.target] = true
         local ok = pcall(emf.damage, world, zn.player, hit.target, 1000000)

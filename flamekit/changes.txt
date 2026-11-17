@@ -1,3 +1,6 @@
+0.15.270 Nov 16, 2026
+- Server (test): logging of the hits after a Fast Dive blast (the monsters did not die). Server only: no game update.
+
 0.15.269 Nov 16, 2026
 - Fast Dive: monsters hit by your landing's blast die (bosses too), as your kill: XP and loot as usual. Not players, pets, tamed animals or villagers; not with Boom only or Off. Server only: no game update.
 
