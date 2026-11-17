@@ -30,7 +30,7 @@ local M = {
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
   MIN_HEIGHT = 10,       -- metres to the ground at 1x default (opts.min); 0 = anywhere
   LANDING_SHIELD = 1.5,
-  DEFAULT_LANDING = 3,
+  DEFAULT_LANDING = 1,  -- (0.15.260, owner: "lets make Fast Dive landing set to Small crater")
   RISING = 2,            -- m/s upward (Velocity.y) during a dive: the player pulls up (0.15.247)
   AUTO_ABOVE = 1000,     -- (0.15.248) metres above sea level: a free fall above it dives by itself (opts.auto; 0 = never)
   AUTO_FALL = 20,        -- metres fallen from the highest point first (not after closing the glider)   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)

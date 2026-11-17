@@ -138,7 +138,7 @@ function glide.sprinting(world, account, p)
     if held then
       local ok2, st = pcall(function() return tonumber(tostring(world:get("DynamicLocomotion", p.entity).state)) end)
       if ok2 and st == HANG_GLIDING then
-        emf.log(string.format("experimental: glider sprint: player %s sprints (%sx of their glider speed %sx)", tostring(p.entity),
+        emf.log(string.format("experimental: glider sprint: player %s sprints (%s of their glider speed %s)", tostring(p.entity),
           glide.label(glide.sbj(account, "sprint")), glide.label(glide.factor(account))))
       end
     end
@@ -207,7 +207,7 @@ glide.SBJ = {
   { which = "divespeed", key = "sbj_divespd", label = "Fast Dive speed", sep = true,
     steps = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5 },
     tip = "How hard the dive pushes you down: you keep speeding up all the way to the ground (1.0x reaches about 180 m/s on a 500 m dive, nine times the game's fastest fall). Only for you." },
-  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 3, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default
+  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default; (0.15.260, owner) Small crater
     name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
     tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage. Only for you." },
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
@@ -1527,9 +1527,13 @@ local function lift(world)
           local q = world:get("CurrentTransform", p.entity).transform.orientation
           local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
           local len = math.sqrt(fx * fx + fz * fz)
+          -- (0.15.259, owner: "the s key keeps me up in the air ... its important to be able to push both at the same
+          -- time") Glider Sprint while climbing: the climb's forward speed times the sprint factor
+          local fwd = p.forward
+          if p.sprint then fwd = fwd * glide.sbj(account, "sprint") end
           if len > 0.01 then
-            vel.x = fx / len * p.forward
-            vel.z = fz / len * p.forward
+            vel.x = fx / len * fwd
+            vel.z = fz / len * fwd
           end
         end)
         if not ok then
@@ -2257,15 +2261,19 @@ local function panel_rows(world)
       end
     end
   end
-  rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line between Enhanced Glider Mode and the glider speed
-  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x
-    local gs = tonumber(v.glide_speed) or 1
+  -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
+  -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B
+  -- Jump's and Fast Dive's
+  local function sbj_row(d)
+    local cur = tonumber(v[d.key]) or d.default or 1
     local opts = {}
-    for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
-    rows[#rows + 1] = { label = true, text = "Glider speed" }
-    rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
-      tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
+    for _, f in ipairs(d.steps) do
+      opts[#opts + 1] = { key = "sbj:" .. d.key .. ":" .. tostring(f), text = glide.sbj_label(f, d), selected = f == cur }
+    end
+    rows[#rows + 1] = { label = true, text = d.label }
+    rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur, d), same_line = true, tooltip = d.tip }
   end
+  rows[#rows + 1] = { separator = true }
   do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +1000% (0.15.207)
     local dp = tonumber(v.damage_pct) or 0
     local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
@@ -2275,16 +2283,24 @@ local function panel_rows(world)
     rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
       tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times. Only for you; off while you are in PvP." }
   end
+  rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line before the glider speed
+  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x
+    local gs = tonumber(v.glide_speed) or 1
+    local opts = {}
+    for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
+    rows[#rows + 1] = { label = true, text = "Glider speed" }
+    rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
+      tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
+  end
+  for _, d in ipairs(glide.SBJ) do
+    if d.which == "sprint" then sbj_row(d) end
+  end
   rows[#rows + 1] = { separator = true }
   for _, d in ipairs(glide.SBJ) do  -- (0.15.209, owner) Super B Jump's own settings: drop-downs, per player
-    if d.sep then rows[#rows + 1] = { separator = true } end  -- (0.15.226) Fast Dive's below a line
-    local cur = tonumber(v[d.key]) or d.default or 1
-    local opts = {}
-    for _, f in ipairs(d.steps) do
-      opts[#opts + 1] = { key = "sbj:" .. d.key .. ":" .. tostring(f), text = glide.sbj_label(f, d), selected = f == cur }
+    if d.which ~= "sprint" then
+      if d.sep then rows[#rows + 1] = { separator = true } end  -- (0.15.226) Fast Dive's below a line
+      sbj_row(d)
     end
-    rows[#rows + 1] = { label = true, text = d.label }
-    rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur, d), same_line = true, tooltip = d.tip }
   end
   return debug_rows(world, rows)
 end
