@@ -1,5 +1,5 @@
 0.15.273 Nov 16, 2026
-- Server (test): the Fast Dive blast is spawned with the player faction, to see whether it then hurts monsters (it did not before). FlameKit's own kill stays off; the monsters' health is still logged. Server only: no game update.
+- Server (test): the Fast Dive blast is spawned with the player faction, to see whether it then hurts monsters (it did not before). FlameKit's own kill stays off; the monsters' health is still logged, with their distance from the landing. Server only: no game update.
 
 0.15.272 Nov 16, 2026
 - Server (test): the Fast Dive kill is off again; instead the health of the monsters around a landing is logged at the landing and 1, 2 and 4 seconds later, to see what the blast itself does to them. Server only: no game update.

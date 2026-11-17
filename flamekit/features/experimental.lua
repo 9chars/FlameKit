@@ -357,7 +357,10 @@ function glide.kill_tick(world)
         -- (0.15.272, owner: "id like to try and see if theres another problem fix before just killing them off") the
         -- kill is off (glide.BLAST_KILL); the health of each monster in reach is noted, and logged again later
         sc.watch = sc.watch or {}
-        if #sc.watch < 20 then sc.watch[#sc.watch + 1] = { id = id, hp = okh and hp and tonumber(hp.health) } end
+        if #sc.watch < 20 then
+          sc.watch[#sc.watch + 1] = { id = id, hp = okh and hp and tonumber(hp.health),
+            d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2) }
+        end
         if glide.BLAST_KILL and not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
           local okd, did = pcall(emf.damage, world, sc.player, id, 1000000)
           if okd and did then sc.n = sc.n + 1 end
@@ -387,7 +390,7 @@ function glide.watch_tick(world)
       for _, m in ipairs(w.list) do
         local okh, hp = pcall(world.get, world, "NetworkHealth", m.id)
         local now = okh and hp and tonumber(hp.health)
-        parts[#parts + 1] = string.format("%s:%s", tostring(m.id), now and string.format("%.0f", now) or "gone")
+        parts[#parts + 1] = string.format("%s(%.0fm):%s", tostring(m.id), m.d or -1, now and string.format("%.0f", now) or "gone")
       end
       emf.log(string.format("experimental: fast dive: blast test: %.1f s after the search (%.1f s after the landing): %s",
         (t - w.at) / 60, (t - (w.start or w.at)) / 60, table.concat(parts, " ")))
