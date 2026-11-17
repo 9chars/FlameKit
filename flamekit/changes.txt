@@ -1,3 +1,6 @@
+0.15.269 Nov 16, 2026
+- Fast Dive: monsters hit by your landing's blast die (bosses too), as your kill: XP and loot as usual. Not players, pets, tamed animals or villagers; not with Boom only or Off. Server only: no game update.
+
 0.15.268 Nov 16, 2026
 - Fast Dive: the updraft burst (Space, with Enhanced Glider Mode) now pulls you out of a glider dive every time: the burst lifts you and the dive stops (before, after the flight's first burst, Space did nothing during a dive). Server only: no game update.
 
