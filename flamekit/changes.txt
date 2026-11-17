@@ -1,3 +1,6 @@
+0.15.258 Nov 16, 2026
+- New in the Experimental tab: Glider Sprint. Hold Sprint while gliding (the same key or button as running) to glide faster, 2x by default (Glider Sprint speed: 1.25x to 5x, multiplies your Glider speed). No stamina. Off in PvP. Needs FlameKit 0.15.258 on the server and in your game.
+
 0.15.257 Nov 16, 2026
 - Server (test): the fall probe is trimmed to one line per Fast Dive landing and each fall damage hit. Server only: no game update.
 

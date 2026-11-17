@@ -38,6 +38,7 @@ local SWITCHES = {
   { "pvp", "PvP (free-for-all)", nil, "PvP" },  -- no hit rule of its own: see pvp() (0.15.65)
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
   { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
+  { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -73,6 +74,7 @@ local TIPS = {
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
+  glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster; let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
   fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing from a free-fall dive kills you unless No Fall Damage is on (a dive started in the glider is survived), and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
@@ -119,8 +121,33 @@ function glide.allowed(f)
   for _, s in ipairs(glide.STEPS) do if s == f then return true end end
   return false
 end
+-- (0.15.258, owner: Shift "while the glider is open ... causes the glider to move faster (such as a sprint would work
+-- when running on the ground)", no stamina, the same input as running) Glider Sprint: while the player's game sends
+-- Sprint (PlayerInputType 53, measured 2026-11-16: sent while running and while gliding), the glider speed is
+-- multiplied by the player's sprint factor
+glide.SPRINT_BIT = 1 << 53
+function glide.sprinting(world, account, p)
+  if not is_on(account, "glidersprint") then p.sprint = nil return false end
+  local ok, held = pcall(function()
+    local inp = world:get("PlayerInput", p.entity)
+    return inp ~= nil and (math.tointeger(inp.fromClient.digitalInput) or 0) & glide.SPRINT_BIT ~= 0
+  end)
+  held = ok and held or false
+  if held ~= (p.sprint or false) then
+    p.sprint = held or nil
+    if held then
+      local ok2, st = pcall(function() return tonumber(tostring(world:get("DynamicLocomotion", p.entity).state)) end)
+      if ok2 and st == HANG_GLIDING then
+        emf.log(string.format("experimental: glider sprint: player %s sprints (%sx of their glider speed %sx)", tostring(p.entity),
+          glide.label(glide.sbj(account, "sprint")), glide.label(glide.factor(account))))
+      end
+    end
+  end
+  return held
+end
 function glide.apply(world, account, p)
   local f = glide.factor(account)
+  if glide.sprinting(world, account, p) then f = f * glide.sbj(account, "sprint") end
   if f == 1 or p.climb or glide.broken then return end
   local ok, err = pcall(function()
     local move = world:get("DynamicLocomotion", p.entity)
@@ -193,6 +220,10 @@ glide.SBJ = {
   { which = "divemin", key = "sbj_divemin", label = "Fast Dive minimum height", default = 10, steps = { 0, 5, 10, 15, 20, 30 },
     name = function(m) return m == 0 and "Off" or (m .. " m") end,
     tip = "No dive this close above the ground (the game only knows the distance to the ground when it is near). Only for you." },
+  -- (0.15.258, owner: "2x the default value should be good, of course give me a range to pick from (slower or faster)")
+  { which = "sprint", key = "sbj_sprint", label = "Glider Sprint speed", sep = true, default = 2,
+    steps = { 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5 },
+    tip = "How much faster you glide while holding Sprint: 2.0x is twice your Glider speed. Only for you." },
 }
 function glide.sbj(account, which)
   for _, d in ipairs(glide.SBJ) do
@@ -233,23 +264,9 @@ function glide.fall_line(what, entity, r)
     r.pct and string.format("%.3f", r.pct) or "nil"))
 end
 function glide.fall_probe(world, p, what)
-  local q = p.fall_probe or {}
-  p.fall_probe = q
-  local r = glide.fall_snap(world, p.entity)
-  local t = world:tick()
-  if what == "dive" then q.dive = true q.next = t end
-  if q.dive and q.next and t >= q.next then glide.fall_line("diving", p.entity, r) q.next = t + 30 end
-  local landed = what == "landed" or (q.prev and q.prev.st ~= 0 and r.st == 0)
-  if landed then
-    if q.prev then glide.fall_line("step before landing", p.entity, q.prev) end
-    glide.fall_line(what == "landed" and "LANDED (fast dive)" or "landed (normal)", p.entity, r)
-    q.after, q.dive, q.next = 5, nil, nil
-  elseif q.after then
-    glide.fall_line("after landing", p.entity, r)
-    q.after = q.after > 1 and q.after - 1 or nil
-  end
-  if what == "cancel" then q.dive, q.next = nil, nil end
-  q.prev = r
+  -- (0.15.257, owner: trim it) one line at each Fast Dive landing (what the game's fall damage measured); every fall
+  -- damage hit stays in the on_hit below. The full probe (every half second, every landing) is in git, 0.15.250.
+  if what == "landed" then glide.fall_line("LANDED (fast dive)", p.entity, glide.fall_snap(world, p.entity)) end
 end
 -- (0.15.253/254, owner: "when the player pops open their glider ... a notice message ... telling them to double tap
 -- the bound key", "every time", "like 5 seconds" (10 since 0.15.255), "light blue is good", "if you're below the minimum height it shouldn't
@@ -410,7 +427,7 @@ local function view(account)
               sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
               sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
               sbj_divemin = glide.sbj(account, "divemin"), sbj_divebase = glide.sbj(account, "divebase"),
-              sbj_diveauto = glide.sbj(account, "diveauto"),
+              sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
