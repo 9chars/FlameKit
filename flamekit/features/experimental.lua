@@ -319,6 +319,7 @@ end
 -- A monster: not a player, has the enemy AI (DynamicEnemy01BehaviorState), a faction that is not player side (7
 -- players, 8 companions, 11 summons). Pets, tamed animals and villagers are left alone. Bosses too are killed.
 -- Not with Boom only or Off (no blast that hurts).
+glide.BLAST_KILL = false  -- (0.15.272, owner: first see whether the blast itself can do it)
 glide.BLAST_R = { [1] = 10, [2] = 12, [3] = 15, [5] = 18, [6] = 24, [7] = 32 }  -- metres around the landing, by landing kind
 glide.scans = {}   -- { player, x, y, z, r, list, i, n }
 function glide.blast_zone(world, p)
@@ -327,7 +328,7 @@ function glide.blast_zone(world, p)
   if not r then return end
   local x, y, z = world:position(p.entity)
   if not x then return end
-  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0 }
+  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0, started = world:tick() }
 end
 function glide.is_monster(world, id)
   local oka, acc = pcall(world.account, world, id)
@@ -353,7 +354,11 @@ function glide.kill_tick(world)
       if ok and x and (x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2 <= r2 and glide.is_monster(world, id) then
         sc.seen = sc.seen + 1
         local okh, hp = pcall(world.get, world, "NetworkHealth", id)
-        if not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
+        -- (0.15.272, owner: "id like to try and see if theres another problem fix before just killing them off") the
+        -- kill is off (glide.BLAST_KILL); the health of each monster in reach is noted, and logged again later
+        sc.watch = sc.watch or {}
+        if #sc.watch < 20 then sc.watch[#sc.watch + 1] = { id = id, hp = okh and hp and tonumber(hp.health) } end
+        if glide.BLAST_KILL and not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
           local okd, did = pcall(emf.damage, world, sc.player, id, 1000000)
           if okd and did then sc.n = sc.n + 1 end
         end
@@ -363,7 +368,32 @@ function glide.kill_tick(world)
   if sc.i > #sc.list then
     emf.log(string.format("experimental: fast dive: player %s's blast (%d m): %d monster(s) in reach, %d killed (searched %d entities)",
       tostring(sc.player), sc.r, sc.seen, sc.n, #sc.list))
+    if sc.watch then
+      glide.watches[#glide.watches + 1] = { list = sc.watch, at = world:tick(), start = sc.started, step = 0 }
+    end
     table.remove(glide.scans, 1)
+  end
+end
+-- (0.15.272, test) the monsters' health at the search, then 1, 2 and 4 seconds after it
+glide.watches = {}
+function glide.watch_tick(world)
+  local t = world:tick()
+  for i = #glide.watches, 1, -1 do
+    local w = glide.watches[i]
+    local marks = { 0, 60, 120, 240 }
+    local due = marks[w.step + 1]
+    if due and t - w.at >= due then
+      local parts = {}
+      for _, m in ipairs(w.list) do
+        local okh, hp = pcall(world.get, world, "NetworkHealth", m.id)
+        local now = okh and hp and tonumber(hp.health)
+        parts[#parts + 1] = string.format("%s:%s", tostring(m.id), now and string.format("%.0f", now) or "gone")
+      end
+      emf.log(string.format("experimental: fast dive: blast test: %.1f s after the search (%.1f s after the landing): %s",
+        (t - w.at) / 60, (t - (w.start or w.at)) / 60, table.concat(parts, " ")))
+      w.step = w.step + 1
+    end
+    if not marks[w.step + 1] then table.remove(glide.watches, i) end
   end
 end
 -- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
@@ -2038,6 +2068,7 @@ function F.tick(world)
   end
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
   if world:is_server() then pcall(glide.kill_tick, world) end  -- (0.15.271) a Fast Dive blast kills the monsters around
+  if world:is_server() then pcall(glide.watch_tick, world) end  -- (0.15.272, test)
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)
