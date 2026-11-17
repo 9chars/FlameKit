@@ -28,7 +28,7 @@ local M = {
   STICK = 0.5,           -- forward on the stick at least this far counts as a press of W
   SPEED = 80,            -- the push down at 1x (the impulse's y, negative)
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
-  MIN_HEIGHT = 10,       -- (0.15.263) metres above where the player last stood: no glider dive (and no tip) below it; not a setting
+  MIN_HEIGHT = 0,        -- (0.15.263: 10 m above where the player last stood; 0.15.264, owner: "there should just be no minimum for the glider") 0 = the glider dive and its tip at any height
   LANDING_SHIELD = 1.5,
   DEFAULT_LANDING = 1,  -- (0.15.260, owner: "lets make Fast Dive landing set to Small crater")
   RISING = 2,            -- m/s upward (Velocity.y) during a dive: the player pulls up (0.15.247)
