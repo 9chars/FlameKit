@@ -68,11 +68,11 @@ systems.
 
 ## Where things stand (updated 2026-11-16 21:15, end of the conversation of 2026-11-16)
 
-- Versions (2026-11-16 21:15): **Development 0.15.275** (game; waiting for the owner's next game start). **Local
-  server 0.15.275.** **Stable 0.15.207. G-Portal 0.15.208.** Nothing of today went to Stable or G-Portal (owner,
-  morning: "don't push any updates ... keep the stable channel out from updates for now"); both only when the owner
-  names them. Before a G-Portal upload: rule 8a (today's server code works with the 0.15.207 Stable game: the new
-  messages "dive" and "tip" are ignored by older games; the new settings are only drawn by games from 0.15.209 on).
+- Versions (2026-11-16 21:30): **0.15.277 everywhere**: Development, **Stable** (dist) and the local server, and
+  **G-Portal** (uploaded 21:29 by the restart helper: 9 files changed since 0.15.208; EMF reloaded, no "restart the
+  game" lines). Owner, 21:27: "send it out to all channels including stable and update g-portal". 0.15.276 took the
+  monster blast damage out by Claude's misreading; 0.15.277 put it back exactly (owner was angry: read his words
+  twice, and never remove or change anything he did not ask for).
 - Every Development version today rebuilt the DLL (flamekit_native/mod.json bumped with flamekit/mod.json, restart
   helper `build`, then stage `out\flamekit_native\flamekit_native.dll` and run make_dist.py with it).
 - The container's git remote https://github.com/9chars/flamekit answers "This repository moved ... FlameKit.git";
