@@ -66,20 +66,20 @@ on its own: no feature calls into or reads another feature's code or data (for e
 be able to change how another works. Keep the code clean, reusable and well factored, without dependencies between
 systems.
 
-## Where things stand (updated 2026-11-16 17:55, end of the conversation of 2026-11-16)
+## Where things stand (updated 2026-11-16 21:15, end of the conversation of 2026-11-16)
 
-- Versions (2026-11-16 17:55): **Development 0.15.256** (game; the owner's client runs it). **Local server 0.15.257**
-  (0.15.257 is server only: the fall probe trimmed). **Stable 0.15.207. G-Portal 0.15.208.** Nothing of today went to
-  Stable or G-Portal (owner, morning: "don't push any updates ... keep the stable channel out from updates for now");
-  both only when the owner names them. Before a G-Portal upload: rule 8a (all of today's server code works with the
-  0.15.207 Stable game: the new messages "dive" and "tip" are ignored by older games; Fast Dive/Super B Jump settings
-  are only drawn by games from 0.15.209 on).
+- Versions (2026-11-16 21:15): **Development 0.15.275** (game; waiting for the owner's next game start). **Local
+  server 0.15.275.** **Stable 0.15.207. G-Portal 0.15.208.** Nothing of today went to Stable or G-Portal (owner,
+  morning: "don't push any updates ... keep the stable channel out from updates for now"); both only when the owner
+  names them. Before a G-Portal upload: rule 8a (today's server code works with the 0.15.207 Stable game: the new
+  messages "dive" and "tip" are ignored by older games; the new settings are only drawn by games from 0.15.209 on).
 - Every Development version today rebuilt the DLL (flamekit_native/mod.json bumped with flamekit/mod.json, restart
   helper `build`, then stage `out\flamekit_native\flamekit_native.dll` and run make_dist.py with it).
 - The container's git remote https://github.com/9chars/flamekit answers "This repository moved ... FlameKit.git";
   pushes still go through.
 - `C:\enshrouded mod shit\outbox` is empty.
-- **Owner, 17:50: Fast Dive is "good until I test it more"**: no more Fast Dive changes unless he reports something.
+- Fast Dive and Glider Sprint: the owner tested and liked what is in 0.15.275 (21:07: "works for me"). Change them only
+  when he reports something.
 - Debug code kept ON PURPOSE (owner, 2026-11-16: "keep the loot drop debug code for now since I want more data in
   case I find new problems"): loot_drop.lua `flamekit.loottest`, `flamekit.fx <1-10>`, the effect-component `dump()`,
   DIAG_MAX 60 lines a minute of Loot Drop notes. Also kept: Fast Dive's console tests (`flamekit.fastdive ...`,
@@ -121,6 +121,39 @@ systems.
     (`s.ground_y`: the game knows the ground below only ~1 m before a landing).
 - **Grave marker** drawn last on the minimap (flamekit_native.cpp, 3 passes).
 - Restart status line first in every report (Rule 0r) and the owner picks every next step (Rule 0p): both from today.
+
+## Built 2026-11-16 evening (0.15.258 .. 0.15.275), in short
+
+- **Glider Sprint** (switch "glidersprint", per player, off in PvP; glide.sprinting/glide.apply): holding the game's
+  Sprint input (PlayerInputType **53**, measured with the input probe: sent while running AND while gliding; same
+  input on a controller) multiplies the glider speed by "Glider Sprint speed" (sbj_sprint, 1.25x..5x, default 2x)
+  on top of Glider speed. No stamina. Also while climbing with back/S (0.15.259: the climb's forward speed times it).
+- **Settings order** (0.15.261): switches, then Damage bonus, line, Glider speed + Glider Sprint speed, line, Super B
+  Jump's, line, Fast Dive's.
+- **Fast Dive changes:** landing default Small crater (0.15.260). "Free-fall Dive Minimum" (0.15.265, owner's name;
+  key sbj_diveauto) is ONLY for the automatic free-fall dive and is the game's altitude above sea level (default
+  1000 m). The glider double tap works at any height (0.15.264: no minimum at all). The old "minimum height" setting
+  is gone (0.15.262/263): groundDistance is only known ~1 m before a landing, so it hardly ever worked.
+  - 0.15.262 tried "height above where you last stood" for both dives and was undone at once: jumping off a 1000 m
+    tower then needed another 1000 m. **Real height above the ground cannot be read** from Lua: EMF has no terrain or
+    raycast call, and the teleport ground search only looks ~10 m around the given point. Owner was confused by the
+    many options that evening: give him ONE plain question at a time.
+  - After a glider dive lands, no fall damage for 5 s (CRATER_GUARD, 0.15.266): the crater opens under the player
+    and the ~14 m drop into it hurt (2515 -> 531). Monsters still take that fall.
+  - A cancelled dive (pull up/S, burst, glider opened, water) now also ends its push (end_push, 0.15.267): before,
+    only the blast and notice were cancelled and the player kept falling at dive speed.
+  - The updraft burst (Space) pulls out of a glider dive every time (0.15.268): FlameKit's renewed burst no longer
+    counts the dive's push (impulse.y <= -50) as "a burst still lifting"; it replaces it and the dive cancels.
+  - **Blast damage to monsters** (0.15.274, glide.kill_tick): the game's explosion spawned by FlameKit NEVER hurts
+    creatures (0.15.272/273 measured monsters 1 m from a Gigantic crater at full health, also with Faction 7 on the
+    explosion; on_hit saw no hit at all). A player's TNT damage comes from the item, which a spawned template lacks.
+    So after a landing FlameKit walks world:entities() (budgeted over a few steps, ~48,000 entities on the local
+    server) and hits every monster within reach with emf.damage FROM THE DIVER: BLAST_DMG Small 500, Medium 1000,
+    Big 2000, Huge 4000, Massive 8000, Gigantic 15000 at the centre, down to BLAST_EDGE (a fifth) at BLAST_R (10..32 m).
+    Bosses too. Monster = no account, has DynamicEnemy01BehaviorState, Faction not 7/8/11. Some places (camps, ruins)
+    let the boom go off but allow no terrain damage: a game rule.
+- Debug kept: one fall-probe line per dive landing and every fall damage hit; the blast line per landing; the
+  0.15.272 health watch is off (glide.BLAST_WATCH) but kept.
 
 ## Built 2026-11-15..16 (0.15.143 .. 0.15.208), in short
 
