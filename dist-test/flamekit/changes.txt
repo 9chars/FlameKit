@@ -1,3 +1,7 @@
+0.15.263 Nov 16, 2026
+- Fast Dive settings made clearer: "Free-fall dive above (altitude)" (was "Fast Dive automatic above") is only for diving without the glider, by the game's altitude (height above sea level, not above the ground). The glider dive (tap forward twice) works at any height, except within 10 m above where you last stood (no tip there either). The "Fast Dive minimum height" setting is gone: it hardly ever did anything. New tooltips say all this.
+- Includes 0.15.261's settings order. (0.15.262, never released: both dives counted from where you last stood; undone.)
+
 0.15.261 Nov 16, 2026
 - Experimental tab: Damage bonus is now the first setting, and Glider Sprint speed sits right below Glider speed.
 - Includes the server changes of 0.15.259 and 0.15.260 (Glider Sprint while climbing, Small crater by default).

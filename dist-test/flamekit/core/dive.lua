@@ -28,11 +28,11 @@ local M = {
   STICK = 0.5,           -- forward on the stick at least this far counts as a press of W
   SPEED = 80,            -- the push down at 1x (the impulse's y, negative)
   SECONDS = 120,         -- one push; from the 2480 m ceiling down at about 60 m/s is about 40 s; it ends at the landing
-  MIN_HEIGHT = 10,       -- metres to the ground at 1x default (opts.min); 0 = anywhere
+  MIN_HEIGHT = 10,       -- (0.15.263) metres above where the player last stood: no glider dive (and no tip) below it; not a setting
   LANDING_SHIELD = 1.5,
   DEFAULT_LANDING = 1,  -- (0.15.260, owner: "lets make Fast Dive landing set to Small crater")
   RISING = 2,            -- m/s upward (Velocity.y) during a dive: the player pulls up (0.15.247)
-  AUTO_ABOVE = 1000,     -- (0.15.248) metres above sea level: a free fall above it dives by itself (opts.auto; 0 = never)
+  AUTO_ABOVE = 1000,     -- (0.15.248) the game's altitude (metres above sea level): a free fall above it dives by itself (opts.auto; 0 = never)
   AUTO_FALL = 20,        -- metres fallen from the highest point first (not after closing the glider)   -- (0.15.240, owner: "default it to big crater")  -- seconds the diver takes no hits after the landing (their own blast)
   -- the landing blasts a player can choose (opts.landing): the game's own explosion templates
   LANDINGS = {
@@ -89,6 +89,11 @@ function M.ground_distance(world, entity)
     return mc and mc.results and mc.results.m_value and tonumber(mc.results.m_value.groundDistance)
   end)
   return ok and d or nil
+end
+
+-- (0.15.262) how high the player is above the last place they stood or swam (s.ground_y), or nil when not known
+function M.above_ground(s, y)
+  return y and s.ground_y and y - s.ground_y or nil
 end
 
 local function push_down(world, entity, gliding, factor, keep_others)
@@ -279,10 +284,12 @@ function M.step(world, entity, s, opts)
         return
       end
       s.first = nil
-      local gd = M.ground_distance(world, entity)
-      s.ground = gd
-      local min = opts.min or M.MIN_HEIGHT
-      if min > 0 and gd and gd > 0 and gd < min then
+      -- (0.15.263, owner, after 0.15.262 tied it to the free-fall height: back to "at any height") only not within
+      -- MIN_HEIGHT m above where the player last stood (M.above_ground; the game's ground distance is known only ~1 m
+      -- before a landing, so the old minimum height setting hardly ever worked and is gone)
+      local above = M.above_ground(s, y)
+      s.ground = above
+      if M.MIN_HEIGHT > 0 and above and above < M.MIN_HEIGHT then
         result = "low"
         return
       end
@@ -292,6 +299,9 @@ function M.step(world, entity, s, opts)
       -- falling above the player's height (the game's altitude, metres above sea level), after a fall of AUTO_FALL m
       -- from the highest point (so jumps and small drops on high ground never start one), or at once when the glider
       -- was just closed (owner: "if you close the glider and you start falling, it should be enough")
+      -- (0.15.262 counted it above where the player last stood: a 1000 m tower then needed another 1000 m; 0.15.263,
+      -- owner: back to the game's altitude, explained better in the setting's name and tooltip. The ground far below
+      -- cannot be measured: the game knows it only ~1 m before a landing, and its ground search looks ~10 m around.)
       local above = opts.auto or M.AUTO_ABOVE
       if not (above and above > 0 and y and y > above) then return end
       local v = world:get("Velocity", entity)

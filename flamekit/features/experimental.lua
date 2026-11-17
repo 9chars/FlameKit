@@ -75,7 +75,7 @@ local TIPS = {
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster; let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
-  fastdive = "Falling without the glider high up dives by itself (the height is below); gliding, tap forward twice quickly for a nose dive. Opening the glider, or pulling up in it, cancels a dive. Landing from a free-fall dive kills you unless No Fall Damage is on (a dive started in the glider is survived), and blasts a crater (choose below, or no crater). Speed, landing and minimum height are below; the tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
+  fastdive = "Two ways to dive. Without the glider: falling above your Free-fall dive altitude (below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, or pulling up in it, cancels a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below). Tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -213,13 +213,13 @@ glide.SBJ = {
   { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
     name = function(k) return k == 1 and "Crater" or "Boom only" end,  -- (0.15.232, owner: per player, their responsibility)
     tip = "Landing inside a base (a flame altar's area, yours or anyone's): Boom only makes the sound without damage; Crater blasts it like anywhere else and can destroy what is built there. Only for you." },
-  { which = "diveauto", key = "sbj_diveauto", label = "Fast Dive automatic above", default = 1000,
+  -- (0.15.263, owner: "it needs to be documented or communicated better in the tool tip or the settings need to be
+  -- renamed so it makes sense to the player") only for the free-fall dive, by the game's altitude; the glider dive has
+  -- no height setting (any height; the minimum height setting is gone since 0.15.262)
+  { which = "diveauto", key = "sbj_diveauto", label = "Free-fall dive above (altitude)", default = 1000,
     steps = { 0, 500, 750, 1000, 1500, 2000 },  -- (0.15.248, owner: default about 1000)
     name = function(m) return m == 0 and "Off" or (m .. " m") end,
-    tip = "Falling without the glider above this height (the game's altitude) starts a Fast Dive by itself, once you have fallen 20 m, or at once when you close the glider. Open the glider to cancel it. Only for you." },
-  { which = "divemin", key = "sbj_divemin", label = "Fast Dive minimum height", default = 10, steps = { 0, 5, 10, 15, 20, 30 },
-    name = function(m) return m == 0 and "Off" or (m .. " m") end,
-    tip = "No dive this close above the ground (the game only knows the distance to the ground when it is near). Only for you." },
+    tip = "Only for diving WITHOUT the glider: falling higher than this dives by itself, once you have fallen 20 m (at once when you close the glider). It is the game's altitude, the height above sea level, not above the ground: over high ground you fall less. Open the glider to cancel. Off: never by itself. The glider dive (tap forward twice) does not use this: it works at any height. Only for you." },
   -- (0.15.258, owner: "2x the default value should be good, of course give me a range to pick from (slower or faster)")
   { which = "sprint", key = "sbj_sprint", label = "Glider Sprint speed", sep = true, default = 2,
     steps = { 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5 },
@@ -287,12 +287,12 @@ function glide.glider_tip(world, p, o, what)
   if d.glider_opened then
     d.glider_opened = nil
     local _, y = world:position(p.entity)
-    local min = tonumber(o.min) or glide.dive.MIN_HEIGHT
-    local above = y and d.ground_y and y - d.ground_y or nil
+    local min = glide.dive.MIN_HEIGHT  -- (0.15.263) as the double tap: not within 10 m above where you last stood
+    local above = glide.dive.above_ground(d, y)
     local high = not (min > 0 and above and above < min)
     emf.log(string.format("experimental: fast dive: player %s opened the glider at %.1f m, %s above where they last stood: tip %s",
       tostring(p.entity), y or 0, above and string.format("%.1f m", above) or "unknown height",
-      high and "shown" or string.format("not shown (minimum %s m)", tostring(min))))
+      high and "shown" or string.format("not shown (under %s m)", tostring(min))))
     if high then
       say(true)
       d.tip_shown = true
@@ -426,7 +426,7 @@ local function view(account)
               sbj_height = glide.sbj(account, "height"), sbj_forward = glide.sbj(account, "forward"),
               sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
               sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
-              sbj_divemin = glide.sbj(account, "divemin"), sbj_divebase = glide.sbj(account, "divebase"),
+              sbj_divebase = glide.sbj(account, "divebase"),
               sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
@@ -1572,7 +1572,7 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     if is_on(account, "fastdive") then
       p.dive = p.dive or {}
       local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed") * glide.DIVE_PUSH,
-                  landing = glide.sbj(account, "diveland"), min = glide.sbj(account, "divemin"),
+                  landing = glide.sbj(account, "diveland"),
                   base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto"),
                   protected = (is_on(account, "fall") or is_on(account, "immortal")) and true or nil }  -- (0.15.251)
       local what = glide.dive.step(world, p.entity, p.dive, o)
@@ -1597,8 +1597,8 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
         emf.log(string.format("experimental: fast dive: player %s: dive cancelled (%s)", tostring(p.entity),
           tostring(p.dive.cancel_why)))
       elseif what == "low" then
-        emf.log(string.format("experimental: fast dive: player %s too low (ground %.1f m below, minimum %s m)",
-          tostring(p.entity), p.dive.ground or 0, tostring(o.min)))
+        emf.log(string.format("experimental: fast dive: player %s too low for the glider dive (%.1f m above where they last stood, needs %s m)",
+          tostring(p.entity), p.dive.ground or 0, tostring(glide.dive.MIN_HEIGHT)))
       elseif what == "landed" then
         local _, y = world:position(p.entity)
         emf.log(string.format("experimental: fast dive: player %s landed at %.1f m, %s, blast %s", tostring(p.entity), y or 0,
