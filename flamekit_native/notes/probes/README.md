@@ -13,6 +13,7 @@ To use one:
 | Probe | What it logs (on every change) | Made for |
 |---|---|---|
 | `jump_probe.lua` | each player's jump button, `DynamicLocomotion.state`, `previousState`, `jumpCount`, height, upward speed, stamina; the height every 0.1 s for 3 s after a press; once per player their unlocked skill nodes and whether Double Jump (`ffd5f940`) is among them | Super B Jump (0.15.209) |
+| `npc_probe.lua` | not read-only, a test: console `flamekit.npc spawn/offer/look/remove`; spawns one of the game's unused test villagers, puts FlameKit's "E Talk" on it, logs its parts | an NPC with FlameKit's own prompts (2026-11-17) |
 | `input_probe.lua` | each player's buttons (`PlayerInput.fromClient.digitalInput` as bit numbers), the actor state bits (`Actor.currentState`), `DynamicLocomotion.state`, `ActorInput.locomotionSpeed`, `PlayerState.playerStateMask` | Fast Dive's crouch (0.15.229) |
 
 What they found is in `../MOVEMENT.md`.
