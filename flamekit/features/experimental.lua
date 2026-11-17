@@ -312,23 +312,22 @@ function glide.tip_notice(msg)
     kit.notice("fastdive_tip")
   end
 end
--- (0.15.269, owner: "I want the blast damage from the blast when I crash from fast dive to kill monsters") for
--- BLAST_KILL_S seconds after a Fast Dive's landing blast (not Off, not Boom only), every monster the server sees hit
--- within the landing's radius gets a killing hit FROM THE DIVER (emf.damage: kill credit, XP, loot as usual). A
--- monster: not a player, has the enemy AI (DynamicEnemy01BehaviorState), a faction that is not player side (7 players,
--- 8 companions, 11 summons). Pets, tamed animals and villagers have no enemy AI or are player side. Bosses too.
-glide.BLAST_KILL_S = 2
+-- (0.15.269, owner: "I want the blast damage from the blast when I crash from fast dive to kill monsters") every
+-- monster within the landing's radius gets a killing hit FROM THE DIVER (emf.damage: kill credit, XP, loot as usual).
+-- (0.15.271: 0.15.269 waited for the blast's own hits, but the server never saw one: 0.15.270's log of seven landings
+-- among monsters had none. Now the world is searched around the landing instead, a budgeted walk over a few steps.)
+-- A monster: not a player, has the enemy AI (DynamicEnemy01BehaviorState), a faction that is not player side (7
+-- players, 8 companions, 11 summons). Pets, tamed animals and villagers are left alone. Bosses too are killed.
+-- Not with Boom only or Off (no blast that hurts).
 glide.BLAST_R = { [1] = 10, [2] = 12, [3] = 15, [5] = 18, [6] = 24, [7] = 32 }  -- metres around the landing, by landing kind
-glide.zones = {}   -- { player, x, y, z, r, until (tick), killed = { [entity] = true }, n }
+glide.scans = {}   -- { player, x, y, z, r, list, i, n }
 function glide.blast_zone(world, p)
   local kind = p.dive.landed_with
   local r = glide.BLAST_R[kind or 0]
   if not r then return end
   local x, y, z = world:position(p.entity)
   if not x then return end
-  emf.log(string.format("experimental: fast dive: blast zone open for player %s, %d m around %.0f %.0f %.0f", tostring(p.entity), r, x, y, z))
-  glide.zones[#glide.zones + 1] = { player = p.entity, x = x, y = y, z = z, r = r, killed = {}, n = 0, logged = 0,
-    until_tick = world:tick() + glide.BLAST_KILL_S * 60 }
+  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0 }
 end
 function glide.is_monster(world, id)
   local oka, acc = pcall(world.account, world, id)
@@ -339,36 +338,32 @@ function glide.is_monster(world, id)
   local fn = okf and f and tonumber(tostring(f.faction))
   return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
 end
-function glide.blast_hit(world, hit)
-  if #glide.zones == 0 or not hit or hit.healing then return end
-  if hit.kind ~= "hit" then
-    emf.log("experimental: fast dive: blast debug: a hit of kind " .. tostring(hit.kind) .. " on " .. tostring(hit.target))
-    return
-  end
-  local t = world:tick()
-  for i = #glide.zones, 1, -1 do
-    local zn = glide.zones[i]
-    if t > zn.until_tick then
-      if zn.n > 0 then emf.log(string.format("experimental: fast dive: player %s's blast killed %d monster(s)", tostring(zn.player), zn.n)) end
-      table.remove(glide.zones, i)
-    elseif hit.target ~= zn.player and not zn.killed[hit.target] then
-      local x, y, z = world:position(hit.target)
-      -- (0.15.270, owner: "these monsters are not dying") every hit while a zone is open, for finding why
-      if zn.logged < 40 then
-        zn.logged = zn.logged + 1
-        local okf, f = pcall(world.get, world, "Faction", hit.target)
-        local oke, ai = pcall(world.get, world, "DynamicEnemy01BehaviorState", hit.target)
-        emf.log(string.format("experimental: fast dive: blast debug: hit on %s by %s (source %s, amount %s, kind %s) at %s m, faction %s, enemy AI %s, monster %s",
-          tostring(hit.target), tostring(hit.attacker), tostring(hit.source), tostring(hit.amount), tostring(hit.kind),
-          x and string.format("%.1f", math.sqrt((x - zn.x) ^ 2 + (y - zn.y) ^ 2 + (z - zn.z) ^ 2)) or "?",
-          okf and f and tostring(f.faction) or "none", tostring(oke and ai ~= nil), tostring(glide.is_monster(world, hit.target))))
-      end
-      if x and (x - zn.x) ^ 2 + (y - zn.y) ^ 2 + (z - zn.z) ^ 2 <= zn.r * zn.r and glide.is_monster(world, hit.target) then
-        zn.killed[hit.target] = true
-        local ok = pcall(emf.damage, world, zn.player, hit.target, 1000000)
-        if ok then zn.n = zn.n + 1 end
+-- every server step while a landing's search is under way: part of the world's entities, within SCAN_BUDGET
+function glide.kill_tick(world)
+  local sc = glide.scans[1]
+  if not sc then return end
+  if not sc.list then sc.list = world:entities() return end  -- the list in one step, the walk in the next ones
+  local t0, done = now_s(), 0
+  local r2 = sc.r * sc.r
+  while sc.i <= #sc.list and not scan_over(t0, done) do
+    local id = sc.list[sc.i]
+    sc.i, done = sc.i + 1, done + 1
+    if id ~= sc.player then
+      local ok, x, y, z = pcall(world.position, world, id)
+      if ok and x and (x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2 <= r2 and glide.is_monster(world, id) then
+        sc.seen = sc.seen + 1
+        local okh, hp = pcall(world.get, world, "NetworkHealth", id)
+        if not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
+          local okd, did = pcall(emf.damage, world, sc.player, id, 1000000)
+          if okd and did then sc.n = sc.n + 1 end
+        end
       end
     end
+  end
+  if sc.i > #sc.list then
+    emf.log(string.format("experimental: fast dive: player %s's blast (%d m): %d monster(s) in reach, %d killed (searched %d entities)",
+      tostring(sc.player), sc.r, sc.seen, sc.n, #sc.list))
+    table.remove(glide.scans, 1)
   end
 end
 -- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
@@ -2042,6 +2037,7 @@ function F.tick(world)
     pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
   end
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
+  if world:is_server() then pcall(glide.kill_tick, world) end  -- (0.15.271) a Fast Dive blast kills the monsters around
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)
@@ -2909,8 +2905,6 @@ function F.setup(k)
     end
     if tell_player then tell_player(world, d.player, account, "You died: PvP is off. Switch it on again to fight.") end
   end, "a player's death"))
-  -- (0.15.269) a Fast Dive blast kills the monsters it hits (glide.blast_hit)
-  pcall(emf.on_hit, kit.guard(F, function(world, hit) glide.blast_hit(world, hit) end, "a blast hit"))
   -- (0.15.250, probe) every fall damage hit on a player: how much, health before and after
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "fall" then return end
