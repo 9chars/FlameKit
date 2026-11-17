@@ -1,3 +1,6 @@
+0.15.274 Nov 16, 2026
+- Fast Dive: the landing blast now damages the monsters around it, as your hits (XP and loot when they die). The damage grows with the crater: Small 500, Medium 1000, Big 2000, Huge 4000, Massive 8000, Gigantic 15000 at the centre, fading to a fifth at the edge of the reach (10 m for Small up to 32 m for Gigantic). Bosses take it too. Not players, pets, tamed animals or villagers; nothing with Boom only or Off. (The game's explosion itself never hurts creatures: tested in 0.15.272 and 0.15.273.) Server only: no game update.
+
 0.15.273 Nov 16, 2026
 - Server (test): the Fast Dive blast is spawned with the player faction, to see whether it then hurts monsters (it did not before). FlameKit's own kill stays off; the monsters' health is still logged, with their distance from the landing. Server only: no game update.
 

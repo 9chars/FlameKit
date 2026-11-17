@@ -134,7 +134,7 @@ end
 -- spawned with the player faction (M.BLAST_FACTION), so the game's enemy check lets its damage through to monsters as it
 -- does for a player's own TNT; when the game refuses the component it is spawned as before. The first few spawns log
 -- the explosion's Faction and OwnerRelationship as the game has them.
-M.BLAST_FACTION = 7
+M.BLAST_FACTION = nil  -- (0.15.274: faction 7 made no difference, the explosion still hurt no creature)
 M.boom_said = 0
 function M.boom(world, x, y, z, guid, scale)
   if not guid or guid == "" or guid == "off" then return nil end

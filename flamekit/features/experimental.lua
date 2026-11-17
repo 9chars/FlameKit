@@ -319,7 +319,13 @@ end
 -- A monster: not a player, has the enemy AI (DynamicEnemy01BehaviorState), a faction that is not player side (7
 -- players, 8 companions, 11 summons). Pets, tamed animals and villagers are left alone. Bosses too are killed.
 -- Not with Boom only or Off (no blast that hurts).
-glide.BLAST_KILL = false  -- (0.15.272, owner: first see whether the blast itself can do it)
+glide.BLAST_KILL = true   -- (0.15.272 off for a test: the game's explosion itself never hurts creatures, 0.15.273 measured
+-- monsters 1 m from the centre at full health, also with the player faction; it has no item behind it to work out damage)
+-- (0.15.274, owner: "lets do B and the damage amount should scale with the crater size") not a kill any more: damage
+-- by crater size (BLAST_DMG, at the centre), fading to a fifth of it at the edge of the reach (BLAST_R). Bosses too.
+glide.BLAST_DMG = { [1] = 500, [2] = 1000, [3] = 2000, [5] = 4000, [6] = 8000, [7] = 15000 }
+glide.BLAST_EDGE = 0.2
+glide.BLAST_WATCH = false  -- (0.15.272, test) the monsters' health logged after a landing
 glide.BLAST_R = { [1] = 10, [2] = 12, [3] = 15, [5] = 18, [6] = 24, [7] = 32 }  -- metres around the landing, by landing kind
 glide.scans = {}   -- { player, x, y, z, r, list, i, n }
 function glide.blast_zone(world, p)
@@ -328,7 +334,8 @@ function glide.blast_zone(world, p)
   if not r then return end
   local x, y, z = world:position(p.entity)
   if not x then return end
-  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0, started = world:tick() }
+  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0, started = world:tick(),
+    dmg = glide.BLAST_DMG[kind] or 0, total = 0 }
 end
 function glide.is_monster(world, id)
   local oka, acc = pcall(world.account, world, id)
@@ -357,21 +364,23 @@ function glide.kill_tick(world)
         -- (0.15.272, owner: "id like to try and see if theres another problem fix before just killing them off") the
         -- kill is off (glide.BLAST_KILL); the health of each monster in reach is noted, and logged again later
         sc.watch = sc.watch or {}
-        if #sc.watch < 20 then
+        if glide.BLAST_WATCH and #sc.watch < 20 then
           sc.watch[#sc.watch + 1] = { id = id, hp = okh and hp and tonumber(hp.health),
             d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2) }
         end
-        if glide.BLAST_KILL and not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
-          local okd, did = pcall(emf.damage, world, sc.player, id, 1000000)
-          if okd and did then sc.n = sc.n + 1 end
+        if glide.BLAST_KILL and sc.dmg > 0 and not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
+          local d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2)
+          local amount = math.floor(sc.dmg * math.max(glide.BLAST_EDGE, 1 - d / sc.r) + 0.5)
+          local okd, did = pcall(emf.damage, world, sc.player, id, amount)
+          if okd and did then sc.n, sc.total = sc.n + 1, sc.total + amount end
         end
       end
     end
   end
   if sc.i > #sc.list then
-    emf.log(string.format("experimental: fast dive: player %s's blast (%d m): %d monster(s) in reach, %d killed (searched %d entities)",
-      tostring(sc.player), sc.r, sc.seen, sc.n, #sc.list))
-    if sc.watch then
+    emf.log(string.format("experimental: fast dive: player %s's blast (%d m, %d at the centre): %d monster(s) in reach, %d hit for %d in all (searched %d entities)",
+      tostring(sc.player), sc.r, sc.dmg, sc.seen, sc.n, sc.total, #sc.list))
+    if sc.watch and #sc.watch > 0 then
       glide.watches[#glide.watches + 1] = { list = sc.watch, at = world:tick(), start = sc.started, step = 0 }
     end
     table.remove(glide.scans, 1)
