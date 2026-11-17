@@ -112,6 +112,34 @@ local function join_tick(world, t)
   end
 end
 local recs = {}      -- entity -> { untill, next } (owner walking, to copy what a real player's game sends)
+-- (plan B1, 2026-11-17) the AI recorder: a fake player's AI state (DynamicEnemy01BehaviorState), twice a second, a line
+-- whenever something in it changed
+local AI_STATES = { [0] = "Invalid", "Start", "Idle", "Dead", "Spawning", "Investigate", "Combat", "ReturnHome", "FleeHome",
+  "WaitAtHome", "ReactToNoise", "Patrol", "TurnAfterPatrol", "WaitAfterPatrol", "ControlledByAttack", "Roaming", "Flee",
+  "WaitAfterFlee", "Falling", "Hit", "Guard", "Interact", "Landing", "BlockProjectile", "MoveToMarker", "Sleep", "Circling",
+  "AvoidWater", "Revive", "Stunned" }
+local airecs = {}    -- entity -> { untill, next, last }
+local function v3(v) return v and string.format("%.1f %.1f %.1f", tonumber(v.x) or 0, tonumber(v.y) or 0, tonumber(v.z) or 0) or "-" end
+local function airec_line(world, id, r)
+  local ok, err = pcall(function()
+    local a = world:get("DynamicEnemy01BehaviorState", id)
+    if not a then return end
+    local x, y, z = world:position(id)
+    local ai = world:get("ActorInput", id)
+    local m = world:get("DynamicLocomotion", id)
+    local key = string.format("state %s | home %s | target %s %s | guard %s (its state %s, distance %.1f, target %s) | enabled %s | idle anim %s walk anim %s | flags %s | speed %s | moving %s",
+      AI_STATES[tonumber(a.state) or -1] or tostring(a.state), v3(a.homeZonePosition), tostring(a.movementTargetIsValid), v3(a.movementTarget),
+      tostring(a.guardEntityId), AI_STATES[tonumber(a.guardingTargetState) or -1] or tostring(a.guardingTargetState),
+      tonumber(a.currentGuardTargetDistance) or -1, v3(a.guardingTargetMovementTarget), tostring(a.enabled),
+      tostring(a.currentIdleAnimation), tostring(a.currentWalkAnimation), tostring(a.runtimeFlags),
+      tostring(ai and ai.locomotionSpeed), tostring(m and m.state))
+    if key ~= r.last then
+      r.last = key
+      log(string.format("ai %s at %s: %s", tostring(id), x and string.format("%.1f %.1f %.1f", x, y, z) or "?", key))
+    end
+  end)
+  if not ok then log("ai recorder failed: " .. tostring(err)) r.untill = 0 end
+end
 local function rec_line(world, id)
   local okr, errr = pcall(function()
     local inp = world:get("PlayerInput", id)
@@ -344,6 +372,21 @@ function F.setup(k)
           log(string.format("tpl %s %s: found (a proxy: read its fields by name; the console's tpl dumps bytes)", tostring(id), comp))
         end
         emf.reply("npc: logged")
+      elseif what == "airec" then  -- airec <entity> [seconds]: the AI recorder (read only)
+        local id, secs = tonumber(args[2]), tonumber(args[3]) or 120
+        if id then airecs[id] = { untill = world:tick() + secs * 60, next = 0 } end
+        log(string.format("airec: %s for %d s", tostring(id), secs))
+        emf.reply("npc: recording the AI")
+      elseif what == "guard" then  -- guard <npc> <target entity>: the game's guard order; guard <npc> stop <target>: stop it
+        local id = tonumber(args[2])
+        if args[3] == "stop" then
+          local okg, res = pcall(emf.emit, "server", "StopGuardingEvent", { guardingEntityId = id, guardedEntityId = tonumber(args[4]) or 1 })
+          log(string.format("guard: StopGuardingEvent %s: %s", tostring(id), okg and tostring(res) or tostring(res)))
+        else
+          local okg, res = pcall(emf.emit, "server", "StartGuardingEvent", { guardingEntityId = id, guardedEntityId = tonumber(args[3]) or 1 })
+          log(string.format("guard: StartGuardingEvent %s -> %s: %s", tostring(id), tostring(args[3]), okg and tostring(res) or tostring(res)))
+        end
+        emf.reply("npc: guard order sent")
       elseif what == "adopt" then  -- adopt <bot>: feed an existing player-type body again (after a reload)
         local id = tonumber(args[2])
         if id then bots[id] = { stick = 0, yaw = 0, said = 0, owner = tonumber(args[3]) or 1 } end
@@ -495,6 +538,9 @@ function F.tick(world)
   for id, b in pairs(bots) do feed(world, id, b, t) end
   local okj, errj = pcall(join_tick, world, t)
   if not okj then log("join recorder failed: " .. tostring(errj)) join = nil end
+  for id, r in pairs(airecs) do
+    if t > r.untill then airecs[id] = nil elseif t >= r.next then airec_line(world, id, r) r.next = t + 30 end
+  end
   for id, r in pairs(recs) do
     if t > r.untill then recs[id] = nil elseif t >= r.next then rec_line(world, id) r.next = t + 15 end
   end
