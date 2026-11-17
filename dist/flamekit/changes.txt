@@ -1,3 +1,232 @@
+0.15.277 Nov 16, 2026
+- Fast Dive: the monster damage from the landing blast is back, exactly as in 0.15.274/0.15.275 (by crater size, fading with distance), at the owner's word. Server only: no game update.
+
+0.15.276 Nov 16, 2026
+- Fast Dive: the monster damage from the landing blast (0.15.269 to 0.15.274) is taken out again, at the owner's word; the dive and the explosion are exactly as in 0.15.268. Server only: no game update (the game's 0.15.275 tooltips still mention the damage).
+
+0.15.275 Nov 16, 2026
+- Tooltips: Fast Dive and Fast Dive landing say the blast damages monsters (by crater size); Fast Dive says pulling back or the updraft burst stops a dive; Glider Sprint says it also works while climbing.
+- Includes the server changes of 0.15.266 to 0.15.274 (no damage from falling into your own crater, cancelled dives really stop, the updraft burst pulls out of a dive, the blast damages monsters).
+
+0.15.274 Nov 16, 2026
+- Fast Dive: the landing blast now damages the monsters around it, as your hits (XP and loot when they die). The damage grows with the crater: Small 500, Medium 1000, Big 2000, Huge 4000, Massive 8000, Gigantic 15000 at the centre, fading to a fifth at the edge of the reach (10 m for Small up to 32 m for Gigantic). Bosses take it too. Not players, pets, tamed animals or villagers; nothing with Boom only or Off. (The game's explosion itself never hurts creatures: tested in 0.15.272 and 0.15.273.) Server only: no game update.
+
+0.15.273 Nov 16, 2026
+- Server (test): the Fast Dive blast is spawned with the player faction, to see whether it then hurts monsters (it did not before). FlameKit's own kill stays off; the monsters' health is still logged, with their distance from the landing. Server only: no game update.
+
+0.15.272 Nov 16, 2026
+- Server (test): the Fast Dive kill is off again; instead the health of the monsters around a landing is logged at the landing and 1, 2 and 4 seconds later, to see what the blast itself does to them. Server only: no game update.
+
+0.15.271 Nov 16, 2026
+- Fast Dive: the monsters around your landing's blast now really die (0.15.269 waited for the blast's own hits, which the server never sees): every monster within the crater's reach gets a killing hit from you. Server only: no game update.
+
+0.15.270 Nov 16, 2026
+- Server (test): logging of the hits after a Fast Dive blast (the monsters did not die). Server only: no game update.
+
+0.15.269 Nov 16, 2026
+- Fast Dive: monsters hit by your landing's blast die (bosses too), as your kill: XP and loot as usual. Not players, pets, tamed animals or villagers; not with Boom only or Off. Server only: no game update.
+
+0.15.268 Nov 16, 2026
+- Fast Dive: the updraft burst (Space, with Enhanced Glider Mode) now pulls you out of a glider dive every time: the burst lifts you and the dive stops (before, after the flight's first burst, Space did nothing during a dive). Server only: no game update.
+
+0.15.267 Nov 16, 2026
+- Fast Dive: pulling up (S), the updraft burst, opening the glider or landing in water now really stops the dive: the push down ends too, so you slow down to normal gliding or falling (before, only the blast and the notice were cancelled and you kept falling at dive speed). Server only: no game update.
+
+0.15.266 Nov 16, 2026
+- Fast Dive: after a glider dive lands, the drop into your own crater no longer hurts (5 seconds without fall damage). Server only: no game update.
+
+0.15.265 Nov 16, 2026
+- Fast Dive: the free-fall setting is now called "Free-fall Dive Minimum", with a new tooltip explaining it. Includes the server change of 0.15.264 (no minimum height for the glider dive).
+
+0.15.264 Nov 16, 2026
+- Fast Dive: the glider dive (and its tip) has no minimum height at all any more (0.15.263 kept 10 m above where you last stood). Server only: no game update.
+
+0.15.263 Nov 16, 2026
+- Fast Dive settings made clearer: "Free-fall dive above (altitude)" (was "Fast Dive automatic above") is only for diving without the glider, by the game's altitude (height above sea level, not above the ground). The glider dive (tap forward twice) works at any height, except within 10 m above where you last stood (no tip there either). The "Fast Dive minimum height" setting is gone: it hardly ever did anything. New tooltips say all this.
+- Includes 0.15.261's settings order. (0.15.262, never released: both dives counted from where you last stood; undone.)
+
+0.15.261 Nov 16, 2026
+- Experimental tab: Damage bonus is now the first setting, and Glider Sprint speed sits right below Glider speed.
+- Includes the server changes of 0.15.259 and 0.15.260 (Glider Sprint while climbing, Small crater by default).
+
+0.15.260 Nov 16, 2026
+- Fast Dive landing: Small crater by default (was Big crater). A landing you picked yourself stays, unless you had picked Big crater while it was the default. Server only: no game update.
+
+0.15.259 Nov 16, 2026
+- Glider Sprint also works while climbing (holding back): the climb goes forward faster by your sprint speed. Server only: no game update.
+
+0.15.258 Nov 16, 2026
+- New in the Experimental tab: Glider Sprint. Hold Sprint while gliding (the same key or button as running) to glide faster, 2x by default (Glider Sprint speed: 1.25x to 5x, multiplies your Glider speed). No stamina. Off in PvP. Needs FlameKit 0.15.258 on the server and in your game.
+
+0.15.257 Nov 16, 2026
+- Server (test): the fall probe is trimmed to one line per Fast Dive landing and each fall damage hit. Server only: no game update.
+
+0.15.256 Nov 16, 2026
+- Fast Dive speed: a new scale, 1x to 5x. The new 1x (the default) is as fast as the old 10x; nothing slower. Your old speed setting is not carried over. Needs FlameKit 0.15.256 on the server and in your game.
+
+0.15.255 Nov 16, 2026
+- Fast Dive glider tip: stays up for 10 seconds (was 5). The server now says how long, so later changes need no game update.
+
+0.15.254 Nov 16, 2026
+- Fast Dive glider tip: now the server sees you open the glider and tells your game (0.15.253's tip never showed on a joined server). Not shown when you open it lower than your Fast Dive minimum height above where you last stood. Needs FlameKit 0.15.254 on the server and in your game.
+
+0.15.253 Nov 16, 2026
+- Fast Dive: each time you open the glider, a light blue notice says "Quickly double tap forward to initiate Fast Dive!" for 5 seconds (gone when the glider closes or the dive starts). Not when you open it lower than your Fast Dive minimum height above where you last stood.
+- Fast Dive tooltip: a free-fall dive's landing kills you (since 0.15.249 on the server); a glider dive is survived.
+- Includes the server changes of 0.15.249 to 0.15.252 (deadly free-fall landing, water ends a dive, fall probe).
+
+0.15.252 Nov 16, 2026
+- Fast Dive: landing in water ends the dive: no blast, and the notice goes away (before, it stayed up and the blast came at the next landing on ground). Server only: no game update.
+
+0.15.251 Nov 16, 2026
+- Fast Dive: the landing of a free-fall dive is now a real fall from your highest point, so the game's own fall damage kills you (before, after a Super B Jump the game measured the fall from where you took off). Glider dives, No Fall Damage and Invincible Mode still keep you alive. The fall probe stays for now. Server only: no game update.
+
+0.15.250 Nov 16, 2026
+- Server (test): a fall probe logs what the game's fall damage sees during a Fast Dive and around landings, and every fall damage hit. Server only: no game update.
+
+0.15.249 Nov 16, 2026
+- Fast Dive: the landing of a free-fall dive now kills you, as the game's own fall would. A dive started in the glider is survived. No Fall Damage (and Invincible Mode) still protect you. Super B Jump still protects every other landing. Server only: no game update (the new tooltip comes with the next game update).
+
+0.15.248 Nov 16, 2026
+- Fast Dive: falling without the glider above a height (default 1000 m, the game's altitude) starts the dive by itself, once you have fallen 20 m, or at once when you close the glider. Opening the glider cancels it (no blast).
+- Fast Dive: tapping forward twice now only works while gliding (the nose dive).
+- Experimental tab: Fast Dive automatic above, Off or 500 to 2000 m, only for you.
+- Needs FlameKit 0.15.248 on the server.
+
+0.15.247 Nov 16, 2026
+- Fast Dive: pulling up while gliding (the updraft burst or climbing) cancels the dive: no blast at the landing, the notice goes away, and a new double tap dives again. Opening or closing the glider during a dive keeps it going. Server only: no game update.
+
+0.15.246 Nov 16, 2026
+- Fast Dive landing: Gigantic crater (228 big TNTs in 4 rings and 4 layers, a pit about 15 m deep). Kept 30 m away from bases with Boom only. Needs FlameKit 0.15.246 on the server.
+- Server (test): the ring test can stack layers (since 0.15.245); small and medium crater keep 2 m from bases (0.15.243, 0.15.244).
+
+0.15.245 Nov 16, 2026
+- Server (test): the ring explosion test can stack layers of explosions on top of each other. Server only: no game update.
+
+0.15.244 Nov 16, 2026
+- Fast Dive near bases (with Boom only): small and medium crater keep 2 m away from a base. Server only: no game update.
+
+0.15.243 Nov 16, 2026
+- Fast Dive near bases (with Boom only): small and medium crater keep 1 m away from a base. Server only: no game update.
+
+0.15.242 Nov 16, 2026
+- Fast Dive: the notice says "Fast Dive in progress! Prepare for impact!".
+- Fast Dive near bases (with Boom only): the protected area around a base is 20 m smaller (small and medium crater: the base itself, big 5 m, huge 10 m, massive 20 m).
+- Needs FlameKit 0.15.242 on the server.
+
+0.15.241 Nov 16, 2026
+- Fast Dive: "Fast Dive in progress!" in orange in your Notices window while you dive, until you land. Needs FlameKit 0.15.241 on the server.
+
+0.15.240 Nov 16, 2026
+- Fast Dive landing: Big crater goes off 1 m below the ground and is the new default. Huge crater and Massive crater are in the Experimental tab.
+- Needs FlameKit 0.15.240 on the server.
+
+0.15.239 Nov 16, 2026
+- Fast Dive landing: Huge crater goes off 2 m below the ground (a deeper, rounder crater); Massive crater added (21 big TNTs, 3 m below the ground). The choices come to the Experimental tab with a later game update.
+
+0.15.238 Nov 16, 2026
+- Server (test): the ring explosion test can set the blasts off below the ground. Server only: no game update.
+
+0.15.237 Nov 16, 2026
+- Fast Dive landing: Huge crater (five big TNTs at once, close together). The choice comes to the Experimental tab with a later game update.
+- Server (test): a console test with several rings of explosions.
+
+0.15.236 Nov 16, 2026
+- Server (test): a console test that sets off several explosions at once in a ring. Server only: no game update.
+
+0.15.235 Nov 16, 2026
+- Server (test): the Fast Dive effect test can set off an explosion at a bigger scale. Server only: no game update.
+
+0.15.234 Nov 16, 2026
+- Server: the size of a base is read from its flame altar's trigger area (its build zone size reads 0). Server only: no game update.
+
+0.15.233 Nov 16, 2026
+- Fast Dive (server): with "Boom only" inside bases, a landing near a base is boom only too (10 m around it for the small crater, 15 m medium, 25 m big), so the blast cannot reach in. Server only: no game update.
+
+0.15.232 Nov 16, 2026
+- Experimental tab: Fast Dive inside bases, Boom only (the default: no damage inside a base, yours or anyone's) or Crater. Only for you. Needs FlameKit 0.15.232 on the server.
+
+0.15.231 Nov 16, 2026
+- Fast Dive: the head-first pose and crouched landing tests are gone (they could not work: the game decides both itself). Fast Dive itself is unchanged.
+
+0.15.230 Nov 16, 2026
+- Fast Dive (test): your own game tries the head-first pose while you fall and a crouch at the landing, by its own movement states.
+- Needs FlameKit 0.15.230 on the server.
+
+0.15.229 Nov 16, 2026
+- Fast Dive (server, test): a free-fall dive lands crouched (as if you pressed crouch; jump or crouch again to stand up).
+
+0.15.228 Nov 16, 2026
+- Fast Dive speed: 6x, 7x, 8x and 10x added.
+- Fast Dive (test): your own game tries the head-first dive pose while you fall and a crouch when you land.
+- Needs FlameKit 0.15.228 on the server.
+
+0.15.227 Nov 16, 2026
+- Fast Dive (server, test): a free-fall dive tries to land crouched (the last 15 m).
+
+0.15.226 Nov 16, 2026
+- New Experimental option: Fast Dive. In the air or gliding, tap forward twice quickly to dive straight down, fast (from the glider: a nose dive). Landing does not hurt you and blasts a crater. Off in PvP.
+- Experimental tab: Fast Dive speed, landing (small, medium or big crater, a boom without a crater, or off) and minimum height, each a drop-down, only for you. The tap speed (now "Tap speed (Super B Jump, Fast Dive)") is shared.
+- Needs FlameKit 0.15.226 on the server.
+
+0.15.225 Nov 16, 2026
+- Fast Dive (server, test): no head-first pose test any more (it left the player rolling forward on the ground); a player stuck that way is freed on the ground.
+
+0.15.224 Nov 16, 2026
+- Fast Dive (server, test): one smooth push all the way down (no more slowdowns every 5 s); lands with the game's small TNT (a boom and a crater); a second try at the head-first pose.
+
+0.15.223 Nov 16, 2026
+- Fast Dive (server, test): lands with the game's Meteoric Descent (its boom and a crater); a test of the head-first dive pose while diving.
+
+0.15.222 Nov 16, 2026
+- Server: the Fast Dive effect test command stopped the Experimental feature (Invincible Mode and the others) until a reload; fixed.
+
+0.15.221 Nov 16, 2026
+- Fast Dive (server, test): the dive keeps its speed all the way to the ground; the landing effect is logged; a console test for landing effects.
+
+0.15.220 Nov 16, 2026
+- Fast Dive (server, test): the push down now lasts (the game had ended it at once); from the glider it dives with the glider open.
+
+0.15.219 Nov 16, 2026
+- Fast Dive (server, test): a second dive in the same fall works; each dive logs its height for 3 s (testing).
+
+0.15.218 Nov 16, 2026
+- New Experimental option (server, first test): Fast Dive. In the air or gliding, tap forward twice quickly to dive straight down, fast; landing does not hurt you and lands with a shockwave. Off in PvP. The switch comes to the Experimental tab with a later game update.
+
+0.15.217 Nov 16, 2026
+- Experimental tab: Super B Jump tap speed, a drop-down from 100 ms to 267 ms (default 183 ms): how quickly you must tap jump twice for a leap. Only for you. Needs FlameKit 0.15.217 on the server.
+
+0.15.216 Nov 16, 2026
+- Super B Jump (server): the double tap must be quicker (within 0.18 s instead of 0.33 s), so a slightly early double jump stays a normal double jump. Server only: no game update.
+
+0.15.215 Nov 16, 2026
+- Super B Jump height: 35x and 40x added. A leap never goes above 2480 m, so the game never sends you back for flying too high: from high ground a leap is shorter. Needs FlameKit 0.15.215 on the server.
+
+0.15.214 Nov 16, 2026
+- Super B Jump height: 25x and 30x added (30x is about 1600 m up). Needs FlameKit 0.15.214 on the server for the new steps.
+
+0.15.213 Nov 16, 2026
+- Super B Jump forward: 12x, 15x and 20x added. Needs FlameKit 0.15.213 on the server for the new steps.
+
+0.15.212 Nov 16, 2026
+- Super B Jump height: 12x, 15x and 20x added. Needs FlameKit 0.15.212 on the server for the new steps.
+- Server: each Super B Jump logs how high it went when you land.
+
+0.15.211 Nov 16, 2026
+- Super B Jump: its tooltip ends with "Named after SuperB, who requested the feature."
+
+0.15.210 Nov 16, 2026
+- Super B Jump height and forward: up to 10x (2.5x, 3x, 4x, 5x, 6x, 7x, 8x, 9x, 10x added). Needs FlameKit 0.15.210 on the server for the new steps.
+
+0.15.209 Nov 16, 2026
+- Minimap: your grave is drawn on top of every other marker, flame altars included, so it is never hidden.
+- New Experimental option: Super B Jump (named after SuperB, who asked for it). Tap jump twice quickly to leap high into the air (about 50 m); hold forward to leap up and over, and steer left and right in the air. Needs the Double Jump skill and at least 50 stamina (a yellow notice says so when you have less). A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Off in PvP.
+- Experimental tab: Super B Jump height, forward and air steering, each a drop-down, only for you.
+- No Fall Damage and Invincible Mode use the same fall protection as Super B Jump (no change in the game).
+
+0.15.208 Nov 16, 2026
+- No Fall Damage and Invincible Mode (server): a deadly fall no longer shows you dead for a moment or tells the server you died. Your fall height is reset while you fall, so the game never sees a deadly fall.
+
 0.15.207 Nov 16, 2026
 - Damage bonus: up to +1000% (+250%, +300%, +350%, +400%, +450%, +500%, +600%, +700%, +800%, +900%, +1000% added).
 - Glider speed: 0.05x is gone (too slow).

@@ -62,6 +62,17 @@ local function to_all(world, msg)
   if kit.is_host() and not done_me then show(msg) end  -- the host before EMF reported their player
 end
 
+-- (0.15.209) A short notice in one player's Notices window only (kind "n", which games since 0.15.205 know). Server
+-- world. `colour` "#rrggbb" (default yellow), `seconds` how long it stays (default 5).
+function F.notice_to(world, player, text, colour, seconds)
+  local msg = { c = "n", t = text, nc = colour or JOIN_COLOUR, ns = seconds or 5 }
+  if player == emf.local_player() and kit.is_host() then
+    show(msg)
+  else
+    pcall(emf.net.send_to, world, player, CHANNEL, emf.json.encode(msg))
+  end
+end
+
 local function name_of(world, entity)
   return players.name(world, entity, "A player")  -- core/players.lua: the character name first
 end

@@ -36,6 +36,9 @@ local SWITCHES = {
   { "stamina", "Unlimited Stamina", nil, "Unlimited Stamina" },  -- no hit rule: topped up every server step
   { "fly", "Enhanced Glider Mode" },  -- on by default; see lift()
   { "pvp", "PvP (free-for-all)", nil, "PvP" },  -- no hit rule of its own: see pvp() (0.15.65)
+  { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
+  { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
+  { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -70,6 +73,9 @@ local TIPS = {
   pvp = "Free-for-all PvP: you can hurt other players who have PvP on, and they can hurt you, with your normal weapons "
     .. "and spells, at full damage. Players without PvP cannot hurt you and you cannot hurt them. Off again when you leave the server. Everyone "
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
+  superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
+  glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
+  fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -103,7 +109,7 @@ end
 -- speed is set outright every step: CRUISE x the factor, along the way the glider flies (steering stays the game's).
 -- Faster: only while the glider is not much slower than cruising (a stall or a dive straight down stays the game's);
 -- slower: never above CRUISE x the factor. Sinking, climbing (S) and the burst are untouched.
-local glide = { CRUISE = 18.7, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
+local glide = { fall_guard = require("core.fall_guard"), leap = require("core.leap"), dive = require("core.dive"), CRUISE = 18.7, DIVE_PUSH = 10, STEPS = { 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5 }, broken = false }
 function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
@@ -115,8 +121,33 @@ function glide.allowed(f)
   for _, s in ipairs(glide.STEPS) do if s == f then return true end end
   return false
 end
+-- (0.15.258, owner: Shift "while the glider is open ... causes the glider to move faster (such as a sprint would work
+-- when running on the ground)", no stamina, the same input as running) Glider Sprint: while the player's game sends
+-- Sprint (PlayerInputType 53, measured 2026-11-16: sent while running and while gliding), the glider speed is
+-- multiplied by the player's sprint factor
+glide.SPRINT_BIT = 1 << 53
+function glide.sprinting(world, account, p)
+  if not is_on(account, "glidersprint") then p.sprint = nil return false end
+  local ok, held = pcall(function()
+    local inp = world:get("PlayerInput", p.entity)
+    return inp ~= nil and (math.tointeger(inp.fromClient.digitalInput) or 0) & glide.SPRINT_BIT ~= 0
+  end)
+  held = ok and held or false
+  if held ~= (p.sprint or false) then
+    p.sprint = held or nil
+    if held then
+      local ok2, st = pcall(function() return tonumber(tostring(world:get("DynamicLocomotion", p.entity).state)) end)
+      if ok2 and st == HANG_GLIDING then
+        emf.log(string.format("experimental: glider sprint: player %s sprints (%s of their glider speed %s)", tostring(p.entity),
+          glide.label(glide.sbj(account, "sprint")), glide.label(glide.factor(account))))
+      end
+    end
+  end
+  return held
+end
 function glide.apply(world, account, p)
   local f = glide.factor(account)
+  if glide.sprinting(world, account, p) then f = f * glide.sbj(account, "sprint") end
   if f == 1 or p.climb or glide.broken then return end
   local ok, err = pcall(function()
     local move = world:get("DynamicLocomotion", p.entity)
@@ -147,6 +178,256 @@ function glide.damage(account)
 end
 function glide.damage_allowed(d)
   for _, s in ipairs(glide.DAMAGE) do if s == d then return true end end
+  return false
+end
+
+-- (0.15.209, owner: "every player should be able to tune this for themselves") Super B Jump's own settings per player:
+-- factors of core/leap.lua's tuned values (1x: about 50 m up, the forward arc and air steering as tested 2026-11-16).
+-- experimental.json keys sbj_height, sbj_forward, sbj_steer (1x is not kept).
+glide.SBJ = {
+  { which = "height", key = "sbj_height", label = "Super B Jump height", steps = { 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 35, 40 },
+    tip = "How high the leap goes: 1.0x is about 54 m (a double jump is about 4 m), 40x about 2150 m. A leap never goes above 2480 m (the game sends you back a little higher up), so from high ground it is shorter. Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.212: 20x, to find the game's height limit; 0.15.214: 30x, measured 2026-11-16: 1x = about 54 m, 20x = 1075 m, so 30x is about 1600 m: from low ground just under the game's limit (its "strayed too far" warning, about 2560 m above sea level: a 20x leap from 2220 m reached 3295 m and was sent back))
+  { which = "forward", key = "sbj_forward", label = "Super B Jump forward", steps = { 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20 },
+    tip = "How far the leap carries you forward while you hold forward: 0x is straight up only. Only for you." },  -- (0.15.210, owner: up to 10x; 0.15.213: 20x)
+  { which = "steer", key = "sbj_steer", label = "Super B Jump air steering", steps = { 0, 1, 2, 3, 4, 5, 7, 10, 15 },
+    tip = "How much left and right moves you while in the air after a leap: 0x is the game's own steering only. Only for you." },
+  -- (0.15.217, owner: "add a setting so it can be fine tuned") how quick the double tap must be, in server steps (60 a
+  -- second); 11 is core/leap.lua's WINDOW. The owner's quick taps: 8-9 steps; the game's double jump: 13 steps on.
+  { which = "window", key = "sbj_window", label = "Tap speed (Super B Jump, Fast Dive)", default = 11,
+    steps = { 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 },
+    name = function(n)
+      local ms = math.floor(n * 1000 / 60 + 0.5)
+      return ms .. " ms" .. (n == 11 and " (default)" or n <= 8 and " (fast)" or n >= 13 and " (relaxed)" or "")
+    end,
+    tip = "How quickly you must tap twice: jump for a Super B Jump, forward for a Fast Dive. Shorter: fewer by accident, but you must tap faster. Longer: easier, but a quick normal double jump may become a leap (from about 217 ms on). Only for you." },
+  -- (0.15.226, owner: "give me all the settings to tweak it like the other features") Fast Dive's own settings
+  -- (0.15.256, owner: "the default should be 10x so whatever 10x is should be the 1x value ... the range goes up from
+  -- there", "I don't want slower as that ruins the effect") a new setting (a saved "10x" of the old one would be 100x):
+  -- 1x pushes as hard as the old 10x (glide.DIVE_PUSH)
+  { which = "divespeed", key = "sbj_divespd", label = "Fast Dive speed", sep = true,
+    steps = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5 },
+    tip = "How hard the dive pushes you down: you keep speeding up all the way to the ground (1.0x reaches about 180 m/s on a 500 m dive, nine times the game's fastest fall). Only for you." },
+  { which = "diveland", key = "sbj_diveland", label = "Fast Dive landing", default = 1, steps = { 0, 1, 2, 3, 5, 6, 7, 4 },  -- (0.15.240) Big crater by default; (0.15.260, owner) Small crater
+    name = function(k) local l = glide.dive.LANDINGS[k] return l and l.name or tostring(k) end,
+    tip = "The blast when a dive lands: the game's own TNT (a boom and a crater in the ground), a boom without a crater, or nothing. The crater is real terrain damage, and it damages the monsters around it as your hits: Small 500 up to Gigantic 15000 at the centre, less toward the edge (10 m to 32 m). Boom only does no damage. Only for you." },
+  { which = "divebase", key = "sbj_divebase", label = "Fast Dive inside bases", default = 0, steps = { 0, 1 },
+    name = function(k) return k == 1 and "Crater" or "Boom only" end,  -- (0.15.232, owner: per player, their responsibility)
+    tip = "Landing inside a base (a flame altar's area, yours or anyone's): Boom only makes the sound without damage; Crater blasts it like anywhere else and can destroy what is built there. Only for you." },
+  -- (0.15.263, owner: "it needs to be documented or communicated better in the tool tip or the settings need to be
+  -- renamed so it makes sense to the player") only for the free-fall dive, by the game's altitude; the glider dive has
+  -- no height setting (any height; the minimum height setting is gone since 0.15.262)
+  { which = "diveauto", key = "sbj_diveauto", label = "Free-fall Dive Minimum", default = 1000,  -- (0.15.265, owner's name)
+    steps = { 0, 500, 750, 1000, 1500, 2000 },  -- (0.15.248, owner: default about 1000)
+    name = function(m) return m == 0 and "Off" or (m .. " m") end,
+    tip = "The lowest altitude where a fall WITHOUT the glider turns into a Fast Dive by itself. Fall from higher than this and, after 20 m of falling (or right away when you close the glider), you dive. Altitude is the game's height number, measured from sea level, not from the ground below you: over hills and mountains you will fall less before landing. Open the glider to stop the dive. Off: never dive by yourself. Has no effect on the glider dive (tap forward twice), which works at any height. Only for you." },
+  -- (0.15.258, owner: "2x the default value should be good, of course give me a range to pick from (slower or faster)")
+  { which = "sprint", key = "sbj_sprint", label = "Glider Sprint speed", sep = true, default = 2,
+    steps = { 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5 },
+    tip = "How much faster you glide while holding Sprint: 2.0x is twice your Glider speed. Only for you." },
+}
+function glide.sbj(account, which)
+  for _, d in ipairs(glide.SBJ) do
+    if d.which == which or d.key == which then
+      local f = tonumber(((saved or {})[account] or {})[d.key])
+      return f and f >= 0 and f or (d.default or 1), d
+    end
+  end
+  return 1
+end
+-- (0.15.250, probe, owner: "I would like it to be real fall damage if possible") what the game's fall damage sees for a
+-- player with Fast Dive on: during a dive every half second, and around every landing (the step before, the landing
+-- and 5 steps after), DynamicFallDamage (wasFalling, fallStartAltitude, detectedFallDistance, detectedFallDamagePercentage),
+-- the Falling state bit, the movement state, height and vertical speed. Fall hits are logged in the on_hit below.
+function glide.fall_snap(world, entity)
+  local r = {}
+  pcall(function()
+    local fd = world:get("DynamicFallDamage", entity)
+    if fd then
+      r.was, r.start = fd.wasFalling, tonumber(fd.fallStartAltitude)
+      r.dist, r.pct = tonumber(fd.detectedFallDistance), tonumber(fd.detectedFallDamagePercentage)
+    end
+    local a = world:get("Actor", entity)
+    r.falling = a and ((math.tointeger(a.currentState) or 0) >> 32) & 1 == 1 or nil
+    local m = world:get("DynamicLocomotion", entity)
+    r.st = m and tonumber(m.state)
+    local _, y = world:position(entity)
+    r.y = y
+    local v = world:get("Velocity", entity)
+    r.vy = v and tonumber(v.velocity.y)
+  end)
+  return r
+end
+function glide.fall_line(what, entity, r)
+  emf.log(string.format("fall probe: player %s %s: y %.1f vy %.1f state %s Falling %s | wasFalling %s start %s dist %s pct %s",
+    tostring(entity), what, r.y or 0, r.vy or 0, tostring(r.st), tostring(r.falling), tostring(r.was),
+    r.start and string.format("%.1f", r.start) or "nil", r.dist and string.format("%.2f", r.dist) or "nil",
+    r.pct and string.format("%.3f", r.pct) or "nil"))
+end
+function glide.fall_probe(world, p, what)
+  -- (0.15.257, owner: trim it) one line at each Fast Dive landing (what the game's fall damage measured); every fall
+  -- damage hit stays in the on_hit below. The full probe (every half second, every landing) is in git, 0.15.250.
+  if what == "landed" then glide.fall_line("LANDED (fast dive)", p.entity, glide.fall_snap(world, p.entity)) end
+end
+-- (0.15.253/254, owner: "when the player pops open their glider ... a notice message ... telling them to double tap
+-- the bound key", "every time", "like 5 seconds" (10 since 0.15.255), "light blue is good", "if you're below the minimum height it shouldn't
+-- show that") the server sees the glider open (core/dive.lua: the game's copy in a joined player's game did not, 0.15.253)
+-- and tells the player's game (op "tip"; older games ignore it). The height counts from the last place the player stood
+-- or swam (the game knows the ground below only about 1 m before a landing). Taken back when the glider closes, at a
+-- landing (the dive start takes it back in the player's game).
+function glide.glider_tip(world, p, o, what)
+  local d = p.dive
+  local function say(on)
+    local m = { op = "tip", on = on, seconds = on and 10 or nil }  -- (0.15.255) how long the tip stays up
+    if kit.is_host() and emf.local_player() == p.entity then
+      pcall(glide.tip_notice, m)
+    else
+      pcall(emf.net.send_to, world, p.entity, CHANNEL, emf.json.encode(m))
+    end
+  end
+  if d.glider_opened then
+    d.glider_opened = nil
+    local _, y = world:position(p.entity)
+    local min = glide.dive.MIN_HEIGHT  -- (0.15.263) as the double tap: not within 10 m above where you last stood
+    local above = glide.dive.above_ground(d, y)
+    local high = not (min > 0 and above and above < min)
+    emf.log(string.format("experimental: fast dive: player %s opened the glider at %.1f m, %s above where they last stood: tip %s",
+      tostring(p.entity), y or 0, above and string.format("%.1f m", above) or "unknown height",
+      high and "shown" or string.format("not shown (under %s m)", tostring(min))))
+    if high then
+      say(true)
+      d.tip_shown = true
+    end
+  elseif d.tip_shown and (what == "dive" or d.st ~= 4) then
+    d.tip_shown = nil
+    if what ~= "dive" then say(false) end
+  end
+end
+function glide.tip_notice(msg)
+  if msg.on == true then
+    -- (0.15.255, owner: "lets make the message stay up for 10 seconds") the server says how long (older servers: 10 s)
+    local secs = tonumber(msg.seconds)
+    kit.notice("fastdive_tip", "Quickly double tap forward to initiate Fast Dive!", "#8cd2ff",
+      secs and secs >= 1 and secs <= 60 and secs or 10)
+  else
+    kit.notice("fastdive_tip")
+  end
+end
+-- (0.15.269, owner: "I want the blast damage from the blast when I crash from fast dive to kill monsters") every
+-- monster within the landing's radius gets a killing hit FROM THE DIVER (emf.damage: kill credit, XP, loot as usual).
+-- (0.15.271: 0.15.269 waited for the blast's own hits, but the server never saw one: 0.15.270's log of seven landings
+-- among monsters had none. Now the world is searched around the landing instead, a budgeted walk over a few steps.)
+-- A monster: not a player, has the enemy AI (DynamicEnemy01BehaviorState), a faction that is not player side (7
+-- players, 8 companions, 11 summons). Pets, tamed animals and villagers are left alone. Bosses too are killed.
+-- Not with Boom only or Off (no blast that hurts).
+glide.BLAST_KILL = true   -- (0.15.272 off for a test: the game's explosion itself never hurts creatures, 0.15.273 measured
+-- monsters 1 m from the centre at full health, also with the player faction; it has no item behind it to work out damage)
+-- (0.15.274, owner: "lets do B and the damage amount should scale with the crater size") not a kill any more: damage
+-- by crater size (BLAST_DMG, at the centre), fading to a fifth of it at the edge of the reach (BLAST_R). Bosses too.
+glide.BLAST_DMG = { [1] = 500, [2] = 1000, [3] = 2000, [5] = 4000, [6] = 8000, [7] = 15000 }
+glide.BLAST_EDGE = 0.2
+glide.BLAST_WATCH = false  -- (0.15.272, test) the monsters' health logged after a landing
+glide.BLAST_R = { [1] = 10, [2] = 12, [3] = 15, [5] = 18, [6] = 24, [7] = 32 }  -- metres around the landing, by landing kind
+glide.scans = {}   -- { player, x, y, z, r, list, i, n }
+function glide.blast_zone(world, p)
+  local kind = p.dive.landed_with
+  local r = glide.BLAST_R[kind or 0]
+  if not r then return end
+  local x, y, z = world:position(p.entity)
+  if not x then return end
+  glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0, started = world:tick(),
+    dmg = glide.BLAST_DMG[kind] or 0, total = 0 }
+end
+function glide.is_monster(world, id)
+  local oka, acc = pcall(world.account, world, id)
+  if oka and acc then return false end
+  local oke, ai = pcall(world.get, world, "DynamicEnemy01BehaviorState", id)
+  if not (oke and ai) then return false end
+  local okf, f = pcall(world.get, world, "Faction", id)
+  local fn = okf and f and tonumber(tostring(f.faction))
+  return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
+end
+-- every server step while a landing's search is under way: part of the world's entities, within SCAN_BUDGET
+function glide.kill_tick(world)
+  local sc = glide.scans[1]
+  if not sc then return end
+  if not sc.list then sc.list = world:entities() return end  -- the list in one step, the walk in the next ones
+  local t0, done = now_s(), 0
+  local r2 = sc.r * sc.r
+  while sc.i <= #sc.list and not scan_over(t0, done) do
+    local id = sc.list[sc.i]
+    sc.i, done = sc.i + 1, done + 1
+    if id ~= sc.player then
+      local ok, x, y, z = pcall(world.position, world, id)
+      if ok and x and (x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2 <= r2 and glide.is_monster(world, id) then
+        sc.seen = sc.seen + 1
+        local okh, hp = pcall(world.get, world, "NetworkHealth", id)
+        -- (0.15.272, owner: "id like to try and see if theres another problem fix before just killing them off") the
+        -- kill is off (glide.BLAST_KILL); the health of each monster in reach is noted, and logged again later
+        sc.watch = sc.watch or {}
+        if glide.BLAST_WATCH and #sc.watch < 20 then
+          sc.watch[#sc.watch + 1] = { id = id, hp = okh and hp and tonumber(hp.health),
+            d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2) }
+        end
+        if glide.BLAST_KILL and sc.dmg > 0 and not (okh and hp and hp.health ~= nil and hp.health <= 0) then  -- not already dead
+          local d = math.sqrt((x - sc.x) ^ 2 + (y - sc.y) ^ 2 + (z - sc.z) ^ 2)
+          local amount = math.floor(sc.dmg * math.max(glide.BLAST_EDGE, 1 - d / sc.r) + 0.5)
+          local okd, did = pcall(emf.damage, world, sc.player, id, amount)
+          if okd and did then sc.n, sc.total = sc.n + 1, sc.total + amount end
+        end
+      end
+    end
+  end
+  if sc.i > #sc.list then
+    emf.log(string.format("experimental: fast dive: player %s's blast (%d m, %d at the centre): %d monster(s) in reach, %d hit for %d in all (searched %d entities)",
+      tostring(sc.player), sc.r, sc.dmg, sc.seen, sc.n, sc.total, #sc.list))
+    if sc.watch and #sc.watch > 0 then
+      glide.watches[#glide.watches + 1] = { list = sc.watch, at = world:tick(), start = sc.started, step = 0 }
+    end
+    table.remove(glide.scans, 1)
+  end
+end
+-- (0.15.272, test) the monsters' health at the search, then 1, 2 and 4 seconds after it
+glide.watches = {}
+function glide.watch_tick(world)
+  local t = world:tick()
+  for i = #glide.watches, 1, -1 do
+    local w = glide.watches[i]
+    local marks = { 0, 60, 120, 240 }
+    local due = marks[w.step + 1]
+    if due and t - w.at >= due then
+      local parts = {}
+      for _, m in ipairs(w.list) do
+        local okh, hp = pcall(world.get, world, "NetworkHealth", m.id)
+        local now = okh and hp and tonumber(hp.health)
+        parts[#parts + 1] = string.format("%s(%.0fm):%s", tostring(m.id), m.d or -1, now and string.format("%.0f", now) or "gone")
+      end
+      emf.log(string.format("experimental: fast dive: blast test: %.1f s after the search (%.1f s after the landing): %s",
+        (t - w.at) / 60, (t - (w.start or w.at)) / 60, table.concat(parts, " ")))
+      w.step = w.step + 1
+    end
+    if not marks[w.step + 1] then table.remove(glide.watches, i) end
+  end
+end
+-- (0.15.241) the Fast Dive notice in the diver's own Notices window: up while the dive lasts (at most 120 s, in case the
+-- landing's word never comes), taken back at the landing
+function glide.dive_notice(msg)
+  if msg.on == true then
+    kit.notice("fastdive", "Fast Dive in progress! Prepare for impact!", "#ff9632", 120)  -- (0.15.242, owner's words)
+    kit.notice("fastdive_tip")  -- (0.15.253) the glider tip goes when the dive starts
+  else
+    kit.notice("fastdive")
+  end
+end
+function glide.sbj_label(f, d)
+  if d and d.name then return d.name(f) end
+  return f == 0 and "Off (0x)" or glide.label(f)
+end
+function glide.sbj_allowed(key, f)
+  for _, d in ipairs(glide.SBJ) do
+    if d.key == key then
+      for _, s in ipairs(d.steps) do if s == f then return true end end
+    end
+  end
   return false
 end
 
@@ -238,6 +519,11 @@ local body_of  -- forward: the PvP test bodies, below
 local function view(account)
   local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
               glide_speed = glide.factor(account), damage_pct = glide.damage(account),
+              sbj_height = glide.sbj(account, "height"), sbj_forward = glide.sbj(account, "forward"),
+              sbj_steer = glide.sbj(account, "steer"), sbj_window = glide.sbj(account, "window"),
+              sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
+              sbj_divebase = glide.sbj(account, "divebase"),
+              sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
               damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
@@ -1137,6 +1423,18 @@ local function handle(world, account, entity, msg)
     end
     return view(account)
   end
+  if msg.op == "set" and type(msg.key) == "string" and msg.key:sub(1, 4) == "sbj_" then  -- (0.15.209) Super B Jump settings
+    local f = tonumber(msg.value)
+    if f and glide.sbj_allowed(msg.key, f) then
+      local set = saved[account] or {}
+      local _, d = glide.sbj(account, msg.key)
+      set[msg.key] = f ~= ((d and d.default) or 1) and f or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      emf.log(string.format("experimental: player %s set %s to %s", tostring(entity), msg.key, glide.sbj_label(f, d)))
+    end
+    return view(account)
+  end
   if msg.op == "set" and msg.key == "glide_speed" then  -- (0.15.200) the glider speed
     local f = tonumber(msg.value)
     if f and glide.allowed(f) then
@@ -1288,7 +1586,11 @@ local function lift(world)
           if height and height > CEILING then return end
           local now = world:tick() * 50000000 // 3   -- the game's clock in nanoseconds: 60 steps a second
           local one, two = push.impulses[1], push.impulses[2]
-          if one.endTime > now or two.endTime > now then return end  -- a burst is still lifting
+          -- a burst is still lifting (0.15.268, owner: "can you make updraft / space bar pull me out of the dive also?"
+          -- a Fast Dive's push down, -800 m/s and more, is not a burst: the burst replaces it, and core/dive.lua then
+          -- cancels the dive because its push is gone)
+          local function lifting(sl) return sl.endTime > now and (tonumber(sl.impulse.y) or 0) > -50 end
+          if lifting(one) or lifting(two) then return end
           one.impulse.x, one.impulse.y, one.impulse.z = 0, 3, 0
           one.type, one.startTime, one.endTime, one.keepAliveMask = 0, now, now + 1000000000, BURST_KEEP
           two.impulse.x, two.impulse.y, two.impulse.z = 0, 9.78, 0
@@ -1325,9 +1627,13 @@ local function lift(world)
           local q = world:get("CurrentTransform", p.entity).transform.orientation
           local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
           local len = math.sqrt(fx * fx + fz * fz)
+          -- (0.15.259, owner: "the s key keeps me up in the air ... its important to be able to push both at the same
+          -- time") Glider Sprint while climbing: the climb's forward speed times the sprint factor
+          local fwd = p.forward
+          if p.sprint then fwd = fwd * glide.sbj(account, "sprint") end
           if len > 0.01 then
-            vel.x = fx / len * p.forward
-            vel.z = fz / len * p.forward
+            vel.x = fx / len * fwd
+            vel.z = fz / len * fwd
           end
         end)
         if not ok then
@@ -1342,7 +1648,8 @@ end
 local stamina_broken = false
 
 local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincible Mode
-  if stamina_broken and glide.mana_broken then return end
+  pcall(glide.dive.tick, world)  -- (0.15.218) Fast Dive's landing shields run out
+  if stamina_broken and glide.mana_broken and glide.fall_guard.broken and glide.leap.broken and glide.dive.broken then return end
   for account, p in pairs(online) do
     if is_on(account, "stamina") and not stamina_broken then
       local ok, err = pcall(function()
@@ -1352,6 +1659,79 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
       if not ok then
         stamina_broken = true
         emf.log("experimental: stamina cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
+    -- (0.15.208, owner: with No Fall Damage a deadly fall showed the player dead for a moment and told the server they
+    -- died: the hit rule gives the health back only after the game took it) the game's fall start height is set to
+    -- where the player is now, every step while they fall, so the landing is never a long fall. The rule stays too.
+    -- (0.15.209) the reset itself is core/fall_guard.lua, shared with Super Jump.
+    if is_on(account, "fall") or is_on(account, "immortal") then glide.fall_guard.step(world, p.entity) end
+    -- (0.15.209, owner) Super B Jump: a quick double tap of jump leaps high (core/leap.lua), with the player's own
+    -- height, forward and air steering factors
+    -- (0.15.218, owner) Fast Dive: a quick double tap of forward in the air dives straight down (core/dive.lua)
+    if is_on(account, "fastdive") then
+      p.dive = p.dive or {}
+      local o = { window = glide.sbj(account, "window"), speed = glide.sbj(account, "divespeed") * glide.DIVE_PUSH,
+                  landing = glide.sbj(account, "diveland"),
+                  base = glide.sbj(account, "divebase"), auto = glide.sbj(account, "diveauto"),
+                  protected = (is_on(account, "fall") or is_on(account, "immortal")) and true or nil }  -- (0.15.251)
+      local what = glide.dive.step(world, p.entity, p.dive, o)
+      p.dive.landed_now = what == "landed" or nil
+      pcall(glide.glider_tip, world, p, o, what)  -- (0.15.254)
+      pcall(glide.fall_probe, world, p, what)  -- (0.15.250, probe)
+      -- (0.15.241, owner: "Fast Dive in progress!" in orange in the Notices window until the landing) the diver's own
+      -- game shows it: the server says when a dive starts and when it lands (op "dive"; older games ignore it)
+      if what == "dive" or what == "landed" or what == "cancel" then
+        local m = { op = "dive", on = what == "dive" }
+        if kit.is_host() and emf.local_player() == p.entity then
+          pcall(glide.dive_notice, m)
+        else
+          pcall(emf.net.send_to, world, p.entity, CHANNEL, emf.json.encode(m))
+        end
+      end
+      if what == "dive" then
+        emf.log(string.format("experimental: fast dive: player %s dives from %.1f m%s (push %sx, landing %s)",
+          tostring(p.entity), p.dive.dive_y or 0, p.dive.from_glider and ", with the glider" or p.dive.auto and ", automatic" or "",
+          tostring(o.speed), tostring(o.landing)))
+      elseif what == "cancel" then  -- (0.15.247)
+        emf.log(string.format("experimental: fast dive: player %s: dive cancelled (%s)", tostring(p.entity),
+          tostring(p.dive.cancel_why)))
+      elseif what == "low" then
+        emf.log(string.format("experimental: fast dive: player %s too low for the glider dive (%.1f m above where they last stood, needs %s m)",
+          tostring(p.entity), p.dive.ground or 0, tostring(glide.dive.MIN_HEIGHT)))
+      elseif what == "landed" then
+        local _, y = world:position(p.entity)
+        emf.log(string.format("experimental: fast dive: player %s landed at %.1f m, %s, blast %s", tostring(p.entity), y or 0,
+          p.dive.in_base == nil and "base unknown" or p.dive.in_base and "inside a base"
+            or p.dive.near_base and string.format("near the base at %.0f %.0f", p.dive.near_base.x, p.dive.near_base.z)
+            or "away from bases",
+          tostring(p.dive.landed_with)))
+        pcall(glide.blast_zone, world, p)  -- (0.15.269) the monsters this blast hits die
+      end
+    end
+    if is_on(account, "superbjump") then
+      p.leap = p.leap or {}
+      local o = { height = glide.sbj(account, "height"), forward = glide.sbj(account, "forward"), steer = glide.sbj(account, "steer"),
+                  window = glide.sbj(account, "window"),
+                  -- (0.15.249) a free-fall Fast Dive is deadly: the leap's fall protection waits until that landing is done
+                  no_guard = p.dive ~= nil and not p.dive.from_glider and (p.dive.diving or p.dive.landed_now) or nil }
+      local what = glide.leap.step(world, p.entity, p.leap, o)
+      if what == "leap" then
+        local cap = glide.leap.last_cap
+        emf.log(string.format("experimental: super b jump: player %s leaps (taps %s steps apart, window %s; height %sx%s, forward %sx at input %.2f, steering %sx)",
+          tostring(p.entity), tostring(glide.leap.last_gap), tostring(o.window), tostring(o.height),
+          cap and string.format(", capped to %.1fx from %.0f m: the ceiling is %d m", cap.got, cap.from or 0, glide.leap.CEILING) or "",
+          tostring(o.forward), glide.leap.last_forward or 0, tostring(o.steer)))
+      elseif what == "ceiling" then
+        emf.log(string.format("experimental: super b jump: player %s passed %d m: the push up ended", tostring(p.entity), glide.leap.CEILING))
+      elseif what == "landed" then  -- (0.15.212) how high the leap went, for tuning
+        emf.log(string.format("experimental: super b jump: player %s landed: highest %.1f m above the leap (%.1f m, ground %.1f m)",
+          tostring(p.entity), p.leap.rise or 0, p.leap.top or 0, p.leap.base or 0))
+      elseif what == "tired" then  -- (owner: a yellow line in the Notices window)
+        pcall(function()
+          require("features.chat").notice_to(world, p.entity,
+            string.format("Not enough stamina for Super B Jump (needs %d).", glide.leap.STAMINA_NEEDED), "#ffe14d", 4)
+        end)
       end
     end
     -- (0.15.207, owner: "Invincible Mode also needs to keep the mana bar full like it does the HP bar")
@@ -1699,6 +2079,8 @@ function F.tick(world)
     pcall(after.clear_tick, world) pcall(after.piles_tick, world) pcall(after.spots.tick, world)
   end
   if world:is_server() then pcall(loot_chest.tick, world, bag) end  -- (0.15.154) empty loot chests go
+  if world:is_server() then pcall(glide.kill_tick, world) end  -- (0.15.271) a Fast Dive blast kills the monsters around
+  if world:is_server() then pcall(glide.watch_tick, world) end  -- (0.15.272, test)
   load_saved()
   if not looked then find_players(world) end
   local account, player = me(world)
@@ -1982,15 +2364,19 @@ local function panel_rows(world)
       end
     end
   end
-  rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line between Enhanced Glider Mode and the glider speed
-  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x
-    local gs = tonumber(v.glide_speed) or 1
+  -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
+  -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B
+  -- Jump's and Fast Dive's
+  local function sbj_row(d)
+    local cur = tonumber(v[d.key]) or d.default or 1
     local opts = {}
-    for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
-    rows[#rows + 1] = { label = true, text = "Glider speed" }
-    rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
-      tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
+    for _, f in ipairs(d.steps) do
+      opts[#opts + 1] = { key = "sbj:" .. d.key .. ":" .. tostring(f), text = glide.sbj_label(f, d), selected = f == cur }
+    end
+    rows[#rows + 1] = { label = true, text = d.label }
+    rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur, d), same_line = true, tooltip = d.tip }
   end
+  rows[#rows + 1] = { separator = true }
   do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +1000% (0.15.207)
     local dp = tonumber(v.damage_pct) or 0
     local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
@@ -1999,6 +2385,25 @@ local function panel_rows(world)
     rows[#rows + 1] = { label = true, text = "Damage bonus" }
     rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
       tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times. Only for you; off while you are in PvP." }
+  end
+  rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line before the glider speed
+  do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x
+    local gs = tonumber(v.glide_speed) or 1
+    local opts = {}
+    for _, f in ipairs(glide.STEPS) do opts[#opts + 1] = { key = "gs:" .. tostring(f), text = glide.label(f), selected = f == gs } end
+    rows[#rows + 1] = { label = true, text = "Glider speed" }
+    rows[#rows + 1] = { options = opts, text = glide.label(gs), same_line = true,
+      tooltip = "How fast you fly with the glider: 1.0x is the game's own speed. Only for you." }
+  end
+  for _, d in ipairs(glide.SBJ) do
+    if d.which == "sprint" then sbj_row(d) end
+  end
+  rows[#rows + 1] = { separator = true }
+  for _, d in ipairs(glide.SBJ) do  -- (0.15.209, owner) Super B Jump's own settings: drop-downs, per player
+    if d.which ~= "sprint" then
+      if d.sep then rows[#rows + 1] = { separator = true } end  -- (0.15.226) Fast Dive's below a line
+      sbj_row(d)
+    end
   end
   return debug_rows(world, rows)
 end
@@ -2252,6 +2657,21 @@ function F.click(world, key)
     end
     return
   end
+  if key:sub(1, 4) == "sbj:" then  -- (0.15.209) Super B Jump settings: "sbj:<setting key>:<factor>"
+    local k, f = key:match("^sbj:(sbj_%a+):([%d%.]+)$")
+    f = tonumber(f)
+    if not (k and f) then return end
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = k, value = f }).note
+    elseif shown then
+      shown[k] = f  -- at once on screen; the server's answer follows
+      ask({ op = "set", key = k, value = f })
+    end
+    return
+  end
   if key:sub(1, 3) == "gs:" then  -- (0.15.200) the glider speed
     local f = tonumber(key:sub(4))
     if not f then return end
@@ -2339,6 +2759,150 @@ function F.setup(k)
         tostring(test.rule ~= nil), why or "spawned"))
       emf.reply("pvptest: on")
     end, "the pvptest command"))
+  -- (0.15.218) Fast Dive from the server console, for testing (until a reload): "fastdive <player entity> on|off",
+  -- "fastdive speed <n>" (the push at 1x), "fastdive ground <player entity>" (logs groundDistance), "fastdive boom
+  -- <player entity> <template GUID>" (an explosion 3 m in front of them). The rest are each player's own settings.
+  pcall(emf.command, "fastdive", "<player entity> on|off, or speed <1x push>, or ground <player entity>, or boom <player entity> <template GUID>: Fast Dive (a test)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      load_saved()
+      local d, a1, a2 = glide.dive, args[1], args[2]
+      local function say(line) emf.log("experimental: " .. line) emf.reply(line) end
+      if a1 == "speed" then d.SPEED = tonumber(a2) or d.SPEED say("fastdive: speed at 1x " .. d.SPEED) return end
+      if a1 == "margin" then  -- (0.15.233) "fastdive margin <small> [medium] [big]": metres around bases, boom only
+        d.MARGIN[1] = tonumber(a2) or d.MARGIN[1]
+        d.MARGIN[2] = tonumber(args[3]) or d.MARGIN[2]
+        d.MARGIN[3] = tonumber(args[4]) or d.MARGIN[3]
+        say(string.format("fastdive: margin around bases %s / %s / %s m", d.MARGIN[1], d.MARGIN[2], d.MARGIN[3]))
+        return
+      end
+      if a1 == "bases" then  -- (0.15.233) the bases core/bases.lua knows
+        local b = require("core.bases")
+        say(string.format("fastdive: %d base(s) known", #b.list))
+        for _, e in ipairs(b.list) do say(string.format("  base at %.1f %.1f, zone reaches %.1f x %.1f m from %.1f %.1f", e.ax, e.az, e.hx, e.hz, e.x, e.z)) end
+        return
+      end
+      if a1 == "rings" then  -- (0.15.237, test) "fastdive rings <player entity> <template GUID> <metres in front>
+        -- <count>:<radius> [<count>:<radius> ...]": one in the middle and each ring around it (each next ring turned by
+        -- half a step, so its blasts sit between the last one's)
+        local id, guid, ahead = tonumber(a2), args[3], tonumber(args[4]) or 10
+        local x, y, z
+        if id then x, y, z = world:position(id) end
+        if not (x and guid) then emf.reply("fastdive rings <player entity> <template GUID> <metres in front> <count>:<radius> ...") return end
+        local rings, total, down = {}, 1, 0
+        local stack_m, stack_n = 0, 0
+        for i = 5, #args do
+          local c, r = tostring(args[i]):match("^(%d+):([%d%.]+)$")
+          local dn = tostring(args[i]):match("^down:([%d%.]+)$")  -- (0.15.238) "down:<m>": the blasts this far below the feet
+          if dn then down = tonumber(dn) or 0 end
+          -- (0.15.245) "stack:<m>[:<layers>]": more copies of the whole pattern, each <m> metres above the last
+          local sm, sl = tostring(args[i]):match("^stack:([%d%.]+):?(%d*)$")
+          if sm then stack_m, stack_n = tonumber(sm) or 2, tonumber(sl) or 1 end
+          if c then
+            rings[#rings + 1] = { tonumber(c), tonumber(r), #rings % 2 == 1 and math.pi / tonumber(c) or 0 }
+            total = total + tonumber(c)
+          end
+        end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local made = 0
+        for layer = 0, stack_n do
+          made = made + d.blast(world, x + fx / len * ahead, y - down + layer * stack_m, z + fz / len * ahead, guid, rings)
+        end
+        total = total * (stack_n + 1)
+        say(string.format("fastdive rings: %s, %d of %d spawned, %d ring(s), %d layer(s) %s m apart, %s m in front, %s m down",
+          tostring(guid), made, total, #rings, stack_n + 1, tostring(stack_m), tostring(ahead), tostring(down)))
+        return
+      end
+      if a1 == "ring" then  -- (0.15.236, test) "fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]":
+        -- one in the middle and <count> around it, <radius> m out (a bigger blast from the game's own explosion)
+        local id, guid, count, radius, ahead = tonumber(a2), args[3], tonumber(args[4]) or 4, tonumber(args[5]) or 6, tonumber(args[6]) or 10
+        local x, y, z
+        if id then x, y, z = world:position(id) end
+        if not (x and guid) then emf.reply("fastdive ring <player entity> <template GUID> <count> <radius> [metres in front]") return end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local cx, cz = x + fx / len * ahead, z + fz / len * ahead
+        local made = d.boom(world, cx, y, cz, guid) and 1 or 0
+        for k = 1, count do
+          local a = 2 * math.pi * k / count
+          if d.boom(world, cx + math.cos(a) * radius, y, cz + math.sin(a) * radius, guid) then made = made + 1 end
+        end
+        say(string.format("fastdive ring: %s, %d of %d spawned, %s m around a point %s m in front", tostring(guid), made, count + 1, tostring(radius), tostring(ahead)))
+        return
+      end
+      if a1 == "boom" then  -- (0.15.221) "fastdive boom <player entity> <template GUID> [scale] [metres in front]"
+        local id, guid, scale, ahead = tonumber(a2), args[3], tonumber(args[4]), tonumber(args[5]) or 3
+        local x, y, z
+        if id then x, y, z = world:position(id) end  -- (0.15.222) "id and world:position(id)" kept only x: z was nil
+        if not (x and guid) then emf.reply("fastdive boom <player entity> <template GUID>") return end
+        local q = world:get("CurrentTransform", id).transform.orientation
+        local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+        local len = math.max(0.01, math.sqrt(fx * fx + fz * fz))
+        local e = d.boom(world, x + fx / len * ahead, y, z + fz / len * ahead, guid, scale)
+        say(string.format("fastdive boom: %s scale %s, %s m in front -> %s", tostring(guid), tostring(scale or 1), tostring(ahead), tostring(e)))
+        return
+      end
+      if a1 == "ground" then
+        local id = tonumber(a2)
+        say("fastdive: ground distance of " .. tostring(id) .. ": " .. tostring(id and d.ground_distance(world, id)))
+        return
+      end
+      local player = tonumber(a1)
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("fastdive: no player with entity " .. tostring(a1)) return end
+      account = tostring(account)
+      seen(account, player)
+      local set = saved[account] or {}
+      set.fastdive = a2 ~= "off" or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      say(string.format("fastdive: %s for player %s", set.fastdive and "on" or "off", tostring(player)))
+    end, "the fastdive command"))
+  -- (0.15.209) Super B Jump from the server console (emf\commands.txt), to try it before the games have the switch and
+  -- to tune the push: "superbjump <player entity> on|off", "superbjump push <up> [seconds] [forward] [forward seconds] [sideways] [sign]"
+  -- (until a reload)
+  pcall(emf.command, "superbjump", "<player entity> on|off, or push <up> [seconds] [forward] [forward seconds] [sideways] [sideways sign], or window <steps>: Super B Jump for that player, its push or its double tap window (a test)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      load_saved()
+      if args[1] == "window" then  -- (0.15.216) the double tap's window in server steps (60 a second)
+        glide.leap.WINDOW = math.tointeger(tonumber(args[2])) or glide.leap.WINDOW
+        local line = "superbjump: window " .. tostring(glide.leap.WINDOW) .. " steps"
+        emf.log("experimental: " .. line)
+        emf.reply(line)
+        return
+      end
+      if args[1] == "push" then
+        glide.leap.STRENGTH = tonumber(args[2]) or glide.leap.STRENGTH
+        glide.leap.SECONDS = tonumber(args[3]) or glide.leap.SECONDS
+        glide.leap.FORWARD = tonumber(args[4]) or glide.leap.FORWARD
+        glide.leap.FORWARD_SECONDS = tonumber(args[5]) or glide.leap.FORWARD_SECONDS
+        glide.leap.SIDE = tonumber(args[6]) or glide.leap.SIDE
+        glide.leap.SIDE_SIGN = tonumber(args[7]) or glide.leap.SIDE_SIGN
+        local line = string.format("superbjump: push up %s for %s s, forward %s for %s s, sideways %s (sign %s)",
+          tostring(glide.leap.STRENGTH), tostring(glide.leap.SECONDS), tostring(glide.leap.FORWARD),
+          tostring(glide.leap.FORWARD_SECONDS), tostring(glide.leap.SIDE), tostring(glide.leap.SIDE_SIGN))
+        emf.log("experimental: " .. line)
+        emf.reply(line)
+        return
+      end
+      local player = tonumber(args[1])
+      local ok, account = pcall(world.account, world, player)
+      if not player or not ok or not account then emf.reply("superbjump: no player with entity " .. tostring(args[1])) return end
+      account = tostring(account)
+      seen(account, player)
+      local set = saved[account] or {}
+      set.superbjump = args[2] ~= "off" or nil
+      saved[account] = next(set) and set or nil
+      save_all()
+      apply()
+      emf.log(string.format("experimental: superbjump: %s for player %s", set.superbjump and "on" or "off", tostring(player)))
+      emf.reply("superbjump: " .. (set.superbjump and "on" or "off"))
+    end, "the superbjump command"))
   -- the game event that points monsters at PvP players (see pvp_aggro); EMF wants it named in the mod's first run
   local okx, said = pcall(emf.emits, { "AddThreatTargetEvent" }, "server")
   if not okx or said == false then emf.log("experimental: AddThreatTargetEvent cannot be sent (" .. tostring(said) .. "): monsters may ignore PvP players") end
@@ -2384,6 +2948,13 @@ function F.setup(k)
     end
     if tell_player then tell_player(world, d.player, account, "You died: PvP is off. Switch it on again to fight.") end
   end, "a player's death"))
+  -- (0.15.250, probe) every fall damage hit on a player: how much, health before and after
+  pcall(emf.on_hit, kit.guard(F, function(world, hit)
+    if not hit or hit.kind ~= "fall" then return end
+    local _, y = world:position(hit.target)
+    emf.log(string.format("fall probe: FALL HIT on %s: amount %s, health %s -> %s, at y %.1f", tostring(hit.target),
+      tostring(hit.amount), tostring(hit.health_before), tostring(hit.health_after), y or 0))
+  end, "a fall hit"), { kinds = { "fall" } })
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
@@ -2421,6 +2992,8 @@ function F.setup(k)
     end, "a message from a player"),
     on_player = kit.guard(F, function(world, from, data)
       local msg = emf.json.decode(data)
+      if type(msg) == "table" and msg.op == "dive" then pcall(glide.dive_notice, msg) return end  -- (0.15.241)
+      if type(msg) == "table" and msg.op == "tip" then pcall(glide.tip_notice, msg) return end  -- (0.15.254)
       if type(msg) == "table" and msg.op == "state" then
         shown = msg
         if msg.note then note = msg.note end
