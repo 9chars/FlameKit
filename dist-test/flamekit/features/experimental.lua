@@ -75,7 +75,7 @@ local TIPS = {
     .. "on the server is told when you switch it. Once another PvP player hits you, you cannot switch PvP off for a minute. While PvP is on, fast travel, spawning test monsters and your other options are off (all but the glider) and come back when you switch PvP off.",
   superbjump = "Tap jump twice quickly to leap high into the air; hold forward to leap up and over. Needs the Double Jump skill and at least 50 stamina. A slow double tap is still a normal double jump. Falling after a leap does not hurt you. Height, forward and air steering are below. Everyone on the server is told when you switch it. Named after SuperB, who requested the feature.",
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster; let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
-  fastdive = "Two ways to dive. Without the glider: falling above your Free-fall dive altitude (below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, or pulling up in it, cancels a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below). Tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
+  fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, or pulling up in it, cancels a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below). Tap speed is shared with Super B Jump. Everyone on the server is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
 }
 
@@ -216,10 +216,10 @@ glide.SBJ = {
   -- (0.15.263, owner: "it needs to be documented or communicated better in the tool tip or the settings need to be
   -- renamed so it makes sense to the player") only for the free-fall dive, by the game's altitude; the glider dive has
   -- no height setting (any height; the minimum height setting is gone since 0.15.262)
-  { which = "diveauto", key = "sbj_diveauto", label = "Free-fall dive above (altitude)", default = 1000,
+  { which = "diveauto", key = "sbj_diveauto", label = "Free-fall Dive Minimum", default = 1000,  -- (0.15.265, owner's name)
     steps = { 0, 500, 750, 1000, 1500, 2000 },  -- (0.15.248, owner: default about 1000)
     name = function(m) return m == 0 and "Off" or (m .. " m") end,
-    tip = "Only for diving WITHOUT the glider: falling higher than this dives by itself, once you have fallen 20 m (at once when you close the glider). It is the game's altitude, the height above sea level, not above the ground: over high ground you fall less. Open the glider to cancel. Off: never by itself. The glider dive (tap forward twice) does not use this: it works at any height. Only for you." },
+    tip = "The lowest altitude where a fall WITHOUT the glider turns into a Fast Dive by itself. Fall from higher than this and, after 20 m of falling (or right away when you close the glider), you dive. Altitude is the game's height number, measured from sea level, not from the ground below you: over hills and mountains you will fall less before landing. Open the glider to stop the dive. Off: never dive by yourself. Has no effect on the glider dive (tap forward twice), which works at any height. Only for you." },
   -- (0.15.258, owner: "2x the default value should be good, of course give me a range to pick from (slower or faster)")
   { which = "sprint", key = "sbj_sprint", label = "Glider Sprint speed", sep = true, default = 2,
     steps = { 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5 },

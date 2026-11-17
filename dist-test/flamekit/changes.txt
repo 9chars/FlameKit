@@ -1,3 +1,9 @@
+0.15.265 Nov 16, 2026
+- Fast Dive: the free-fall setting is now called "Free-fall Dive Minimum", with a new tooltip explaining it. Includes the server change of 0.15.264 (no minimum height for the glider dive).
+
+0.15.264 Nov 16, 2026
+- Fast Dive: the glider dive (and its tip) has no minimum height at all any more (0.15.263 kept 10 m above where you last stood). Server only: no game update.
+
 0.15.263 Nov 16, 2026
 - Fast Dive settings made clearer: "Free-fall dive above (altitude)" (was "Fast Dive automatic above") is only for diving without the glider, by the game's altitude (height above sea level, not above the ground). The glider dive (tap forward twice) works at any height, except within 10 m above where you last stood (no tip there either). The "Fast Dive minimum height" setting is gone: it hardly ever did anything. New tooltips say all this.
 - Includes 0.15.261's settings order. (0.15.262, never released: both dives counted from where you last stood; undone.)
