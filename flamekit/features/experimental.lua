@@ -138,7 +138,7 @@ function glide.sprinting(world, account, p)
     if held then
       local ok2, st = pcall(function() return tonumber(tostring(world:get("DynamicLocomotion", p.entity).state)) end)
       if ok2 and st == HANG_GLIDING then
-        emf.log(string.format("experimental: glider sprint: player %s sprints (%sx of their glider speed %sx)", tostring(p.entity),
+        emf.log(string.format("experimental: glider sprint: player %s sprints (%s of their glider speed %s)", tostring(p.entity),
           glide.label(glide.sbj(account, "sprint")), glide.label(glide.factor(account))))
       end
     end
@@ -1527,9 +1527,13 @@ local function lift(world)
           local q = world:get("CurrentTransform", p.entity).transform.orientation
           local fx, fz = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
           local len = math.sqrt(fx * fx + fz * fz)
+          -- (0.15.259, owner: "the s key keeps me up in the air ... its important to be able to push both at the same
+          -- time") Glider Sprint while climbing: the climb's forward speed times the sprint factor
+          local fwd = p.forward
+          if p.sprint then fwd = fwd * glide.sbj(account, "sprint") end
           if len > 0.01 then
-            vel.x = fx / len * p.forward
-            vel.z = fz / len * p.forward
+            vel.x = fx / len * fwd
+            vel.z = fz / len * fwd
           end
         end)
         if not ok then
