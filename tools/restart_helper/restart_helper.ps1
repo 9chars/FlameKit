@@ -12,6 +12,7 @@
 #   sign    sign signing\update.txt with that key (SHA-256, ECDSA P-256): the signature (64 bytes, hex) goes to
 #           signing\update.sig, which is published next to the channel's update.txt
 #   build   build FlameKit's DLL: ..\flamekit_native\build.cmd, its output in build.log and its result code in build.done
+#   buildprobe   the same for ..\flamekit_server_probe (a test mod for the local server)
 #           there (the same as build_watch.cmd, which is no longer needed)
 #   installold, installnew  (0.15.124, the release packages) a test install into a scratch folder, never the game:
 #           installtest\game (a fake dedicated server folder: an empty enshrouded_server.exe, so no save backup is made)
@@ -183,12 +184,13 @@ function Start-Server {
     return $false
 }
 
-function Build {
-    $dir = Join-Path (Split-Path -Parent $here) 'flamekit_native'
+function Build([string]$folder = 'flamekit_native') {
+    # (2026-11-17) 'buildprobe' builds ..\flamekit_server_probe (a test mod for the local server) the same way
+    $dir = Join-Path (Split-Path -Parent $here) $folder
     if (-not (Test-Path (Join-Path $dir 'build.cmd'))) { Log "build: FAILED: build.cmd not found in $dir"; return $false }
     $doneB = Join-Path $dir 'build.done'
     if (Test-Path $doneB) { Remove-Item $doneB }
-    Log 'build: building FlameKit Native'
+    Log "build: building $folder"
     # Not Start-Process -Wait: that also waits for the compiler's helper (mspdbsrv.exe), which stays running for minutes
     $p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'call build.cmd > build.log 2>&1' -WorkingDirectory $dir -WindowStyle Hidden -PassThru
     if (-not $p.WaitForExit(600000)) { Log 'build: FAILED: not done after 10 minutes'; return $false }
@@ -298,6 +300,7 @@ while ($true) {
                     Finish $ok 'client and server restart'
                 }
                 'build' { $ok = Build; Finish $ok 'build' }
+                'buildprobe' { $ok = Build 'flamekit_server_probe'; Finish $ok 'buildprobe' }
                 'keygen' { $ok = Keygen; Finish $ok 'keygen' }
                 'sign' { $ok = Sign; Finish $ok 'sign' }
                 'installold' { $ok = Install-Test 'old'; Finish $ok 'installold' }
@@ -305,7 +308,7 @@ while ($true) {
                 'upload' { $ok = Upload; Finish $ok 'upload' }
                 'ftplist' { $ok = Upload -List; Finish $ok 'ftplist' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, keygen, sign, installold, installnew, upload, ftplist, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, buildprobe, keygen, sign, installold, installnew, upload, ftplist, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"
