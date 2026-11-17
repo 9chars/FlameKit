@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "emf/emf.hpp"
+#include "emf/query.hpp"
 
 namespace {
 constexpr const char* kMod = "fk_server_probe";
@@ -39,6 +40,35 @@ void hexdump(const char* title, uint64_t base, size_t bytes) {
         EMF_LOG(kMod, "%s", line);
     }
 }
+
+// A template GUID as the game stores it (Windows layout: the first three groups little-endian).
+bool parse_guid(const std::string& t, uint8_t out[16]) {
+    std::string hex;
+    for (char c : t) if (c != '-') hex += c;
+    if (hex.size() != 32) return false;
+    uint8_t b[16];
+    for (int i = 0; i < 16; ++i) b[i] = (uint8_t)std::strtoul(hex.substr(i * 2, 2).c_str(), nullptr, 16);
+    const int order[16] = {3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15};
+    for (int i = 0; i < 16; ++i) out[i] = b[order[i]];
+    return true;
+}
+
+#pragma pack(push, 1)
+struct WorldTransform {  // CurrentTransform (56 bytes): position in fixed point (1 m = 2^32), orientation, scale
+    int64_t px, py, pz;
+    float qx, qy, qz, qw;
+    float sx, sy, sz;
+    uint32_t pad;
+};
+#pragma pack(pop)
+static_assert(sizeof(WorldTransform) == 56, "CurrentTransform is 56 bytes");
+struct SpawnComponent { uint32_t hash; uint32_t pad; const void* data; uint64_t size; };
+struct SpawnSlice { const SpawnComponent* items; uint64_t count; };
+// the server's "spawn a player's body" (EMF ENGINE_MAP 1.4 "spawn player-owned"; found in enshrouded_server.exe at
+// exe+0x628e20 on 2026-11-17): createEntity(world+0xE179C0, id = slot + 1, {parent 0, guid, comps, mask 1 << slot,
+// kind 2}, 0); returns the new entity id (0 = refused)
+using SpawnPlayerFn = uint32_t (*)(void* world, uint32_t slot, const uint8_t* guid, const SpawnSlice* comps);
+constexpr const char* kSpawnPlayer = "48 83 EC 58 41 0F 10 00 4C 8B D1 8B CA 41 0F 10 09 B8 01 00 00 00 C7 44";
 
 uint64_t find_singleton(emf::World w, const std::string& name) {
     const char* tries[] = {"", "ecs::", "keen::", "keen::ecs::"};
@@ -94,6 +124,37 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                          EMF_REPLY("dumped (see the log)");
                      });
 
-    EMF_LOG(kMod, "loaded (read-only test commands: fkprobe.players, fkprobe.dump)");
+    // (2026-11-17, owner: "let us methodically work through it one byte at a time") a WRITE test: a player's body
+    // made the way the server makes one, for player slot <slot> (entity slot + 1), next to the given player
+    emf::add_command("fkprobe.spawnplayer", "<slot 1-15> [template guid] [near player entity] [metres]: a player body as the server makes one (test)",
+                     [](emf::World w, const std::vector<std::string>& args) {
+                         if (!w.is_server()) { EMF_REPLY("server world only"); return; }
+                         const int slot = args.size() > 1 ? std::atoi(args[1].c_str()) : 0;
+                         if (slot < 1 || slot > 15) { EMF_REPLY("usage: fkprobe.spawnplayer <slot 1-15> [guid] [player] [metres]"); return; }
+                         const std::string guid_text = args.size() > 2 ? args[2] : "c3db66d6-89a5-4a6c-a8e3-d9a1f6009812";  // 1_Player
+                         const uint32_t near_id = args.size() > 3 ? (uint32_t)std::strtoul(args[3].c_str(), nullptr, 10) : 1;
+                         const double metres = args.size() > 4 ? std::atof(args[4].c_str()) : 2.0;
+                         uint8_t guid[16];
+                         if (!parse_guid(guid_text, guid)) { EMF_REPLY("bad template guid"); return; }
+                         const auto pos = emf::position(w, near_id);
+                         if (!pos) { EMF_REPLY("no position for entity %u", near_id); return; }
+                         const uintptr_t fn = emf::find_pattern(kSpawnPlayer);
+                         if (!fn) { EMF_REPLY("the server's spawn-player function was not found (see the log)"); return; }
+                         WorldTransform t{};
+                         t.px = (int64_t)((pos->x + metres) * 4294967296.0);
+                         t.py = (int64_t)((pos->y + 0.5) * 4294967296.0);
+                         t.pz = (int64_t)(pos->z * 4294967296.0);
+                         t.qw = 1.0f;
+                         t.sx = t.sy = t.sz = 1.0f;
+                         SpawnComponent comp{0x027ac564u, 0, &t, sizeof t};  // CurrentTransform
+                         SpawnSlice slice{&comp, 1};
+                         EMF_LOG(kMod, "spawnplayer: slot %d (entity %d), template %s, near %u (%.1f %.1f %.1f) + %.1f m, function at %llx",
+                                 slot, slot + 1, guid_text.c_str(), near_id, pos->x, pos->y, pos->z, metres, (unsigned long long)fn);
+                         const uint32_t id = reinterpret_cast<SpawnPlayerFn>(fn)(w.raw(), (uint32_t)slot, guid, &slice);
+                         EMF_LOG(kMod, "spawnplayer: the server returned entity %u", id);
+                         EMF_REPLY("spawnplayer: entity %u", id);
+                     });
+
+    EMF_LOG(kMod, "loaded (test commands: fkprobe.players, fkprobe.dump, fkprobe.spawnplayer)");
     return true;
 }
