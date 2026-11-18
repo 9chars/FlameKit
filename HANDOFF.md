@@ -561,6 +561,15 @@ what you remember is the rebuild's fault, not a decision.
    mitigate this situation. having him closer on land would be good too probably". Found: the land stop distance is
    ALSO hard-coded in the C++ drive (`server_probe.cpp` drive_post: `if (dp > 3.0 && dl > 0.05)`; speed Walk/Run/
    Sprint at 6 / 12 m), besides Lua DRIVE_STOP 3: 2 m on land needs a probe rebuild (buildprobe) and a server restart.
+   **Owner decision 11:12:** "I think both fixes should be done.. if he's still swimming he hasn't arrived (there could
+   be other edge cases where this happens) and the follow distance needs to be 2 m. I think this is a one of situation
+   where its safe to do both fixes together" (an exception to the one-fix rule, his call).
+   Built 11:12-11:15: C++ `kFollowStop = 2.0` (was the literal 3.0 in drive_post; buildprobe BUILD OK 11:12:56, backup
+   `claude_scratch/server_probe.before_stop2_1113.cpp`); the loaded DLL renamed to `mods\fk_server_probe\
+   fk_server_probe.dll.old_1115` and the new one copied in (md5 d56a065e...), used from the next server start. Lua
+   (live 11:13): DRIVE_STOP 2; in the water with the player NOT swimming the stop is SWIM_OUT_STOP 0.8 m and the hop
+   and the water stuck count past it. Backup `claude_scratch/npc_probe.before_stop2_1114.lua`. Until the restart the
+   old DLL still stops him at 3 m while Lua expects 2 m: "stuck ... gave up / goes on" every 3 s at 2.4 m (11:13:17).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
