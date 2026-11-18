@@ -410,6 +410,11 @@ teleport function as when I move across the map from a fast travel or what not..
 Pieces already there: "Put away" (wheel/do_away: body removed, kept in the roster) and Call / P (on_call: respawn 0.3 m
 to the player's right, facing his way). 13:40 logging: "air <id>: player state N after s in the air (...)" each time a
 new locomotion state shows up mid-flight, to find the glider's number.
+Glide test (13:42, owner: "2 long glides and 1 short one"): **the glider is locomotion state 4** (state 2 = in the air
+after a jump; 4 shows ~1.1-1.2 s after takeoff, after the double jump that opens it). Long glides: 79.7 m in 9.9 s
+(top 997.2, 43 m above takeoff), 74.5 m in 9.2 s (came down 14.2 m lower); short: 18.4 m in 2.33 s, 1.4 m lower. All
+three left a break (flight > 2 s) in the trail: the hound waits at the last crumb before it (and at 13:42:23, 38 m from
+the player, "gave up" as can't follow).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
