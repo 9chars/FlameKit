@@ -438,7 +438,9 @@ what you remember is the rebuild's fault, not a decision.
    now". Built 10:07 (npc_probe, live reload): FLOOR_LINK 0.7 m between crumbs, FLOOR_REACH 3.6 m (past the 3.5 m
    sprint ray), level = within 0.8 m of his height, no brk; then the permission flag is set (the native 7.5 m limit
    stays). Log: "edge <id>: floor proven by the trail / no floor proof (unbroken level trail X m ahead)". Backup
-   `claude_scratch/npc_probe.before_floorproof_1007.lua`. NOT yet tested.
+   `claude_scratch/npc_probe.before_floorproof_1007.lua`. Test 1 (10:09-10:11): log shows him crossing the trap
+   door both ways (10:09:10 proof at 6300.4 -> 6304.3 two seconds later; 10:10:34 proof at 6304.1 -> 6291.6 at
+   10:10:38), no edge stop, no stuck. Owner's view: pending. Open trap door jumped over: not tested yet.
    **Owner wishes / ideas (10:06, not decided):** "it would be nice if he could just also jump over it"; "its too bad
    he can't use my actions as predictions as to what he should do.. it would be nice if we could add more context to
    the bread crumbs for instance the bread crumb could indicate I jumped next, etc... not sure how possible or stable
