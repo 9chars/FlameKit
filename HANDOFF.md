@@ -570,6 +570,11 @@ what you remember is the rebuild's fault, not a decision.
    (live 11:13): DRIVE_STOP 2; in the water with the player NOT swimming the stop is SWIM_OUT_STOP 0.8 m and the hop
    and the water stuck count past it. Backup `claude_scratch/npc_probe.before_stop2_1114.lua`. Until the restart the
    old DLL still stops him at 3 m while Lua expects 2 m: "stuck ... gave up / goes on" every 3 s at 2.4 m (11:13:17).
+   Restart (owner 11:18 "yes lets do the restart"): 11:18:58-11:19:55, the helper's new 30 s wait ran ("waiting 30 s
+   for it to finish coming up before the client starts"); the new fk_server_probe.dll loaded 11:19:01.
+- **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
+  does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
+  might be able to avoid all this restarting...."
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
