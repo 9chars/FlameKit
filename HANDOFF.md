@@ -312,6 +312,11 @@ what you remember is the rebuild's fault, not a decision.
 ### The owner's rules for companion work
 - NO GAME AI, ever [L 17:06: "I DO NOT WANT TO USE ANYTHING FROM THE GAME THAT USES THIER CRAPPY AI"]; no old code,
   no fallback [L 17:00: "under no circumstances do I want any of the old code. no fall back code ..."].
+- **Logging needs no question (owner 2026-11-18 10:00):** "when it comes to a question of adding more logging to get
+  more data, you do not need to ask me that, automatically add the new logging in, explain to me about the new
+  logging and then ask to proceed with a new test".
+- **Odd edge cases first (owner 10:00):** when a new odd situation comes up mid-test, evaluate it right away ("its
+  important to evaluate these odd ball edge cases when they happen"), then go back to the test.
 - No movement code changes from a single test: he does several tests first [S 2026-11-18 07:20].
 - One fix per test round [S 07:49: "lets make sure we test one fix at a time so we don't add any complexity we dont need"].
 - In-game tests only after his "ready" [S 2026-11-17 20:01] (a test once ran while he was in a menu).
@@ -422,6 +427,12 @@ what you remember is the rebuild's fault, not a decision.
   'template', other ones would not have that feature most likely, so you'd need to store these behaviors by the
   model/template type eventually". Today FLOAT_LIFT / FLOAT_PITCH (and the jump numbers) are single constants, not
   per template: to do when a second body comes.
+0b. **Trap door "stuck" (owner 10:00, village):** "the dogs path in front of me is clear and wide open, yet the message
+   says the companion is stuck ... he is on a flat boardwalk type surface. there IS a closed trap door in front of
+   him". Log 09:56:14 and 09:56:56: `edge: 33767 stops at 6301.5 948.5 5179.9 (ground 1.5 m ahead: a drop the player
+   did not take, 5.50 m down)`, then stuck. The player's crumbs there are level (y 948.50), so the player walked
+   over it. The edge ray (mask 7) went through the closed trap door and hit the ground 5.5 m below. Permission today
+   only covers crumbs going DOWN; a level crumb ahead (laid only on solid ground) is not counted as proof of a floor.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
