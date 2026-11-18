@@ -886,8 +886,9 @@ next restart (no yes for a restart yet).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
-4. Ground under a glide path: parked. Owner idea (2026-11-18 09:27, not decided): "maybe the dog could just follow
-   the trail in the air".
+4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
+   a way for the hound to walk after a glide (find ground he could cross under the flight, or follow the trail in the
+   air); the glider put-away and respawn beside the player (13:48, owner 13:54 "it works pretty well") does that job.
 7. **Companion inventory (owner 2026-11-18 13:06):** "also add to your list: companions can carry extra items for you
    (they have their own inventory like a storage check basically)". (a storage chest the companion carries; later)
    Owner 13:29: "a quick initial assessment of that idea... is it doable with what you know so far?" Assessment
