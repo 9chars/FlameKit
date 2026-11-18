@@ -994,10 +994,14 @@ local function drive_steer(s)
     end
     local proof = false
     if not ok then
-      local lx, lz, far, whole = nx, nz, 0, #trail > 0
+      local lx, lz, far, whole, why = nx, nz, 0, #trail > 0, nil
       for i = 1, #trail do
         local cc = trail[i]
         if cc.brk or (cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > FLOOR_LINK ^ 2 or math.abs(cc.y - ny) > 0.8 then
+          -- (17:35 logging) why the unbroken level trail ends here
+          why = string.format("; ends at crumb %d of %d: %s", i, #trail, cc.brk and "a break" or
+            ((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > FLOOR_LINK ^ 2 and string.format("%.2f m from %s", math.sqrt((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2), i == 1 and "him" or "the crumb before")
+              or string.format("%.2f m %s him", math.abs(cc.y - ny), cc.y > ny and "above" or "below")))
           whole = false
           break
         end
@@ -1013,9 +1017,9 @@ local function drive_steer(s)
         proof, to_player = true, true
       end
       if proof ~= (h.floorproof or false) then
-        log(string.format("edge %s: %s (unbroken level trail %.1f m ahead%s) at %.1f %.1f %.1f", tostring(id),
+        log(string.format("edge %s: %s (unbroken level trail %.1f m ahead%s%s) at %.1f %.1f %.1f", tostring(id),
           proof and "floor proven by the trail, native edge stop off" or "no floor proof", far,
-          to_player and ", to the player" or "", nx, ny, nz))
+          to_player and ", to the player" or "", proof and "" or (why or (#trail == 0 and "; no trail" or "; the trail ends there, the player is not on it")), nx, ny, nz))
       end
       ok = proof
     end
