@@ -9,7 +9,8 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
    long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
-2. Versions: **0.15.281 on Development and the local server** (2026-11-18 14:18: fast travel hides all of FlameKit's
+2. Versions: **0.15.282 on Development and the local server** (2026-11-18 14:35: the minimap comes back with the rest
+   of the UI after fast travel, Rule 0n fix), 0.15.281 (14:18: fast travel hides all of FlameKit's
    UI; includes 0.15.280 Invincible air), earlier today **0.15.279** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
    Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
    server's main.lua keeps `features.npc_probe` instead of `features.npc_wheel_probe`; its npc_probe feeds
@@ -496,6 +497,12 @@ Restart 14:19-14:20 (owner 14:16 "build it and restart"); the owner's game on 0.
 "it looks a lot better now". Log: 5 travels: hidden 3.3 s after the request (4x) or at the teleport (1x, 14:28:11: the
 teleport came first), shown again "loaded" after 5.7-8.9 s; once (14:27:46) "no teleport came, after 3.7 s" (shown 7 s
 after the request without a teleport: a cancelled travel? not asked yet).
+Owner 14:30: "when the UI reappears after the zone, the mini map doesn't appear until I move.... ?" Cause: the minimap's
+own old rule (TeleportCount up -> hidden until the player moves, 2-20 s) still ran beside the new server signal. Owner
+14:31: "yes of course the old signal needs to get cleaned up ..." -> Rule 0n. **0.15.282 to Development (built 14:35):**
+`g_travel_signal` (set on the first "travel 1" from the server): the old rule no longer starts once the signal was seen,
+and the signal's end also ends it (log "fast travel: the minimap's own rule ended by the server's signal"). The old rule
+stays only for a server without travel_hide.lua. To test: fast travel, the minimap must come back with everything else.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
