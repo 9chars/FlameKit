@@ -701,6 +701,21 @@ what you remember is the rebuild's fault, not a decision.
   for the flight (DJ_TICKS 150). Logs "double jump <id>: follows the player's ..." and "... down at ..., x m from the
   player's landing". Nothing else changed. Backup `claude_scratch/npc_probe.before_meta_dj_1240.lua`. Unknown before
   the test: whether a Velocity write takes on LAND (in water it did), and what jumpCount counts.
+  **Test 1 (12:41-12:45), owner 12:44:** "I'm getting 'Companion can't get up there!' in the messages window, but not
+  the notice window... so that should be fixed, also the dog can't get up here. I did see him make an attempt".
+  - Metadata works: double jumps log "jump count 2, second push true" (a single jump once also showed "second push
+    true": the jump COUNT is the reliable sign).
+  - 12:42:54 double jump follow fired (3.6 m up, 4.7 m out) but a Velocity write alone did nothing on the ground (he
+    never left it). His own step jump then got him up 3 m (12:42:56). The next ledge (1.6 m up, 4 m out) the player
+    reached without an air segment the log saw (a climb/mantle).
+  - Notice bug: he gave up with the player 4 m away, "the player is back near him" was true at once, so notice on/off
+    every 3 s: a Messages line each time, nothing kept in Notices.
+  Fixes 12:45-12:46 (live): resume after a give-up only when the player has MOVED STUCK_MOVED 1.5 m since then (and is
+  near); launch = lift 0.3 m + speed, the speed rewritten until the game counts him in the air (DJ_LIFT 40 ticks; it
+  took 14 at 12:45:06); over the landing spot (0.6 m) the speed across goes to 0; and a crumb-based jump: no progress
+  for DJ_WAIT toward his next crumb that is DJ_RISE..6 m higher and within DJ_REACH 6 m: the same launch at it (log
+  "double jump <id>: jumps up to his next crumb ..."). 12:45:06 (before the DJ_LIFT fix) it went up 2.2 m but the
+  flight ended after 10 ticks, he flew 7.6 m past the ledge. Backup `claude_scratch/npc_probe.before_djfix_1246.lua`.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
