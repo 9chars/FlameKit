@@ -630,6 +630,15 @@ what you remember is the rebuild's fault, not a decision.
    correctly, but one of the village animals blocked his way and he correctly gave the 'cant follow you message'. is
    there anything he can do to navigate that problem?" (log 11:58:57 "stuck: 34877 gave up at 6307.6 948.5 5202.6
    (crumb 0.9 m away, player 15.3 m)").
+   Owner 12:02: "definitely do #2.. he'll get blocked by NPC's too. idk if the hit test can tell the difference between
+   animals and NPC's but if it can, the message should reflect that, such as 'Blocked by animals!' or 'Blocked by NPC!'
+   Some NPC's won't move ever...". Built 12:03 (live, logging only so far): `blockers()` in npc_probe: when he gives up
+   (land, water, to-the-water), every body within BLOCK_R 2.5 m (2 m height) is listed with its kind from components
+   (Animal -> animal, ActiveNpcState -> npc, an account -> player, DynamicEnemy01BehaviorState -> monster), distance,
+   in front/behind, faction, plus his collider's "touching a character / a player" flags; log "stuck: <id> in his way:
+   ...". h.blocked_by = the nearest kind in front. Notice text not changed yet (wording to confirm with the owner).
+   Backup `claude_scratch/npc_probe.before_blockers_1203.lua`. Unverified: that village animals carry "Animal" and
+   villagers "ActiveNpcState".
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
