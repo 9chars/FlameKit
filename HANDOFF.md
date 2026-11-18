@@ -725,6 +725,13 @@ what you remember is the rebuild's fault, not a decision.
   in the air the speed across is written every tick toward the landing spot until he is over it (up/down left to
   gravity); after a jump-follow landing up top he stands still DJ_SETTLE 20 ticks (speed across 0, target = himself).
   Backup `claude_scratch/npc_probe.before_djsteer_1253.lua`.
+  **Test 3 (12:55, 4 double jumps), owner 12:56:** "the first two times he had to jump twice. the 3rd time he got it in
+  one jump, the 4th time I think he jumped twice. this result is good enough for me, but if you think you can tweak it
+  further so he can nail it in one jump, go ahead". Log: all 4 follows landed 0.5 m from the player's landing and
+  level with it (0.2-0.3 m), "7.0 / 7.3 / 6.6 / 7.3 m forward, highest +3.2..3.7 m". The "second jump" was the native
+  step jump hopping him IN PLACE 0.35 s after landing ("a step 0.7 m up ... 0.08 m forward"), as the 20-tick settle
+  ended (the 3rd test had no hop). Tweak 12:57 (live): DJ_SETTLE 45 ticks, with the step jump and edge stop off while
+  he stands still settling.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
