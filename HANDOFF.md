@@ -639,6 +639,11 @@ what you remember is the rebuild's fault, not a decision.
    ...". h.blocked_by = the nearest kind in front. Notice text not changed yet (wording to confirm with the owner).
    Backup `claude_scratch/npc_probe.before_blockers_1203.lua`. Unverified: that village animals carry "Animal" and
    villagers "ActiveNpcState".
+   **Diving (owner 12:05):** "I swam back on the little island again and he followed me correctly. I jumped off this
+   island and he did correctly follow me, but he did not match my depth in the water. I swam all the way to the bottom
+   and he did not follow me down." Log: he stays at the surface (his depth 0.93) above the player: by design since
+   fix round 2 (10:38, held at SWIM_DEPTH below the surface where he is). Before round 2 he dove because he was held
+   at the player's height. The hound has canDive = false and an Oxygen value (5): drowning not known.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
