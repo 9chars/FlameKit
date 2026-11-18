@@ -340,6 +340,10 @@ what you remember is the rebuild's fault, not a decision.
 - **Odd edge cases first (owner 10:00):** when a new odd situation comes up mid-test, evaluate it right away ("its
   important to evaluate these odd ball edge cases when they happen"), then go back to the test.
 - No movement code changes from a single test: he does several tests first [S 2026-11-18 07:20].
+- **A one-off is never a fix, for ANY code, not only movement** (owner 2026-11-18 14:54, verbatim: "one rare one off
+  glitch != do a fix, always violating your directives, what's the point of them ?"). After the 14:27 slow-load travel
+  Claude proposed a fix (0.15.284) from one occurrence. A single odd event gets evaluated (Rule 10:00) and written down
+  as "watch", with the log evidence; no fix and no fix proposal until it repeats or the owner asks for one.
 - One fix per test round [S 07:49: "lets make sure we test one fix at a time so we don't add any complexity we dont need"].
 - In-game tests only after his "ready" [S 2026-11-17 20:01] (a test once ran while he was in a menu).
 - Before guessing a cause: search this file and the notes for the same symptom [S] (the faction 7 miss cost about an hour).
@@ -516,7 +520,7 @@ CANCEL_AFTER timer, teleport only at 14:28:11.2 (28 s after the request): the UI
 Proposed fix (not done): drop the 7 s cancel timer, keep hidden until loaded (60 s LONGEST cap), unless a fast travel
 can be cancelled in game (asked the owner 14:43).
 Owner 14:50: "ok restart it now, but this isn't worth losing your shit over right now" -> the 7 s cancel timer fix is
-PARKED (rare game glitch; follow-up later). Restart into 0.15.283 at 14:50.
+PARKED: a WATCH item only, no fix unless it repeats (owner 14:54: "one rare one off glitch != do a fix"). Restart into 0.15.283 at 14:50.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
