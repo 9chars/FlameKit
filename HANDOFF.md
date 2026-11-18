@@ -732,6 +732,11 @@ what you remember is the rebuild's fault, not a decision.
   step jump hopping him IN PLACE 0.35 s after landing ("a step 0.7 m up ... 0.08 m forward"), as the 20-tick settle
   ended (the 3rd test had no hop). Tweak 12:57 (live): DJ_SETTLE 45 ticks, with the step jump and edge stop off while
   he stands still settling.
+  **Test 4 (12:58), owner 12:59: "looks good. he nailed it first try, the other jumps didnt get quite as far, but he
+  still made it up".** Log: all 4 follows down 0.4-0.6 m from the player's landing, level (0.2-0.4 m); in 3 of them
+  the native step jump then fired 0.78 s after landing ("a step 0.7-0.8 m up 1.5 m ahead", i.e. real ground rising
+  toward the player's next crumbs), which is likely the "not quite as far" look. 3 of 4 launches were at the 10 m/s
+  across cap (8.5-9.8 m out). Owner content; no further change.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
