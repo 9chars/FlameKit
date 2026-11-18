@@ -356,16 +356,49 @@ what you remember is the rebuild's fault, not a decision.
 - Eventually: different models must work with the same tuning; companions shown like players (party list) [S].
 
 ### Where things are
-- Server Lua: `<server>\emf\mods\flamekit\features\npc_probe.lua` (local server only, never published; backups
-  `claude_scratch/npc_probe.before_*.lua`). The local server's `main.lua` loads `features.npc_probe`, NOT
-  `features.npc_wheel_probe` (npc_probe owns channel `npcwheel` there).
-- C++ server mod: `<work folder>\flamekit_server_probe\src\server_probe.cpp` (restart helper `buildprobe`; backups
-  `server_probe.cpp.before_*`).
+- Server Lua: `<server>\emf\mods\flamekit\features\npc_probe.lua` (local server only, never published). **In git
+  since 2026-11-18 15:45: `local_server/` (npc_probe.lua, npc_fields.lua, the local server's main.lua, README.md,
+  tests/drive_harness.lua).** Whenever the server copy changes, copy it into `local_server/` and commit (owner 15:39
+  "#1 get it into get"). The local server's `main.lua` loads `features.npc_probe`, NOT `features.npc_wheel_probe`
+  (npc_probe owns channel `npcwheel` there). The old `claude_scratch/npc_probe.before_*.lua` backups named below were
+  deleted 2026-11-18 16:10 (owner #6); the full pre-split version with all its history comments is git commit 5f661f1
+  and `claude_scratch/npc_probe.BEFORE_SPLIT_2026-11-18.lua`.
+- C++ server mod: `<work folder>\flamekit_server_probe\src\server_probe.cpp`, in git (`flamekit_server_probe/`)
+  since 2026-11-18 15:45 (restart helper `buildprobe`).
 - Client (in the release since 0.15.278): `features/npc_wheel_probe.lua` (status notices, wheel, P key, panel button),
   `core/companions.lua` + `features/minimap.lua` (map dot, 0.15.278/279).
 - Commands (console or `emf\commands.txt` on the server; write via `cp /tmp/c.txt commands.txt`): `flamekit.npc`
   roster | drive | lure | hold | still | attr | level | faction | combat | atk | face | tpground | fullrec | look |
   spawnwild | remove ... Logs "npc probe: ..." in `emf\emf_core.log`.
+
+### Cleanup round (owner 2026-11-18 15:29-15:39)
+Owner 15:29: "before we move ahead is there any clean up we need to do? I want to keep the logging we added ... but
+maybe old tests, old code? old systems and functions that didn't work right still in there, code that isn't factored
+properly so code can be appropriately reused, etc?" Owner 15:39 on Claude's list, verbatim: "#1 get it into get.. #2
+are you saying we don't need this anymore or??? #3 go ahead and do this one, we'll retest everything, make sure we have
+a complete backup of the function in case we need to revert back to it. #4 keep them for now #5 get rid of dead code
+#6 once the code is in git go ahead and clean this up if we don't need it. #7 go ahead and clean that up #8 you're
+talking about companion stuff or????? comments: we'll reassess after this is done. proceed in the order that makes the
+most sense"
+- #1 done: live companion code and server_probe.cpp in git (commit 5f661f1).
+- #5 done: try_offer, v3, gy, the unused `logcrumbs` field, DROP_GAP removed.
+- #3 done (16:09, live on the local server by EMF's reload, no restart needed): drive_step is now drive_read,
+  drive_waterlog, drive_water, drive_track_player, drive_put_away, drive_lay_crumb, drive_upkeep, drive_jump_follow,
+  drive_lure, drive_hold, drive_pick_target, drive_stuck, drive_steer (a part returning true ends the tick), plus
+  helpers face, hold_at, health, edge_off, launch_speeds, launch, report_blockers. Checked with
+  `local_server/tests/drive_harness.lua` (old vs new in a fake world, every write, log line and notice compared per
+  tick): 0 differences in 66 scenarios; every line of the old drive reached except one fallback line. **Owner: retest
+  everything in game** (walking, trap door, water in/out, piers, islands, diving, climb-out hop, jumps and double jumps,
+  drops, stuck notices, glider, fast travel, Call). Revert = put `claude_scratch/npc_probe.BEFORE_SPLIT_2026-11-18.lua`
+  back on the server (or git 5f661f1).
+- #7 done: npc_probe.lua comments say what the code does now (history: this file and git 5f661f1).
+- #6 done: deleted the claude_scratch backups (npc_probe.before_*, client/server .before_*, rel278-rel284,
+  server_before_278, dist_md5_*), notes/probes/npc_probe.lua and npc_wheel_probe.lua (superseded copies), the server's
+  `_to_delete/input_probe.lua` and `fk_server_probe.dll.old_1115`. Kept: the data and tools in claude_scratch (bt, tpl,
+  skills, items/inspect dumps, nightly_log_fetch, buffs.png), `server_probe.flattop_setaside.cpp` (set aside by the
+  owner), notes/probes input/jump probes (measuring tools), `restart_helper/_to_delete` (FTP setup files: not touched),
+  the server's 79 fullrec_*.txt recordings (43 MB, logging output: owner's call).
+- #4 kept for now (test console commands). #2 and #8 were questions, answered 16:1x: not done.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
