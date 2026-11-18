@@ -448,6 +448,13 @@ what you remember is the rebuild's fault, not a decision.
    then carried on fine. The proof checks the trail, not that the trail passes the spot the ray tested: if his line
    leaves the trail (a corner), the proof can cover ground the player never walked. Possible tightening: the chain
    must pass within ~0.5 m of the tested point(s). Not changed (one case; owner decides).
+   Owner 10:18 (stale crumbs): "theres a button to open that trap door ... only stays open for a few seconds. to
+   access the button ... I had to step on the trap door itself. that may have left a bread crumb there. I hit the
+   switch and hopped off quick to the other side while it opened. I could see that situation tricking the dog into
+   trying to walk over it". Why he stopped in this test: the hop broke the trail (gap), so no proof. Had the owner
+   WALKED off the door, crumbs would lie over the open hole and the proof would let him walk in. The edge ray cannot
+   tell open from closed (it goes through the closed door too). Bound: the proof never allows a drop of 7.5 m or
+   more (native limit), his fall damage starts at 8 m, so the worst case is a harmless fall into the hole.
    **Owner wishes / ideas (10:06, not decided):** "it would be nice if he could just also jump over it"; "its too bad
    he can't use my actions as predictions as to what he should do.. it would be nice if we could add more context to
    the bread crumbs for instance the bread crumb could indicate I jumped next, etc... not sure how possible or stable
