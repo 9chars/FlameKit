@@ -458,6 +458,10 @@ the teleport count (14:06:51.297, same moment) and came back when the player mov
 14:08 logging: the player's fast travel request (PlayerInput.fromClient.teleportAction: target / teleporterType /
 versionData, e.g. "18766/1/607074"); one more fast travel shows whether it arrives before the teleport (an earlier
 "hide" signal than the count).
+Owner 14:10 "ok" (yes to #1 and one more fast travel). Built 14:10 (live): a return also waits while the player's
+fromClientIsReadyForGameplay is false (then LAND_TICKS on the ground). Backup `claude_scratch/npc_probe.before_ready_1410.lua`.
+#2 (hide ALL of FlameKit's layers while travelling, back on the ready signal: a client DLL change, Development) waits
+for the travel-request timing.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
