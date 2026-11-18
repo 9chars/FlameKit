@@ -15,6 +15,7 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    `core.companions.set_places` ({x, z, owner = character name}); minimap sends `c x z owner<TAB>companion name` lines, the DLL draws a
    small dot in the owner's player_style colour with the companion's name over it (owner 09:17: "named by the
    companion's name"; there was never a "no name" request), never merged with players.
+   Owner 09:26 on 0.15.279 in his game (named dot, P key, Messages): "yeah looks good so far".
 2b. (owner 2026-11-18 09:23) "you need to add a longer delay before trying to load that client for dev test cause it
    loads faster now than before and the server is not up fast enough": restart_helper.ps1 starts the client right at
    the server's "world loaded" (about 22 s after start). Done 09:25 (owner: 30 s "should work"): Wait-ForServer
