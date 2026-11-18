@@ -2296,12 +2296,19 @@ struct Frame {  // what a layer gets to know about this moment
 // says otherwise (Layer::stays_in_build). Owner, 0.15.61: ALL of FlameKit's UI on screen hides in build mode, the lower
 // left lines too; only FlameKit's window (F4, opened on purpose) stays, and a future build mode feature may opt out.
 std::atomic<bool> g_build_hide{false};
+// (0.15.281, owner 2026-11-18: "a lot of the UI elements don't disappear during zoning ... It just looks goofy") a fast
+// travel's animation and loading screen: the server's FlameKit tells the game (features/travel_hide.lua), the Lua part
+// writes "travel 1" into ui_hud.dat, and ALL of FlameKit's UI hides (FlameKit's window too). g_travelling (the minimap's
+// own TeleportCount rule) stays for servers without it.
+std::atomic<bool> g_travel_hide{false};
 
 struct Layer {
     virtual ~Layer() = default;
     virtual const char* name() const = 0;
     virtual bool stays_in_build() const { return false; }  // true: shown in build mode too (see g_build_hide)
-    bool shown() const { return visible && !(g_build_hide.load() && !stays_in_build()); }  // what is on screen now
+    bool shown() const {  // what is on screen now
+        return visible && !(g_build_hide.load() && !stays_in_build()) && !g_travel_hide.load();
+    }
     // Brings the layer up to date: visible, rect (where, in the game window's client coordinates; its size is the
     // canvas's) and the picture. Sets changed when the picture changed.
     virtual void update(const Frame& f) = 0;
@@ -6291,7 +6298,7 @@ struct HudLayer : Layer {
         }
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_hud.dat").c_str(), L"rb", _SH_DENYNO)) {
             std::wstring new_label;
-            bool complete = false, build = false;
+            bool complete = false, build = false, travel = false;
             char line[512];
             while (fgets(line, sizeof line, fp)) {
                 line[std::strcspn(line, "\r\n")] = 0;
@@ -6301,6 +6308,8 @@ struct HudLayer : Layer {
                 }
                 if (std::strcmp(line, "build 1") == 0) {
                     build = true;
+                } else if (std::strcmp(line, "travel 1") == 0) {
+                    travel = true;
                 } else if (std::strncmp(line, "label ", 6) == 0) {
                     new_label = widen(line + 6);
                 }
@@ -6312,6 +6321,12 @@ struct HudLayer : Layer {
                 if (build != g_build_hide.load()) {
                     g_build_hide = build;
                     FK_LOG(fklog::kInfo, "build mode: FlameKit's windows %s", build ? "hidden" : "shown again");
+                }
+                // not gated by in_world (unlike build mode): during the loading screen the player's position may stop
+                // coming, and the UI must stay hidden then too. The Lua part writes the file again in the next world.
+                if (travel != g_travel_hide.load()) {
+                    g_travel_hide = travel;
+                    FK_LOG(fklog::kInfo, "fast travel: all of FlameKit's UI %s (the server's signal)", travel ? "hidden" : "shown again");
                 }
                 label = new_label;
             }

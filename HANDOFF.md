@@ -4,13 +4,13 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
 
 ## Start here (next conversation, written 2026-11-17 07:25)
 
-1. Read Rules 0r, 0p, 0w, 0h, 0a, 0d, 0c, 0b below before anything else, then "Companions". The two that went wrong most on 2026-11-16:
+1. Read Rules 0r, 0p, 0g, 0w, 0h, 0a, 0d, 0c, 0b below before anything else, then "Companions". The two that went wrong most on 2026-11-16:
    **0p** (the owner picks every next step; no change, test or "cleanup" he did not ask for) and reading his words
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
    long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
-2. Versions: **local server 0.15.280** (server-only: Invincible Mode keeps air full, 2026-11-18 12:14), **0.15.279 on
-   Development and the local server's game part** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
+2. Versions: **0.15.281 on Development and the local server** (2026-11-18 14:18: fast travel hides all of FlameKit's
+   UI; includes 0.15.280 Invincible air), earlier today **0.15.279** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
    Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
    server's main.lua keeps `features.npc_probe` instead of `features.npc_wheel_probe`; its npc_probe feeds
    `core.companions.set_places` ({x, z, owner = character name}); minimap sends `c x z owner<TAB>companion name` lines, the DLL draws a
@@ -67,6 +67,13 @@ published 0.15.226 with Fast Dive's settings unasked; the owner wanted to test t
 gun here per usual"). Owner: "This simple ask makes the work flow move smoother and prevents unnecessary changes until
 the plan has been perfectly dialed in." This sharpens rule 1 (confirm before changing anything), which Claude kept
 breaking by treating an earlier general request ("give me all the settings") as a yes for every step after it.
+
+## Rule 0g: CORE DIRECTIVE, Stable and G-Portal only on the owner's direct word (owner, 2026-11-18 14:16)
+
+"do not touch g-portal or stable release ever unless I say so. you do not need to keep asking me about it. I will
+directly tell you when I want stable and g-portal updated. otherwise assume I do not want it!" Never update, propose or
+ask about Stable or G-Portal; do it only when he says so himself. Releases go to the Development channel (dist-test)
+and the local server as usual.
 
 ## Rule 0w: CORE DIRECTIVE, the owner's exact words (owner, 2026-11-18 09:22)
 
@@ -462,6 +469,19 @@ Owner 14:10 "ok" (yes to #1 and one more fast travel). Built 14:10 (live): a ret
 fromClientIsReadyForGameplay is false (then LAND_TICKS on the ground). Backup `claude_scratch/npc_probe.before_ready_1410.lua`.
 #2 (hide ALL of FlameKit's layers while travelling, back on the ready signal: a client DLL change, Development) waits
 for the travel-request timing.
+Travel request timing (14:10-14:12): it reaches the server ~4.2-4.3 s BEFORE the teleport (14:11:11.2 -> 14:11:15.6);
+owner 14:13: "there's a short animation, maybe about 3.5 seconds before the screen goes dark". Owner 14:16: "build it
+and restart" (#2: the server drives hiding ALL of FlameKit's UI: hide 3.3 s after the request or at the teleport, show
+when the client reports ready; Development 0.15.281).
+**0.15.281 to Development (built 14:18):** `features/travel_hide.lua` (new, listed in main.lua; the local server's own
+main.lua got the line too, next to npc_probe): the server watches each player's travel request version, TeleportCount
+and ready flag; hides HIDE_AFTER 198 ticks after the request or at the teleport, shows again once ready went false and
+then true after the teleport; cancelled travel (no teleport 7 s after the request) or 60 s: shown again. Channel
+flamekit/travel ("1"/"0") to the player's game (the host's own game directly); kit.travelling -> ui_hud.dat "travel 1"
+(core/kit.lua) -> DLL g_travel_hide: Layer::shown() false for EVERY layer (FlameKit's window too), not gated by
+in_world. Logs: server "travel: player N travels: FlameKit's UI hidden (...)" / "... shown again (loaded, after x s)";
+client log "fast travel: all of FlameKit's UI hidden / shown again (the server's signal)". The minimap's own
+TeleportCount rule stays for servers without it. Also in this release: 0.15.280's Invincible Mode air refill.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water

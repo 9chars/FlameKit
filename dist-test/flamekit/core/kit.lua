@@ -212,6 +212,8 @@ end
 --   notice <text>             (orange, in the lower left corner: the server runs an older FlameKit)
 --   build 1                   (0.15.59: the player is in build mode and ui_hide_build is on: the DLL hides all of
 --                              FlameKit's UI but FlameKit's window, these lines too since 0.15.61)
+--   travel 1                  (0.15.281: a fast travel's animation and loading screen, as the server's FlameKit tells
+--                              it, features/travel_hide.lua: the DLL hides ALL of FlameKit's UI)
 --   end                       (a file without it is half written: the DLL reads it again later)
 -- The updater's line under the label comes from the DLL itself. ui_hud.dat is a runtime file: never deployed.
 -- Build mode: ClientPlayerInput.data.mask of your own player, in your game's world. Measured in the owner's game
@@ -299,6 +301,7 @@ local function hud_tick(world)
   server_messages(world, connected)
   update_message()
   if kit.setting("ui_hide_build", true) and in_build_mode(world) then lines[#lines + 1] = "build 1" end
+  if kit.travelling then lines[#lines + 1] = "travel 1" end  -- (0.15.281) features/travel_hide.lua
   lines[#lines + 1] = "end"
   local text = table.concat(lines, "\n") .. "\n"
   if text == hud_written then return end

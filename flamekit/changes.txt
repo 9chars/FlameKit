@@ -1,3 +1,6 @@
+0.15.281 Nov 18, 2026
+- Fast travel: all of FlameKit's UI now hides during the travel animation and the loading screen, and comes back as soon as your game has loaded (the server's FlameKit tells your game when). Before, only the minimap hid, a little late.
+
 0.15.280 Nov 18, 2026
 - Invincible Mode keeps your air full under water too, so the drowning effect no longer shows. Server only: no game update.
 
