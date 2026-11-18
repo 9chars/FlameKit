@@ -444,6 +444,11 @@ after 2 s, at most 20 s); the other layers (HUD lines, notices, party window ...
 (local server): "load: player <id> ready for gameplay <PlayerInput.fromClientIsReadyForGameplay>, teleport count <n>,
 at x y z" whenever either changes: if the flag drops during the loading screen it is the signal for both (the respawn
 waits for it; the client could hide all of FlameKit's layers on it, a Development release).
+Can't-follow fallback test (14:02-14:03, owner jumped off without the glider): 14:02:56.970 "stuck: gave up ... player
+16.0 m", 14:03:02.004 "put away (can't follow)", 14:03:03.002 back beside the player: works. Owner 14:03: "the respawn
+works so well, I wouldn't even wait 5 seconds... wait like 2 seconds maybe. the only case where I would want to change
+this is if we were testing it more and trying to figure out situations why he couldn't get to me when he should".
+14:04 (live): TP_AFTER 120 ticks (2 s after he gives up; giving up itself takes STUCK_TICKS 3 s of no progress).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
