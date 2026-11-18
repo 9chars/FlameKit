@@ -411,7 +411,12 @@ most sense"
   first hit 1.5 m ahead can be the overhang, read as a step 0.6-3.6 m up: he jumps. Log since 16:24: three step jumps
   that landed no higher (16:44:59, 16:45:45, 17:01:21). 16:45:45 fits: he "jumped a 0.72 m step up" at 6227.3 920.6
   5287.2, the spot where the player had just jumped DOWN (came down 5 m lower), and landed 1.92 m lower. Owner 17:07:
-  "I was able to reproduce it at the time" -> not a one-off: fix proposed 17:1x (headroom ray, see below).
+  "I was able to reproduce it at the time" -> not a one-off. Fix proposed 17:08 (server_probe.cpp only): before the
+  downward step ray, one ray straight UP from just above his feet 1.5 m ahead; if it hits a ceiling, the downward ray
+  starts just under it instead of 5 m up; nothing overhead = as now; both hits logged per jump. Needs buildprobe + a
+  server restart. Owner 17:10: "no, but you maybe right, I would like to find more situations first so we can test
+  the fix. currently I don't have a situation where the problem and fix can be tested" -> PARKED until the owner has
+  a spot where it happens (then: build, restart, test there).
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
