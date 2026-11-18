@@ -9,8 +9,8 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
    long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
-2. Versions: **0.15.283 on Development and the local server** (2026-11-18 14:42: the minimap's old TeleportCount rule
-   removed entirely, Rule 0n no fallbacks; restarted into at 14:50), 0.15.282 (14:35: the minimap comes back with the rest
+2. Versions: **0.15.284 on Development and the local server** (2026-11-18 15:21: travel UI hides at 5.3 s, cancel rule
+   removed; not yet restarted into), 0.15.283 (14:42: the minimap's old TeleportCount rule removed entirely, Rule 0n), 0.15.282 (14:35: the minimap comes back with the rest
    of the UI after fast travel), 0.15.281 (14:18: fast travel hides all of FlameKit's
    UI; includes 0.15.280 Invincible air), earlier today **0.15.279** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
    Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
@@ -521,6 +521,12 @@ Proposed fix (not done): drop the 7 s cancel timer, keep hidden until loaded (60
 can be cancelled in game (asked the owner 14:43).
 Owner 14:50: "ok restart it now, but this isn't worth losing your shit over right now" -> the 7 s cancel timer fix is
 PARKED: a WATCH item only, no fix unless it repeats (owner 14:54: "one rare one off glitch != do a fix"). Restart into 0.15.283 at 14:50.
+Owner 15:20 on 0.15.283: "the UI seems to act correctly with the zoning, you could probably wait 2 seconds longer
+before taking the UI off" and "at that point you cant cancel it and theres no need to wait or listen for a cancelled
+teleport". **0.15.284 to Development (15:21, server Lua only, travel_hide.lua):** HIDE_AFTER 3.3 -> 5.3 s; the teleport
+(about 4.2 s after the request) no longer hides by itself when the request was seen; the 7 s CANCEL_AFTER rule and its
+"no teleport came" path are removed (the 14:27 slow load is covered by this now, by the owner's direction); LONGEST 60 s
+stays only as a cap. Log line now gives the hide and the teleport times after the request.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
