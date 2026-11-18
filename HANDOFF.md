@@ -82,8 +82,10 @@ and the local server as usual.
 the first time new feature replaces an old feature and you leave the old feature in place? why are you doing that?"
 (0.15.281: the new server travel signal showed the UI again, but the minimap's old TeleportCount rule still kept it
 hidden until the player moved.) When something new takes over a job, the old code must stop doing that job wherever the
-new one runs: no two mechanisms for one job side by side. Old code stays only as a fallback where the new one cannot
-run (and must then never interfere with the new one). Check this explicitly for every replacement before releasing.
+new one runs: no two mechanisms for one job side by side. **No fallbacks either** (owner 14:39, verbatim): "I don't want
+old features left in "when the new one can't run". if the new one can't run then there is a problem with the new
+feature." So the old code is REMOVED, not kept as a fallback; if the new one can't run, fix the new one. Check this
+explicitly for every replacement before releasing.
 ("Never remove anything we added" is about the owner's features, not about superseded mechanisms.)
 
 ## Rule 0w: CORE DIRECTIVE, the owner's exact words (owner, 2026-11-18 09:22)
@@ -503,6 +505,8 @@ own old rule (TeleportCount up -> hidden until the player moves, 2-20 s) still r
 `g_travel_signal` (set on the first "travel 1" from the server): the old rule no longer starts once the signal was seen,
 and the signal's end also ends it (log "fast travel: the minimap's own rule ended by the server's signal"). The old rule
 stays only for a server without travel_hide.lua. To test: fast travel, the minimap must come back with everything else.
+Owner 14:39: no fallbacks (Rule 0n). Proposed 0.15.283: remove the old TeleportCount rule and g_travelling entirely
+(the minimap is a Layer, so g_travel_hide already hides it).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
