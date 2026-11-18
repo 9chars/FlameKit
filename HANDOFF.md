@@ -527,6 +527,8 @@ teleport". **0.15.284 to Development (15:21, server Lua only, travel_hide.lua):*
 (about 4.2 s after the request) no longer hides by itself when the request was seen; the 7 s CANCEL_AFTER rule and its
 "no teleport came" path are removed (the 14:27 slow load is covered by this now, by the owner's direction); LONGEST 60 s
 stays only as a cap. Log line now gives the hide and the teleport times after the request.
+**Fast travel UI item DONE** (owner 15:25: "thats good we can cross that one off the list"). 0.15.284 loads at the
+next restart (no yes for a restart yet).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
