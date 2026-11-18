@@ -499,6 +499,16 @@ what you remember is the rebuild's fault, not a decision.
    PLAYER's state while the hound was 3.7 m behind over deep water: he sank 1.5 m/s to the bottom (y 939.3, 8 m
    under the surface) and gave up stuck at 10:35:18. Cause: the switch follows the player (owner's 09:42 decision
    not built yet).
+   **Fix round 2 (owner 10:37 "yes change it"; built 10:38-10:39, live reload):** water mode = the HOUND's own depth
+   > SWIM_ENTER 0.5 m; held at SWIM_DEPTH 0.9 m below the surface by his own depth (a quarter of the difference per
+   tick, at most 0.08 m a tick, never pushed down while he touches the bottom); edge-stop skip flag from HIS
+   swimming; a swimming player lays no crumbs and gets no flight time; when the player swims and the hound is at the
+   end of the trail (or it is empty) he heads straight for the player with edge permission (7.5 m limit kept), log
+   "trail ends at the water: straight to the swimming player" / "back on the trail"; entering the water ends a stuck
+   or drop wait. Logs "in the water himself (depth x)" / "out of the water himself (depth x)". FLOAT_LIFT is no longer
+   used (kept). Backup `claude_scratch/npc_probe.before_ownwater_1039.lua`.
+   First effect (10:38:52, the first reload): the stuck hound at the bottom (8.04 m deep) rose, swam to the shore
+   and walked out by himself in about 1.5 s, 2.9 m from the player.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
