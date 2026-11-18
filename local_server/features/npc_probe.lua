@@ -1487,14 +1487,7 @@ local function on_pick(world, from, data)
   if not ok then log("wheel: failed: " .. tostring(err)) say(world, player, "Cannot do that (see the server's log).") end
 end
 
-local function try_offer(world, id)
-  local ok, res = pcall(emf.offer, world, id, { verb = "Talk" }, on_talk)
-  log(string.format("offer on %s: %s", tostring(id), ok and tostring(res) or ("error: " .. tostring(res))))
-  return ok and res == true
-end
-
 -- ===== Read-only tools =================================================================================================
-local function v3(v) return v and string.format("%.1f %.1f %.1f", tonumber(v.x) or 0, tonumber(v.y) or 0, tonumber(v.z) or 0) or "-" end
 local function look(world, id)
   local okf, f = pcall(world.get, world, "Faction", id)
   local oka, a = pcall(world.get, world, "DynamicEnemy01BehaviorState", id)
@@ -1636,7 +1629,7 @@ function F.setup(k)
         cd.lastTargetId = tg
         cd.isTargetReachable = true
         cd.isTargetInsideLeash = true
-        local gx, gy, gz = world:position(tg)
+        local gx, _, gz = world:position(tg)
         local nx, _, nz = world:position(id)
         if gx and nx then cd.distanceToTarget = math.sqrt((gx - nx) ^ 2 + (gz - nz) ^ 2) end
         log(string.format("combat: %s state 6, combat state 3, attack %d, target %s", tostring(id), ix, tostring(tg)))
