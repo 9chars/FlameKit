@@ -593,6 +593,13 @@ what you remember is the rebuild's fault, not a decision.
    ..." and "leaps after the player: ...". Stuck notice while heading straight to the swimmer: his own way toward the
    player, none for 3 s -> orange; log "stuck (to the water)". Backup `claude_scratch/npc_probe.before_leap_1140.lua`.
    Unknown: whether water spares the hound fall damage.
+   **Leap test 1 (11:42):** owner 11:43: "two different tests, he did not follow, but he's giving me the 'Companion is
+   stuck!' error. So that works, but he's not really stuck, he just can't follow me, so the notice should say
+   'Companion can't follow you!'". Log 11:42:33: "the player leapt into the water from 6328.5 948.5 5187.5 (2.6 m
+   above where he went in ...)": recorded right. But the edge stop holds him 1.5 m short of the edge ("stops at
+   6326.0 948.5 5187.4 ... 8.97 m down"): 2.5 m from the takeoff crumb, outside LEAP_AT 2.0, so no leap; 3 s later
+   "stuck (to the water)". Notice text changed 11:44 (live) to "Companion can't follow you!" for that case (the water
+   bank stuck still says "Companion is stuck!").
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
