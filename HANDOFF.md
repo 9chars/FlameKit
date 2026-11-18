@@ -600,6 +600,13 @@ what you remember is the rebuild's fault, not a decision.
    6326.0 948.5 5187.4 ... 8.97 m down"): 2.5 m from the takeoff crumb, outside LEAP_AT 2.0, so no leap; 3 s later
    "stuck (to the water)". Notice text changed 11:44 (live) to "Companion can't follow you!" for that case (the water
    bank stuck still says "Companion is stuck!").
+   Owner 11:46: "lets change the other message too. I want 'stuck' to mean he's actually stuck on terrain he can't get
+   out of like a clipping problem.... are you sure your approach is right on this? seems like we're tweak a ton of
+   numbers that might not work in other situations, the crux of it is, if I jumped in, im in water, I'm safe, dog
+   follows....". Done 11:47 (live): the water-bank notice also says "Companion can't follow you!".
+   **Owner's meaning of "stuck" (11:46):** only a hound really stuck in terrain he cannot get out of (clipping). Still
+   "Companion is stuck!" today: the land "blocked" case (STUCK_TEXT.blocked, no progress toward a level crumb), which
+   was the trap-door edge stop, i.e. NOT clipping: to bring to the owner.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
