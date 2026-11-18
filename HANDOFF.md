@@ -9,8 +9,9 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
    long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
-2. Versions: **0.15.282 on Development and the local server** (2026-11-18 14:35: the minimap comes back with the rest
-   of the UI after fast travel, Rule 0n fix), 0.15.281 (14:18: fast travel hides all of FlameKit's
+2. Versions: **0.15.283 on Development and the local server** (2026-11-18 14:42: the minimap's old TeleportCount rule
+   removed entirely, Rule 0n no fallbacks; not yet restarted into), 0.15.282 (14:35: the minimap comes back with the rest
+   of the UI after fast travel), 0.15.281 (14:18: fast travel hides all of FlameKit's
    UI; includes 0.15.280 Invincible air), earlier today **0.15.279** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
    Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
    server's main.lua keeps `features.npc_probe` instead of `features.npc_wheel_probe`; its npc_probe feeds
@@ -507,6 +508,13 @@ and the signal's end also ends it (log "fast travel: the minimap's own rule ende
 stays only for a server without travel_hide.lua. To test: fast travel, the minimap must come back with everything else.
 Owner 14:39: no fallbacks (Rule 0n). Proposed 0.15.283: remove the old TeleportCount rule and g_travelling entirely
 (the minimap is a Layer, so g_travel_hide already hides it).
+Owner 14:41 on 0.15.282: "it looks like it worked, go ahead and update dev" -> **0.15.283 to Development (built
+14:42)**: g_travelling, g_travel_signal and the TeleportCount block are gone from the DLL; travel_hide.lua is the only
+fast travel hide. Owner 14:41 on the 14:27:46 travel: "no something glitched out on the game and it took wayyy longer
+to zoned/load". Client log: request ~14:27:42.9 (map closed), hidden 14:27:46.2, shown 14:27:49.9 by the 7 s
+CANCEL_AFTER timer, teleport only at 14:28:11.2 (28 s after the request): the UI showed for 21 s of that loading screen.
+Proposed fix (not done): drop the 7 s cancel timer, keep hidden until loaded (60 s LONGEST cap), unless a fast travel
+can be cancelled in game (asked the owner 14:43).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water

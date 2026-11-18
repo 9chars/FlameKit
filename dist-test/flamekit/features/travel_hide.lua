@@ -14,7 +14,8 @@
 -- after the teleport, "0". The player's game keeps it in kit.travelling; core/kit.lua writes "travel 1" into
 -- ui_hud.dat and the DLL hides all of FlameKit's UI (like build mode). A travel that never comes (cancelled) shows
 -- the UI again CANCEL_AFTER the request; nothing stays hidden longer than LONGEST.
--- Without this on the server (an older FlameKit) the DLL's own rule still hides the minimap (TeleportCount).
+-- (0.15.283, owner 14:39, Rule 0n: no fallbacks) this is the only fast travel hide: the DLL's old minimap rule
+-- (TeleportCount, hidden until the player moved) is removed.
 
 local F = { id = "travel_hide", title = "Travel" }
 

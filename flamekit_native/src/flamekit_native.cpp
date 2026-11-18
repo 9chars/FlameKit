@@ -190,12 +190,6 @@ void read_settings() {
 
 std::atomic<float> g_x{0}, g_z{0};        // the player's place in metres (x east, z north)
 std::atomic<float> g_y{0};                // how high the player is, in metres
-std::atomic<bool> g_travelling{false};    // a fast travel's loading screen is (very likely) up: the minimap hides
-// (0.15.282, owner 14:30/14:31: "the mini map doesn't appear until I move" ... "the old signal needs to get cleaned up")
-// once the server's signal has been seen in this session it REPLACES the minimap's own TeleportCount rule (g_travelling):
-// that rule no longer starts, and ends whenever the server's signal ends. Without the signal (an older server's
-// FlameKit) the old rule still works alone.
-std::atomic<bool> g_travel_signal{false};
 std::atomic<float> g_heading{0};          // radians, clockwise from north
 std::atomic<uint64_t> g_seen{0};          // GetTickCount64 of the last update; old = no world
 
@@ -640,42 +634,6 @@ void on_world_tick(emf::World w) {
     g_y.store(static_cast<float>(meters(t->transform.position.y)));
     if (std::fabs(fx) + std::fabs(fz) > 1e-4f) g_heading.store(std::atan2(fx, fz));
     g_seen.store(GetTickCount64());
-
-    // A fast travel: the game counts the player's teleports (TeleportCount). When the count goes up the game shows its
-    // loading screen, and the minimap hides until the player first moves at the new place (nothing the game's data
-    // shows marks the end of the loading screen), at least 2 seconds and at most 20.
-    // (0.15.282) This is only the fallback for a server without FlameKit's travel signal: once that signal has been seen
-    // (g_travel_signal) this rule no longer starts, and the signal's end also ends it (see read_files).
-    {
-        static int count = -1;
-        static uint64_t since = 0;
-        static float from_x = 0, from_z = 0;
-        const uint64_t tick = GetTickCount64();
-        if (const auto* tc = w.get<gen::TeleportCount>(emf::local_player())) {
-            const int c = tc->counter;
-            if (count >= 0 && c != count && !g_travel_signal.load()) {
-                since = tick;
-                g_travelling.store(true);
-                FK_LOG(fklog::kInfo, "fast travel: the minimap hides (teleport count %d -> %d)", count, c);
-            }
-            count = c;
-        }
-        if (g_travelling.load()) {
-            const float x = g_x.load(), z = g_z.load();
-            const uint64_t gone = tick - since;
-            if (gone < 2000) {  // the arrival: the place the player stands at when the 2 seconds are over
-                from_x = x;
-                from_z = z;
-            } else {
-                const bool moved = std::fabs(x - from_x) + std::fabs(z - from_z) > 1.0f;
-                if (moved || gone > 20000) {
-                    g_travelling.store(false);
-                    FK_LOG(fklog::kInfo, "fast travel: the minimap is back after %.1f s (%s)", static_cast<double>(gone) / 1000.0,
-                            moved ? "the player moved" : "20 seconds are over");
-                }
-            }
-        }
-    }
 
     // markers and players: a look through every entity every two seconds (they seldom change)
     static std::vector<uint32_t> player_ids;
@@ -2305,8 +2263,9 @@ struct Frame {  // what a layer gets to know about this moment
 std::atomic<bool> g_build_hide{false};
 // (0.15.281, owner 2026-11-18: "a lot of the UI elements don't disappear during zoning ... It just looks goofy") a fast
 // travel's animation and loading screen: the server's FlameKit tells the game (features/travel_hide.lua), the Lua part
-// writes "travel 1" into ui_hud.dat, and ALL of FlameKit's UI hides (FlameKit's window too). g_travelling (the minimap's
-// own TeleportCount rule) stays for servers without it.
+// writes "travel 1" into ui_hud.dat, and ALL of FlameKit's UI hides (FlameKit's window too). (0.15.283, owner 14:39,
+// Rule 0n: no fallbacks) the minimap's own old TeleportCount rule (hidden until the player moved) is removed: this is
+// the only fast travel hide.
 std::atomic<bool> g_travel_hide{false};
 
 struct Layer {
@@ -2451,12 +2410,12 @@ struct MinimapLayer : Layer {
         // another program is in front and leaves the game's chat out. The minimap had its own copy of the check before,
         // so it came up over the bag when the game lost the front.
         const bool in_menu = s.hide_menus && f.in_menu;
-        const bool want = s.show && f.in_world && !in_menu && !g_travelling.load() && f.game && f.gw > 0;
+        const bool want = s.show && f.in_world && !in_menu && f.game && f.gw > 0;
         if (want != visible) {
             visible = want;
             changed = true;
-            FK_LOG(fklog::kDebug, "minimap: %s (show %d, world %d, menu %d, travelling %d)", want ? "shown" : "hidden", s.show,
-                   f.in_world, in_menu, g_travelling.load() ? 1 : 0);
+            FK_LOG(fklog::kDebug, "minimap: %s (show %d, world %d, menu %d)", want ? "shown" : "hidden", s.show,
+                   f.in_world, in_menu);
         }
         if (!visible) return;
         if (f.now - drawn_at < 33 && !dragging) return;  // about 30 pictures a second
@@ -6331,13 +6290,8 @@ struct HudLayer : Layer {
                 }
                 // not gated by in_world (unlike build mode): during the loading screen the player's position may stop
                 // coming, and the UI must stay hidden then too. The Lua part writes the file again in the next world.
-                if (travel) g_travel_signal = true;
                 if (travel != g_travel_hide.load()) {
                     g_travel_hide = travel;
-                    if (!travel && g_travelling.load()) {
-                        g_travelling = false;  // the old rule's hide ends with the server's signal (0.15.282)
-                        FK_LOG(fklog::kInfo, "fast travel: the minimap's own rule ended by the server's signal");
-                    }
                     FK_LOG(fklog::kInfo, "fast travel: all of FlameKit's UI %s (the server's signal)", travel ? "hidden" : "shown again");
                 }
                 label = new_label;
