@@ -716,6 +716,11 @@ what you remember is the rebuild's fault, not a decision.
   for DJ_WAIT toward his next crumb that is DJ_RISE..6 m higher and within DJ_REACH 6 m: the same launch at it (log
   "double jump <id>: jumps up to his next crumb ..."). 12:45:06 (before the DJ_LIFT fix) it went up 2.2 m but the
   flight ended after 10 ticks, he flew 7.6 m past the ledge. Backup `claude_scratch/npc_probe.before_djfix_1246.lua`.
+  **Test 2 (12:50), owner 12:50: "his double jump looks great".** Log: 12:50:40 the double jump follow launched (body
+  47704, 2.6 m up, 4.7 m out, in the air after 5 ticks) but went nearly straight UP (0.95 m forward, highest +3.0 m)
+  and came back down 2.7 m below the landing; 0.6 s later his own step jump with the boost ("a step 2.67 m up ...
+  push 17.9", landed +2.51 m) got him onto the ledge: that is what the owner saw. So the launch's speed ACROSS does not
+  hold once he is in the air (the up speed does). Not changed yet.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
