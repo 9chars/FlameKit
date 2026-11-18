@@ -525,6 +525,11 @@ what you remember is the rebuild's fault, not a decision.
    Result 10:46:55: "hop: 44436 hops out of the water toward the player (1.7 m higher, 3.6 m away): 11.0 m/s up",
    jumplog "highest +2.21 m, landed +1.52 m", on the bank 1.5 m from the player 2 s later: an upward Velocity write
    takes in the water. Owner 10:47: "he came up on shore, so it seemed to work, I will test it further".
+   **False water stuck (owner 10:49: "I'm getting a stuck message when he isn't stuck (in the water)"):** log
+   10:48:53 and 10:48:59 "stuck (water): makes no progress (player 3.7 m / 3.0 m)" while he swam after the swimming
+   player at 1-2 m/s, 3-4 m behind (input = faces = toward the player). Cause (Claude's rule): progress = the
+   distance to the player shrinking by 0.3 m; following a MOVING player at a steady distance never shrinks it. The
+   hop uses the same measure (it only fires with the player higher, so it did not fire here).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
