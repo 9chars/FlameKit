@@ -399,6 +399,11 @@ most sense"
   owner), notes/probes input/jump probes (measuring tools), `restart_helper/_to_delete` (FTP setup files: not touched),
   the server's 79 fullrec_*.txt recordings (43 MB, logging output: owner's call).
 - #4 kept for now (test console commands). #2 and #8 were questions, answered 16:1x: not done.
+- Restart 16:23-16:24 into 0.15.284 (owner 16:23 "yes"). Retest 16:24-16:45, owner 16:45: "initial testing looks good".
+  Log: no errors; glides (put away and back), a fast travel, a double jump follow (2.1 m up, landed 0.5 m from the
+  player's landing), water in/out, leaps, dives. Three "gave up" (16:43:57, 16:44:06, 16:45:35) with his crumb only
+  0.4-0.7 m away on the same level and nobody in his way, each followed by the 2 s respawn. WATCH only (Rule: a
+  one-off is never a fix); asked the owner whether they were on purpose.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
