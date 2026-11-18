@@ -417,6 +417,16 @@ most sense"
   server restart. Owner 17:10: "no, but you maybe right, I would like to find more situations first so we can test
   the fix. currently I don't have a situation where the problem and fix can be tested" -> PARKED until the owner has
   a spot where it happens (then: build, restart, test there).
+- BOARDWALK (owner 17:20): "im on a boardwalk suspended above the air partly that connects to land, when I walk out to
+  it, he treats it like its not there, like its a cliff face going downward ... gives me the cant follow then
+  teleports". Log 17:17-17:20: five "gave up" with the crumb 0.4-1.1 m away on his level; the native edge stop:
+  "ground 1.5 m ahead: none within 12 m" (the ray goes through the planks, like the trap door; the floor proof only
+  raised the drop limit to 7.5 m), and the proof itself flipped off whenever the player stood within about 5.6 m (trail
+  ahead shorter than FLOOR_REACH). Owner 17:29: "go ahead, but the fix for #2 isn't clear to me". **Done 17:31 (Lua,
+  live by EMF's reload, git):** (1) the floor proof also counts when the whole trail is one unbroken level piece that
+  ends where the player stands on the ground (log "..., to the player"); (2) with a floor proof the native edge stop
+  (and its step jump) is off for that tick (edge_off), not only the drop limit. Log line now "floor proven by the
+  trail, native edge stop off". Watch: corner cutting on a narrow walkway (up to about 0.3 m).
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
