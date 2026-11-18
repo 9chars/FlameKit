@@ -393,6 +393,12 @@ what you remember is the rebuild's fault, not a decision.
   players; server line `c x z owner<TAB>name` [owner 08:49-09:17].
 
 ### Open list (owner's order decides)
+0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
+   water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
+   ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
+   mode follows the PLAYER's water state (`currentWaterState > 0.5`), and while it lasts the hound's height is set
+   every tick to the player's height + 0.45 m, wherever the hound is. Logged now: only "player in water" / "out of
+   the water" lines.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
