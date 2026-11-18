@@ -759,6 +759,8 @@ and get the teleport stuff in there and then we can move on" -> next: glider sit
 3. Teleport fallback (later, owner's word).
 4. Ground under a glide path: parked. Owner idea (2026-11-18 09:27, not decided): "maybe the dog could just follow
    the trail in the air".
+7. **Companion inventory (owner 2026-11-18 13:06):** "also add to your list: companions can carry extra items for you
+   (they have their own inventory like a storage check basically)". (a storage chest the companion carries; later)
 6. **Blocked by animal / NPC notice (owner 12:18, follow up later):** "that edge case was so rare, I could not
    reproduce it. it only happened when the dog let himself back up on the shore... when I'm on land he follows me so
    well he doesn't get stuck... so we might have to just add that to the list for a follow up later to see if its been
