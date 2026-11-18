@@ -685,6 +685,9 @@ what you remember is the rebuild's fault, not a decision.
    registered programs, all state) + the logic as a plugin DLL loaded from a fresh copy; reload = preload the new copy,
    swap one function pointer, free the old one once no worker thread is inside it (a use count). Client side later,
    riskier (overlay, render hooks; the updater already swaps the DLL at the next start). Local server only first.
+   (12:22) Also added to `flamekit_native/notes/EMF_REQUESTS.md` "Candidates" (owner: "add them to the list, not a big
+   deal right now"): native mod reload in EMF, and "oxygen"/"max_oxygen" in emf.attribute. Controller buttons for mod
+   keys stay candidate #6 (not moved up).
 - Watch: the client lag at first launch through steam://connect.
 
 ## How to build and publish a version

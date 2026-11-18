@@ -31,6 +31,14 @@ Things FlameKit cannot do because EMF (0.6.6) does not offer them. Kept by Ninec
 - A mod window that can be dragged (EMF's windows are fixed: left, centre or right).
 - A way to run code before a hit lands on one player only without a rule per player (the 64 hit rule limit).
 - A documented way to read the game clock in nanoseconds (FlameKit derives it from world:tick() * 1e9 / 60).
+- (2026-11-18, owner 12:22: "add them to the list, not a big deal right now") Air in `emf.attribute`: `"oxygen"` and
+  `"max_oxygen"` (read, and refill through `emf.attribute_add` like health, stamina and mana). FlameKit's Invincible
+  Mode (0.15.280) keeps the air full by writing the player's Oxygen component directly (`dataStorage[1]` = air now,
+  `[2]` = maximum, plus `DynamicOxygenState.accumulatedValue`), which a game update could break.
+- (2026-11-18, same) Reloading a native (C++) mod while the game runs: unload the DLL and load the new one between
+  steps, with its hooks, commands and programs taken back and set up again. FlameKit's local test server mod
+  (fk_server_probe) needs a server restart (and the game with it) for every C++ change; doing it inside the mod
+  (a permanent host DLL plus a swapped plugin DLL) is on FlameKit's own list as the alternative.
 
 6) Controller buttons for mod key settings. A keybind setting takes keyboard keys only, so a player on a controller cannot open a mod panel or use a mod key without the keyboard.
 
