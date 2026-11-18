@@ -556,6 +556,11 @@ what you remember is the rebuild's fault, not a decision.
    3.0 m from the player, who stands on the island 0.74 m higher; "input none", speed 0. Cause: the swim speed is 0
    within DRIVE_STOP (3 m), and the hop and the water stuck notice only count beyond DRIVE_STOP, so a player standing
    on land less than 3 m from the water's edge never pulls him out.
+   Owner 11:10: "so I'm good with your fix, but generally I think we should bump is follow range closer to me, which
+   might be a better fix. theres a lot of tight spots on this map and him following closer like 2m would possible
+   mitigate this situation. having him closer on land would be good too probably". Found: the land stop distance is
+   ALSO hard-coded in the C++ drive (`server_probe.cpp` drive_post: `if (dp > 3.0 && dl > 0.05)`; speed Walk/Run/
+   Sprint at 6 / 12 m), besides Lua DRIVE_STOP 3: 2 m on land needs a probe rebuild (buildprobe) and a server restart.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
