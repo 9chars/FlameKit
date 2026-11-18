@@ -415,6 +415,21 @@ after a jump; 4 shows ~1.1-1.2 s after takeoff, after the double jump that opens
 (top 997.2, 43 m above takeoff), 74.5 m in 9.2 s (came down 14.2 m lower); short: 18.4 m in 2.33 s, 1.4 m lower. All
 three left a break (flight > 2 s) in the trail: the hound waits at the last crumb before it (and at 13:42:23, 38 m from
 the player, "gave up" as can't follow).
+Claude's proposal 13:44 (numbers): glider seen -> wait; still in the air after 4 s or 30 m away -> put away; back
+beside him after 1 s on the ground; a short glide landing close is no break, he walks; can't reach the player for 5 s
+(stuck or afraid) -> the same respawn (the general teleport fallback); fast travel (> 50 m in a moment) -> the same.
+Owner 13:46 (taken as the yes, with the notices): "there should be a notice saying 'Companion put away, waiting for
+your landing.'. When he appears (or maybe ANY time he spawns by you, there should be a notice that says 'Companion has
+spawned near you!'".
+**Built 13:48 (npc_probe, live):** GLIDE_STATE 4, GLIDE_WAIT 240 ticks, GLIDE_FAR 30 m, LAND_TICKS 60, TP_AFTER 300,
+FAR_JUMP 50 m. drive_step sets h.go_away ("glide" / "fast travel" / "can't follow": h.stuck, h.waiting, h.sstuck or
+h.wstuck for TP_AFTER); F.tick put_away_for() removes the body (roster out = false, like "Put away"), the glide one
+shows the persistent status "Companion put away, waiting for your landing." (tag companion_away, #8cd2ff), and keeps
+`returning[name]`; once the player has been on the ground (not in the air, not swimming) LAND_TICKS, on_call() brings
+him back beside the player. on_call (P, Call, these returns) now clears companion_away / companion_stuck and shows
+"Companion has spawned near you!" (5 s, #8cd2ff) instead of "<name>: Coming!". A glide that lands before the put-away
+sets no drop break. Logs "away: <name> (<id>) put away (<why>) ..." and "away: <name> back beside player ...".
+Backup `claude_scratch/npc_probe.before_glider_1348.lua`.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
