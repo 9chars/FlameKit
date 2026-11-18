@@ -433,6 +433,18 @@ what you remember is the rebuild's fault, not a decision.
    did not take, 5.50 m down)`, then stuck. The player's crumbs there are level (y 948.50), so the player walked
    over it. The edge ray (mask 7) went through the closed trap door and hit the ground 5.5 m below. Permission today
    only covers crumbs going DOWN; a level crumb ahead (laid only on solid ground) is not counted as proof of a floor.
+   Owner 10:03: "I could see a situation where the trap door is open and I jumped over it, how would that situation be
+   handled?" -> rule tightened: only an UNBROKEN trail counts (a jump leaves a gap). Owner 10:06: "yes do the fix for
+   now". Built 10:07 (npc_probe, live reload): FLOOR_LINK 0.7 m between crumbs, FLOOR_REACH 3.6 m (past the 3.5 m
+   sprint ray), level = within 0.8 m of his height, no brk; then the permission flag is set (the native 7.5 m limit
+   stays). Log: "edge <id>: floor proven by the trail / no floor proof (unbroken level trail X m ahead)". Backup
+   `claude_scratch/npc_probe.before_floorproof_1007.lua`. NOT yet tested.
+   **Owner wishes / ideas (10:06, not decided):** "it would be nice if he could just also jump over it"; "its too bad
+   he can't use my actions as predictions as to what he should do.. it would be nice if we could add more context to
+   the bread crumbs for instance the bread crumb could indicate I jumped next, etc... not sure how possible or stable
+   that would be in real practice, just an idea to think about?"
+   10:07 (logging, owner rule 10:00): waterlog lines now also give his speed and its compass angle, the drive's move
+   input angle, his facing angle and the angle to the player (0 = +z, 90 = +x).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
