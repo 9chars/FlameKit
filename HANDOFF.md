@@ -530,6 +530,10 @@ what you remember is the rebuild's fault, not a decision.
    player at 1-2 m/s, 3-4 m behind (input = faces = toward the player). Cause (Claude's rule): progress = the
    distance to the player shrinking by 0.3 m; following a MOVING player at a steady distance never shrinks it. The
    hop uses the same measure (it only fires with the player higher, so it did not fire here).
+   Fix (owner 10:50 "go ahead and do the fix"; built 10:51): water progress = his own movement along the line to the
+   player since the last mark (> 0.3 m resets it), no count within DRIVE_STOP. Entering the water now always clears
+   the stuck notice (one from the old rule stayed on screen after the reload). Backup
+   `claude_scratch/npc_probe.before_wprog_1050.lua`.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
