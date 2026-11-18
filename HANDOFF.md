@@ -440,8 +440,8 @@ most sense"
   0.6 m of it; the C++ edge stop (ray 1.5 m ahead) held him about 0.7 m short (crumb ~0.74 m away), so every tick
   "walks there first" cleared h.waiting, and while walking there neither the stuck count nor the wait count runs: no
   notice, no TP_AFTER. 17:54 logging (live): "drop wait <id>: walks to the last safe crumb first / waits at the last
-  safe crumb / over ..." with the distances. Proposed fix (not done): he counts as at the last safe crumb within 1.5 m
-  (the edge ray's reach) instead of 0.6 m.
+  safe crumb / over ..." with the distances. Owner 17:59 "yes": **done 18:0x (Lua, live):** DROP_AT 1.5 m, he counts
+  as at the last safe crumb within 1.5 m (the edge ray's reach) instead of 0.6 m.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
