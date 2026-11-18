@@ -449,6 +449,7 @@ Can't-follow fallback test (14:02-14:03, owner jumped off without the glider): 1
 works so well, I wouldn't even wait 5 seconds... wait like 2 seconds maybe. the only case where I would want to change
 this is if we were testing it more and trying to figure out situations why he couldn't get to me when he should".
 14:04 (live): TP_AFTER 120 ticks (2 s after he gives up; giving up itself takes STUCK_TICKS 3 s of no progress).
+Owner 14:05: "the 2 seconds was a quicker response and good just enough total time to see the error from the dog".
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
