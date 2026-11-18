@@ -4,7 +4,7 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
 
 ## Start here (next conversation, written 2026-11-17 07:25)
 
-1. Read Rules 0r, 0p, 0g, 0w, 0h, 0a, 0d, 0c, 0b below before anything else, then "Companions". The two that went wrong most on 2026-11-16:
+1. Read Rules 0r, 0p, 0g, 0n, 0w, 0h, 0a, 0d, 0c, 0b below before anything else, then "Companions". The two that went wrong most on 2026-11-16:
    **0p** (the owner picks every next step; no change, test or "cleanup" he did not ask for) and reading his words
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
@@ -74,6 +74,16 @@ breaking by treating an earlier general request ("give me all the settings") as 
 directly tell you when I want stable and g-portal updated. otherwise assume I do not want it!" Never update, propose or
 ask about Stable or G-Portal; do it only when he says so himself. Releases go to the Development channel (dist-test)
 and the local server as usual.
+
+## Rule 0n: CORE DIRECTIVE, a new feature REPLACES the old one (owner, 2026-11-18 14:31)
+
+"yes of course the old signal needs to get cleaned up, why is this such a difficult concept to understand? this isn't
+the first time new feature replaces an old feature and you leave the old feature in place? why are you doing that?"
+(0.15.281: the new server travel signal showed the UI again, but the minimap's old TeleportCount rule still kept it
+hidden until the player moved.) When something new takes over a job, the old code must stop doing that job wherever the
+new one runs: no two mechanisms for one job side by side. Old code stays only as a fallback where the new one cannot
+run (and must then never interfere with the new one). Check this explicitly for every replacement before releasing.
+("Never remove anything we added" is about the owner's features, not about superseded mechanisms.)
 
 ## Rule 0w: CORE DIRECTIVE, the owner's exact words (owner, 2026-11-18 09:22)
 
