@@ -547,7 +547,8 @@ what you remember is the rebuild's fault, not a decision.
    swimming player with drop permission, and a stuck there is cleared. First build (10:55:53) broke the drive for 35 s:
    "npc_probe.lua:471: attempt to perform arithmetic on a emf.proxy value (local 'pw')" ("pw" is reused later in
    drive_step for his DynamicPathWalker); fixed 10:56:28 with `pwater`. Result 10:56:28: "trail ends at the water:
-   straight to the swimming player", into the water 10:56:29. Backup `claude_scratch/npc_probe.before_island_1056.lua`.
+   straight to the swimming player", into the water 10:56:29 (owner 10:59: "yes he's in the water again with me").
+   Backup `claude_scratch/npc_probe.before_island_1056.lua`.
    Watch: the native edge stop still blocks "no ground within 12 m" even with permission (a flicker here, 10:56:28.703):
    water deeper than 12 m could hold him at the shore.
 1. Combat behavior (next after follow/safety).
