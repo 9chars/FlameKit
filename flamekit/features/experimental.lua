@@ -1745,6 +1745,25 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
         emf.log("experimental: mana cannot be kept full on this game version (" .. tostring(err) .. ")")
       end
     end
+    -- (0.15.280, owner 2026-11-18 12:11/12:14: with Invincible Mode on, under water "the oxygen level depletes and we get
+    -- the drowning effect on the screen") Invincible Mode keeps the air full too. EMF has no attribute name for air, so
+    -- the player's Oxygen data is written directly: dataStorage[1] = the air now, [2] = its maximum (measured on the
+    -- local server: "30 30 0 0 0 30" full, "0 30 0 0 0 30" drowning), and the game's leftover fraction
+    -- (DynamicOxygenState.accumulatedValue) back to 0.
+    if is_on(account, "immortal") and not glide.air_broken then
+      local ok, err = pcall(function()
+        local o = world:get("Oxygen", p.entity).dataStorage
+        local now, full = tonumber(o[1]), tonumber(o[2])
+        if now and full and full > 0 and now < full then
+          o[1] = full
+          pcall(function() world:get("DynamicOxygenState", p.entity).accumulatedValue = 0 end)
+        end
+      end)
+      if not ok then
+        glide.air_broken = true
+        emf.log("experimental: air cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
   end
 end
 

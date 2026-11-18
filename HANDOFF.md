@@ -9,7 +9,8 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
    long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
-2. Versions: **0.15.279 on Development and the local server** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
+2. Versions: **local server 0.15.280** (server-only: Invincible Mode keeps air full, 2026-11-18 12:14), **0.15.279 on
+   Development and the local server's game part** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
    Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
    server's main.lua keeps `features.npc_probe` instead of `features.npc_wheel_probe`; its npc_probe feeds
    `core.companions.set_places` ({x, z, owner = character name}); minimap sends `c x z owner<TAB>companion name` lines, the DLL draws a
@@ -658,8 +659,12 @@ what you remember is the rebuild's fault, not a decision.
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
   experimental.lua keep_stamina_full (emf.attribute_add "mana"); EMF's emf.attribute has no "oxygen" name and refuses
   heals of other attributes (lua.md), but the player's Oxygen component is plain data: dataStorage reads "30 30 0 0 0
-  30" at full (12:12, logged by npc_probe's waterlog, local only), DynamicOxygenState.accumulatedValue 0.00. Which
-  slot drains: to see under water.
+  30" at full (12:12, logged by npc_probe's waterlog, local only), DynamicOxygenState.accumulatedValue 0.00.
+  Under water drowning (12:14): "0 30 0 0 0 30 (acc 0.53)": [1] = air now, [2] = max. Owner 12:14 "build it".
+  **0.15.280 (server only, rule 0d: no game update, no dist-test):** experimental.lua keep_stamina_full: with
+  Invincible Mode on, Oxygen.dataStorage[1] set to [2] when lower, DynamicOxygenState.accumulatedValue 0
+  (glide.air_broken if it fails). Local server + work folder 12:14:50; result: "30 30 0 0 0 30" at 2.4 m deep.
+  NOT on G-Portal (owner's word needed).
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."

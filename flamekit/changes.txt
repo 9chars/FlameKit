@@ -1,3 +1,6 @@
+0.15.280 Nov 18, 2026
+- Invincible Mode keeps your air full under water too, so the drowning effect no longer shows. Server only: no game update.
+
 0.15.279 Nov 18, 2026
 - Companions (test): the companion's dot on the minimap now has the companion's name over it, in its owner's colour.
 
