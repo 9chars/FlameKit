@@ -572,6 +572,13 @@ what you remember is the rebuild's fault, not a decision.
    old DLL still stops him at 3 m while Lua expects 2 m: "stuck ... gave up / goes on" every 3 s at 2.4 m (11:13:17).
    Restart (owner 11:18 "yes lets do the restart"): 11:18:58-11:19:55, the helper's new 30 s wait ran ("waiting 30 s
    for it to finish coming up before the client starts"); the new fk_server_probe.dll loaded 11:19:01.
+   **Pier case (owner 11:25: "I walked off a pier that a bit above the water, the dog doesn't say he's stuck, but he
+   doesn't follow me into the water"):** body 26151 on the pier at y 948.50; the player swims (y 945.2, depth 1.30:
+   surface 946.5, so the pier is 1.98 m above it). 11:25:15.951 "trail ends at the water: straight to the swimming
+   player", but the native edge stop: "stops at 6327.1 948.5 5187.6 (ground 1.5 m ahead: more than 7.5 m lower,
+   8.96 m down)": the ray measures to the lake BOTTOM under the pier, and the 7.5 m limit holds even with permission.
+   No notice: heading straight to the swimmer sets no crumb target, and stuck detection only watches a crumb.
+   WATER_NEAR 2 m only just covered 1.98 m.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
