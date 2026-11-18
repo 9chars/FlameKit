@@ -551,6 +551,11 @@ what you remember is the rebuild's fault, not a decision.
    Backup `claude_scratch/npc_probe.before_island_1056.lua`.
    Watch: the native edge stop still blocks "no ground within 12 m" even with permission (a flicker here, 10:56:28.703):
    water deeper than 12 m could hold him at the shore.
+   **Island again (owner 11:00: "I tested the island thing again and now he's struggle to get up back on it.. I did
+   not see him try to hop or get a message that he was stuck"):** log 10:59:17-11:00:31: he floats at the surface
+   3.0 m from the player, who stands on the island 0.74 m higher; "input none", speed 0. Cause: the swim speed is 0
+   within DRIVE_STOP (3 m), and the hop and the water stuck notice only count beyond DRIVE_STOP, so a player standing
+   on land less than 3 m from the water's edge never pulls him out.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
