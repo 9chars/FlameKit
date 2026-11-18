@@ -580,6 +580,11 @@ what you remember is the rebuild's fault, not a decision.
 3. Teleport fallback (later, owner's word).
 4. Ground under a glide path: parked. Owner idea (2026-11-18 09:27, not decided): "maybe the dog could just follow
    the trail in the air".
+5. **Hot reload for the C++ server probe (owner 11:22: "add the hot reload to the list for us to look at later, I'm not
+   sure I want to risk introducing stability issues right now"):** a small permanent host DLL (hook, commands,
+   registered programs, all state) + the logic as a plugin DLL loaded from a fresh copy; reload = preload the new copy,
+   swap one function pointer, free the old one once no worker thread is inside it (a use count). Client side later,
+   riskier (overlay, render hooks; the updater already swaps the DLL at the next start). Local server only first.
 - Watch: the client lag at first launch through steam://connect.
 
 ## How to build and publish a version
