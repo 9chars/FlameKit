@@ -146,6 +146,7 @@ local FLOOR_FIRST = 1.5  -- (owner 17:46 "sure") the first link, from where he s
 -- and goes on when the player is back within DROP_RESUME on his level.
 local DROP_HEIGHT, DROP_RESUME = 7.5, 6
 local DROP_AIR_TICKS = 120
+local DROP_AT = 1.5  -- (owner 17:59 "yes") he is at the last safe crumb within this (the native edge ray looks 1.5 m ahead and holds him back from the lip)
 -- the stuck notice says what holds him ("stuck" itself is only for a real clipping problem)
 local STUCK_TEXT = {
   down = "Companion is afraid to follow (too steep)!",
@@ -952,7 +953,7 @@ local function drive_stuck(s)
     local wstate
     if (px - nx) ^ 2 + (pz - nz) ^ 2 < DROP_RESUME ^ 2 and math.abs(py - ny) < 2 then
       wstate = "over: the player is back near him"
-    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > 0.6 ^ 2 then
+    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > DROP_AT ^ 2 then
       wstate = "walks to the last safe crumb first"
     else
       wstate = "waits at the last safe crumb"
@@ -968,7 +969,7 @@ local function drive_stuck(s)
       h.wait_state = nil
       if h.wait_told then h.wait_told = nil status(world, h.player, "companion_stuck", nil) end
       fullrec_event(world, id, "drive: player back near him, waiting over, fresh trail")
-    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > 0.6 ^ 2 then
+    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > DROP_AT ^ 2 then
       h.waiting = nil
     else
       a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z = nx, ny, nz
