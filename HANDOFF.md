@@ -582,6 +582,17 @@ what you remember is the rebuild's fault, not a decision.
    Owner 11:33 on Claude's proposal (cliff check off within 3 m above the water): "what the 3 m limit? you can legit
    fall into water from the highests points and never die.. if I leap into water he should follow.. 3 m limit is
    too... limiting?"
+   Claude proposed instead: follow the player's LEAP (takeoff crumb -> where he went in), no height limit, edge check
+   off only for that leap; plus a stuck notice while heading straight to a swimmer. Owner 11:39: "ok, but he's got to
+   make sure I'm in water first". **Built 11:40 (live):** the player's first wet tick straight after air time (h.air,
+   no ground between) records h.leap {takeoff = his last crumb, entry = his position}; walking in records none. When
+   the player is in the water NOW and the hound is within LEAP_AT 2 m of the takeoff (height within 1.5 m): Velocity
+   out toward the entry point (speed so he comes down there, LEAP_UP 4 m/s up, gravity 25, at most LEAP_MAX 15 m/s),
+   edge stop off for the flight, LEAP_TICKS 300; ends in the water (log "leap ...: in the water (health x, was y)") or
+   on the ground (log "ended on the ground, not in the water"). Logs "leap ...: the player leapt into the water from
+   ..." and "leaps after the player: ...". Stuck notice while heading straight to the swimmer: his own way toward the
+   player, none for 3 s -> orange; log "stuck (to the water)". Backup `claude_scratch/npc_probe.before_leap_1140.lua`.
+   Unknown: whether water spares the hound fall damage.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
