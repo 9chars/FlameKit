@@ -475,6 +475,16 @@ what you remember is the rebuild's fault, not a decision.
      ~946). It reads right in locomotion state 0, wrong or 0 in state 2 (0.55 when it should be ~1.2; 0.0 at times).
    - After the player left the water (10:25:48) he sank 1.5 m/s to the bottom (y 939.6, 4.4 m under the surface),
      walked on the bottom, and gave up stuck at 10:25:56 under his crumb 7.2 m above him.
+   - Run 1 of this test (body 33767, 10:23:40-10:23:57): frozen at 12.4 m/s in direction 346 while the input said
+     170-184 (the opposite way): 125 m in 10 s. When the player left the water he was over land far away and dropped
+     19.6 m (jumplog "landed -19.61 m"), more than his 16 m lethal height in the fall-damage data; he was still
+     jumping afterwards.
+   - Owner 10:27: "I had to reset the dog several times, the first time the dog just ran off completely, the second
+     time I eased him in slowly and he made it in the water, but he real struggled to follow me. I took a dive under
+     water and he seemed to follow that. He struggled to get out of the water where he is stuck now. this illustrates
+     all the known issues pretty well. the data should reflect that. those are the things we need to improve on".
+     The data matches every point (ran off = frozen air speed; struggled = frozen speed + no turning; followed the
+     dive = locomotion 0; stuck getting out = sank to the bottom under a 7 m wall).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
