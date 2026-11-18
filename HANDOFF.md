@@ -541,6 +541,15 @@ what you remember is the rebuild's fault, not a decision.
    water to the lake bottom; water looks like a cliff). The trail-ends-at-the-water switch needs him AT the last
    crumb (within 1 m), which the edge stop never let him reach; 3 s later land stuck (10:52:26), and a stuck hound
    is excluded from that switch. He stands on the island since then, the player 6.8 m away swimming.
+   Fix (owner 10:55 "sure, but is it possible for him to know I'm just in the water?"; built 10:55-10:56): the
+   player's water surface = his height + his water depth; when the hound stands at most WATER_NEAR 2 m above it (and
+   not more than 1 m below) and the trail's last crumb is within 3 m (or there is none), he heads straight for the
+   swimming player with drop permission, and a stuck there is cleared. First build (10:55:53) broke the drive for 35 s:
+   "npc_probe.lua:471: attempt to perform arithmetic on a emf.proxy value (local 'pw')" ("pw" is reused later in
+   drive_step for his DynamicPathWalker); fixed 10:56:28 with `pwater`. Result 10:56:28: "trail ends at the water:
+   straight to the swimming player", into the water 10:56:29. Backup `claude_scratch/npc_probe.before_island_1056.lua`.
+   Watch: the native edge stop still blocks "no ground within 12 m" even with permission (a flicker here, 10:56:28.703):
+   water deeper than 12 m could hold him at the shore.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
