@@ -769,6 +769,10 @@ and get the teleport stuff in there and then we can move on" -> next: glider sit
    FlameKit's own window (like the Auto Junk List tiles) showing its items, clicks moving items with emf.move. The
    game's own chest screen cannot be opened on the dog. Unknown: whether gear keeps perks/durability through
    emf.move, and where a hidden chest may safely stand.
+   Owner 13:33: "I'd want all interaction to be in game, I'm trying to get rid of panels windows and buttons users need
+   to mess with. I'm sure we could 'spawn' a chest to the ground and populate it with the companions 'simulated bang'
+   ? when the user is done interacting with the chest, the game updates the new inventory list for the companion and
+   the chest disappears? just spit balling here". (Design direction: NO FlameKit window; the game's own chest screen.)
 6. **Blocked by animal / NPC notice (owner 12:18, follow up later):** "that edge case was so rare, I could not
    reproduce it. it only happened when the dog let himself back up on the shore... when I'm on land he follows me so
    well he doesn't get stuck... so we might have to just add that to the list for a follow up later to see if its been
