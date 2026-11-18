@@ -607,6 +607,19 @@ what you remember is the rebuild's fault, not a decision.
    **Owner's meaning of "stuck" (11:46):** only a hound really stuck in terrain he cannot get out of (clipping). Still
    "Companion is stuck!" today: the land "blocked" case (STUCK_TEXT.blocked, no progress toward a level crumb), which
    was the trap-door edge stop, i.e. NOT clipping: to bring to the owner.
+   **Owner decisions 11:50:** (1) replace the leap launch with the simple rule: "yes -- he doesn't have to leap in, he
+   just needs to follow" (player came down into the water from the air AND is in the water now -> edge check off for
+   the hound until he is in the water himself, he heads straight for the player). (2) "if its not a clipping problem
+   then yes change it to can't follow you, if he can't follow me because he can't get over or navigate an obstacle,
+   then its 'cant follow you'".
+   Built 11:50 (live): the 11:40 launch/flight code and LEAP_* removed (owner's yes to replace it); h.leap (recorded
+   when the player comes down into the water from the air, with the hound's health) now sets the native edge-stop skip
+   flag (combatData.targetOfMyTarget) until the hound is in the water himself or the player leaves the water, and
+   allows the straight-to-the-swimmer target from any height (near_water OR h.leap). Logs "the player leapt into the
+   water ... edge stop off for the hound (health x)", "followed the player into the water (health x, was y)", "the
+   player left the water, edge stop on again". STUCK_TEXT.blocked = "Companion can't follow you!" (land); no text says
+   "Companion is stuck!" now except fallbacks (no clipping detection exists yet). Backup
+   `claude_scratch/npc_probe.before_simplefollow_1151.lua`.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
