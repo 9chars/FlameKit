@@ -404,6 +404,13 @@ most sense"
   player's landing), water in/out, leaps, dives. Three "gave up" (16:43:57, 16:44:06, 16:45:35) with his crumb only
   0.4-0.7 m away on the same level and nobody in his way, each followed by the 2 s respawn. WATCH only (Rule: a
   one-off is never a fix); asked the owner whether they were on purpose.
+- WATCH (owner 17:06, could not reproduce): "in one dungeon, it was having problems going down stairs and was jumping
+  straight up and out when the stairs went below the ground and their was an over hang above him from the ceiling, it
+  seems to have confused him". Likely cause (server_probe.cpp maybe_step_jump): the step-jump rays start 5 m ABOVE him
+  (raised 2026-11-17 07:47 to catch steps up to 3.6 m) and look down; under a ceiling or overhang lower than that, the
+  first hit 1.5 m ahead can be the overhang, read as a step 0.6-3.6 m up: he jumps. Log since 16:24: three step jumps
+  that landed no higher (16:44:59, 16:45:45, 17:01:21), none clearly the dungeon stairs (time unknown). No fix (one-off
+  rule); the "autojump" + "jumplog ... landed" lines show the next one.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
