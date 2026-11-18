@@ -399,6 +399,8 @@ what you remember is the rebuild's fault, not a decision.
   players; server line `c x z owner<TAB>name` [owner 08:49-09:17].
 
 ### Open list (owner's order decides)
+**Owner's plan (2026-11-18 13:00):** "going to take a short break, but I'd like to handle situations with the glider
+and get the teleport stuff in there and then we can move on" -> next: glider situations, then the teleport fallback.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
