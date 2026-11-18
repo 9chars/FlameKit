@@ -650,6 +650,9 @@ what you remember is the rebuild's fault, not a decision.
    never pushed down while touching the bottom); back to the surface when the player comes up. Logs "dives with the
    player" / "back to the surface". The bank hop now only fires when the player is OUT of the water. Waterlog lines
    start with "air <now>/<max>, health <hp>". Backup `claude_scratch/npc_probe.before_dive_1208.lua`.
+   Dive test (12:08-12:10): "dives with the player" 12:08:51, down to 6.4 m deep (player 6.8 m) 2.0 m from him, back
+   to the surface 12:10:00; air stayed 5/5 and health 3680 the whole ~70 s under: no drowning seen. Owner 12:10: "he
+   looked fine, followed me well".
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
