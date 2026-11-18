@@ -15,6 +15,11 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    `core.companions.set_places` ({x, z, owner = character name}); minimap sends `c x z owner<TAB>companion name` lines, the DLL draws a
    small dot in the owner's player_style colour with the companion's name over it (owner 09:17: "named by the
    companion's name"; there was never a "no name" request), never merged with players.
+2b. (owner 2026-11-18 09:23) "you need to add a longer delay before trying to load that client for dev test cause it
+   loads faster now than before and the server is not up fast enough": restart_helper.ps1 starts the client right at
+   the server's "world loaded" (about 22 s after start). Done 09:25 (owner: 30 s "should work"): Wait-ForServer
+   sleeps 30 s between Start-Server and Start-Client on a `server`/`both` request. Takes effect once the owner
+   restarts the helper window (same as the steam://connect change).
 3. Production after the release (nightly log `production_stable_logs\emf_core_2026-11-17.log`, 12,492 lines up to
    03:55): no errors; Super B Jump and the glider tip in use there. Check it again at the start.
 4. Ask for folder access first (the four folders in "Where things stand").

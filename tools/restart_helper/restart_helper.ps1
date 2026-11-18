@@ -53,6 +53,9 @@ if (Test-Path $cfgFile) {
 }
 $serverDir = $cfg['server_folder']
 $appId = if ($cfg['game_app_id']) { $cfg['game_app_id'] } else { '1203620' }
+# (owner 2026-11-18 07:56: "that command did work") the client starts through Steam's server connect, which opens the
+# game with the test server's session ready to join; restart_paths.txt client_start_url overrides it
+$clientUrl = if ($cfg['client_start_url']) { $cfg['client_start_url'] } else { 'steam://connect/127.0.0.1:15637' }
 $chimeSound = if ($cfg['chime_sound']) { $cfg['chime_sound'] } elseif (Test-Path (Join-Path $env:WINDIR 'Media\Alarm01.wav')) { Join-Path $env:WINDIR 'Media\Alarm01.wav' } else { Join-Path $env:WINDIR 'Media\chimes.wav' }
 
 # The game's own window: the process also has FlameKit's overlay window (class FlameKitOverlay), which ignores a
@@ -126,9 +129,15 @@ function Close-Client {
     return $true
 }
 
+function Wait-ForServer {
+    Log 'server: waiting 30 s for it to finish coming up before the client starts'
+    Start-Sleep -Seconds 30
+    return $true
+}
+
 function Start-Client {
-    Log "client: starting through Steam (steam://rungameid/$appId)"
-    Start-Process "steam://rungameid/$appId"
+    Log "client: starting through Steam ($clientUrl)"
+    Start-Process $clientUrl
     for ($i = 0; $i -lt 90; $i++) {
         Start-Sleep -Seconds 2
         $p = Get-Process -Name 'enshrouded' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -296,7 +305,9 @@ while ($true) {
             switch ($what) {
                 'client' { $ok = (Close-Client) -and (Start-Client); Finish $ok 'client restart' }
                 { $_ -eq 'server' -or $_ -eq 'both' } {
-                    $ok = (Close-Client) -and (Stop-Server) -and (Start-Server) -and (Start-Client)
+                    # (owner 2026-11-18 09:23/09:25) the client loads faster now than the server comes up: wait 30 s after
+                    # "world loaded" before starting the client
+                    $ok = (Close-Client) -and (Stop-Server) -and (Start-Server) -and (Wait-ForServer) -and (Start-Client)
                     Finish $ok 'client and server restart'
                 }
                 'build' { $ok = Build; Finish $ok 'build' }
