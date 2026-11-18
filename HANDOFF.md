@@ -664,7 +664,8 @@ what you remember is the rebuild's fault, not a decision.
   **0.15.280 (server only, rule 0d: no game update, no dist-test):** experimental.lua keep_stamina_full: with
   Invincible Mode on, Oxygen.dataStorage[1] set to [2] when lower, DynamicOxygenState.accumulatedValue 0
   (glide.air_broken if it fails). Local server + work folder 12:14:50; result: "30 30 0 0 0 30" at 2.4 m deep.
-  NOT on G-Portal (owner's word needed).
+  NOT on G-Portal (owner's word needed). Owner 12:16: "it worked, its keeping my air up, no I'm not ready to update
+  G-portal".
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
