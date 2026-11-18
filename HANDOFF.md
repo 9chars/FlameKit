@@ -485,6 +485,13 @@ what you remember is the rebuild's fault, not a decision.
      all the known issues pretty well. the data should reflect that. those are the things we need to improve on".
      The data matches every point (ran off = frozen air speed; struggled = frozen speed + no turning; followed the
      dive = locomotion 0; stuck getting out = sank to the bottom under a 7 m wall).
+   **Fix round 1 (owner 10:30: "you can adjust his height and angle if you need to, if that is part of the problem. go
+   ahead with your proposed fixes"; built 10:31, live reload):** in water mode FlameKit writes his Velocity every
+   tick: toward the player, 0 within DRIVE_STOP (3 m), else 1 m/s + 1.2 m/s per metre past it, at most 6 (SWIM_MAX,
+   SWIM_GAIN), up/down 0; his yaw kept in h.swim_yaw (not read back from the tilted body), tilt 28 deg kept, height
+   still player + 0.45. Not yet changed: switching on his own water value, sinking after the player leaves the water.
+   Backup `claude_scratch/npc_probe.before_swimsteer_1031.lua`. Unknown before the test: whether the game takes a
+   Velocity write in the air (the waterlog "vel" will show it).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
