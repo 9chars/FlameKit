@@ -409,8 +409,9 @@ most sense"
   seems to have confused him". Likely cause (server_probe.cpp maybe_step_jump): the step-jump rays start 5 m ABOVE him
   (raised 2026-11-17 07:47 to catch steps up to 3.6 m) and look down; under a ceiling or overhang lower than that, the
   first hit 1.5 m ahead can be the overhang, read as a step 0.6-3.6 m up: he jumps. Log since 16:24: three step jumps
-  that landed no higher (16:44:59, 16:45:45, 17:01:21), none clearly the dungeon stairs (time unknown). No fix (one-off
-  rule); the "autojump" + "jumplog ... landed" lines show the next one.
+  that landed no higher (16:44:59, 16:45:45, 17:01:21). 16:45:45 fits: he "jumped a 0.72 m step up" at 6227.3 920.6
+  5287.2, the spot where the player had just jumped DOWN (came down 5 m lower), and landed 1.92 m lower. Owner 17:07:
+  "I was able to reproduce it at the time" -> not a one-off: fix proposed 17:1x (headroom ray, see below).
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
