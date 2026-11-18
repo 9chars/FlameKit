@@ -492,6 +492,13 @@ what you remember is the rebuild's fault, not a decision.
    still player + 0.45. Not yet changed: switching on his own water value, sinking after the player leaves the water.
    Backup `claude_scratch/npc_probe.before_swimsteer_1031.lua`. Unknown before the test: whether the game takes a
    Velocity write in the air (the waterlog "vel" will show it).
+   **Fix round 1 result (body 41655, 10:34:46-10:35:14):** it works: in water mode "vel" = "input" = "faces" every
+   second (e.g. 3.4 m/s at 257, input 257, faces 257), 2-5 m from the player, locomotion 0 now. His own water value
+   held steady at 0.87-0.98 at that height (player + 0.45). Exit: the player walked out at 10:35:14 ("the spot here
+   he's stuck, I walked right out. I didn't need to jump or anything", owner 10:35); water mode ended with the
+   PLAYER's state while the hound was 3.7 m behind over deep water: he sank 1.5 m/s to the bottom (y 939.3, 8 m
+   under the surface) and gave up stuck at 10:35:18. Cause: the switch follows the player (owner's 09:42 decision
+   not built yet).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
