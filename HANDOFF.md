@@ -662,6 +662,12 @@ what you remember is the rebuild's fault, not a decision.
    player wet ..., surface, his height, near water, leap, player m, trail n crumbs, last crumb m, tick") reset his
    trail; he went straight into the water 0.5 s later. The flip is tied to the trail's state; the new line will show
    it next time.
+   Retest 12:25:55 (owner 12:26: "he jumped in this time with me"): leap recorded (1.4 m), straight to the swimmer
+   ("trail 2 crumbs, last crumb 1.3 m"), at 12:25:57.135 "back on the trail" with "last crumb 3.0 m", 0.07 s later
+   in the water. Likely cause of the 12:23 flip-flop: the switch needs the trail's last crumb within 3 m; walking
+   straight toward the player carries him past 3 m from it, so it switches back to the trail, he turns toward the
+   crumb, gets within 3 m, switches again. Fix idea: once he heads straight for the swimmer, he stays on that until
+   he is in the water himself or the player leaves the water.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
