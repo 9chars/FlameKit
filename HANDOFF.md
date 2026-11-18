@@ -427,6 +427,13 @@ most sense"
   ends where the player stands on the ground (log "..., to the player"); (2) with a floor proof the native edge stop
   (and its step jump) is off for that tick (edge_off), not only the drop limit. Log line now "floor proven by the
   trail, native edge stop off". Watch: corner cutting on a narrow walkway (up to about 0.3 m).
+  Test 17:31-17:34, owner 17:34: "looks fixed now". Log: proven several times ("to the player" too), but two more
+  give-ups on the boardwalk (17:33:24, 17:33:38, each teleported back): "no floor proof (... 0.0 m ahead)", the chain
+  broke at the FIRST link: the nearest crumb was 0.9-1.1 m from him (over FLOOR_LINK 0.7), e.g. after he stood beside
+  the player's path while the player walked past. 17:35 logging (live): the "no floor proof" line now says where and
+  why the trail ends ("ends at crumb i of n: x m from him / from the crumb before / above/below him / a break", or "the
+  trail ends there, the player is not on it"). Proposed fix (not done): the first link, from him to the nearest
+  crumb, may be up to 1.5 m (he stands on solid ground himself).
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
