@@ -401,6 +401,16 @@ what you remember is the rebuild's fault, not a decision.
    the water" lines.
    **Owner decision 09:42:** "his state should change based on when he's in the water and not mine" (water mode from
    the HOUND's own water state, not the player's).
+   Owner 09:45 on the plan (switch on HIS water depth > 0.5 m, held at the water surface where he is, tilt kept, still
+   heading to the player, walks the trail while the player swims and he is on land, logging): "that all sounds right
+   to me". Found before building: the full recorder could not read the hound's `currentWaterState.waterDepth` ("?";
+   for the player the code reads `currentWaterState` as a plain number); the hound has canSwim = false, canDive =
+   false; unknown whether his water value is live and whether it means depth below the surface at his feet or the
+   water's whole depth. Also on him: `ServerSubmerge.submergeDepth`.
+- **Behaviour per body type (owner 09:45):** "the water body tilt thing is probably only going to be for the dog
+  'template', other ones would not have that feature most likely, so you'd need to store these behaviors by the
+  model/template type eventually". Today FLOAT_LIFT / FLOAT_PITCH (and the jump numbers) are single constants, not
+  per template: to do when a second body comes.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
