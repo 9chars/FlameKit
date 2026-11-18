@@ -672,6 +672,14 @@ what you remember is the rebuild's fault, not a decision.
    every flip, the player 3.9 -> 6.3 m away). Owner 12:27: "yup make it". Built 12:27:43 (live): the switch keeps
    to_swimmer while the player is in the water once it was on (was_to_swimmer). He went into the water 0.6 s after the
    reload. Backup `claude_scratch/npc_probe.before_commit_1228.lua`.
+- **Double-jump cliff (owner 12:31: "there is one last thing, not sure we should mess with it since everything is going
+  well... I double-jumped up a cliff and made it, but the dog could not"):** log 12:30:04 autojump "a step 2.49 m up
+  ... aims 3.19 m high, push 16.2" landed +2.54 m (up), but 12:30:10 he dropped back down 4.04 m (takeoff at 949.23,
+  "landed -4.04 m"); then 12:30:19 "stuck: gave up at 6280.7 946.3 5219.1 (crumb 6280.4 949.8 5218.8, 0.4 m away)":
+  the next crumb 3.5 m straight above him, 0.4 m out (a wall face). Not changed.
+  Found for the blockers log: "his collider: touching a character true" with nobody within 2.5 m, so
+  hasSpheroidCollision is not "touching a creature" (a wall counts too): the kind list from components is the
+  reliable part.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
