@@ -139,6 +139,7 @@ local holds = {}  -- entity -> { target, untill (tick) }
 local DRIVE_STOP, DRIVE_STEP = 2, 0.25  -- he stops within 2 m of the player (the C++ kFollowStop matches); a crumb every 0.25 m
 local CRUMB_REACH = 0.3  -- a crumb within this is reached; he aims at the first one further away
 local FLOOR_LINK, FLOOR_REACH = 0.7, 3.6  -- the floor proof, see drive_steer
+local FLOOR_FIRST = 1.5  -- (owner 17:46 "sure") the first link, from where he stands to the nearest crumb, may be this long
 -- Drops and flights: no crumbs while the player is off the ground. A crumb more than DROP_HEIGHT below the one before
 -- (just below his own fall damage: from 8 m, lethal at 16 m), or the first one after more than DROP_AIR_TICKS in the
 -- air (a glide, not a jump), starts a new piece of trail (brk): he walks to the last crumb before it and waits there,
@@ -973,10 +974,10 @@ end
 -- The native hook's inputs: the target (the crumb, or the player) and the player's spot. The edge stop's permission
 -- (isTargetInsideLeash): it lets him drop more than 2.5 m only where the player went down himself (a crumb within 12 m
 -- ahead, before any break, 0.8 to 7.5 m below him) or the way to the swimming player. The floor proof: an unbroken level
--- trail ahead (each crumb within FLOOR_LINK of the one before, none more than 0.8 m above or below him) out to
--- FLOOR_REACH, or all the way to where the player stands on the ground, proves a floor the edge ray cannot see (a
--- closed trap door, a boardwalk): then the native edge stop is off. A jump leaves a gap, so a hole the player jumped
--- over still stops him. While he moves his body faces the target.
+-- trail ahead (the nearest crumb within FLOOR_FIRST of him, each next one within FLOOR_LINK of the one before, none
+-- more than 0.8 m above or below him) out to FLOOR_REACH, or all the way to where the player stands on the ground,
+-- proves a floor the edge ray cannot see (a closed trap door, a boardwalk): then the native edge stop is off. A jump
+-- leaves a gap, so a hole the player jumped over still stops him. While he moves his body faces the target.
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
@@ -997,10 +998,11 @@ local function drive_steer(s)
       local lx, lz, far, whole, why = nx, nz, 0, #trail > 0, nil
       for i = 1, #trail do
         local cc = trail[i]
-        if cc.brk or (cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > FLOOR_LINK ^ 2 or math.abs(cc.y - ny) > 0.8 then
-          -- (17:35 logging) why the unbroken level trail ends here
+        local link = i == 1 and FLOOR_FIRST or FLOOR_LINK
+        if cc.brk or (cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > link ^ 2 or math.abs(cc.y - ny) > 0.8 then
+          -- why the unbroken level trail ends here (log)
           why = string.format("; ends at crumb %d of %d: %s", i, #trail, cc.brk and "a break" or
-            ((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > FLOOR_LINK ^ 2 and string.format("%.2f m from %s", math.sqrt((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2), i == 1 and "him" or "the crumb before")
+            ((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > link ^ 2 and string.format("%.2f m from %s", math.sqrt((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2), i == 1 and "him" or "the crumb before")
               or string.format("%.2f m %s him", math.abs(cc.y - ny), cc.y > ny and "above" or "below")))
           whole = false
           break
