@@ -654,6 +654,14 @@ what you remember is the rebuild's fault, not a decision.
    Dive test (12:08-12:10): "dives with the player" 12:08:51, down to 6.4 m deep (player 6.8 m) 2.0 m from him, back
    to the surface 12:10:00; air stayed 5/5 and health 3680 the whole ~70 s under: no drowning seen. Owner 12:10: "he
    looked fine, followed me well".
+   **Shore jump retest (owner 12:23: "I jumped into the water from the shore and he appears stuck or confused"):** body
+   41363 on the shore (y 946.15, 0.8 m above the water surface 945.36), the player swimming 10 m out. Log 12:23:36-41:
+   "trail ends at the water: straight to the swimming player" / "back on the trail" flipping every 10 ticks (0.17 s),
+   he did not move, no notice (each flip resets the to-the-water progress mark). No "leap" line (the player probably
+   touched ground in the shallows). Cause NOT found: at 12:24:17 a logging-only reload (new line "drive <id>: switch:
+   player wet ..., surface, his height, near water, leap, player m, trail n crumbs, last crumb m, tick") reset his
+   trail; he went straight into the water 0.5 s later. The flip is tied to the trail's state; the new line will show
+   it next time.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
