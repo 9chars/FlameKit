@@ -509,6 +509,13 @@ what you remember is the rebuild's fault, not a decision.
    used (kept). Backup `claude_scratch/npc_probe.before_ownwater_1039.lua`.
    First effect (10:38:52, the first reload): the stuck hound at the bottom (8.04 m deep) rose, swam to the shore
    and walked out by himself in about 1.5 s, 2.9 m from the player.
+   **Water test 3 (10:42-10:45, body 44436):** owner 10:44: "he's not throwing an error about being stuck, but I
+   walked up over a bank and he can't get out to follow me". Log: he followed into the water ("trail ends at the
+   water: straight to the swimming player" 10:42:30 / 10:43:17), swam right ("input" = "faces" = toward the player).
+   At the bank: at the surface (depth 1.02, y 946.72), the player 3.6 m away on top at y 948.55 (1.8 m higher); he
+   pushes toward him (input 347) but moves 0.4-0.5 m/s sideways along the bank, locomotion 2, for over 40 s. Water
+   is deep right up to the bank: he cannot touch bottom and walk out; the step jump only works on the ground. No
+   stuck notice: stuck detection is skipped in water mode (the water branch returns before it).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
