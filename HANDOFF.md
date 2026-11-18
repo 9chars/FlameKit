@@ -433,6 +433,17 @@ Backup `claude_scratch/npc_probe.before_glider_1348.lua`.
 Test (13:53-13:54), owner 13:54: "it works pretty well". Log: three glides, each "put away (glide)" then "back beside
 player 1 (glide over)" and respawned (7.0 s, 1.6 s, 2.4 s later). Not yet seen in a test: fast travel, the 5 s can't
 follow fallback.
+**Fast travel + loading screens (owner 13:57):** "when I warp to a new location. I got the 'Companion spawns near you
+message.' before the load was done. is there anyway to wait UNTIL the load is done? Also a lot of the UI elements don't
+disappear during zoning to a different area. This has been a problem for a while and just mentioning it to you now. I
+will note the mini map does attempt to disappear, but it disappears a little too late. is there anyway to dial this in
+a bit better. It just looks goofy to the player". Log: 13:56:00.7 "put away (fast travel)", 13:56:01.7 back (1 s on
+the ground at the destination on the SERVER, while the client still loaded). Client today: flamekit_native.cpp hides
+only the minimap during a fast travel (g_travelling: the local player's TeleportCount went up; back when he moves
+after 2 s, at most 20 s); the other layers (HUD lines, notices, party window ...) do not look at it. 13:58 logging
+(local server): "load: player <id> ready for gameplay <PlayerInput.fromClientIsReadyForGameplay>, teleport count <n>,
+at x y z" whenever either changes: if the flag drops during the loading screen it is the signal for both (the respawn
+waits for it; the client could hide all of FlameKit's layers on it, a Development release).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
