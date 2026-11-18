@@ -5,7 +5,7 @@
 
 local M = {}
 
-local list = {}  -- { x = , z = , owner = "<the owner's character name>" }
+local list = {}  -- { x = , z = , owner = "<the owner's character name>", name = "<the companion's name>" }
 
 -- The companion code: the whole list, as it is now (replaces the last one).
 function M.set_places(places)

@@ -122,10 +122,13 @@ function F.tick(world)
       if p.x then lines[#lines + 1] = string.format("%.1f %.1f %s", p.x, p.z, p.name) end
     end
     -- (0.15.278, owner: "just a dot that's smaller than the other markers", in its owner's colour) companions: a line
-    -- "c <x> <z> <owner's name>" (core/companions.lua); the native minimap draws a small dot in the owner's colour and
+    -- "c <x> <z> <owner's name>\t<companion's name>" (core/companions.lua; 0.15.279, owner: the dot carries the
+    -- companion's name); the native minimap draws a small dot in the owner's colour with the companion's name and
     -- never takes it for a player. Older native parts skip these lines (they do not start with a number).
     for _, c in ipairs(companions.places()) do
-      if c.x and c.z then lines[#lines + 1] = string.format("c %.1f %.1f %s", c.x, c.z, tostring(c.owner or "")) end
+      if c.x and c.z then
+        lines[#lines + 1] = string.format("c %.1f %.1f %s\t%s", c.x, c.z, tostring(c.owner or ""), tostring(c.name or ""))
+      end
     end
     local text = table.concat(lines, "\n")
     if to.id == me then

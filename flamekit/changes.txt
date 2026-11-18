@@ -1,3 +1,6 @@
+0.15.279 Nov 18, 2026
+- Companions (test): the companion's dot on the minimap now has the companion's name over it, in its owner's colour.
+
 0.15.278 Nov 18, 2026
 - Companions (test): the minimap shows each companion as a small dot in its owner's player colour, smaller than a player's mark and with no name; it is never taken for a player. Every status notice now also goes to the Messages window. The companion test controls are in the game: the P key calls your companion to your side, plus the wheel and the panel button.
 

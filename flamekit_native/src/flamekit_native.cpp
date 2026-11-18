@@ -208,6 +208,7 @@ struct Marker {
 struct Other {  // another player
     float x, z;
     std::string name;
+    std::string label;  // (0.15.279) a companion's own name (name is then its owner's, for the colour)
 };
 struct Ping {
     float x, z;
@@ -380,7 +381,15 @@ struct FarPlayers {
                         const float z = std::strtof(after_x, &after_z);
                         if (after_z == after_x || x < 0 || x > 10240 || z < 0 || z > 10240) continue;
                         while (*after_z == ' ') ++after_z;
-                        (companion ? companions : list).push_back({x, z, std::string(after_z)});
+                        std::string rest(after_z), label;
+                        if (companion) {  // "owner<TAB>companion's name"
+                            const size_t tab = rest.find('\t');
+                            if (tab != std::string::npos) {
+                                label = rest.substr(tab + 1);
+                                rest.erase(tab);
+                            }
+                        }
+                        (companion ? companions : list).push_back({x, z, rest, label});
                     }
                 }
             }
@@ -2073,13 +2082,19 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
         }
     }
     // (0.15.278, owner 2026-11-18) companions: a small dot in the owner's player colour, smaller than a player's mark,
-    // with a dark outline and no name; at the edge when far away. Under the players, so a player is never hidden.
+    // with a dark outline; at the edge when far away. Under the players, so a player is never hidden. (0.15.279, owner)
+    // the companion's own name above it, in the owner's colour, like a player's name.
     for (const Other& k : ov.companions) {
         if (!place(k.x, k.z, u, true, sx, sy, outside)) continue;
         const PlayerStyle st = player_style(k.name);
         c.disc(sx, sy, u * 0.32f + 1.4f, 16, 18, 24, 1.0f);
         if (k.name.empty()) c.disc(sx, sy, u * 0.32f, 246, 246, 250, 1.0f);
         else c.disc(sx, sy, u * 0.32f, st.r, st.g, st.b, 1.0f);
+        if (!outside && !k.label.empty() && names.ready(nullptr, name_px)) {
+            const std::wstring label = widen(k.label);
+            const uint8_t lr = k.name.empty() ? 246 : st.r, lg = k.name.empty() ? 246 : st.g, lb = k.name.empty() ? 250 : st.b;
+            names.draw(c, static_cast<int>(sx) - names.width(label) / 2, static_cast<int>(sy - u * 0.32f) - names.font_px - 3, label, lr, lg, lb);
+        }
     }
     for (const Other& k : ov.players) {  // other players: their symbol and colour (as in the party window), at the edge when
                                          // far away, and the name; a white dot for a player whose name is not known
