@@ -4,7 +4,7 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
 
 ## Start here (next conversation, written 2026-11-17 07:25)
 
-1. Read Rules 0r, 0p, 0a, 0d, 0c, 0b below before anything else. The two that went wrong most on 2026-11-16:
+1. Read Rules 0r, 0p, 0w, 0a, 0d, 0c, 0b below before anything else. The two that went wrong most on 2026-11-16:
    **0p** (the owner picks every next step; no change, test or "cleanup" he did not ask for) and reading his words
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
@@ -60,6 +60,16 @@ published 0.15.226 with Fast Dive's settings unasked; the owner wanted to test t
 gun here per usual"). Owner: "This simple ask makes the work flow move smoother and prevents unnecessary changes until
 the plan has been perfectly dialed in." This sharpens rule 1 (confirm before changing anything), which Claude kept
 breaking by treating an earlier general request ("give me all the settings") as a yes for every step after it.
+
+## Rule 0w: CORE DIRECTIVE, the owner's exact words (owner, 2026-11-18 09:22)
+
+Found 2026-11-18: after a context summary cut his message to "I'm not sure we need it to say 'companion' ...", Claude
+guessed "no label" and released a nameless map dot; he had asked for the companion's name on it. Two rules:
+1. **Check before building.** When a request rests on the owner's wording and Claude has only a shortened or unclear
+   version (a summary, a "..."), restate it in ONE line ("dot with the companion's name, in your colour?") and get his
+   yes before writing code. A cut-off part is unknown, never a guess.
+2. **Write his decisions down at once.** Every decision or requirement he states goes into this file (with his words
+   and the time) in the same turn, before the work, so it survives a context summary.
 
 ## Rule 0a: CORE DIRECTIVE, tests and requests (owner, 2026-11-15 14:46)
 
