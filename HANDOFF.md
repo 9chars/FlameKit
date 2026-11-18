@@ -668,6 +668,10 @@ what you remember is the rebuild's fault, not a decision.
    straight toward the player carries him past 3 m from it, so it switches back to the trail, he turns toward the
    crumb, gets within 3 m, switches again. Fix idea: once he heads straight for the swimmer, he stays on that until
    he is in the water himself or the player leaves the water.
+   Owner 12:26: "it happened again. I jumped, hit the the shore edge and swam in" (log 12:26:30-32: "last crumb 3.0 m"
+   every flip, the player 3.9 -> 6.3 m away). Owner 12:27: "yup make it". Built 12:27:43 (live): the switch keeps
+   to_swimmer while the player is in the water once it was on (was_to_swimmer). He went into the water 0.6 s after the
+   reload. Backup `claude_scratch/npc_probe.before_commit_1228.lua`.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
