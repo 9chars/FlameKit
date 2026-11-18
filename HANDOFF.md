@@ -450,6 +450,14 @@ works so well, I wouldn't even wait 5 seconds... wait like 2 seconds maybe. the 
 this is if we were testing it more and trying to figure out situations why he couldn't get to me when he should".
 14:04 (live): TP_AFTER 120 ticks (2 s after he gives up; giving up itself takes STUCK_TICKS 3 s of no progress).
 Owner 14:05: "the 2 seconds was a quicker response and good just enough total time to see the error from the dog".
+**Fast travel data (owner 14:07 "I did a couple fast travels"):** the server's "ready for gameplay" flag
+(PlayerInput.fromClientIsReadyForGameplay) goes FALSE 0.04-0.06 s after the teleport count rises and TRUE again when
+the client has loaded: 14:06:51.32 -> 14:06:59.60 (8.3 s), 14:07:44.45 -> 14:07:50.32 (5.9 s). The return came at
+14:07:00.8 (after ready, by luck) and at 14:07:46.9 (3.4 s BEFORE ready: the early notice). The client's minimap hid at
+the teleport count (14:06:51.297, same moment) and came back when the player moved (10.1 s, 11.2 s: later than ready).
+14:08 logging: the player's fast travel request (PlayerInput.fromClient.teleportAction: target / teleporterType /
+versionData, e.g. "18766/1/607074"); one more fast travel shows whether it arrives before the teleport (an earlier
+"hide" signal than the count).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
