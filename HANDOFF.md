@@ -407,6 +407,9 @@ what you remember is the rebuild's fault, not a decision.
    for the player the code reads `currentWaterState` as a plain number); the hound has canSwim = false, canDive =
    false; unknown whether his water value is live and whether it means depth below the surface at his feet or the
    water's whole depth. Also on him: `ServerSubmerge.submergeDepth`.
+   Owner 09:47 "ok" to a logging round first. 09:48: npc_probe logs "waterlog <id>: hound water=... submerge=...
+   check=... y ... ground ... loco ... | player water=... y ... | m apart [water mode]" once a second while either
+   reads water and 5 s after. No behaviour change. Backup `claude_scratch/npc_probe.before_waterlog_0948.lua`.
 - **Behaviour per body type (owner 09:45):** "the water body tilt thing is probably only going to be for the dog
   'template', other ones would not have that feature most likely, so you'd need to store these behaviors by the
   model/template type eventually". Today FLOAT_LIFT / FLOAT_PITCH (and the jump numbers) are single constants, not
