@@ -2345,6 +2345,10 @@ local function panel_rows(world)
   local rows = {
     { color = "#ffb060", text = "Experimental: these bend the game's rules for you only. Every player has their own." },
   }
+  do  -- TEMPORARY (2026-11-17, owner: "make a button on the Experimental panel that just calls the players assigned pet")
+    local okp, extra = pcall(function() return require("features.npc_wheel_probe").panel_rows(world) end)
+    if okp and type(extra) == "table" then for _, r in ipairs(extra) do rows[#rows + 1] = r end end
+  end
   if not v then
     rows[#rows + 1] = { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."
       or "This server does not run FlameKit (or not this version), so there is nothing to switch here." }
@@ -2547,6 +2551,7 @@ function F.minimap_waypoint(world, arg)
 end
 
 function F.click(world, key)
+  if key:sub(1, 4) == "npc:" then return pcall(function() require("features.npc_wheel_probe").click(world, key) end) end  -- TEMPORARY
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
   if key == "dbg:what:" .. RANDOM_KEY then duel_what = RANDOM_KEY return end
   local what = key:match("^dbg:what:([%x%-]+)$")

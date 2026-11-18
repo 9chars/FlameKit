@@ -9,8 +9,11 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
    long option lists ("I have no idea what you're asking me", "this is getting to be too complicated").
-2. Versions: **0.15.277 on Development, Stable, the local server and G-Portal** (all the same, released 2026-11-16
-   21:29). Nothing is waiting to be published. The outbox is empty.
+2. Versions: **0.15.278 on Development and the local server** (2026-11-18: companion map dots, notices also go to
+   Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
+   server's main.lua keeps `features.npc_probe` instead of `features.npc_wheel_probe`; its npc_probe feeds
+   `core.companions.set_places` ({x, z, owner = character name}); minimap sends `c x z owner` lines, the DLL draws a
+   small dot in the owner's player_style colour, never merged with players.
 3. Production after the release (nightly log `production_stable_logs\emf_core_2026-11-17.log`, 12,492 lines up to
    03:55): no errors; Super B Jump and the glider tip in use there. Check it again at the start.
 4. Ask for folder access first (the four folders in "Where things stand").
@@ -69,6 +72,11 @@ recap: what Claude needs, what Claude will do, what the owner will do. Short: a 
 to the local server only: no DLL build, no dist-test list, no Development channel push, no client update. The server's
 `flamekit/mod.json` still gets the next version number and changes.txt its line (rule 5). The Development channel gets a
 version only when something the game client runs changed (client Lua, the DLL, or a feature both sides need).
+
+**Development is the default (owner, 2026-11-18 09:05):** "I generally assume if were adding a feature and updating the
+code it always goes to development". A feature change the game client runs goes to the Development channel
+(dist-test) without asking. Stable and G-Portal only with his explicit word for that version. Never remove anything we
+added while releasing.
 
 ## Rule 0c: copying files to the PC (found 2026-11-15)
 

@@ -22,5 +22,7 @@ kit.start({
   "features.chat",            -- chat copied into the Messages window, FlameKit's announcements there
   "features.leaderboard",     -- the PvP Leaderboard (kills and deaths between players)
   "features.loot_drop",       -- (0.15.142) monsters drop their loot on the ground (a Server tab setting)
+  "features.npc_wheel_probe",  -- companion test code (2026-11-17; in the release since 0.15.278; the local test server's
+                               -- main.lua leaves it out: its features.npc_probe owns the channel npcwheel there)
   -- "features.my_next_feature",
 })

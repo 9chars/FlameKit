@@ -217,6 +217,7 @@ struct Shared {
     std::mutex lock;
     std::vector<Marker> markers;
     std::vector<Other> players;
+    std::vector<Other> companions;  // (0.15.278) companions: x, z and the owner's character name (FarPlayers)
     std::vector<Ping> pings;
     bool waypoint = false;
     float wx = 0, wz = 0;
@@ -331,14 +332,17 @@ void read_filters(Settings& s) {
 // world's host sends everyone's place, and the Lua part writes it to emf\mods\flamekit\far_players.dat: a line with
 // a number that goes up with every list, then a line "x z name" per player. Read here a few times a second; a list
 // that stops changing (no FlameKit on this server, or it stopped) is dropped after four seconds.
+// (0.15.278, owner 2026-11-18) a line "c x z owner" is a companion, with its owner's character name: kept in its own
+// list, never merged with or renamed like a player (older versions skip these lines: they don't start with a number).
 struct FarPlayers {
     std::wstring path;
     std::vector<Other> list;
+    std::vector<Other> companions;
     std::string seq;
     uint64_t changed = 0, looked = 0;
 
     // Adds the far players that `players` (the ones this game knows itself, by name) does not have yet.
-    void add_to(std::vector<Other>& players, uint64_t now) {
+    void add_to(std::vector<Other>& players, std::vector<Other>& companions_out, uint64_t now) {
         if (path.empty()) {
             wchar_t exe[MAX_PATH];
             const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
@@ -361,11 +365,14 @@ struct FarPlayers {
                     seq = first;
                     changed = now;
                     list.clear();
-                    while (eol && list.size() < 64) {
+                    companions.clear();
+                    while (eol && list.size() < 64 && companions.size() < 64) {
                         p = eol + 1;
                         eol = std::strchr(p, '\n');
                         std::string line = eol ? std::string(p, eol) : std::string(p);
                         while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+                        const bool companion = line.size() > 2 && line[0] == 'c' && line[1] == ' ';
+                        if (companion) line.erase(0, 2);
                         char* after_x = nullptr;
                         char* after_z = nullptr;
                         const float x = std::strtof(line.c_str(), &after_x);
@@ -373,12 +380,13 @@ struct FarPlayers {
                         const float z = std::strtof(after_x, &after_z);
                         if (after_z == after_x || x < 0 || x > 10240 || z < 0 || z > 10240) continue;
                         while (*after_z == ' ') ++after_z;
-                        list.push_back({x, z, std::string(after_z)});
+                        (companion ? companions : list).push_back({x, z, std::string(after_z)});
                     }
                 }
             }
         }
         if (now - changed > 4000) return;  // no fresh list: only the players this game knows itself
+        companions_out = companions;
         // A joined game knows the players near it only by their connection (account) names: each one takes the name
         // of the list's nearest player (the server's list has character names), when that one is close by.
         for (Other& near_one : players) {
@@ -890,13 +898,15 @@ void on_world_tick(emf::World w) {
                 players.push_back({static_cast<float>(meters(p.x)), static_cast<float>(meters(p.z)), name ? *name : std::string()});
             }
         }
-        if (s.players) g_far_players.add_to(players, now);
+        std::vector<Other> companions;
+        if (s.players) g_far_players.add_to(players, companions, now);
         const auto* wp = w.get<gen::PlayerWaypoint>(emf::local_player());
         float hours, minutes;
         bool is_day = true;
         read_clock(w, hours, is_day, minutes);
         std::lock_guard<std::mutex> l(g_shared.lock);
         g_shared.players.swap(players);
+        g_shared.companions.swap(companions);
         g_shared.waypoint = wp && wp->enabled;
         if (g_shared.waypoint) {
             g_shared.wx = static_cast<float>(meters(wp->waypointPosition.x));
@@ -1832,6 +1842,7 @@ void draw_player_mark(Canvas& c, float cx, float cy, float size, const PlayerSty
 struct Overlay {
     std::vector<Marker> markers;
     std::vector<Other> players;
+    std::vector<Other> companions;
     std::vector<Ping> pings;
     bool waypoint = false;
     float wx = 0, wz = 0;
@@ -2060,6 +2071,15 @@ void draw_dial(Canvas& c, MapData& map, float x_east, float z_north, float range
             c.disc(sx, sy, u * 0.52f, 10, 30, 44, 1.0f);
             c.disc(sx, sy, u * 0.26f, 232, 250, 255, 1.0f);
         }
+    }
+    // (0.15.278, owner 2026-11-18) companions: a small dot in the owner's player colour, smaller than a player's mark,
+    // with a dark outline and no name; at the edge when far away. Under the players, so a player is never hidden.
+    for (const Other& k : ov.companions) {
+        if (!place(k.x, k.z, u, true, sx, sy, outside)) continue;
+        const PlayerStyle st = player_style(k.name);
+        c.disc(sx, sy, u * 0.32f + 1.4f, 16, 18, 24, 1.0f);
+        if (k.name.empty()) c.disc(sx, sy, u * 0.32f, 246, 246, 250, 1.0f);
+        else c.disc(sx, sy, u * 0.32f, st.r, st.g, st.b, 1.0f);
     }
     for (const Other& k : ov.players) {  // other players: their symbol and colour (as in the party window), at the edge when
                                          // far away, and the name; a white dot for a player whose name is not known
@@ -2428,6 +2448,7 @@ struct MinimapLayer : Layer {
             pings.erase(std::remove_if(pings.begin(), pings.end(), [&](const Ping& p) { return f.now - p.at > 8000; }), pings.end());
             over.markers = g_shared.markers;
             over.players = g_shared.players;
+            over.companions = g_shared.companions;
             over.pings = pings;
             over.waypoint = g_shared.waypoint;
             over.wx = g_shared.wx;

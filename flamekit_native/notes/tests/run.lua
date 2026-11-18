@@ -588,7 +588,7 @@ local function yells()
 end
 local text, whole = notice()
 check(text and text:find("Auto%-Collect Scattered Loot") and whole:find("\nend\n$"), "auto loot on and junk dropped: a red notice in ui_notices.dat (the Notices window)")
-check(yells() == 0, "and nothing about it in the Messages window any more")
+check(yells() == 1, "and (0.15.278, owner: every status notice also goes to Messages) once in the Messages window")
 check((junk_view().warning or ""):find("Auto%-Collect Scattered Loot") ~= nil, "and the window's Auto Junk List view shows the warning over the bag")
 check((hud.autoloot or "") == "", "no extra line is left on the screen")
 ui_action("action", "delete")

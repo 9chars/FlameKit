@@ -118,7 +118,11 @@ local notices_dirty = true
 
 -- (0.15.114, owner) `seconds`: the notice goes away by itself after that long (short news such as "connected to
 -- server"); without it, it stays until the feature takes it back. The player can also close any notice with its x.
-function kit.notice(tag, text, colour, seconds)
+-- (owner 2026-11-18 07:35: "anytime a message goes to the Status window, it also needs to put that same text to the
+-- Messages window") a notice that comes up (a new tag) is also written to the Messages window, in its colour, here in
+-- one place for every feature. Changing the text of a notice that is already up (a live distance, say) does not write
+-- again. `opts.noted = true`: the caller already wrote the line itself (chat.lua's announcements).
+function kit.notice(tag, text, colour, seconds, opts)
   if type(tag) ~= "string" or not tag:match("^[%w_%.]+$") then return end
   if text == nil then
     if notices[tag] then
@@ -138,6 +142,7 @@ function kit.notice(tag, text, colour, seconds)
   if not had then notice_order = notice_order + 1 end
   notices[tag] = { colour = c, text = t, order = had and had.order or notice_order, expires = expires }
   notices_dirty = true
+  if not had and not (type(opts) == "table" and opts.noted) then kit.note(t, "#" .. c, true) end
 end
 
 -- Short notices whose time is up go (each step of your own screen's world).

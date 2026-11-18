@@ -39,7 +39,8 @@ local function show(msg)
   kit.note(msg.t:sub(1, 400), colour, true, who)
   if msg.c == "a" and type(msg.nc) == "string" and msg.nc:match("^#%x%x%x%x%x%x$") then  -- (0.15.134) also a short notice
     announce_n = announce_n + 1
-    kit.notice("announce_" .. announce_n, msg.t:sub(1, 200), msg.nc, math.max(2, math.min(300, tonumber(msg.ns) or 30)))
+    kit.notice("announce_" .. announce_n, msg.t:sub(1, 200), msg.nc, math.max(2, math.min(300, tonumber(msg.ns) or 30)),
+      { noted = true })  -- (2026-11-18) the line above is already in the Messages window
   end
 end
 

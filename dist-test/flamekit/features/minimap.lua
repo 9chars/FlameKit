@@ -82,6 +82,7 @@ end
 
 local CHANNEL = "map"
 local test_players = require("core.test_players")
+local companions = require("core.companions")
 local players = require("core.players")
 local steps = 0
 local seq = 0
@@ -119,6 +120,12 @@ function F.tick(world)
     end
     for _, p in ipairs(test_players.list(world, to.id)) do  -- this player's test players (core/test_players.lua)
       if p.x then lines[#lines + 1] = string.format("%.1f %.1f %s", p.x, p.z, p.name) end
+    end
+    -- (0.15.278, owner: "just a dot that's smaller than the other markers", in its owner's colour) companions: a line
+    -- "c <x> <z> <owner's name>" (core/companions.lua); the native minimap draws a small dot in the owner's colour and
+    -- never takes it for a player. Older native parts skip these lines (they do not start with a number).
+    for _, c in ipairs(companions.places()) do
+      if c.x and c.z then lines[#lines + 1] = string.format("c %.1f %.1f %s", c.x, c.z, tostring(c.owner or "")) end
     end
     local text = table.concat(lines, "\n")
     if to.id == me then
