@@ -761,6 +761,14 @@ and get the teleport stuff in there and then we can move on" -> next: glider sit
    the trail in the air".
 7. **Companion inventory (owner 2026-11-18 13:06):** "also add to your list: companions can carry extra items for you
    (they have their own inventory like a storage check basically)". (a storage chest the companion carries; later)
+   Owner 13:29: "a quick initial assessment of that idea... is it doable with what you know so far?" Assessment
+   (from EMF 0.6.6 lua.md, nothing built): EMF has emf.put / emf.take / emf.move (moves between two inventories "without
+   losing any", opts slot/exact/level/rarity) and emf.spawn (any template); emf.add_component only allows
+   ScaleComponent and InteractionPause, so the hound cannot be given an Inventory. Likely way: a real storage chest
+   template spawned out of sight as the companion's bag (kept in the world save, owned by the roster record), and
+   FlameKit's own window (like the Auto Junk List tiles) showing its items, clicks moving items with emf.move. The
+   game's own chest screen cannot be opened on the dog. Unknown: whether gear keeps perks/durability through
+   emf.move, and where a hidden chest may safely stand.
 6. **Blocked by animal / NPC notice (owner 12:18, follow up later):** "that edge case was so rare, I could not
    reproduce it. it only happened when the dog let himself back up on the shore... when I'm on land he follows me so
    well he doesn't get stuck... so we might have to just add that to the list for a follow up later to see if its been
