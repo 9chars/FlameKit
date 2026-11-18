@@ -680,6 +680,27 @@ what you remember is the rebuild's fault, not a decision.
   Found for the blockers log: "his collider: touching a character true" with nobody within 2.5 m, so
   hasSpheroidCollision is not "touching a creature" (a wall counts too): the kind list from components is the
   reliable part.
+  **Owner decisions 12:38:** "I think we should try to implement that, we double-jump a lot and he'll need to follow
+  during that situation. Also -- in general, I think you should add the player meta data to the bread crumbs, even if
+  we are not using the information yet, because in the future were certainly going to run into situations where
+  having that information would be useful, even possibly required to solve the problem. Meta data could include
+  things like, was I running, jumping, did I take off in the glider, and any other relevant player meta data I did
+  not think of). To be clear, I don't really want to change how any of the existing stuff as it is working right now
+  (other than adding the ability to follow a double jump to higher heights)."
+  Owner 12:40 (while building): "if jumping higher is his only block to following me, he should do it...".
+  **Built 12:40 (npc_probe, live):** (1) player metadata: every tick the player's locomotion state, jump count/type,
+  speed, up/down speed, facing, water depth; each crumb keeps it in `crumb.m`, the crumb log line shows state, speed,
+  facing. Air segments (every time in the air between crumbs): takeoff point/speed/up speed, top, landing, duration,
+  jump count max, "second push" (up speed rising 3 m/s over its lowest mid-air: a double jump), every locomotion
+  state seen; the takeoff crumb gets `.takeoff`, the first crumb after gets `.landing`, into water `.water`; log
+  "air <id>: the player took off at ... came down at ... (x m higher/lower, y m out) after s; jump count n, second
+  push b, states ...". (2) jump follow: at a takeoff crumb (within DJ_AT 1.5 m, height within 1 m) whose segment came
+  down DJ_RISE 1 m or more higher: a double jump (count 2+ or second push) launches at once; any other such jump after
+  DJ_WAIT 60 ticks without progress (his own step jump first). Launch = Velocity up for landing height + DJ_MARGIN 0.7
+  (gravity 25, max 16 m/s) and across to land on the player's landing point (max 10 m/s); edge stop and step jump off
+  for the flight (DJ_TICKS 150). Logs "double jump <id>: follows the player's ..." and "... down at ..., x m from the
+  player's landing". Nothing else changed. Backup `claude_scratch/npc_probe.before_meta_dj_1240.lua`. Unknown before
+  the test: whether a Velocity write takes on LAND (in water it did), and what jumpCount counts.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
