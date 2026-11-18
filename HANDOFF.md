@@ -4,7 +4,7 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
 
 ## Start here (next conversation, written 2026-11-17 07:25)
 
-1. Read Rules 0r, 0p, 0w, 0a, 0d, 0c, 0b below before anything else. The two that went wrong most on 2026-11-16:
+1. Read Rules 0r, 0p, 0w, 0h, 0a, 0d, 0c, 0b below before anything else, then "Companions". The two that went wrong most on 2026-11-16:
    **0p** (the owner picks every next step; no change, test or "cleanup" he did not ask for) and reading his words
    right (on 2026-11-16 21:19 Claude read "THE last changes you made to make the monsters take damage" backwards and
    removed the feature he wanted kept). When unsure what he means: ask ONE short, plain question. He gets lost in
@@ -76,6 +76,13 @@ guessed "no label" and released a nameless map dot; he had asked for the compani
    yes before writing code. A cut-off part is unknown, never a guess.
 2. **Write his decisions down at once.** Every decision or requirement he states goes into this file (with his words
    and the time) in the same turn, before the work, so it survives a context summary.
+
+## Rule 0h: CORE DIRECTIVE, HANDOFF is never overwritten (owner, 2026-11-18 09:30)
+
+2026-11-18 09:22 Claude copied the repo's HANDOFF over the work folder's without comparing them and lost the companion
+notes (rebuilt in "Companions" below). From now on: never copy HANDOFF.md in either direction without a diff first;
+the work folder copy and the repo copy must stay identical (md5), and every HANDOFF change is committed and pushed
+in the same turn, so the repo always holds a backup.
 
 ## Rule 0a: CORE DIRECTIVE, tests and requests (owner, 2026-11-15 14:46)
 
@@ -294,6 +301,104 @@ Folder names on the owner's PC are not in this repository (it is public). `<work
 - **Logs:** `emf\emf_core.log` in the client and in the server folder.
 
 Runtime files that are never deployed, diffed or overwritten (all in `emf\mods\flamekit\` unless said): `junk_list.json`, `seen_version.json`, `far_players.dat`, `experimental.json` (server), `leaderboard.json` (server), `item_details.dat`, `update_status.txt`, `update_channel.txt`, `debug.txt`, `logs\`; the Lua → DLL files `ui_list.dat`, `ui_tabs.dat`, `ui_exp.dat`, `ui_hud.dat`, `ui_messages.dat`, `ui_notices.dat`, `ui_party.dat`, `ui_board.dat`, `ui_open.dat`; the DLL → Lua file `ui_actions.txt`; the DLL's own `ui_layout.txt`; one-shot requests `ui_board_toggle.request`, `ui_open_logs.request`, `save_now.request`/`save_now.done` (server); the Restart Game script `restart_game.ps1` and its `restart_game.log`.
+
+## Companions (test feature, local server only) — REBUILT 2026-11-18 09:35
+
+The original section (written 2026-11-17/18 in the work folder's HANDOFF only) was overwritten at 09:22 by Claude
+(rule 0h). Rebuilt from: [L] comments in the server's `features/npc_probe.lua`, [C] comments in
+`flamekit_server_probe/src/server_probe.cpp`, [S] Claude's conversation summary. Owner: anything that does not match
+what you remember is the rebuild's fault, not a decision.
+
+### The owner's rules for companion work
+- NO GAME AI, ever [L 17:06: "I DO NOT WANT TO USE ANYTHING FROM THE GAME THAT USES THIER CRAPPY AI"]; no old code,
+  no fallback [L 17:00: "under no circumstances do I want any of the old code. no fall back code ..."].
+- No movement code changes from a single test: he does several tests first [S 2026-11-18 07:20].
+- One fix per test round [S 07:49: "lets make sure we test one fix at a time so we don't add any complexity we dont need"].
+- In-game tests only after his "ready" [S 2026-11-17 20:01] (a test once ran while he was in a menu).
+- Before guessing a cause: search this file and the notes for the same symptom [S] (the faction 7 miss cost about an hour).
+- Log everything that helps [S]. Never use `world` inside callbacks (EMF paused all of FlameKit once) [S].
+- Teleport catch-up is the LAST fallback, not yet [S 08:23: "the fix will be he'll just teleport to me in any situation he
+  cant really get to me... im not ready to add that yet"].
+- The jump overshoot stays [S: "it gives him a bit of character"]. The flat-top check is set aside
+  (`claude_scratch/server_probe.flattop_setaside.cpp`) [S 07:15].
+- Slope limit 30 degrees [C 23:11/23:12; owner: "these are all guesses"].
+- Eventually: different models must work with the same tuning; companions shown like players (party list) [S].
+
+### Where things are
+- Server Lua: `<server>\emf\mods\flamekit\features\npc_probe.lua` (local server only, never published; backups
+  `claude_scratch/npc_probe.before_*.lua`). The local server's `main.lua` loads `features.npc_probe`, NOT
+  `features.npc_wheel_probe` (npc_probe owns channel `npcwheel` there).
+- C++ server mod: `<work folder>\flamekit_server_probe\src\server_probe.cpp` (restart helper `buildprobe`; backups
+  `server_probe.cpp.before_*`).
+- Client (in the release since 0.15.278): `features/npc_wheel_probe.lua` (status notices, wheel, P key, panel button),
+  `core/companions.lua` + `features/minimap.lua` (map dot, 0.15.278/279).
+- Commands (console or `emf\commands.txt` on the server; write via `cp /tmp/c.txt commands.txt`): `flamekit.npc`
+  roster | drive | lure | hold | still | attr | level | faction | combat | atk | face | tpground | fullrec | look |
+  spawnwild | remove ... Logs "npc probe: ..." in `emf\emf_core.log`.
+
+### Body, side and stats
+- Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
+- Roster [L 11:56/11:58]: names N1, N2 ... kept in the world's data; one main companion per player [L 13:06];
+  controllers (accounts) + admins (`npc_admins.json`) may command [L 12:36-12:40]; owner account 0x485890b753e75ad1.
+- **Faction 11 (PlayerAlly)** [L 19:31]. Faction 7 (Player) = every attack does 0 damage (bite test 19:23). This was
+  already in the notes (0.15.81 dummy) and was missed: rule "search the notes first".
+- Level = owner's level [L 19:47]: `Level.dataStorage[1]`, then `DynamicEnemyScaling.nextUpdateTime = 0`; at setup
+  and every 10 s. Level 30 = 1164 HP / bite 239; level 50 = 3680 HP / bite 420 [S].
+- Attributes: Strength/Dexterity/Intelligence writable (100 each gave a 2520 bite); Constitution/Spirit/Endurance
+  not available (emf.add_component limits) [S]. Owner: "just scale his HP up according to his level"; "stop making
+  up things" [S].
+- Facing a target while attacking [C 18:38]; bite = attack 0 `0x63FE3237` (2 m), lunge = attack 1 `0xC34733A8` (4 m) [C].
+
+### Following: the drive and the breadcrumb trail
+- His AI off (`DynamicEnemy01BehaviorState.enabled = false`, route planner off). Lua writes the next crumb into
+  movementTarget and the player's spot into homeZonePosition; the C++ hook right after the game's steering step
+  writes his movement input (direction, look, Walk/Run/Sprint; nothing within 3 m) [L/C 15:42-16:05].
+- Crumb every **0.25 m** [L 08:10 "lets try .25", tight spaces between trees; was 0.5, 2 m before 15:54]; reached
+  within **0.3 m** (CRUMB_REACH); reached crumbs are deleted [L 20:43, back-and-forth fix].
+- Crumbs only on the ground: contact AND groundDistance < 0.1 AND DynamicLocomotion.state 0 [L 20:36].
+- Breaks ("brk"): a drop over **7.5 m** (his fall damage starts at 8 m, lethal 16 m) [L 20:16/20:18], or more than
+  **120 ticks (2 s)** in the air (a flight; a jump is about 1 s) [L 20:37]. He waits at the last crumb before a break;
+  goes on when the player is within **6 m and 2 m height**; the fresh trail starts where HE stands [L 08:25].
+- Faces where he goes [L 17:32]. Swimming: FLOAT_LIFT 0.45 m, FLOAT_PITCH 28 deg [L 13:28-13:31, 16:33].
+- Hold (stay put, face a target) while attacking [L 19:00].
+
+### Edge stop (C++ edge_blocked) [C 22:37-23:12]
+- Ray 1.5 m ahead (plus 2.5 / 3.5 m running / sprinting), mask 7, from +2 m to -12 m. Blocks on: no ground, more
+  than 7.5 m down, or more than 0.87 m down within 1.5 m (30 degrees) unless permitted.
+- Permission: Lua sets `combatData.isTargetInsideLeash` when a trail crumb within **12 m** ahead (before any brk) is
+  more than 0.8 m and less than 7.5 m below him [L 22:55, 23:02, 23:19, 08:23 (12 m)]. Swimming:
+  `combatData.targetOfMyTarget` = skip. Skipped while airborne (state 2) [S].
+
+### Jumps (C++) [C 23:32-23:51, 07:46/07:47]
+- The game's jump: `ActorInput.externalTriggerJumpType` (offset 377) = 1, `externalTriggerJumpTime` (384) = now.
+  1.76 m high, 4-9 m forward when running.
+- Auto step jump: rays 0.5 m (level within 0.4 m) and 1.5 m ahead (a step 0.6-3.6 m up); cooldown 90 ticks.
+- Boost sized to the step [owner 07:47: "the dog should just be able to adjust his jump height"]: an Impulse slot at
+  takeoff aiming at step + 0.7 m; push = (sqrt(2*25*peak) - 9.4)/0.2 for 0.2 s. Overshoots about 2.2x: kept.
+- Double jump: owner, "just make it more complicated" [S]; not done.
+
+### Stuck and status notices
+- Stuck = no 0.3 m progress toward his crumb in 3 s (180 ticks) [L 07:23/07:24]: he stands; resumes like a drop wait,
+  or with P / Call.
+- Notices stay until the condition clears [L 07:30], and (0.15.278) every notice also goes to Messages [S].
+  - "Companion is afraid to follow (too steep)!" [L 08:20], "Companion is afraid to follow (drop too high)!" [L 08:41],
+    "Companion can't get up there!", "Companion is stuck!" — orange #ff9050.
+  - Live line once a second: distance and height to the player, "(come within 6 m, 2 m height)" [L 07:35, 08:18].
+  - "Companion has died!" red #ff4040 [L 07:23]; all cleared when he comes back to life.
+
+### Call and the map
+- P key (client) / "Call my companion": spawns him 0.3 m to the player's right, facing the player's way
+  [L 07:07-07:10].
+- Map dot (0.15.278/279): small dot in the owner's player colour with the companion's name over it, never merged with
+  players; server line `c x z owner<TAB>name` [owner 08:49-09:17].
+
+### Open list (owner's order decides)
+1. Combat behavior (next after follow/safety).
+2. Companions in the party list.
+3. Teleport fallback (later, owner's word).
+4. Ground under a glide path: parked. Owner idea (2026-11-18 09:27, not decided): "maybe the dog could just follow
+   the trail in the air".
+- Watch: the client lag at first launch through steam://connect.
 
 ## How to build and publish a version
 
