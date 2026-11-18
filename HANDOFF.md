@@ -579,6 +579,9 @@ what you remember is the rebuild's fault, not a decision.
    8.96 m down)": the ray measures to the lake BOTTOM under the pier, and the 7.5 m limit holds even with permission.
    No notice: heading straight to the swimmer sets no crumb target, and stuck detection only watches a crumb.
    WATER_NEAR 2 m only just covered 1.98 m.
+   Owner 11:33 on Claude's proposal (cliff check off within 3 m above the water): "what the 3 m limit? you can legit
+   fall into water from the highests points and never die.. if I leap into water he should follow.. 3 m limit is
+   too... limiting?"
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
