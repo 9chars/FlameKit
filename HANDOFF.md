@@ -399,6 +399,8 @@ what you remember is the rebuild's fault, not a decision.
    mode follows the PLAYER's water state (`currentWaterState > 0.5`), and while it lasts the hound's height is set
    every tick to the player's height + 0.45 m, wherever the hound is. Logged now: only "player in water" / "out of
    the water" lines.
+   **Owner decision 09:42:** "his state should change based on when he's in the water and not mine" (water mode from
+   the HOUND's own water state, not the player's).
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
