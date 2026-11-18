@@ -948,8 +948,24 @@ local function drive_stuck(s)
     end
   end
   if h.waiting then
+    -- (17:55 logging) the drop wait's state, whenever it changes: walking to the last safe crumb, or waiting there
+    local wstate
+    if (px - nx) ^ 2 + (pz - nz) ^ 2 < DROP_RESUME ^ 2 and math.abs(py - ny) < 2 then
+      wstate = "over: the player is back near him"
+    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > 0.6 ^ 2 then
+      wstate = "walks to the last safe crumb first"
+    else
+      wstate = "waits at the last safe crumb"
+    end
+    if wstate ~= h.wait_state then
+      h.wait_state = wstate
+      log(string.format("drop wait %s: %s (that crumb %s m away, player %.1f m, %.1f m %s)", tostring(id), wstate,
+        c and string.format("%.2f", math.sqrt((c.x - nx) ^ 2 + (c.z - nz) ^ 2)) or "-", dp, math.abs(py - ny),
+        py >= ny and "higher" or "lower"))
+    end
     if (px - nx) ^ 2 + (pz - nz) ^ 2 < DROP_RESUME ^ 2 and math.abs(py - ny) < 2 then
       h.trail, h.waiting = { { x = nx, y = ny, z = nz } }, nil
+      h.wait_state = nil
       if h.wait_told then h.wait_told = nil status(world, h.player, "companion_stuck", nil) end
       fullrec_event(world, id, "drive: player back near him, waiting over, fresh trail")
     elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > 0.6 ^ 2 then
@@ -967,6 +983,8 @@ local function drive_stuck(s)
       end
       return true
     end
+  elseif h.wait_state then
+    h.wait_state = nil
   end
   return false
 end
