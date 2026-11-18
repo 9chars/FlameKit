@@ -482,6 +482,10 @@ flamekit/travel ("1"/"0") to the player's game (the host's own game directly); k
 in_world. Logs: server "travel: player N travels: FlameKit's UI hidden (...)" / "... shown again (loaded, after x s)";
 client log "fast travel: all of FlameKit's UI hidden / shown again (the server's signal)". The minimap's own
 TeleportCount rule stays for servers without it. Also in this release: 0.15.280's Invincible Mode air refill.
+Restart 14:19-14:20 (owner 14:16 "build it and restart"); the owner's game on 0.15.281. Test 14:27-14:29, owner 14:29:
+"it looks a lot better now". Log: 5 travels: hidden 3.3 s after the request (4x) or at the teleport (1x, 14:28:11: the
+teleport came first), shown again "loaded" after 5.7-8.9 s; once (14:27:46) "no teleport came, after 3.7 s" (shown 7 s
+after the request without a teleport: a cancelled travel? not asked yet).
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
