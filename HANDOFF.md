@@ -410,6 +410,14 @@ what you remember is the rebuild's fault, not a decision.
    Owner 09:47 "ok" to a logging round first. 09:48: npc_probe logs "waterlog <id>: hound water=... submerge=...
    check=... y ... ground ... loco ... | player water=... y ... | m apart [water mode]" once a second while either
    reads water and 5 s after. No behaviour change. Backup `claude_scratch/npc_probe.before_waterlog_0948.lua`.
+   **Water test 1 (09:52-09:57, owner):** "on first attempt the dog swam around the water erratically and then got
+   stuck or fell into the terrain some place"; "on the second attempt, I jumped right in and the dog took off in the
+   complete wrong direction". Log: (1) body 32953: in water mode he drifted 3 -> 28 m from the player; after the
+   player left the water he fell 20 m every second with no ground under him (y 944 -> 844): under the terrain.
+   (2) body 33570: in water mode the distance grew steadily 8 -> 99 m (about 2.2 m/s, straight). Both: locomotion
+   state 2 (in the air) the whole time in water mode, no ground. Hound water value: 0.70-1.08 for a few seconds in
+   attempt 1, 0.0 the whole of attempt 2 (even with the player in 4.8 m deep water 10 m away). Not yet logged: his
+   velocity, the move direction written, his facing. No change made from this test (rule: several tests first).
 - **Behaviour per body type (owner 09:45):** "the water body tilt thing is probably only going to be for the dog
   'template', other ones would not have that feature most likely, so you'd need to store these behaviors by the
   model/template type eventually". Today FLOAT_LIFT / FLOAT_PITCH (and the jump numbers) are single constants, not
