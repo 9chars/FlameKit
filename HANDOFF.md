@@ -440,8 +440,14 @@ what you remember is the rebuild's fault, not a decision.
    stays). Log: "edge <id>: floor proven by the trail / no floor proof (unbroken level trail X m ahead)". Backup
    `claude_scratch/npc_probe.before_floorproof_1007.lua`. Test 1 (10:09-10:11): log shows him crossing the trap
    door both ways (10:09:10 proof at 6300.4 -> 6304.3 two seconds later; 10:10:34 proof at 6304.1 -> 6291.6 at
-   10:10:38), no edge stop, no stuck. Owner 10:10: "he walked over it fine this time". Open trap door jumped over:
-   not tested yet.
+   10:10:38), no edge stop, no stuck. Owner 10:10: "he walked over it fine this time".
+   Open trap door (owner 10:11 test, 10:13 "he stops at an open trap door"): log 10:12:36 and 10:12:53 edge stops at
+   the trap door (5.50 m down), no floor proof, then stuck: correct.
+   **Watch (10:13:29, one case):** at 6285.0 947.0 5211.0 (about 30 m from the trap door) the edge ray saw 5.19 m
+   down, the floor proof (level trail 3.7 m ahead) let him go on, and he dropped 1.91 m (jumplog "landed -1.91 m"),
+   then carried on fine. The proof checks the trail, not that the trail passes the spot the ray tested: if his line
+   leaves the trail (a corner), the proof can cover ground the player never walked. Possible tightening: the chain
+   must pass within ~0.5 m of the tested point(s). Not changed (one case; owner decides).
    **Owner wishes / ideas (10:06, not decided):** "it would be nice if he could just also jump over it"; "its too bad
    he can't use my actions as predictions as to what he should do.. it would be nice if we could add more context to
    the bread crumbs for instance the bread crumb could indicate I jumped next, etc... not sure how possible or stable
