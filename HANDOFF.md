@@ -516,6 +516,15 @@ what you remember is the rebuild's fault, not a decision.
    pushes toward him (input 347) but moves 0.4-0.5 m/s sideways along the bank, locomotion 2, for over 40 s. Water
    is deep right up to the bank: he cannot touch bottom and walk out; the step jump only works on the ground. No
    stuck notice: stuck detection is skipped in water mode (the water branch returns before it).
+   **Fix round 3 (owner 10:46 "I'm good with those fixes, but will a hop work in water?"; built 10:46-10:47):** in
+   water mode, no 0.3 m progress toward the player for HOP_TICKS 90 (1.5 s) and the player more than 0.3 m higher:
+   a hop: Velocity up = sqrt(2*25*(player height difference + HOP_MARGIN 0.7)) (max 14) and HOP_FORWARD 3 m/s toward
+   the player, no surface hold for HOP_HOLD 40 ticks, at most every HOP_EVERY 120. No progress for STUCK_TICKS (3 s)
+   in water: orange "Companion is stuck!", cleared when he gets closer or leaves the water. Logs "hop: ..." and
+   "stuck (water): ...". Not the game's jump (that needs ground). Backup `claude_scratch/npc_probe.before_hop_1047.lua`.
+   Result 10:46:55: "hop: 44436 hops out of the water toward the player (1.7 m higher, 3.6 m away): 11.0 m/s up",
+   jumplog "highest +2.21 m, landed +1.52 m", on the bank 1.5 m from the player 2 s later: an upward Velocity write
+   takes in the water. Owner 10:47: "he came up on shore, so it seemed to work, I will test it further".
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
