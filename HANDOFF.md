@@ -401,6 +401,15 @@ what you remember is the rebuild's fault, not a decision.
 ### Open list (owner's order decides)
 **Owner's plan (2026-11-18 13:00):** "going to take a short break, but I'd like to handle situations with the glider
 and get the teleport stuff in there and then we can move on" -> next: glider situations, then the teleport fallback.
+Owner 13:35: the companion inventory idea "on the back burner for now, lets continue with the main tasks".
+**Glider design (owner 13:40):** "it will look way to strange if the dog flies in the air with the glider. since we
+have new meta data now, the dog sees I took off on the glider. it should briefly wait to make sure im just just popping
+it out quick and landing near by. when it realises I'm not coming back, distance too far, etc, it automatically
+'despawns' it waits until I arrive back on ground and magically spawns back in next to me. this could use the same
+teleport function as when I move across the map from a fast travel or what not..."
+Pieces already there: "Put away" (wheel/do_away: body removed, kept in the roster) and Call / P (on_call: respawn 0.3 m
+to the player's right, facing his way). 13:40 logging: "air <id>: player state N after s in the air (...)" each time a
+new locomotion state shows up mid-flight, to find the glider's number.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
