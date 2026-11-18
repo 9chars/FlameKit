@@ -461,6 +461,20 @@ what you remember is the rebuild's fault, not a decision.
    that would be in real practice, just an idea to think about?"
    10:07 (logging, owner rule 10:00): waterlog lines now also give his speed and its compass angle, the drive's move
    input angle, his facing angle and the angle to the player (0 = +z, 90 = +x).
+   **Water test 2 (10:24-10:26, body 39619, with the new logging):**
+   - In water mode with locomotion state 2 ("in the air", he is held above the ground at the player's height) his
+     horizontal speed is FROZEN at whatever it was when he left the ground: "vel 1.2 m/s at 50" for 14 s while the
+     drive's input turned 64 -> 202; "vel 3.5 at 320" while the input said 140-147 (the opposite way); "vel 9.3 at 4"
+     with input 180-194. Distance grew to 20 m each time. Each brief touch of the ground set a new frozen speed. The
+     drive's input was right every time: the body cannot steer in the air. Vertical speed sits at -20 m/s (gravity
+     keeps pulling; his height is reset every tick).
+   - With locomotion state 0 (10:25:22-10:25:48, the owner dove to 6 m) his speed followed the input exactly and he
+     kept 4-6 m from the player.
+   - Facing stuck at 128 the whole time in water mode (the tilt code keeps the yaw it reads back; he never turns).
+   - Hound water value = depth below the surface (player water 6.4 at y 939.8, hound 5.7 at 940.2: same surface
+     ~946). It reads right in locomotion state 0, wrong or 0 in state 2 (0.55 when it should be ~1.2; 0.0 at times).
+   - After the player left the water (10:25:48) he sank 1.5 m/s to the bottom (y 939.6, 4.4 m under the surface),
+     walked on the bottom, and gave up stuck at 10:25:56 under his crumb 7.2 m above him.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
