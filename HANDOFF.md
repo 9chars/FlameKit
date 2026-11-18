@@ -884,7 +884,8 @@ next restart (no yes for a restart yet).
   might be able to avoid all this restarting...."
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
-3. Teleport fallback (later, owner's word).
+3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
+   14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. Ground under a glide path: parked. Owner idea (2026-11-18 09:27, not decided): "maybe the dog could just follow
    the trail in the air".
 7. **Companion inventory (owner 2026-11-18 13:06):** "also add to your list: companions can carry extra items for you
