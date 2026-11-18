@@ -674,6 +674,12 @@ what you remember is the rebuild's fault, not a decision.
 3. Teleport fallback (later, owner's word).
 4. Ground under a glide path: parked. Owner idea (2026-11-18 09:27, not decided): "maybe the dog could just follow
    the trail in the air".
+6. **Blocked by animal / NPC notice (owner 12:18, follow up later):** "that edge case was so rare, I could not
+   reproduce it. it only happened when the dog let himself back up on the shore... when I'm on land he follows me so
+   well he doesn't get stuck... so we might have to just add that to the list for a follow up later to see if its been
+   encountered again". The blockers() log stays on ("stuck: <id> in his way: ..."): when it happens again, check
+   that animals and NPCs come out as different kinds, then ask the owner's wording ("Blocked by animals!" / "Blocked
+   by NPC!" alone, or after "Companion can't follow you!").
 5. **Hot reload for the C++ server probe (owner 11:22: "add the hot reload to the list for us to look at later, I'm not
    sure I want to risk introducing stability issues right now"):** a small permanent host DLL (hook, commands,
    registered programs, all state) + the logic as a plugin DLL loaded from a fresh copy; reload = preload the new copy,
