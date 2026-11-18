@@ -430,6 +430,9 @@ him back beside the player. on_call (P, Call, these returns) now clears companio
 "Companion has spawned near you!" (5 s, #8cd2ff) instead of "<name>: Coming!". A glide that lands before the put-away
 sets no drop break. Logs "away: <name> (<id>) put away (<why>) ..." and "away: <name> back beside player ...".
 Backup `claude_scratch/npc_probe.before_glider_1348.lua`.
+Test (13:53-13:54), owner 13:54: "it works pretty well". Log: three glides, each "put away (glide)" then "back beside
+player 1 (glide over)" and respawned (7.0 s, 1.6 s, 2.4 s later). Not yet seen in a test: fast travel, the 5 s can't
+follow fallback.
 0. **Pathing retests before combat** (owner 2026-11-18 09:32: "I think we have more pathing issues to test out first like
    water. he was getting stuck or falling through the ground between water and terrain transitions? that was a while
    ago so maybe these are none issues.. but need to get tested again"). Note from the code (not a diagnosis): water
