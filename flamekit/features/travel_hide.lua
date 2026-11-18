@@ -12,8 +12,8 @@
 -- The server (where the world is hosted) watches every player: HIDE_AFTER after the request, or at the teleport if
 -- that comes first, it sends "1" on channel flamekit/travel to that player's game; when his game reports ready again
 -- after the teleport, "0". The player's game keeps it in kit.travelling; core/kit.lua writes "travel 1" into
--- ui_hud.dat and the DLL hides all of FlameKit's UI (like build mode). A travel that never comes (cancelled) shows
--- the UI again CANCEL_AFTER the request; nothing stays hidden longer than LONGEST.
+-- ui_hud.dat and the DLL hides all of FlameKit's UI (like build mode). A picked travel cannot be cancelled (owner
+-- 15:20); nothing stays hidden longer than LONGEST.
 -- (0.15.283, owner 14:39, Rule 0n: no fallbacks) this is the only fast travel hide: the DLL's old minimap rule
 -- (TeleportCount, hidden until the player moved) is removed.
 
@@ -21,7 +21,14 @@ local F = { id = "travel_hide", title = "Travel" }
 
 local kit
 local CHANNEL = "travel"
-local HIDE_AFTER, CANCEL_AFTER, LONGEST = 198, 420, 3600  -- ticks (60 a second): 3.3 s, 7 s, 60 s
+-- (0.15.284, owner 15:20: "the UI seems to act correctly with the zoning, you could probably wait 2 seconds longer
+-- before taking the UI off") HIDE_AFTER 3.3 s -> 5.3 s. The teleport comes about 4.2 s after the request, so a teleport
+-- no longer hides the UI by itself when the request was seen: it waits for HIDE_AFTER too. (A teleport without a
+-- request seen still hides at once.)
+-- (0.15.284, owner 15:20: "at that point you cant cancel it and theres no need to wait or listen for a cancelled
+-- teleport") the 7 s cancel rule is removed: once the request comes the travel happens, and the UI stays hidden until
+-- the player's game has loaded. LONGEST only keeps the UI from staying hidden for good if a signal never comes.
+local HIDE_AFTER, LONGEST = 318, 3600  -- ticks (60 a second): 5.3 s, 60 s
 local state = {}  -- player entity -> { ver, cnt, req_t, hiding, hid_t, tp, unready }
 
 local function set_here(on)
@@ -63,29 +70,31 @@ function F.tick(world)
       local hide_now = false
       if cnt and st.cnt and cnt ~= st.cnt then
         st.tp = true
-        hide_now = true
+        st.tp_t = t
+        if not st.req_t then hide_now = true end  -- no request seen: hide at the teleport
       end
       st.cnt = cnt or st.cnt
+      -- the game may go "not ready" (loading) before the hide now (the teleport comes first): noted from the teleport on
+      if st.tp and ready == false then st.unready = true end
       if st.req_t and t - st.req_t >= HIDE_AFTER then hide_now = true end
       if hide_now and not st.hiding then
-        st.hiding, st.hid_t, st.unready = true, t, false
+        st.hiding, st.hid_t = true, t
         send(world, pid, true)
-        emf.log(string.format("travel: player %s travels: FlameKit's UI hidden (%s)", tostring(pid),
-          st.tp and "teleported" or "3.3 s after the request"))
+        emf.log(string.format("travel: player %s travels: FlameKit's UI hidden (%s; teleport %s)", tostring(pid),
+          st.req_t and string.format("%.1f s after the request", (t - st.req_t) / 60) or "at the teleport, no request seen",
+          st.tp_t and (st.req_t and string.format("%.1f s after the request", (st.tp_t - st.req_t) / 60) or "now")
+            or "not yet"))
       end
       if st.hiding then
         if ready == false then st.unready = true end
         local done = st.tp and st.unready and ready == true
-        local cancelled = not st.tp and st.req_t and t - st.req_t > CANCEL_AFTER
         local too_long = t - st.hid_t > LONGEST
-        if done or cancelled or too_long then
+        if done or too_long then
           send(world, pid, false)
           emf.log(string.format("travel: player %s: FlameKit's UI shown again (%s, after %.1f s)", tostring(pid),
-            done and "loaded" or (cancelled and "no teleport came" or "60 s"), (t - st.hid_t) / 60))
+            done and "loaded" or "60 s, no load seen", (t - st.hid_t) / 60))
           state[pid] = { ver = st.ver, cnt = st.cnt }
         end
-      elseif st.req_t and not st.tp and t - st.req_t > CANCEL_AFTER then
-        st.req_t = nil
       end
     end
   end

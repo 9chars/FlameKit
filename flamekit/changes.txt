@@ -1,3 +1,6 @@
+0.15.284 Nov 18, 2026
+- Fast travel: FlameKit's UI now hides 2 seconds later (5.3 s after you pick the destination instead of 3.3 s), so it stays up through the travel animation, and it stays hidden for the whole loading screen even when loading takes long. Server only: no game change.
+
 0.15.283 Nov 18, 2026
 - Fast travel: the minimap's old hide-until-you-move rule is removed; the minimap now hides and comes back only with the rest of FlameKit's UI.
 
