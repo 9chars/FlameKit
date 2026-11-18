@@ -974,8 +974,9 @@ end
 -- (isTargetInsideLeash): it lets him drop more than 2.5 m only where the player went down himself (a crumb within 12 m
 -- ahead, before any break, 0.8 to 7.5 m below him) or the way to the swimming player. The floor proof: an unbroken level
 -- trail ahead (each crumb within FLOOR_LINK of the one before, none more than 0.8 m above or below him) out to
--- FLOOR_REACH proves a floor the edge ray cannot see (a closed trap door); a jump leaves a gap, so a hole the player
--- jumped over still stops him. While he moves his body faces the target.
+-- FLOOR_REACH, or all the way to where the player stands on the ground, proves a floor the edge ray cannot see (a
+-- closed trap door, a boardwalk): then the native edge stop is off. A jump leaves a gap, so a hole the player jumped
+-- over still stops him. While he moves his body faces the target.
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
@@ -983,7 +984,7 @@ local function drive_steer(s)
   a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z = px, py, pz
   local tx, ty, tz = px, py, pz
   if c then tx, ty, tz = c.x, c.y, c.z end
-  pcall(function()
+  local okp, perr = pcall(function()
     local ok = h.to_swimmer or false
     for i = 1, #trail do
       local cc = trail[i]
@@ -993,25 +994,42 @@ local function drive_steer(s)
     end
     local proof = false
     if not ok then
-      local lx, lz, far = nx, nz, 0
+      local lx, lz, far, whole = nx, nz, 0, #trail > 0
       for i = 1, #trail do
         local cc = trail[i]
-        if cc.brk then break end
-        if (cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > FLOOR_LINK ^ 2 then break end
-        if math.abs(cc.y - ny) > 0.8 then break end
+        if cc.brk or (cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > FLOOR_LINK ^ 2 or math.abs(cc.y - ny) > 0.8 then
+          whole = false
+          break
+        end
         lx, lz = cc.x, cc.z
         far = math.sqrt((cc.x - nx) ^ 2 + (cc.z - nz) ^ 2)
         if far >= FLOOR_REACH then proof = true break end
       end
+      -- the whole trail is one unbroken level piece and it ends where the player stands on the ground (within
+      -- FLOOR_LINK of its last crumb, on his level): the floor goes all the way to the player
+      local to_player = false
+      if not proof and whole and not s.airborne and not s.pwet and (px - lx) ^ 2 + (pz - lz) ^ 2 <= FLOOR_LINK ^ 2
+          and math.abs(py - ny) <= 0.8 then
+        proof, to_player = true, true
+      end
       if proof ~= (h.floorproof or false) then
-        log(string.format("edge %s: %s (unbroken level trail %.1f m ahead) at %.1f %.1f %.1f", tostring(id),
-          proof and "floor proven by the trail" or "no floor proof", far, nx, ny, nz))
+        log(string.format("edge %s: %s (unbroken level trail %.1f m ahead%s) at %.1f %.1f %.1f", tostring(id),
+          proof and "floor proven by the trail, native edge stop off" or "no floor proof", far,
+          to_player and ", to the player" or "", nx, ny, nz))
       end
       ok = proof
     end
     h.floorproof = proof
     a.combatData.isTargetInsideLeash = ok
+    -- (owner 2026-11-18 17:20 boardwalk, 17:29 "go ahead") a proven floor is one the edge ray cannot see (it goes
+    -- through planks and trap doors and found no ground within 12 m under a boardwalk): the native edge stop (and its
+    -- step jump) is off for this tick, not only the drop limit raised
+    if proof then edge_off(a) end
   end)
+  if not okp and not h.steer_err then
+    h.steer_err = true
+    log("drive " .. tostring(id) .. ": the edge permission failed: " .. tostring(perr))
+  end
   a.movementTarget.x, a.movementTarget.y, a.movementTarget.z = tx, ty, tz
   a.movementTargetIsValid = true
   if dp > DRIVE_STOP then
