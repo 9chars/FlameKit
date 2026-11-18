@@ -644,6 +644,12 @@ what you remember is the rebuild's fault, not a decision.
    and he did not follow me down." Log: he stays at the surface (his depth 0.93) above the player: by design since
    fix round 2 (10:38, held at SWIM_DEPTH below the surface where he is). Before round 2 he dove because he was held
    at the player's height. The hound has canDive = false and an Oxygen value (5): drowning not known.
+   Owner 12:07: "#2 -- he should dive with me, because there are a lot of underwater areas and it would be cool if he
+   could follow me down". Built 12:07 (live): the player in the water deeper than DIVE_PLAYER 1.8 m (at the surface he
+   reads ~1.3): the hound is held at the player's height + FLOAT_LIFT 0.45 (same quarter step, at most 0.08 m a tick,
+   never pushed down while touching the bottom); back to the surface when the player comes up. Logs "dives with the
+   player" / "back to the surface". The bank hop now only fires when the player is OUT of the water. Waterlog lines
+   start with "air <now>/<max>, health <hp>". Backup `claude_scratch/npc_probe.before_dive_1208.lua`.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
