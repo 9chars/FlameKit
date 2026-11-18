@@ -653,6 +653,13 @@ what you remember is the rebuild's fault, not a decision.
    Dive test (12:08-12:10): "dives with the player" 12:08:51, down to 6.4 m deep (player 6.8 m) 2.0 m from him, back
    to the surface 12:10:00; air stayed 5/5 and health 3680 the whole ~70 s under: no drowning seen. Owner 12:10: "he
    looked fine, followed me well".
+- **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
+  it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
+  oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
+  experimental.lua keep_stamina_full (emf.attribute_add "mana"); EMF's emf.attribute has no "oxygen" name and refuses
+  heals of other attributes (lua.md), but the player's Oxygen component is plain data: dataStorage reads "30 30 0 0 0
+  30" at full (12:12, logged by npc_probe's waterlog, local only), DynamicOxygenState.accumulatedValue 0.00. Which
+  slot drains: to see under water.
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
