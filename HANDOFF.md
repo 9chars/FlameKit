@@ -721,6 +721,10 @@ what you remember is the rebuild's fault, not a decision.
   and came back down 2.7 m below the landing; 0.6 s later his own step jump with the boost ("a step 2.67 m up ...
   push 17.9", landed +2.51 m) got him onto the ledge: that is what the owner saw. So the launch's speed ACROSS does not
   hold once he is in the air (the up speed does). Not changed yet.
+  Owner 12:52: "if you think you can tweak it go ahead. one time he cleared the jump, but slid off". Built 12:52 (live):
+  in the air the speed across is written every tick toward the landing spot until he is over it (up/down left to
+  gravity); after a jump-follow landing up top he stands still DJ_SETTLE 20 ticks (speed across 0, target = himself).
+  Backup `claude_scratch/npc_probe.before_djsteer_1253.lua`.
 - **Invincible Mode and air (owner 12:11, a player's complaint):** "when invincible mode is on and I go under water,
   it keeps me alive, but the oxygen level depletes and we get the drowning effect on the screen.. anyway to keep my
   oxygen full so I don't get that message when in invincible mode?" Found: Invincible keeps mana full in
