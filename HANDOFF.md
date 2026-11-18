@@ -534,6 +534,13 @@ what you remember is the rebuild's fault, not a decision.
    player since the last mark (> 0.3 m resets it), no count within DRIVE_STOP. Entering the water now always clears
    the stuck notice (one from the old rule stayed on screen after the reload). Backup
    `claude_scratch/npc_probe.before_wprog_1050.lua`.
+   **Island case (owner 10:53: "I found a small island in the water (very small) which he climbed up on correctly
+   with me, but I stepped back off into the water and now he says he's stuck"):** 10:52:18 hop onto the island (0.6 m
+   higher, 8.1 m/s up), crumbs 1-9 on the island. 10:52:23 the player stepped into the water; the edge stop held him
+   0.8 m short of the island's edge crumbs: "a drop the player did not take, 6.29 m down" (the ray goes through the
+   water to the lake bottom; water looks like a cliff). The trail-ends-at-the-water switch needs him AT the last
+   crumb (within 1 m), which the edge stop never let him reach; 3 s later land stuck (10:52:26), and a stuck hound
+   is excluded from that switch. He stands on the island since then, the player 6.8 m away swimming.
 1. Combat behavior (next after follow/safety).
 2. Companions in the party list.
 3. Teleport fallback (later, owner's word).
