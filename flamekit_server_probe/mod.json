@@ -2,8 +2,10 @@
   "id": "fk_server_probe",
   "name": "FlameKit server probe (test)",
   "version": "0.0.1",
-  "description": "A read-only test for FlameKit's development: console commands that dump the server's player records. Local test server only; never published.",
-  "authors": ["Ninechars"],
+  "description": "FlameKit's companion drive (test): a hook after the game's steering step that moves a driven companion. Local test server only; never published.",
+  "authors": [
+    "Ninechars"
+  ],
   "emf": 13,
   "side": "server"
 }

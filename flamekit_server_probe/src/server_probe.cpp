@@ -1,57 +1,25 @@
-// fk_server_probe (2026-11-17, owner: find what makes a body a player): a READ-ONLY server-side test mod. Never
-// published; installed on the local dedicated server only, removed afterwards.
-//
-// Console (or emf\commands.txt on the server):
-//   fkprobe.players [entries 1-16]   hex dump of the "BasicPlayerInfos" world singleton: its first 0x40 bytes and one
-//                                    0xA0-byte entry per player slot (entry = player entity - 1), with the connection
-//                                    handle (+0x04) and the account (+0x08) read out
-//   fkprobe.dump <singleton> [bytes] [offset]   hex dump of any world singleton by name (bytes up to 4096)
-// Every read goes through ReadProcessMemory: a wrong guess fails, it never crashes the server.
+// fk_server_probe (2026-11-17): FlameKit's companion drive, a TEST server mod on the owner's local server only (never
+// published). Rebuilt at 17:09 (owner: everything old that did not work is gone: the player-body experiments, the
+// template writes, the read-only dumps). What is left: the hook that moves a driven companion (see below).
 #include <windows.h>
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <map>
+#include <mutex>
+#include <atomic>
+#include <cmath>
+#include "emf/generated/components.hpp"
 
 #include "emf/emf.hpp"
 #include "emf/query.hpp"
 
 namespace {
 constexpr const char* kMod = "fk_server_probe";
-
-bool peek(uint64_t at, void* into, size_t bytes) {
-    SIZE_T got = 0;
-    return at > 0x10000 && ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<LPCVOID>(at), into, bytes, &got) && got == bytes;
-}
-
-void hexdump(const char* title, uint64_t base, size_t bytes) {
-    std::vector<uint8_t> buf(bytes);
-    if (!peek(base, buf.data(), bytes)) {
-        EMF_LOG(kMod, "%s: %zu bytes at %llx cannot be read", title, bytes, (unsigned long long)base);
-        return;
-    }
-    EMF_LOG(kMod, "%s at %llx (%zu bytes):", title, (unsigned long long)base, bytes);
-    for (size_t off = 0; off < bytes; off += 16) {
-        char line[160];
-        int n = std::snprintf(line, sizeof line, "  +%04zx:", off);
-        for (size_t i = 0; i < 16 && off + i < bytes; ++i) n += std::snprintf(line + n, sizeof line - n, " %02x", buf[off + i]);
-        EMF_LOG(kMod, "%s", line);
-    }
-}
-
-// A template GUID as the game stores it (Windows layout: the first three groups little-endian).
-bool parse_guid(const std::string& t, uint8_t out[16]) {
-    std::string hex;
-    for (char c : t) if (c != '-') hex += c;
-    if (hex.size() != 32) return false;
-    uint8_t b[16];
-    for (int i = 0; i < 16; ++i) b[i] = (uint8_t)std::strtoul(hex.substr(i * 2, 2).c_str(), nullptr, 16);
-    const int order[16] = {3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15};
-    for (int i = 0; i < 16; ++i) out[i] = b[order[i]];
-    return true;
-}
 
 #pragma pack(push, 1)
 struct WorldTransform {  // CurrentTransform (56 bytes): position in fixed point (1 m = 2^32), orientation, scale
@@ -62,123 +30,610 @@ struct WorldTransform {  // CurrentTransform (56 bytes): position in fixed point
 };
 #pragma pack(pop)
 static_assert(sizeof(WorldTransform) == 56, "CurrentTransform is 56 bytes");
-struct SpawnComponent { uint32_t hash; uint32_t pad; const void* data; uint64_t size; };
-struct SpawnSlice { const SpawnComponent* items; uint64_t count; };
-// the server's "spawn a player's body" (EMF ENGINE_MAP 1.4 "spawn player-owned"; found in enshrouded_server.exe at
-// exe+0x628e20 on 2026-11-17): createEntity(world+0xE179C0, id = slot + 1, {parent 0, guid, comps, mask 1 << slot,
-// kind 2}, 0); returns the new entity id (0 = refused)
-using SpawnPlayerFn = uint32_t (*)(void* world, uint32_t slot, const uint8_t* guid, const SpawnSlice* comps);
-constexpr const char* kSpawnPlayer = "48 83 EC 58 41 0F 10 00 4C 8B D1 8B CA 41 0F 10 09 B8 01 00 00 00 C7 44";
 
-uint64_t find_singleton(emf::World w, const std::string& name) {
-    const char* tries[] = {"", "ecs::", "keen::", "keen::ecs::"};
-    for (const char* pre : tries) {
-        const std::string full = std::string(pre) + name;
-        const void* p = w.singleton(full.c_str());
-        if (p) {
-            EMF_LOG(kMod, "singleton %s found as %s", name.c_str(), full.c_str());
-            return reinterpret_cast<uint64_t>(p);
+// (owner 2026-11-18 11:12) how close he follows the player: within this he stands (was 3 m); Lua DRIVE_STOP matches
+constexpr double kFollowStop = 2.0;
+// ===== Option 2 (owner 15:58: "now that we've proven better bread crumbs work, get working on option 2") =========
+// FlameKit's Lua picks where a driven NPC goes (his AI off): it writes the next breadcrumb into his AI data's
+// movementTarget and the player's position into homeZonePosition (the AI is off, so nothing else uses them). The game's
+// steering step writes "stand still" into his movement input every step, and Lua only runs after the step; so this hook
+// runs right AFTER the steering step, inside the same step, and writes the movement input (direction, look, Walk/Run/
+// Sprint), before his locomotion reads it. The game then moves and animates him like any monster.
+// Driven = his AI off (enabled false), movementTargetIsValid true, faction 11 (PlayerAlly; 7 before 19:31). The list is refreshed every 30 ticks.
+std::mutex g_drive_mx;
+std::vector<uint32_t> g_driven;
+std::atomic<uint64_t> g_drive_writes{0};
+uint32_t g_drive_scan_tick = 0;
+
+// ===== Bite test (owner 17:39-18:19): start one of his attack sequences the way the game's own code does it
+// (server 0x1400369d0, "trigger an action sequence"): fill his movement input's trigger: sequence id (FNV-1a of the
+// sequence GUID), the time, his entity, the call counter, and the fixed codes 0x18 / 0x38 (every attack call uses them).
+// The skeleton hound: attack 0 = 0x63FE3237 (bite, 2 m), attack 1 = 0xC34733A8 (lunge, 4 m).
+std::mutex g_bite_mx;
+std::vector<std::pair<uint32_t, uint32_t>> g_bites;  // entity, sequence id: written once, at the next steering step
+
+// (owner 18:38 "you gotta add code to keep the dog facing the monster its attacking") entity -> {target, until (ns)}:
+// while it lasts, the look direction written at every steering step points at the target, moving or not. Without it
+// the dog's look direction stays whatever it last was (the drive only writes it while he moves), so he attacks sideways.
+struct FaceTarget { uint32_t target; int64_t until_ns; };
+std::mutex g_face_mx;
+std::map<uint32_t, FaceTarget> g_face;
+
+// (owner 23:32 "lets try to finish the jump") two ways a jump may start, tried by fkprobe.jump <id> <mode> [type]:
+//  mode 1: ActorInput.externalTriggerJumpType = type (JumpType: 1 Default, 5 Sprint), externalTriggerJumpTime = now
+//  mode 2: the hound's jump sequence 0xe80706fc (PathWalker.jumpSequence) with triggerContext.jumpType = type,
+//          strength 1 and directionOverride = his facing, else like the bite
+struct JumpAsk { uint32_t id; int mode; uint8_t type; };
+std::mutex g_jump_mx;
+std::vector<JumpAsk> g_jumps;
+void write_jumps(emf::World w) {
+    std::vector<JumpAsk> todo;
+    { std::lock_guard<std::mutex> lk(g_jump_mx); if (g_jumps.empty()) return; todo.swap(g_jumps); }
+    for (auto& j : todo) {
+        auto* ai = w.get<emf::gen::ecs::ActorInput>(j.id);
+        auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, j.id));
+        if (!ai || !tr) { EMF_LOG(kMod, "jump: %u has no movement input", j.id); continue; }
+        const int64_t now = w.ecs_time_ns();
+        auto* raw = reinterpret_cast<uint8_t*>(ai);
+        if (j.mode == 1) {
+            raw[377] = j.type;
+            std::memcpy(raw + 384, &now, 8);
+            EMF_LOG(kMod, "jump: %u external jump type %u at %lld", j.id, j.type, (long long)now);
+        } else {
+            auto* tc = reinterpret_cast<uint8_t*>(&ai->triggerContext);
+            std::memset(tc, 0, sizeof(ai->triggerContext));
+            const uint32_t seq = 0xE80706FCu;
+            const uint8_t call = ai->triggerCallCounter;
+            std::memcpy(tc + 0, &seq, 4); std::memcpy(tc + 8, &now, 8); std::memcpy(tc + 16, &j.id, 4);
+            tc[20] = call; const uint16_t trig = 0x18; std::memcpy(tc + 24, &trig, 2); tc[26] = 0x38;
+            tc[88] = j.type;
+            const double yaw = std::atan2(2.0 * (tr->qx * tr->qz + tr->qw * tr->qy), 1.0 - 2.0 * (tr->qx * tr->qx + tr->qy * tr->qy));
+            const float dir[3] = {(float)std::sin(yaw), 0.0f, (float)std::cos(yaw)};
+            std::memcpy(tc + 92, dir, 12);
+            const float strength = 1.0f;
+            std::memcpy(tc + 104, &strength, 4);
+            EMF_LOG(kMod, "jump: %u sequence e80706fc, jumpType %u, direction %.2f %.2f", j.id, j.type, dir[0], dir[2]);
         }
     }
-    EMF_LOG(kMod, "singleton %s not found (tried with and without ecs::, keen::)", name.c_str());
-    return 0;
+}
+
+void write_bites(emf::World w) {
+    std::vector<std::pair<uint32_t, uint32_t>> todo;
+    {
+        std::lock_guard<std::mutex> lk(g_bite_mx);
+        if (g_bites.empty()) return;
+        todo.swap(g_bites);
+    }
+    for (auto& b : todo) {
+        auto* ai = w.get<emf::gen::ecs::ActorInput>(b.first);
+        if (!ai) { EMF_LOG(kMod, "bite: %u has no movement input", b.first); continue; }
+        auto* tc = reinterpret_cast<uint8_t*>(&ai->triggerContext);
+        std::memset(tc, 0, sizeof(ai->triggerContext));
+        const int64_t now = w.ecs_time_ns();
+        const uint8_t call = ai->triggerCallCounter;
+        std::memcpy(tc + 0, &b.second, 4);
+        std::memcpy(tc + 8, &now, 8);
+        std::memcpy(tc + 16, &b.first, 4);
+        tc[20] = call;
+        const uint16_t trig = 0x18;
+        std::memcpy(tc + 24, &trig, 2);
+        tc[26] = 0x38;
+        EMF_LOG(kMod, "bite: sequence %08x written into %u's trigger (call %u, time %lld)", b.second, b.first, call, (long long)now);
+    }
+}
+
+// ---- (owner 20:55-20:59) the game's ray cast, for ground heights under the player's flight path ----
+// Server function 0x1409300b0 (build of 2026-11-17, enshrouded_server.exe), used by the programs
+// check_line_above_sensor (0x1400f0df0) and ray_cast_spawner (0x140107120):
+//   rayCast(out, const float3* from, const float3* to, const Query* q)
+//   out: +0 byte 0 = hit, +0x10 float3 = hit position (ray_cast_spawner reads them so).
+//   Query (0x34 bytes, as check_line_above_sensor builds it): +0 byte = programContext->world->byte 0xbb,
+//   +8 / +0x10 = the program's two system pointers (sys-read ecs::ColliderSystem, ecs::VoxelGrid; here from
+//   emf singleton(), NOT CONFIRMED the same pointers), +0x18 0, +0x20 mask bits 0 and 3, +0x24 u16 0x100,
+//   +0x28/+0x2c entity ids to ignore (0), +0x30 0, +0x33 byte 1. Test only: fkprobe.ground.
+constexpr uintptr_t kRayCastRva = 0x9300b0;
+const uint8_t kRayCastStart[] = {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x08, 0x4C, 0x89, 0x40, 0x18, 0x48, 0x89, 0x50, 0x10};
+using RayCastFn = void (*)(void* out, const float* from, const float* to, const void* query);
+
+struct GroundAsk { double x, z, top, bottom; uint32_t mask; uint16_t flags; uint8_t b33; };
+std::mutex g_ground_mx;
+std::vector<GroundAsk> g_ground;
+
+// Plain C function (no objects with destructors) so __try can guard it: a wrong guess faults here, not the server.
+int ray_cast_guarded(RayCastFn fn, void* ctx, void* col, void* vox, const float* from, const float* to, float* hit,
+                     uint32_t mask, uint16_t flags, uint8_t b33) {
+    __try {
+        alignas(16) uint8_t q[0x40] = {};
+        alignas(16) uint8_t out[0x100] = {};
+        q[0] = *(*(uint8_t**)ctx + 0xbb);
+        *(void**)(q + 0x08) = col;
+        *(void**)(q + 0x10) = vox;
+        *(uint32_t*)(q + 0x20) = mask;
+        *(uint16_t*)(q + 0x24) = flags;
+        q[0x33] = b33;
+        fn(out, from, to, q);
+        hit[0] = *(float*)(out + 0x10); hit[1] = *(float*)(out + 0x14); hit[2] = *(float*)(out + 0x18);
+        return out[0] == 0 ? 1 : 0;
+    } __except (1) {
+        return -1;
+    }
+}
+
+void do_ground(emf::World w, void* ctx) {
+    std::vector<GroundAsk> todo;
+    { std::lock_guard<std::mutex> lk(g_ground_mx); if (g_ground.empty()) return; todo.swap(g_ground); }
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kRayCastRva;
+    if (std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) != 0) {
+        EMF_LOG(kMod, "ground: the ray cast function is not at +0x%llx in this game build: not called", (unsigned long long)kRayCastRva);
+        return;
+    }
+    void* col = w.singleton("ecs::ColliderSystem");
+    void* vox = w.singleton("ecs::VoxelGrid");
+    if (!col || !vox) { EMF_LOG(kMod, "ground: no ColliderSystem (%p) or VoxelGrid (%p)", col, vox); return; }
+    for (auto& a : todo) {
+        const float from[3] = {(float)a.x, (float)a.top, (float)a.z};
+        const float to[3] = {(float)a.x, (float)a.bottom, (float)a.z};
+        float hit[3] = {0, 0, 0};
+        const int r = ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, a.mask, a.flags, a.b33);
+        if (r < 0) EMF_LOG(kMod, "ground: %.1f %.1f: the ray cast FAULTED (caught); the query guess is wrong", a.x, a.z);
+        else if (r == 0) EMF_LOG(kMod, "ground: %.1f %.1f: no hit between y %.1f and %.1f (mask %x flags %x b33 %u)", a.x, a.z, a.top, a.bottom, a.mask, a.flags, a.b33);
+        else EMF_LOG(kMod, "ground: %.1f %.1f: hit at %.2f %.2f %.2f (ray from y %.1f; mask %x flags %x b33 %u)", a.x, a.z, hit[0], hit[1], hit[2], a.top, a.mask, a.flags, a.b33);
+    }
+}
+
+// ---- (owner 21:39) the walkable-ground search (path grid), as the teleport program's ground search calls it ----
+// Server 0x140175a20 (found from the teleport program 0x1400916a0, call at 0x140091a3a):
+//   search(out, const float3* pos, bool isPlayer, PathGridSystem* pg, u8 worldFlag)   worldFlag = world byte 0xbb
+//   out: +0 byte status (0 found; 1-3 not ready, ask again next tick; else nothing), +8 float3 the walkable spot.
+// EMF re_teleport.md 1.4: snaps to the nearest walkable cell, about +-10 m vertically. Test only: fkprobe.walk.
+constexpr uintptr_t kWalkSearchRva = 0x175a20;
+const uint8_t kWalkSearchStart[] = {0x48, 0x89, 0x5C, 0x24, 0x08, 0x55, 0x48, 0x8B, 0xEC, 0x48, 0x83, 0xEC, 0x70, 0x33, 0xC0};
+using WalkSearchFn = void* (*)(void* out, const float* pos, bool isPlayer, void* pg, uint8_t flag);
+struct WalkAsk { float p[3]; int tries; int layer; int player; };
+std::mutex g_walk_mx;
+std::vector<WalkAsk> g_walk;
+
+int walk_search_guarded(WalkSearchFn fn, void* ctx, void* pg, const float* pos, float* res, int layer, int player, int* used) {
+    __try {
+        alignas(16) uint8_t out[0x40] = {};
+        const uint8_t flag = layer >= 0 ? (uint8_t)layer : *(*(uint8_t**)ctx + 0xbb);
+        *used = flag;
+        fn(out, pos, player != 0, pg, flag);
+        res[0] = *(float*)(out + 8); res[1] = *(float*)(out + 0xc); res[2] = *(float*)(out + 0x10);
+        return out[0];
+    } __except (1) {
+        return -1;
+    }
+}
+
+void do_walk(emf::World w, void* ctx, void* pg_in = nullptr) {
+    std::vector<WalkAsk> todo;
+    { std::lock_guard<std::mutex> lk(g_walk_mx); if (g_walk.empty()) return; todo.swap(g_walk); }
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kWalkSearchRva;
+    if (std::memcmp(fnp, kWalkSearchStart, sizeof(kWalkSearchStart)) != 0) {
+        EMF_LOG(kMod, "walk: the search function is not at +0x%llx in this game build: not called", (unsigned long long)kWalkSearchRva);
+        return;
+    }
+    void* pg = pg_in ? pg_in : w.singleton("ecs::PathGridSystem");
+    if (!pg) { EMF_LOG(kMod, "walk: no PathGridSystem"); return; }
+    std::vector<WalkAsk> again;
+    for (auto& a : todo) {
+        float r[3] = {0, 0, 0};
+        int used = -1;
+        const int st = walk_search_guarded(reinterpret_cast<WalkSearchFn>(fnp), ctx, pg, a.p, r, a.layer, a.player, &used);
+        if (st < 0) EMF_LOG(kMod, "walk: %.1f %.1f %.1f: FAULTED (caught)", a.p[0], a.p[1], a.p[2]);
+        else if (st >= 1 && st <= 3 && a.tries < 120) { a.tries++; again.push_back(a); }
+        else if (st == 0) EMF_LOG(kMod, "walk: %.1f %.1f %.1f: walkable at %.2f %.2f %.2f (after %d waits; layer %d player %d)", a.p[0], a.p[1], a.p[2], r[0], r[1], r[2], a.tries, used, a.player);
+        else EMF_LOG(kMod, "walk: %.1f %.1f %.1f: nothing (status %d, after %d waits; layer %d player %d)", a.p[0], a.p[1], a.p[2], st, a.tries, used, a.player);
+    }
+    if (!again.empty()) { std::lock_guard<std::mutex> lk(g_walk_mx); g_walk.insert(g_walk.end(), again.begin(), again.end()); }
+}
+
+// (owner 22:28 "lets try it") ground check ahead of a driven companion, measuring only: every 15 steps, rays straight
+// down 1, 2 and 3 m ahead along his movement (or facing) direction, from his height + 2 m to - 12 m, mask 7 (terrain
+// and objects, not characters), ignoring himself. Logged; nothing about his movement changes. fkprobe.ahead on|off.
+std::atomic<bool> g_ahead{false};
+uint32_t g_ahead_tick = 0;
+void log_ahead(emf::World w, void* ctx, uint32_t id, const emf::gen::ecs::ActorInput* ai, const WorldTransform* tr) {
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kRayCastRva;
+    if (std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) != 0) return;
+    void* col = w.singleton("ecs::ColliderSystem");
+    void* vox = w.singleton("ecs::VoxelGrid");
+    if (!col || !vox) return;
+    const double S = 4294967296.0;
+    const double nx = tr->px / S, ny = tr->py / S, nz = tr->pz / S;
+    double dx = ai->desiredWorldMoveInput.x, dz = ai->desiredWorldMoveInput.z;
+    bool moving = true;
+    if (dx * dx + dz * dz < 0.01) {  // standing: his facing (yaw from the orientation)
+        moving = false;
+        const double yaw = std::atan2(2.0 * (tr->qx * tr->qz + tr->qw * tr->qy), 1.0 - 2.0 * (tr->qx * tr->qx + tr->qy * tr->qy));
+        dx = std::sin(yaw); dz = std::cos(yaw);
+    }
+    const double dl = std::sqrt(dx * dx + dz * dz);
+    dx /= dl; dz /= dl;
+    char buf[256]; int n = 0;
+    n += std::snprintf(buf + n, sizeof(buf) - n, "ahead %u (%s, y %.2f):", id, moving ? "moving" : "standing", ny);
+    for (int k = 1; k <= 3; k++) {
+        const float from[3] = {(float)(nx + dx * k), (float)(ny + 2.0), (float)(nz + dz * k)};
+        const float to[3] = {from[0], (float)(ny - 12.0), from[2]};
+        float hit[3] = {0, 0, 0};
+        const int r = ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, 0x7u, (uint16_t)0x100, (uint8_t)0);
+        if (r < 0) n += std::snprintf(buf + n, sizeof(buf) - n, " %dm FAULT", k);
+        else if (r == 0) n += std::snprintf(buf + n, sizeof(buf) - n, " %dm none", k);
+        else n += std::snprintf(buf + n, sizeof(buf) - n, " %dm %+.2f", k, hit[1] - ny);
+    }
+    EMF_LOG(kMod, "%s", buf);
+}
+
+// (owner 22:37) edge stop: while a companion moves, one ray straight down 1.5 m ahead along his move direction (from his
+// height + 2 m to - 12 m, mask 7: terrain and objects). No ground there, or ground more than 7.5 m lower (his fall
+// damage starts at 8 m): he does not move this step. Worked out at most once per game step per companion (this hook
+// runs several times per step on different worker threads; the result is cached for the step). Skipped while the Lua
+// side marks him swimming (combatData.targetOfMyTarget = true; unused with his AI off).
+struct EdgeState { uint32_t tick; bool blocked; bool was_blocked; };
+std::mutex g_edge_mx;
+std::map<uint32_t, EdgeState> g_edge;
+std::atomic<uint32_t> g_edge_stops{0};
+bool edge_blocked(emf::World w, void* ctx, uint32_t id, const WorldTransform* tr, double dx, double dz, bool drop_ok, uint8_t speed) {
+    const uint32_t t = w.tick();
+    {
+        std::lock_guard<std::mutex> lk(g_edge_mx);
+        auto it = g_edge.find(id);
+        if (it != g_edge.end() && it->second.tick == t) return it->second.blocked;
+    }
+    bool blocked = false;
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kRayCastRva;
+    void* col = w.singleton("ecs::ColliderSystem");
+    void* vox = w.singleton("ecs::VoxelGrid");
+    float hy = 0;
+    int r = -2;
+    if (std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) == 0 && col && vox) {
+        const double S = 4294967296.0;
+        const double nx = tr->px / S, ny = tr->py / S, nz = tr->pz / S;
+        // (22:48 test: he stopped at the edge, shifted a little, the ray 1.5 m ahead met the cliff face 7.25 m down,
+        // under the 7.5 m limit: he stepped off and slid 27 m) a second ray 3 m ahead: a step down of more than 2.5 m
+        // is only allowed when the ground beyond it is level (the 3 m point no more than 2.5 m lower than the 1.5 m
+        // point, and within 7.5 m of him): a step he can drop down, not a cliff face that keeps going.
+        auto ray_at = [&](double d, float* hit) {
+            const float from[3] = {(float)(nx + dx * d), (float)(ny + 2.0), (float)(nz + dz * d)};
+            const float to[3] = {from[0], (float)(ny - 12.0), from[2]};
+            return ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, 0x7u, (uint16_t)0x100, (uint8_t)0);
+        };
+        float hit[3] = {0, 0, 0}, hit3[3] = {0, 0, 0};
+        r = ray_at(1.5, hit);
+        hy = hit[1];
+        double d1 = ny - hit[1];
+        if (r != 1) blocked = true;
+        else if (d1 > 7.5) blocked = true;
+        // (22:53 test: a rock or plant on the cliff face read as a ledge 7 m down, he fell 30 m) (owner 22:55) a drop
+        // is allowed only when the Lua side says the player took it himself (his trail ahead goes down there:
+        // combatData.isTargetInsideLeash = true, unused with the AI off); the 7.5 m limit still holds.
+        // (23:08 test: he went down a ~58 degree slope at speed, stopped at the edge, and his speed carried him over)
+        // (owner 23:11/23:12) without the player's way: no more than 30 degrees (0.87 m down within 1.5 m): the
+        // hound's SlopeConfig slides on some ground materials from 30 degrees (slidingMaterialMinAngle 30).
+        else if (d1 > 0.87) blocked = !drop_ok;
+        // running or sprinting: a second look further ahead (2.5 / 3.5 m), same rules scaled, so he has room to stop
+        if (!blocked && speed >= 3) {
+            const double ahead2 = speed >= 4 ? 3.5 : 2.5;
+            const int r2 = ray_at(ahead2, hit3);
+            const double d2 = ny - hit3[1];
+            if (r2 != 1 || d2 > 7.5 || (d2 > ahead2 * 0.577 && !drop_ok)) { blocked = true; d1 = d2; r = r2; }
+        }
+        bool was = false;
+        {
+            std::lock_guard<std::mutex> lk(g_edge_mx);
+            auto& e = g_edge[id];
+            was = e.was_blocked;
+            e.tick = t; e.blocked = blocked; e.was_blocked = blocked;
+        }
+        if (blocked && !was) {
+            g_edge_stops.fetch_add(1);
+            EMF_LOG(kMod, "edge: %u stops at %.1f %.1f %.1f (ground 1.5 m ahead: %s, %.2f m down)", id, nx, ny, nz,
+                    r != 1 ? "none within 12 m" : (d1 > 7.5 ? "more than 7.5 m lower" : "a drop the player did not take"), r == 1 ? d1 : -1.0);
+        } else if (!blocked && was) {
+            EMF_LOG(kMod, "edge: %u goes on (ground ahead %+.2f m)", id, (double)hy - ny);
+        }
+    }
+    return blocked;
+}
+
+// (owner 23:36) jump log: per driven companion, every game step once: DynamicLocomotion.state 2 = in the air. Logs the
+// takeoff spot, the highest point and the landing spot: distance and height of each jump.
+// (owner 2026-11-18 07:46/07:47: "the dog should just be able to adjust his jump height ... he won't die by getting up
+// here") a jump sized to the step: maybe_step_jump leaves the push it wants here; track_jump writes it into one of his
+// Impulse slots the step he leaves the ground (the way FlameKit's leap pushes a player, core/leap.lua: an impulse is a
+// push in m/s per second while it lasts, alive while he is Jumping or Falling). His own jump: 9.4 m/s up, 1.76 m high,
+// gravity 25. The peak wanted: the step + JUMP_MARGIN.
+constexpr double kJumpV0 = 9.4, kGravity = 25.0, kJumpMargin = 0.7, kBoostSeconds = 0.2;
+struct PendingBoost { double up; uint32_t tick; };
+std::mutex g_boost_mx;
+std::map<uint32_t, PendingBoost> g_boost;
+void apply_boost(emf::World w, uint32_t id) {
+    PendingBoost b{0, 0};
+    {
+        std::lock_guard<std::mutex> lk(g_boost_mx);
+        auto it = g_boost.find(id);
+        if (it == g_boost.end()) return;
+        b = it->second;
+        g_boost.erase(it);
+    }
+    if (w.tick() - b.tick > 30 || b.up <= 0) return;
+    auto* imp = w.get<emf::gen::ecs::Impulse>(id);
+    if (!imp) { EMF_LOG(kMod, "boost: %u has no Impulse", id); return; }
+    const int64_t now = w.ecs_time_ns();
+    auto* slots = reinterpret_cast<uint8_t*>(imp) + 16;
+    int k = 0;
+    for (int i = 0; i < 4; i++) { int64_t end; std::memcpy(&end, slots + i * 40 + 24, 8); if (end <= now) { k = i; break; } }
+    uint8_t* sl = slots + k * 40;
+    const float v[3] = {0.0f, (float)b.up, 0.0f};
+    std::memcpy(sl, v, 12);
+    sl[12] = 0;
+    const int64_t end = now + (int64_t)(kBoostSeconds * 1e9);
+    const uint64_t keep = (1ull << 1) | (1ull << 32);
+    std::memcpy(sl + 16, &now, 8); std::memcpy(sl + 24, &end, 8); std::memcpy(sl + 32, &keep, 8);
+    EMF_LOG(kMod, "boost: %u pushed up %.1f for %.2f s (slot %d)", id, b.up, kBoostSeconds, k);
+}
+
+struct JumpTrack { uint32_t tick; uint8_t state; double x, y, z, top; };
+std::mutex g_jt_mx;
+std::map<uint32_t, JumpTrack> g_jt;
+void track_jump(emf::World w, uint32_t id, const WorldTransform* tr) {
+    auto* loc = w.get<emf::gen::ecs::DynamicLocomotion>(id);
+    if (!loc) return;
+    const uint32_t t = w.tick();
+    const double S = 4294967296.0;
+    const double x = tr->px / S, y = tr->py / S, z = tr->pz / S;
+    const uint8_t st = static_cast<uint8_t>(loc->state);
+    std::lock_guard<std::mutex> lk(g_jt_mx);
+    auto& j = g_jt[id];
+    if (j.tick == t) return;
+    j.tick = t;
+    if (st == 2 && j.state != 2) {
+        j.x = x; j.y = y; j.z = z; j.top = y;
+        apply_boost(w, id);
+        EMF_LOG(kMod, "jumplog: %u takes off at %.2f %.2f %.2f", id, x, y, z);
+    } else if (st == 2) {
+        if (y > j.top) j.top = y;
+    } else if (j.state == 2) {
+        EMF_LOG(kMod, "jumplog: %u lands at %.2f %.2f %.2f: %.2f m forward, highest %+.2f m, landed %+.2f m", id, x, y, z,
+                std::sqrt((x - j.x) * (x - j.x) + (z - j.z) * (z - j.z)), j.top - j.y, y - j.y);
+    }
+    j.state = st;
+}
+
+// (owner 23:51) automatic step jump: while he moves on the ground, rays 0.5 m and 1.5 m ahead. The ground right in
+// front of him level with him (within 0.4 m) and 1.5 m ahead a step 0.6-1.6 m higher: he jumps once (the game's
+// jump: ActorInput.externalTriggerJumpType = 1 Default, externalTriggerJumpTime = now; tested 23:35-23:47: about
+// 1.76 m high, 4-9 m forward when running). Not again for 90 steps (1.5 s). A gentle slope never shows such a step.
+struct StepState { uint32_t tick; uint32_t last_jump; };
+std::mutex g_step_mx;
+std::map<uint32_t, StepState> g_step;
+void maybe_step_jump(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::ActorInput* ai, const WorldTransform* tr,
+                     double dx, double dz) {
+    const uint32_t t = w.tick();
+    {
+        std::lock_guard<std::mutex> lk(g_step_mx);
+        auto& e = g_step[id];
+        if (e.tick == t) return;
+        e.tick = t;
+        if (e.last_jump && t - e.last_jump < 90) return;
+    }
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kRayCastRva;
+    if (std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) != 0) return;
+    void* col = w.singleton("ecs::ColliderSystem");
+    void* vox = w.singleton("ecs::VoxelGrid");
+    if (!col || !vox) return;
+    const double S = 4294967296.0;
+    const double nx = tr->px / S, ny = tr->py / S, nz = tr->pz / S;
+    auto ray_at = [&](double d, float* hit) {
+        const float from[3] = {(float)(nx + dx * d), (float)(ny + 5.0), (float)(nz + dz * d)};  // (07:47) from 5 m up: steps to 3.6 m
+        const float to[3] = {from[0], (float)(ny - 3.0), from[2]};
+        return ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, 0x7u, (uint16_t)0x100, (uint8_t)0);
+    };
+    float h05[3] = {0, 0, 0}, h15[3] = {0, 0, 0};
+    if (ray_at(0.5, h05) != 1 || std::fabs(h05[1] - ny) > 0.4) return;
+    if (ray_at(1.5, h15) != 1) return;
+    const double up = h15[1] - ny;
+    if (up < 0.6 || up > 3.6) return;  // (owner 07:46) with the Lua jump boost (about 4 m) up to 3.6 m steps
+    auto* raw = reinterpret_cast<uint8_t*>(ai);
+    const int64_t now = w.ecs_time_ns();
+    raw[377] = 1;
+    std::memcpy(raw + 384, &now, 8);
+    { std::lock_guard<std::mutex> lk(g_step_mx); g_step[id].last_jump = t; }
+    const double peak = up + kJumpMargin;
+    const double need = std::sqrt(2.0 * kGravity * peak) - kJumpV0;  // extra m/s up
+    double push = 0;
+    if (need > 0) {
+        push = need / kBoostSeconds;
+        std::lock_guard<std::mutex> lk(g_boost_mx);
+        g_boost[id] = PendingBoost{push, t};
+    }
+    EMF_LOG(kMod, "autojump: %u jumps at %.1f %.1f %.1f: a step %.2f m up 1.5 m ahead (aims %.2f m high, push %.1f)", id, nx, ny, nz, up, peak, push);
+}
+
+void drive_post(void* ctx, void*) {
+    emf::World w = emf::server_world();
+    if (!w) return;
+    write_bites(w);
+    write_jumps(w);
+    if (ctx) do_ground(w, ctx);
+
+    std::vector<uint32_t> ids;
+    {
+        std::lock_guard<std::mutex> lk(g_drive_mx);
+        ids = g_driven;
+    }
+    for (uint32_t id : ids) {
+        auto* st = w.get<emf::gen::ecs::DynamicEnemy01BehaviorState>(id);
+        auto* ai = w.get<emf::gen::ecs::ActorInput>(id);
+        auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, id));
+        if (!st || !ai || !tr || st->enabled || !st->movementTargetIsValid) continue;
+        track_jump(w, id, tr);
+        const double S = 4294967296.0;
+        const double nx = tr->px / S, nz = tr->pz / S;
+        const double tx = st->movementTarget.x, tz = st->movementTarget.z;
+        const double hx = st->homeZonePosition.x, hz = st->homeZonePosition.z;  // the player
+        const double dp = std::sqrt((hx - nx) * (hx - nx) + (hz - nz) * (hz - nz));
+        double dx = tx - nx, dz = tz - nz;
+        const double dl = std::sqrt(dx * dx + dz * dz);
+        uint8_t speed = 0;  // LocomotionSpeedSelector: 0 Zero, 2 Walk, 3 Run, 4 Sprint
+        // (owner 2026-11-18 11:10/11:12 "the follow distance needs to be 2 m": tight spots) he stops within kFollowStop
+        if (dp > kFollowStop && dl > 0.05) {
+            dx /= dl; dz /= dl;
+            speed = dp > 12.0 ? 4 : dp > 6.0 ? 3 : 2;
+            // (23:41 test) no edge check while he is in the air (DynamicLocomotion.state 2): it measured from his raised
+            // height and stopped his legs mid-jump
+            auto* loc_now = w.get<emf::gen::ecs::DynamicLocomotion>(id);
+            const bool airborne = loc_now && static_cast<uint8_t>(loc_now->state) == 2;
+            if (ctx && !airborne && !st->combatData.targetOfMyTarget) maybe_step_jump(w, ctx, id, ai, tr, dx, dz);
+            if (ctx && !airborne && !st->combatData.targetOfMyTarget && edge_blocked(w, ctx, id, tr, dx, dz, st->combatData.isTargetInsideLeash, speed)) {
+                speed = 0;  // edge: stand, still looking that way
+                ai->desiredWorldLookDirection.x = (float)dx; ai->desiredWorldLookDirection.y = 0; ai->desiredWorldLookDirection.z = (float)dz;
+                dx = dz = 0;
+            }
+        } else {
+            dx = dz = 0;
+        }
+        ai->desiredWorldMoveInput.x = (float)dx; ai->desiredWorldMoveInput.y = 0; ai->desiredWorldMoveInput.z = (float)dz;
+        if (speed) { ai->desiredWorldLookDirection.x = (float)dx; ai->desiredWorldLookDirection.y = 0; ai->desiredWorldLookDirection.z = (float)dz; }
+        ai->locomotionSpeed = static_cast<decltype(ai->locomotionSpeed)>(speed);
+        g_drive_writes.fetch_add(1, std::memory_order_relaxed);
+        if (g_ahead.load() && ctx && w.tick() % 15 == 0 && w.tick() != g_ahead_tick) log_ahead(w, ctx, id, ai, tr);
+        FaceTarget ft{0, 0};
+        {
+            std::lock_guard<std::mutex> lk(g_face_mx);
+            auto it = g_face.find(id);
+            if (it != g_face.end()) {
+                if (it->second.until_ns < w.ecs_time_ns()) g_face.erase(it); else ft = it->second;
+            }
+        }
+        if (ft.target) {
+            auto* tt = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, ft.target));
+            if (tt) {
+                double fx = tt->px / S - nx, fz = tt->pz / S - nz;
+                const double fl = std::sqrt(fx * fx + fz * fz);
+                if (fl > 0.05) {
+                    ai->desiredWorldLookDirection.x = (float)(fx / fl);
+                    ai->desiredWorldLookDirection.y = 0;
+                    ai->desiredWorldLookDirection.z = (float)(fz / fl);
+                }
+            }
+        }
+    }
+}
+
+void drive_scan(emf::World w) {
+    if (!w.is_server()) return;
+    const uint32_t t = w.tick();
+    if (t - g_drive_scan_tick < 30) return;
+    g_drive_scan_tick = t;
+    std::vector<uint32_t> found;
+    w.for_each_entity([&](uint32_t id) {
+        auto* st = w.get<emf::gen::ecs::DynamicEnemy01BehaviorState>(id);
+        if (!st || st->enabled || !st->movementTargetIsValid) return;
+        auto* f = static_cast<const uint8_t*>(w.get_raw(0xa1f30f21u, id));
+        if (!f || (*f != 11 && *f != 7)) return;  // (owner 19:31) companions are PlayerAlly 11; 7 = bodies from before
+        found.push_back(id);
+    });
+    size_t before;
+    {
+        std::lock_guard<std::mutex> lk(g_drive_mx);
+        before = g_driven.size();
+        g_driven = found;
+    }
+    if (found.size() != before)
+        EMF_LOG(kMod, "drive: %zu driven NPC(s) (movement input written %llu times so far)", found.size(),
+                (unsigned long long)g_drive_writes.load());
 }
 }  // namespace
 
 extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     if (!emf::init(api)) return false;
-
-    emf::add_command("fkprobe.players", "[entries 1-16]: hex dump of BasicPlayerInfos (read only)",
+    // option 2: the hook after the steering step, and the driven list refreshed after each server step
+    const bool hooked = emf::api()->hook_program && emf::api()->hook_program("steering_locomotion", nullptr, drive_post, nullptr);
+    EMF_LOG(kMod, "drive: hook after steering_locomotion %s", hooked ? "installed" : "NOT installed");
+    emf::on_tick([](emf::World w) { drive_scan(w); });
+    emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {
+        size_t n;
+        { std::lock_guard<std::mutex> lk(g_drive_mx); n = g_driven.size(); }
+        EMF_LOG(kMod, "drive: %zu driven, %llu writes", n, (unsigned long long)g_drive_writes.load());
+        EMF_REPLY("drive: %zu driven, %llu writes", n, (unsigned long long)g_drive_writes.load());
+    });
+    emf::add_command("fkprobe.bite", "<entity> [sequence id hex, default 63fe3237]: start one attack sequence (test)",
                      [](emf::World w, const std::vector<std::string>& args) {
-                         if (!w.is_server()) { EMF_REPLY("server world only"); return; }
-                         int count = args.size() > 1 ? std::atoi(args[1].c_str()) : 4;
-                         if (count < 1) count = 1;
-                         if (count > 16) count = 16;
-                         const uint64_t base = find_singleton(w, "BasicPlayerInfos");
-                         if (!base) { EMF_REPLY("not found (see the log)"); return; }
-                         hexdump("BasicPlayerInfos head", base, 0x40);
-                         for (int i = 0; i < count; ++i) {
-                             char title[96];
-                             const uint64_t e = base + uint64_t(i) * 0xA0;
-                             uint32_t handle = 0;
-                             uint64_t account = 0;
-                             peek(e + 0x04, &handle, 4);
-                             peek(e + 0x08, &account, 8);
-                             std::snprintf(title, sizeof title, "entry %d (player entity %d): handle %x, account %016llx", i,
-                                           i + 1, handle, (unsigned long long)account);
-                             hexdump(title, e, 0xA0);
-                         }
-                         EMF_REPLY("dumped %d entries (see the log)", count);
+                         if (args.size() < 2) { EMF_REPLY("usage: fkprobe.bite <entity> [sequence hex]"); return; }
+                         const uint32_t id = (uint32_t)std::strtoul(args[1].c_str(), nullptr, 0);
+                         const uint32_t seq = args.size() > 2 ? (uint32_t)std::strtoul(args[2].c_str(), nullptr, 16) : 0x63FE3237u;
+                         { std::lock_guard<std::mutex> lk(g_bite_mx); g_bites.emplace_back(id, seq); }
+                         EMF_REPLY("bite %u: %08x queued", id, seq);
                      });
-
-    emf::add_command("fkprobe.dump", "<singleton> [bytes] [offset]: hex dump of a world singleton (read only)",
+    emf::add_command("fkprobe.face", "<entity> <target> [seconds, default 5]: the entity looks at the target (attack test)",
                      [](emf::World w, const std::vector<std::string>& args) {
-                         if (args.size() < 2) { EMF_REPLY("usage: fkprobe.dump <singleton> [bytes] [offset]"); return; }
-                         size_t bytes = args.size() > 2 ? std::strtoul(args[2].c_str(), nullptr, 0) : 0x100;
-                         if (bytes < 16) bytes = 16;
-                         if (bytes > 4096) bytes = 4096;
-                         const uint64_t off = args.size() > 3 ? std::strtoull(args[3].c_str(), nullptr, 0) : 0;
-                         const uint64_t base = find_singleton(w, args[1]);
-                         if (!base) { EMF_REPLY("not found (see the log)"); return; }
-                         hexdump(args[1].c_str(), base + off, bytes);
-                         EMF_REPLY("dumped (see the log)");
+                         if (args.size() < 3) { EMF_REPLY("usage: fkprobe.face <entity> <target> [seconds]"); return; }
+                         const uint32_t id = (uint32_t)std::strtoul(args[1].c_str(), nullptr, 0);
+                         const uint32_t tg = (uint32_t)std::strtoul(args[2].c_str(), nullptr, 0);
+                         const double sec = args.size() > 3 ? std::strtod(args[3].c_str(), nullptr) : 5.0;
+                         const int64_t until = w.ecs_time_ns() + (int64_t)(sec * 1e9);
+                         { std::lock_guard<std::mutex> lk(g_face_mx); g_face[id] = FaceTarget{tg, until}; }
+                         EMF_LOG(kMod, "face: %u looks at %u for %.1f s", id, tg, sec);
+                         EMF_REPLY("face %u -> %u for %.1f s", id, tg, sec);
                      });
-
-    // (2026-11-17, owner: "let us methodically work through it one byte at a time") a WRITE test: a player's body
-    // made the way the server makes one, for player slot <slot> (entity slot + 1), next to the given player
-    emf::add_command("fkprobe.spawnplayer", "<slot 1-15> [template guid] [near player entity] [metres]: a player body as the server makes one (test)",
-                     [](emf::World w, const std::vector<std::string>& args) {
-                         if (!w.is_server()) { EMF_REPLY("server world only"); return; }
-                         const int slot = args.size() > 1 ? std::atoi(args[1].c_str()) : 0;
-                         if (slot < 1 || slot > 15) { EMF_REPLY("usage: fkprobe.spawnplayer <slot 1-15> [guid] [player] [metres]"); return; }
-                         const std::string guid_text = args.size() > 2 ? args[2] : "c3db66d6-89a5-4a6c-a8e3-d9a1f6009812";  // 1_Player
-                         const uint32_t near_id = args.size() > 3 ? (uint32_t)std::strtoul(args[3].c_str(), nullptr, 10) : 1;
-                         const double metres = args.size() > 4 ? std::atof(args[4].c_str()) : 2.0;
-                         uint8_t guid[16];
-                         if (!parse_guid(guid_text, guid)) { EMF_REPLY("bad template guid"); return; }
-                         const auto pos = emf::position(w, near_id);
-                         if (!pos) { EMF_REPLY("no position for entity %u", near_id); return; }
-                         const uintptr_t fn = emf::find_pattern(kSpawnPlayer);
-                         if (!fn) { EMF_REPLY("the server's spawn-player function was not found (see the log)"); return; }
-                         WorldTransform t{};
-                         t.px = (int64_t)((pos->x + metres) * 4294967296.0);
-                         t.py = (int64_t)((pos->y + 0.5) * 4294967296.0);
-                         t.pz = (int64_t)(pos->z * 4294967296.0);
-                         t.qw = 1.0f;
-                         t.sx = t.sy = t.sz = 1.0f;
-                         SpawnComponent comp{0x027ac564u, 0, &t, sizeof t};  // CurrentTransform
-                         SpawnSlice slice{&comp, 1};
-                         EMF_LOG(kMod, "spawnplayer: slot %d (entity %d), template %s, near %u (%.1f %.1f %.1f) + %.1f m, function at %llx",
-                                 slot, slot + 1, guid_text.c_str(), near_id, pos->x, pos->y, pos->z, metres, (unsigned long long)fn);
-                         const uint32_t id = reinterpret_cast<SpawnPlayerFn>(fn)(w.raw(), (uint32_t)slot, guid, &slice);
-                         EMF_LOG(kMod, "spawnplayer: the server returned entity %u", id);
-                         EMF_REPLY("spawnplayer: entity %u", id);
+    emf::add_command("fkprobe.ground", "<x> <z> <y top> <y bottom> [mask hex] [flags hex] [byte33]: one ray cast straight down, logs the ground hit (test)",
+                     [](emf::World, const std::vector<std::string>& args) {
+                         if (args.size() < 5) { EMF_REPLY("usage: fkprobe.ground <x> <z> <y top> <y bottom>"); return; }
+                         GroundAsk a{std::strtod(args[1].c_str(), nullptr), std::strtod(args[2].c_str(), nullptr),
+                                     std::strtod(args[3].c_str(), nullptr), std::strtod(args[4].c_str(), nullptr),
+                                     args.size() > 5 ? (uint32_t)std::strtoul(args[5].c_str(), nullptr, 16) : 0x9u,
+                                     args.size() > 6 ? (uint16_t)std::strtoul(args[6].c_str(), nullptr, 16) : (uint16_t)0x100,
+                                     args.size() > 7 ? (uint8_t)std::strtoul(args[7].c_str(), nullptr, 10) : (uint8_t)1};
+                         { std::lock_guard<std::mutex> lk(g_ground_mx); g_ground.push_back(a); }
+                         EMF_REPLY("ground %.1f %.1f queued", a.x, a.z);
                      });
-
-    // (2026-11-17) a WRITE test: one value into a player-list slot (BasicPlayerInfos + slot * 0xA0 + offset), the old
-    // and the new value logged
-    emf::add_command("fkprobe.slotset", "<slot> <offset> <u8|u16|u32|u64> <value>: write one value into a player-list slot (test)",
-                     [](emf::World w, const std::vector<std::string>& args) {
-                         if (!w.is_server()) { EMF_REPLY("server world only"); return; }
-                         if (args.size() < 5) { EMF_REPLY("usage: fkprobe.slotset <slot> <offset> <u8|u16|u32|u64> <value>"); return; }
-                         const int slot = std::atoi(args[1].c_str());
-                         const uint64_t off = std::strtoull(args[2].c_str(), nullptr, 0);
-                         const std::string type = args[3];
-                         const uint64_t value = std::strtoull(args[4].c_str(), nullptr, 0);
-                         const size_t n = type == "u8" ? 1 : type == "u16" ? 2 : type == "u32" ? 4 : type == "u64" ? 8 : 0;
-                         if (slot < 0 || slot > 15 || off + n > 0xA0 || !n) { EMF_REPLY("bad slot, offset or type"); return; }
-                         const uint64_t base = find_singleton(w, "BasicPlayerInfos");
-                         if (!base) { EMF_REPLY("player list not found"); return; }
-                         const uint64_t at = base + uint64_t(slot) * 0xA0 + off;
-                         uint64_t before = 0, after = 0;
-                         peek(at, &before, n);
-                         const bool ok = emf::api()->write_memory && emf::api()->write_memory(reinterpret_cast<void*>(at), &value, n);
-                         peek(at, &after, n);
-                         EMF_LOG(kMod, "slotset: slot %d +0x%llx (%s): %llx -> %llx (%s)", slot, (unsigned long long)off, type.c_str(),
-                                 (unsigned long long)before, (unsigned long long)after, ok ? "written" : "NOT written");
-                         EMF_REPLY("slot %d +0x%llx: %llx -> %llx", slot, (unsigned long long)off, (unsigned long long)before, (unsigned long long)after);
+    // (21:57) our own step in the game loop, registered with the walkable-ground map (and the collision and terrain
+    // grids): the walkable search answered "not ready" forever when called from the steering hook.
+    const bool prog = emf::add_program("fk_ground_probe", EMF_WORLD_SERVER, {}, {},
+        {"ecs::PathGridSystem", "ecs::ColliderSystem", "ecs::VoxelGrid"}, {}, [](void* ctx) {
+            emf::World w = emf::server_world();
+            if (!w) return;
+            void* pg = emf::program_singleton(ctx, "ecs::PathGridSystem");
+            static bool once = false;
+            if (!once) {
+                once = true;
+                EMF_LOG(kMod, "ground program: PathGridSystem %p (world %p), ColliderSystem %p (world %p), VoxelGrid %p (world %p)",
+                        pg, w.singleton("ecs::PathGridSystem"), emf::program_singleton(ctx, "ecs::ColliderSystem"),
+                        w.singleton("ecs::ColliderSystem"), emf::program_singleton(ctx, "ecs::VoxelGrid"), w.singleton("ecs::VoxelGrid"));
+            }
+            if (pg) do_walk(w, ctx, pg);
+        });
+    EMF_LOG(kMod, "ground program %s", prog ? "registered" : "NOT registered");
+    emf::add_command("fkprobe.ahead", "on|off: log the ground 1, 2, 3 m ahead of each driven companion (measuring)",
+                     [](emf::World, const std::vector<std::string>& args) {
+                         g_ahead = args.size() > 1 && args[1] == "on";
+                         EMF_REPLY("ahead %s", g_ahead.load() ? "on" : "off");
                      });
-
-    EMF_LOG(kMod, "loaded (test commands: fkprobe.players, fkprobe.dump, fkprobe.spawnplayer, fkprobe.slotset)");
+    emf::add_command("fkprobe.jump", "<entity> <mode 1 external | 2 sequence> [jump type, default 1]: jump test",
+                     [](emf::World, const std::vector<std::string>& args) {
+                         if (args.size() < 3) { EMF_REPLY("usage: fkprobe.jump <entity> <1|2> [type]"); return; }
+                         JumpAsk j{(uint32_t)std::strtoul(args[1].c_str(), nullptr, 0), (int)std::strtol(args[2].c_str(), nullptr, 10),
+                                   (uint8_t)(args.size() > 3 ? std::strtoul(args[3].c_str(), nullptr, 10) : 1)};
+                         { std::lock_guard<std::mutex> lk(g_jump_mx); g_jumps.push_back(j); }
+                         EMF_REPLY("jump %u mode %d type %u queued", j.id, j.mode, j.type);
+                     });
+    emf::add_command("fkprobe.walk", "<x> <y> <z> [layer, -1 = the world's] [player 0/1]: the game's walkable-ground search near that point (test)",
+                     [](emf::World, const std::vector<std::string>& args) {
+                         if (args.size() < 4) { EMF_REPLY("usage: fkprobe.walk <x> <y> <z>"); return; }
+                         WalkAsk a{{(float)std::strtod(args[1].c_str(), nullptr), (float)std::strtod(args[2].c_str(), nullptr),
+                                    (float)std::strtod(args[3].c_str(), nullptr)}, 0,
+                                   args.size() > 4 ? (int)std::strtol(args[4].c_str(), nullptr, 10) : -1,
+                                   args.size() > 5 ? (int)std::strtol(args[5].c_str(), nullptr, 10) : 0};
+                         { std::lock_guard<std::mutex> lk(g_walk_mx); g_walk.push_back(a); }
+                         EMF_REPLY("walk %.1f %.1f %.1f queued", a.p[0], a.p[1], a.p[2]);
+                     });
+    EMF_LOG(kMod, "loaded (drive, bite, facing, ground ray and walkable search tests; commands: fkprobe.drive, fkprobe.bite, fkprobe.face, fkprobe.ground, fkprobe.walk)");
     return true;
 }
