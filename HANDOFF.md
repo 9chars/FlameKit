@@ -620,6 +620,16 @@ what you remember is the rebuild's fault, not a decision.
    player left the water, edge stop on again". STUCK_TEXT.blocked = "Companion can't follow you!" (land); no text says
    "Companion is stuck!" now except fallbacks (no clipping detection exists yet). Backup
    `claude_scratch/npc_probe.before_simplefollow_1151.lua`.
+   **Pier test with the simple rule (11:58:22, body 34877): it works.** "the player leapt into the water from 6328.6
+   948.5 5187.9 (2.6 m above ...)", 1 s later "trail ends at the water: straight to the swimming player", 2 s after
+   the leap "followed the player into the water (health 3680, was 3680)": no damage. Earlier (11:57:57) a 1.9 m leap
+   where the player climbed out again within 4 s ("the player left the water, edge stop on again") before the hound
+   got there. Seen: in/out of water mode flickers at a depth right on 0.5 (11:57:56, four switches in 0.2 s): no
+   problem reported; a small hysteresis would end it if it ever matters.
+   **Village animal (owner 12:00, information only, "I don't want a complicated solution"):** "he climbed on shore
+   correctly, but one of the village animals blocked his way and he correctly gave the 'cant follow you message'. is
+   there anything he can do to navigate that problem?" (log 11:58:57 "stuck: 34877 gave up at 6307.6 948.5 5202.6
+   (crumb 0.9 m away, player 15.3 m)").
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
