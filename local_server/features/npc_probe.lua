@@ -1898,6 +1898,10 @@ drive_fight = function(s)
   local mx, my, mz = world:position(tg)
   if not (mx and monster_alive(world, tg)) then
     log(string.format("fight %s: %s is dead", name, tostring(tg)))
+    if A.atk then  -- (13:57 logging) the attack that killed it (its own hit comes a tick after this)
+      log(string.format("fight %s: his %s from %.1f m killed it %.2f s after it started", name, A.atk.ix == 0 and "bite" or "lunge",
+        A.atk.d or -1, (t - A.atk.t) / 60))
+    end
     repick("his target is dead")
     return hold_still()
   end
@@ -1991,6 +1995,18 @@ drive_fight = function(s)
   local at = A.atk
   if at then
     if hit_tg then at.hit = true end
+    -- (owner 2026-11-19 13:57 "yes log it": how far a lunge really reaches) every hit as it lands, and where he is
+    -- at 0.4 s (the hits so far came 0.40-0.46 s after the start)
+    for _, e in ipairs(hits) do
+      log(string.format("fight %s: his %s's hit landed %.2f s after the start on %s: he is %.1f m from it, moved %.1f m",
+        name, at.ix == 0 and "bite" or "lunge", (t - at.t) / 60, e.tg == tg and "it" or (e.obj and ("object " .. tostring(e.tg)) or ("monster " .. tostring(e.tg))),
+        d, math.sqrt((nx - at.x) ^ 2 + (nz - at.z) ^ 2)))
+    end
+    if t - at.t == 24 then
+      log(string.format("fight %s: his %s at 0.4 s: he is %.1f m from it (%.1f at the start), moved %.1f m; it moved %.1f m",
+        name, at.ix == 0 and "bite" or "lunge", d, at.d or -1, math.sqrt((nx - at.x) ^ 2 + (nz - at.z) ^ 2),
+        math.sqrt((mx - (at.mx or mx)) ^ 2 + (mz - (at.mz or mz)) ^ 2)))
+    end
     local asked = (tonumber(cd.selectedAttackIndex) or 255) ~= 255
     if not at.started and not asked then at.started = t end
     if at.started and act and act ~= 0 then at.anim = act end
@@ -2011,7 +2027,7 @@ drive_fight = function(s)
   if not at and d <= FIGHT_LUNGE and math.abs(off) <= FACE_OK then
     local ix = d <= FIGHT_BITE and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
-    A.atk = { ix = ix, t = t, x = nx, z = nz, d = d }
+    A.atk = { ix = ix, t = t, x = nx, z = nz, d = d, mx = mx, mz = mz }
     log(string.format("fight %s: %s at %s (%.1f m)%s; %s", name, ix == 0 and "bite" or "lunge", tostring(tg), d, ok and "" or " (could not ask)",
       face_info(world, id, tg, nx, ny, nz, mx, my, mz)))
   end
