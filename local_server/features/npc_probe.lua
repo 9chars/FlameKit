@@ -1488,7 +1488,7 @@ end
 -- centered on me within my radius and kill anything in it"; it replaced the 30 m leash). fight_watch clears old threats and
 -- logs his health and defence data. His maximum health: Health.dataStorage[3] (2026-11-18 20:28/20:34: [1] goes down
 -- when he is hurt, [3] and [8] stay at the maximum).
-local FIGHT_RANGE = 15
+local FIGHT_RANGE = 20                -- (owner 2026-11-19 13:58: 20 m, was 15)
 local SCAN_BUDGET, SCAN_MAX = 0.03, 6000
 local threats = {}         -- companion entity -> { monster entity -> tick of its last hit }
 local mscan = nil          -- the scan under way: { list, i, found = { player -> { monster ids } }, steps, t }

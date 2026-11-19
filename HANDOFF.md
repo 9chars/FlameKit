@@ -1216,6 +1216,8 @@ next restart (no yes for a restart yet).
      hit landed x s after the start on it/object/monster: he is d m from it, moved m"), his lunge at 0.4 s ("he is d
      m from it (d0 at the start), moved m; it moved m"), the killing attack ("his lunge from d m killed it x s after
      it started"). The radius: asked the owner whether "by 20 m" means a 20 m radius (from 15) or 35 m; not built.
+     **Owner 13:58, verbatim:** "you're reading it right: 20 m". Built 14:0x (live): FIGHT_RANGE 20 (the radius he
+     fights in, the monster scan, a target leaving it, the end at 20 + 2.5 m from the player).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
