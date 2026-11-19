@@ -467,6 +467,11 @@ most sense"
     in height.
   - Fake-world check (drive_harness, dump): no errors; jump follows, can't-follow + respawn at the 10 m cliff, the
     wall at the shore. Behaviour changed on purpose, so only an in-game retest says whether it is right.
+  - Restart 18:52-18:53 (owner 18:52 "yes"); both loaded clean. Test 18:53-18:58, owner 18:58: "its pretty good, he
+    fell in the trap door and just jumped out on his own" (the step-up rule: next crumb up, he jumps). Log: two big
+    drops (11.5 m, 24.5 m) -> "can't follow: drop" -> respawn after 2 s; a glide put-away and return; jump follows
+    landing within 0.6 m. WATCH: 18:58:18 a jump follow for a landing with jump count 0 but "second push" (the
+    double-jump guess fired during a fall); he hopped 3.4 m down, landed fine.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
