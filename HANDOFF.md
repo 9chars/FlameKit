@@ -1055,6 +1055,17 @@ next restart (no yes for a restart yet).
      ticks; animation ...)", "stops fighting <id>: it is dead / runs back: ...".
    - Fake-world test (local_server/tests via /tmp fighttest): lock-on, lunge then bites, waits for each move, next
      target after the kill; following unchanged (drive_harness: no errors).
+   - Restart 20:59-21:00 (owner 20:58 "yes"). Owner 21:07 "where are all the monsters lol" (scans: 0 within 15 m up at
+     y 1126). Fight at 21:11:22-21:11:43: locked on, bites 280/350/450 (one 900), killed several (33739, 31741,
+     31618); he died at 21:11:43 and 21:14:25 (25 hits on him in about 20 s). Owner 21:15: "he's attacking things
+     that are not there": 21:14:50 he locked on 31809 (it had hit the player), stayed exactly 4.0 m off and lunged
+     every ~3.5 s; his hits landed on entity 3055812669 for 0. Owner 21:17: "he was attacking mushrooms and things
+     that were not monsters I think". C++ bug seen: each attack start written ~7 times in the same tick (the hook runs
+     several times per step; the 255 reset is not seen in time): guard per entity per tick at the next rebuild.
+     Proposed (not done): out of reach = no progress toward his target for 3 s and no hit on it -> drop it, skip it 20 s.
+     21:18 logging (live): every threat and every target described: faction, the template's model
+     (world:template("ModelResource", id).model), and which of DynamicLocomotion / DynamicPathWalker / NetworkHealth /
+     Animal / MovementCollider it has (to tell fixed plants from creatures by data).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
