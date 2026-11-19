@@ -1131,6 +1131,19 @@ next restart (no yes for a restart yet).
      close by. I want to get rid of the requirement for the "running back when badly hurt with you far away."
      mechanic for right now. Defense mode mainly means he attacks only if something attacks us." -> the hurt rule is
      REMOVED; the 30 m leash stays; Defensive = only what attacked him or the player.
+     **Built 2026-11-19 09:22 (commit 191329c), NOT yet tested in game:** C++ `fight_step` (server DLL md5 6990b645,
+     installed; the one before renamed `fk_server_probe.dll.old_0922`; `.old_2100` still there): every step a ray from
+     his shoulder (+0.7 m) to the target's middle (+0.5 m) for `combatData.lastTargetId`, clear = no hit or a hit within
+     1 m of the target -> `combatData.isTargetReachable` / `distanceToTarget`; log "fight ray: ... clear/BLOCKED" on a
+     change; the attack start once per step (the guard; it was written ~7 times per tick). Lua `drive_fight` = the
+     sequence: pick (each candidate nearest first: lastTargetId = it, 2 ticks, read the ray; he stands still), fight
+     (locked on; hold_at the target; attacks paced as before), blocked -> hop toward it, 1 s left 2 m, 1 s right 2 m,
+     then dropped for 20 s and pick again; nothing reachable -> try again 1 s later, after 3 tries the sequence ends
+     and the monsters that were blocked are skipped for 20 s too (else it starts again at once on them and he never
+     follows the player; seen in the fake-world test). Following stops while the sequence runs. Logs: "fight N1: the
+     attack sequence starts/ends ...", "attacks", "is blocked", "repositioning", "hops", "moves 2 m", "gives up",
+     "clear again", "is dead", "picks again", "try n", stall lines. The Lua (md5 fdedea51) is staged in
+     claude_scratch/seq_npc_probe.lua and goes on the server with the restart (the old DLL never writes the ray).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
