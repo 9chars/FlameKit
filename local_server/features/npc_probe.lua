@@ -1555,10 +1555,13 @@ local function fight_watch(world)
         end
       end
       local hp, hmax = nil, nil
-      pcall(function() local d = world:get("Health", cid).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[2]) end)
-      -- (20:25 logging) where his maximum health is: once per body, every slot of Health.dataStorage and NetworkHealth
-      if not h.health_dumped then
+      -- (20:25 log: [1]=3680 [2]=0 [3]=3680 ... [8]=3680 at full health) the maximum is [3] or [8], [3] for now (NOT
+      -- confirmed: the slots are logged again the first time he is hurt, the one that stays full is the maximum)
+      pcall(function() local d = world:get("Health", cid).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[3]) end)
+      local hurt_now = hp and hmax and hp < hmax
+      if not h.health_dumped or (hurt_now and not h.health_dumped_hurt) then
         h.health_dumped = true
+        if hurt_now then h.health_dumped_hurt = true end
         local parts = {}
         pcall(function()
           local d = world:get("Health", cid).dataStorage
@@ -1569,7 +1572,8 @@ local function fight_watch(world)
           local n = world:get("NetworkHealth", cid)
           nh = string.format("health %s, maxHealth %s, max %s", tostring(n.health), tostring(n.maxHealth), tostring(n.max))
         end)
-        log(string.format("fight %s: his Health.dataStorage %s; NetworkHealth %s", tostring(name_of[cid] or cid), table.concat(parts, " "), nh))
+        log(string.format("fight %s: his Health.dataStorage %s; NetworkHealth %s%s", tostring(name_of[cid] or cid), table.concat(parts, " "), nh,
+          hurt_now and " (hurt)" or ""))
       end
       local dpl = math.sqrt((px - nx) ^ 2 + (py - ny) ^ 2 + (pz - nz) ^ 2)
       local back
