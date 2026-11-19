@@ -993,7 +993,23 @@ next restart (no yes for a restart yet).
 - **Idea (owner 11:18, not decided):** "can't we write a plugin type system so you can just 'hot reload' the DLL or
   does EMF not like that? same with the client side? if we could 'hot reload' the DLL with a plugin type system, we
   might be able to avoid all this restarting...."
-1. Combat behavior (next after follow/safety).
+1. Combat behavior (next after follow/safety). **Owner's design, 2026-11-18 20:09, verbatim:** "You press 'E' on the
+   campanion, there should be an "Attack" menu you can select. In the attack menu, you have 4 options. Passive,
+   Defensive, Aggressive, and Healing. Each mode determines how the campanion acts and responds in battle situations.
+   Passive: the campanion doesn't attack at all. Defensive: the campanion does not seek after monsters, but if
+   attacked or if the player is attacked, the campanion will respond by attacking the monster. If he's hurt and the
+   player is a good distance away, he should come running back, if the player is near by, he should just keep
+   fighting. Aggressive: campanion seeks out targets that are in range and automatically attacks them. He will jump
+   to the next nearest target in range until there is nothing left to kill. Only stops when he dies or is moved back
+   to passive mode. Healing: Healing is like passive mode, campanion never attacks, but has the added responsibility
+   of watching their player, keeping him healed up and tries to stay out of the combat. Monsters don't tend to run
+   away so I don't think chasing monster will be an issue, but there should be a maximum distance the campanion
+   should be at before running back. How close he gets to monster before attacking I'm not sure -- we'll have to pick
+   a distance and adjust it based on game play -- 10 m or 15 m? The bite plus lunge enough for now for damage -- we
+   can expand that later if it makes sense. Campanion stays in whatever mode you set it in until you change it."
+   Known from 2026-11-17 tests: bite (attack 0, 0x63FE3237, 2 m) and lunge (attack 1, 0xC34733A8, 4 m) start through
+   the C++ trigger (fkprobe.bite) with real damage (faction 11; level 50 bite 420); facing via fkprobe.face; the HIT
+   log has attacker/target/amount for every hit on or by a companion. Claude's restatement + numbers asked 20:1x.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
