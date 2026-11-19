@@ -1238,6 +1238,17 @@ next restart (no yes for a restart yet).
      were never searched (a later item if the owner wants). **Built 14:5x (option 2, live by reload):** a target faster
      than FAST 3 m/s and out of bite reach: he stands at lunge reach facing it and lunges when it slows; waiting does
      not count as "can't deliver attacks" (ok_t reset); logs "waits: X moves v m/s ...", "X slowed to v m/s".
+     **Owner 15:28:** "so far he's doing very well" (14:53-15:28: 42 kills, 114 attacks, 23 missed, 0 give-ups, 41 waits
+     all ended with the target slowing). **Owner 15:29:** "going to play this dungon all the way through and then lets
+     check the data for improvements". **Owner 16:31:** "he struggling with getting monsters that float in the air
+     right now". Log: 68778 (faction 10) hovering 0.7-0.8 m above him, mostly 0.0 m/s: lunges from 3.5/4.0 m went
+     under it (0.8-0.9 m from it at 0.4 s, ended with it behind him), bites from 0.9-2.4 m all missed; 68618 (0.7 m
+     up) died to a lunge from 4.0 m. Claude proposed (1) jump into the attack, (2) lunge from farther. **Owner 16:32,
+     verbatim:** "yeah lets see how that goes, he's done well otherwise I think". **Built 16:4x (option 1, live by
+     reload, an experiment):** a target HIGH 0.5 m or more above him: when the attack has started he is lifted 0.3 m
+     and gets upward speed launch_speeds(0, rise) (rise 0.8 -> ~8.7 m/s), rewritten for up to 6 ticks until he is in
+     the air; the attack's forward move is not touched; h.djump NOT used (the follow jump code stays out). Logs
+     "jumps into his bite/lunge (up v m/s)", and the 0.4 s line "he is h m higher than at the start, it is x m above him".
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

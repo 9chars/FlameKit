@@ -1737,6 +1737,10 @@ local TURN, FACE_OK = math.rad(30), 15
 -- faster than FAST m/s that is out of bite reach: he stands at lunge reach facing it and lunges when it slows down
 -- (a bat slows when it swoops in); while he waits, no "can't deliver attacks"
 local FAST = 3
+-- (owner 2026-11-19 16:32 "yeah lets see how that goes"; floating monsters 0.7-0.8 m above him: bites and lunges
+-- went under them) a target HIGH m or more above him: he jumps into the attack (upward speed only, the attack's own
+-- forward move is kept), as soon as the attack has started
+local HIGH = 0.5
 
 local function speed_of(world, m)
   local v = 0
@@ -2031,12 +2035,27 @@ drive_fight = function(s)
         d, math.sqrt((nx - at.x) ^ 2 + (nz - at.z) ^ 2)))
     end
     if t - at.t == 24 then
-      log(string.format("fight %s: his %s at 0.4 s: he is %.1f m from it (%.1f at the start), moved %.1f m; it moved %.1f m",
+      log(string.format("fight %s: his %s at 0.4 s: he is %.1f m from it (%.1f at the start), moved %.1f m; it moved %.1f m; he is %.1f m higher than at the start, it is %.1f m above him",
         name, at.ix == 0 and "bite" or "lunge", d, at.d or -1, math.sqrt((nx - at.x) ^ 2 + (nz - at.z) ^ 2),
-        math.sqrt((mx - (at.mx or mx)) ^ 2 + (mz - (at.mz or mz)) ^ 2)))
+        math.sqrt((mx - (at.mx or mx)) ^ 2 + (mz - (at.mz or mz)) ^ 2), ny - (at.y or ny), my - ny))
     end
     local asked = (tonumber(cd.selectedAttackIndex) or 255) ~= 255
     if not at.started and not asked then at.started = t end
+    if at.jump and at.started and not at.jumped then
+      at.jumped = t
+      local okj = pcall(function()
+        local tr = world:get("CurrentTransform", id).transform
+        tr.position.y = tr.position.y + math.floor(0.3 * 2 ^ 32)
+        world:get("Velocity", id).velocity.y = at.jump
+      end)
+      log(string.format("fight %s: jumps into his %s (up %.1f m/s)%s", name, at.ix == 0 and "bite" or "lunge", at.jump,
+        okj and "" or " (could not set his speed)"))
+    end
+    if at.jumped and t > at.jumped and t <= at.jumped + 6 then  -- a speed written on the ground may not take: again until he is in the air
+      local air = false
+      pcall(function() air = world:get("DynamicLocomotion", id).state == 2 end)
+      if not air then pcall(function() world:get("Velocity", id).velocity.y = at.jump end) end
+    end
     if at.started and act and act ~= 0 then at.anim = act end
     local over = at.started and at.anim and (act == 0)
     if over or t - at.t > ATTACK_MAX then
@@ -2055,7 +2074,8 @@ drive_fight = function(s)
   if not at and d <= FIGHT_LUNGE and math.abs(off) <= FACE_OK and not waiting then
     local ix = d <= FIGHT_BITE and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
-    A.atk = { ix = ix, t = t, x = nx, z = nz, d = d, mx = mx, mz = mz }
+    A.atk = { ix = ix, t = t, x = nx, z = nz, d = d, mx = mx, mz = mz, y = ny }
+    if my - ny >= HIGH then A.atk.jump = (launch_speeds(0, my - ny)) end
     log(string.format("fight %s: %s at %s (%.1f m)%s; %s", name, ix == 0 and "bite" or "lunge", tostring(tg), d, ok and "" or " (could not ask)",
       face_info(world, id, tg, nx, ny, nz, mx, my, mz)))
   end
