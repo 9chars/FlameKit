@@ -113,6 +113,20 @@ void start_sequence(emf::World w, uint32_t id, emf::gen::ecs::ActorInput* ai, ui
     EMF_LOG(kMod, "%s: sequence %08x written into %u's trigger (call %u, time %lld)", why, seq, id, call, (long long)now);
 }
 
+// (owner 2026-11-19 09:03/09:17, the attack sequence) once per step per companion: the attack the Lua part asks for
+// (combatData.selectedAttackIndex 0 = bite 0x63FE3237, 1 = lunge 0xC34733A8, the skeleton hound's; set back to 255 once
+// started), and the ray to the monster he fights or checks (combatData.lastTargetId): from his shoulder (0.7 m up) to
+// the monster's middle (0.5 m above its position), mask 7 (terrain and objects, not characters). Clear = nothing hit,
+// or the hit within 1 m of the monster. Written into combatData.isTargetReachable (clear) and combatData
+// .distanceToTarget (metres to the hit; the whole distance when clear) for the Lua part; logged when it changes. The
+// hook runs several times per step on different threads: the per-step guard also ends the attack being started several
+// times in one step (seen 2026-11-18 21:15).
+struct FightStep { uint32_t tick = 0; uint32_t target = 0; int clear = -1; };
+std::mutex g_fight_mx;
+std::map<uint32_t, FightStep> g_fight;
+void fight_step(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::DynamicEnemy01BehaviorState* st,
+                emf::gen::ecs::ActorInput* ai, const WorldTransform* tr);
+
 void write_bites(emf::World w) {
     std::vector<std::pair<uint32_t, uint32_t>> todo;
     {
@@ -396,16 +410,9 @@ void drive_post(void* ctx, void*) {
         auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, id));
         if (!st || !ai || !tr || st->enabled || !st->movementTargetIsValid) continue;
         track_jump(w, id, tr);
-        // (owner 2026-11-18 20:09/20:47, the companion's fight) an attack the Lua part asks for: combatData
-        // .selectedAttackIndex 0 = bite (0x63FE3237), 1 = lunge (0xC34733A8) (the skeleton hound's); set back to 255 once
-        // started, which tells the Lua part it began. combatData.lastTargetId = the monster he fights: he faces it.
-        {
-            const uint8_t ask = st->combatData.selectedAttackIndex;
-            if (ask == 0 || ask == 1) {
-                start_sequence(w, id, ai, ask == 0 ? 0x63FE3237u : 0xC34733A8u, ask == 0 ? "fight bite" : "fight lunge");
-                st->combatData.selectedAttackIndex = 255;
-            }
-        }
+        // (the companion's fight) the attack asked for and the ray to his target, once per step (fight_step); combatData
+        // .lastTargetId = the monster he fights: he faces it (below)
+        fight_step(w, ctx, id, st, ai, tr);
         const double S = 4294967296.0;
         const double nx = tr->px / S, ny_here = tr->py / S, nz = tr->pz / S;
         const double tx = st->movementTarget.x, tz = st->movementTarget.z;
@@ -459,6 +466,62 @@ void drive_post(void* ctx, void*) {
                 }
             }
         }
+    }
+}
+
+void fight_step(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::DynamicEnemy01BehaviorState* st,
+                emf::gen::ecs::ActorInput* ai, const WorldTransform* tr) {
+    const uint32_t t = w.tick();
+    FightStep prev;
+    {
+        std::lock_guard<std::mutex> lk(g_fight_mx);
+        auto& e = g_fight[id];
+        if (e.tick == t) return;
+        e.tick = t;
+        prev = e;
+    }
+    const uint8_t ask = st->combatData.selectedAttackIndex;
+    if (ask == 0 || ask == 1) {
+        start_sequence(w, id, ai, ask == 0 ? 0x63FE3237u : 0xC34733A8u, ask == 0 ? "fight bite" : "fight lunge");
+        st->combatData.selectedAttackIndex = 255;
+    }
+    const uint32_t target = st->combatData.lastTargetId.id;
+    if (!target || !ctx) return;
+    auto* tt = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, target));
+    if (!tt) return;
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kRayCastRva;
+    void* col = w.singleton("ecs::ColliderSystem");
+    void* vox = w.singleton("ecs::VoxelGrid");
+    if (std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) != 0 || !col || !vox) return;
+    const double S = 4294967296.0;
+    const float from[3] = {(float)(tr->px / S), (float)(tr->py / S + 0.7), (float)(tr->pz / S)};
+    const float to[3] = {(float)(tt->px / S), (float)(tt->py / S + 0.5), (float)(tt->pz / S)};
+    const double total = std::sqrt((double)(to[0] - from[0]) * (to[0] - from[0]) + (double)(to[1] - from[1]) * (to[1] - from[1]) +
+                                   (double)(to[2] - from[2]) * (to[2] - from[2]));
+    float hit[3] = {0, 0, 0};
+    const int r = ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, 0x7u, (uint16_t)0x100, (uint8_t)0);
+    double hitd = total;
+    bool clear = true;
+    if (r == 1) {
+        hitd = std::sqrt((double)(hit[0] - from[0]) * (hit[0] - from[0]) + (double)(hit[1] - from[1]) * (hit[1] - from[1]) +
+                         (double)(hit[2] - from[2]) * (hit[2] - from[2]));
+        const double left = std::sqrt((double)(to[0] - hit[0]) * (to[0] - hit[0]) + (double)(to[1] - hit[1]) * (to[1] - hit[1]) +
+                                      (double)(to[2] - hit[2]) * (to[2] - hit[2]));
+        clear = left <= 1.0;
+    }
+    st->combatData.isTargetReachable = clear;
+    st->combatData.distanceToTarget = (float)(clear ? total : hitd);
+    if (target != prev.target || (clear ? 1 : 0) != prev.clear) {
+        {
+            std::lock_guard<std::mutex> lk(g_fight_mx);
+            auto& e = g_fight[id];
+            e.target = target;
+            e.clear = clear ? 1 : 0;
+        }
+        if (r < 0) EMF_LOG(kMod, "fight ray: %u -> %u: the ray FAULTED (taken as clear)", id, target);
+        else EMF_LOG(kMod, "fight ray: %u -> %u: %s (%.1f m; hit at %.1f m, %.1f %.1f %.1f)", id, target, clear ? "clear" : "BLOCKED", total,
+                     hitd, r == 1 ? hit[0] : 0.0f, r == 1 ? hit[1] : 0.0f, r == 1 ? hit[2] : 0.0f);
     }
 }
 

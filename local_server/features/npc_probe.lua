@@ -1479,17 +1479,15 @@ local function on_pick(world, from, data)
   if not ok then log("wheel: failed: " .. tostring(err)) say(world, player, "Cannot do that (see the server's log).") end
 end
 
--- ===== Fight (owner 2026-11-18 20:09/20:11/20:47) ======================================================================
+-- ===== Fight (owner 2026-11-18 20:09/20:11/20:47, 2026-11-19 09:03/09:17) =============================================
 -- The fight modes (the wheel's Attack menu): Passive and Healing never attack (Healing's healing comes later);
--- Defensive and Aggressive fight (drive_fight, below). The watch (fight_watch) logs once a second what each following
--- companion would do in his mode, whenever that changes ("fight <name>: <mode>: ...").
--- Defensive: a monster that hit him or his player (a threat, noted by the hit handler); the nearest one to him, alive
--- and within FIGHT_LEASH of the player. Aggressive: those too, and every monster within FIGHT_RANGE of the player (a
--- scan over the world's entities, spread over steps within SCAN_BUDGET: the world has some 37,000 entities and EMF
--- pauses FlameKit when one call runs over 250 ms). Run back: more than FIGHT_LEASH from the player (every mode);
--- Defensive also when his health is under FIGHT_HURT and the player is more than FIGHT_RANGE away. His maximum health:
--- Health.dataStorage[3] (2026-11-18 20:28/20:34: [1] goes down when he is hurt, [3] and [8] stay at the maximum).
-local FIGHT_RANGE, FIGHT_LEASH, FIGHT_HURT = 15, 30, 0.3
+-- Defensive and Aggressive run the attack sequence (drive_fight, below). Threats: monsters that hit him or his player
+-- (the hit handler). Aggressive also looks at every monster within FIGHT_RANGE of the player (a scan over the world's
+-- entities, spread over steps within SCAN_BUDGET: the world has some 37,000 entities and EMF pauses FlameKit when one
+-- call runs over 250 ms). FIGHT_LEASH: the leash (the attack sequence ends past it). fight_watch clears old threats and
+-- logs his health and defence data. His maximum health: Health.dataStorage[3] (2026-11-18 20:28/20:34: [1] goes down
+-- when he is hurt, [3] and [8] stay at the maximum).
+local FIGHT_RANGE, FIGHT_LEASH = 15, 30
 local SCAN_BUDGET, SCAN_MAX = 0.03, 6000
 local threats = {}         -- companion entity -> { monster entity -> tick of its last hit }
 local mscan = nil          -- the scan under way: { list, i, found = { player -> { monster ids } }, steps, t }
@@ -1569,7 +1567,6 @@ local function note_threat(world, hit)
     elseif a == cid then
       local f = sum_of(cid)
       f.dealt, f.hits_by = f.dealt + amount, f.hits_by + 1
-      if h.fight and tg == h.fight.target then h.fight.hit_t = world:tick() end  -- his hit landed on his target
     elseif tg == h.player and is_monster(world, a) then
       log(string.format("fight %s: the player took %s (%s, %s) from %s (health %s -> %s)", tostring(name_of[cid] or cid), tostring(hit.amount),
         types, table.concat(hit.attacks or {}, ","), tostring(a), tostring(hit.health_before), tostring(hit.health_after)))
@@ -1690,150 +1687,231 @@ local function fight_watch(world)
   for cid in pairs(fight_sums) do if not drives[cid] then fight_sums[cid] = nil end end
 end
 
--- the monster he picks: the nearest of the candidates (Defensive: a threat; Aggressive: a threat or any monster within
--- FIGHT_RANGE of the player), alive and within FIGHT_LEASH of the player
-local function fight_pick(world, cid, h, mode, px, py, pz, nx, ny, nz)
-  local best, bestd, why
-  local function consider(m, reason)
-    local mx, my, mz = world:position(m)
-    if not (mx and monster_alive(world, m)) then return end
-    if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then return end
-    local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
-    if not best or d < bestd then best, bestd, why = m, d, reason end
-  end
-  local skip = h.fight_skip or {}
-  local now = world:tick()
-  for m, untill in pairs(skip) do if now > untill then skip[m] = nil end end
-  local consider0 = consider
-  consider = function(m, reason) if not skip[m] then consider0(m, reason) end end
-  for m in pairs(threats[cid] or {}) do consider(m, "it hit you or him") end
-  if mode == "Aggressive" then
-    for _, m in ipairs(near_monsters[h.player] or {}) do
-      local mx, my, mz = world:position(m)
-      if mx and (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 <= FIGHT_RANGE ^ 2 then consider(m, "within " .. FIGHT_RANGE .. " m of you") end
-    end
-  end
-  return best, bestd, why
-end
-
 -- his current action's animation (Actor.currentServerAction.animationStateId: a number while a move plays, 0 idle)
 local function action_of(world, id)
   local ok, v = pcall(function() return tonumber(world:get("Actor", id).currentServerAction.animationStateId) end)
   return ok and v or nil
 end
 
--- The fight, every step for a following companion in Defensive or Aggressive (returns true while he fights; the
--- trail is not followed then, the player's crumbs keep coming). He picks a monster (fight_pick) and keeps it until it
--- is dead (owner 20:47: "lock on a target that he picks until its dead, then make a new choice"); only the run-back
--- rules end it sooner: more than FIGHT_LEASH from the player, or (Defensive) hurt under FIGHT_HURT with the player more
--- than FIGHT_RANGE away; a monster more than FIGHT_LEASH from the player is out of reach too. He runs straight at it
--- (the native hook stops him 2 m from it; the edge stop is on: no trail here), faces it (combatData.lastTargetId, the
--- C++ turns him), lunges from FIGHT_LUNGE and bites from FIGHT_BITE (combatData.selectedAttackIndex 1 / 0; the C++
--- starts the move and sets it back to 255). The next attack waits until his move is over: his action's animation
--- goes back to 0 (at most ATTACK_MAX, logged). A target he cannot get at (behind a door or wall) is let go after
--- REACH_TICKS (see there). Logs "fight <name>: ...".
+-- ===== The attack sequence (owner 2026-11-19 09:03 spec, 09:17 decisions; HANDOFF has both verbatim) ===================
+-- Defensive and Aggressive only. Once he has a target, attack mode is on and the following (and coming back to the
+-- player) stops until the sequence ends (drive_fight returns true).
+-- Picking: the candidates, nearest to him first (Defensive: monsters that hit him or the player; Aggressive: those and
+-- every monster within FIGHT_RANGE of the player; alive, within FIGHT_LEASH of the player, not skipped). For each one
+-- the C++ shoots a ray from his shoulder to its middle (combatData.lastTargetId -> isTargetReachable, every step);
+-- blocked (a fence, wall, tree or object) -> the next one; the first clear one is his target.
+-- Fighting: locked on until it is dead. The ray every step; he faces it (the C++ turns him to lastTargetId), runs at it
+-- (the native hook stops him 2 m off), lunges from FIGHT_LUNGE and bites from FIGHT_BITE as often as his moves allow
+-- (the next one when his move's animation is over, at most ATTACK_MAX). Blocked: he repositions, MOVE_STEP each: a hop
+-- toward it, then SIDE m to the left, then SIDE m to the right; still blocked -> he drops it (not picked again for
+-- SKIP_TICKS) and picks again.
+-- The end: nothing reachable on PICK_TRIES tries PICK_EVERY apart (that includes "all dead"), or he is more than
+-- FIGHT_LEASH from the player (the leash, owner 09:17 "keep the 30 m leash for now"). (09:17: the "run back when badly
+-- hurt" rule is gone.) Logs "fight <name>: ...".
 local FIGHT_BITE, FIGHT_LUNGE, ATTACK_MAX = 2.5, 4, 180
--- (owner 21:21-21:35: he hammered a door between him and his target, 21:14 and 21:29; "I'd drop that to like 2
--- seconds") out of reach: not within bite reach, no 0.3 m closer and no hit of his on it for REACH_TICKS: he lets it go
--- and does not pick it again for SKIP_TICKS
-local REACH_TICKS, SKIP_TICKS = 120, 1200
+local RAY_WAIT = 2                    -- ticks before a candidate's ray result is read (the C++ casts every step)
+local PICK_TRIES, PICK_EVERY = 3, 60  -- (owner 09:17 "3 tries ... might be too few, but we'll start there")
+local MOVE_STEP, SIDE = 60, 2
+local SKIP_TICKS = 1200
+
+local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
+  local list, seen = {}, {}
+  local skip = h.fight_skip or {}
+  local now = world:tick()
+  for m, untill in pairs(skip) do if now > untill then skip[m] = nil end end
+  local function add(m, why)
+    if seen[m] or skip[m] then return end
+    local mx, my, mz = world:position(m)
+    if not (mx and monster_alive(world, m)) then return end
+    if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then return end
+    seen[m] = true
+    list[#list + 1] = { id = m, why = why, d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2) }
+  end
+  for m in pairs(threats[cid] or {}) do add(m, "it hit you or him") end
+  if mode == "Aggressive" then
+    for _, m in ipairs(near_monsters[h.player] or {}) do
+      local mx, my, mz = world:position(m)
+      if mx and (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 <= FIGHT_RANGE ^ 2 then add(m, "within " .. FIGHT_RANGE .. " m of you") end
+    end
+  end
+  table.sort(list, function(x, y) return x.d < y.d end)
+  return list
+end
+
 drive_fight = function(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local cd = a.combatData
   local name = tostring(name_of[id] or id)
+  local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
   if not h.fight_init then
     h.fight_init = true
     pcall(function() cd.selectedAttackIndex = 255 end)
   end
-  local function stop(why)
-    if h.fight then log(string.format("fight %s: stops fighting %s: %s", name, tostring(h.fight.target), why)) end
-    h.fight = nil
+  local function clear_target()
     pcall(function() if cd.lastTargetId ~= 0 then cd.lastTargetId = 0 end end)
+  end
+  local function the_end(why)
+    if h.atk then log(string.format("fight %s: the attack sequence ends: %s", name, why)) end
+    h.atk = nil
+    clear_target()
   end
   local mode = fight_mode(id)
   local hp, hmax
   pcall(function() local d = world:get("Health", id).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[3]) end)
-  if (mode ~= "Defensive" and mode ~= "Aggressive") or s.pwet or not hp or hp <= 0 then
-    stop(mode ~= "Defensive" and mode ~= "Aggressive" and ("mode " .. mode) or (s.pwet and "the player swims" or "he is down"))
-    return false
-  end
-  local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
+  if mode ~= "Defensive" and mode ~= "Aggressive" then the_end("mode " .. mode) return false end
+  if s.pwet then the_end("the player swims") return false end
+  if not hp or hp <= 0 then the_end("he is down") return false end
   local dpl = math.sqrt((px - nx) ^ 2 + (py - ny) ^ 2 + (pz - nz) ^ 2)
-  local f = h.fight
-  if f then
-    local mx, my, mz = world:position(f.target)
-    if not (mx and monster_alive(world, f.target)) then
-      stop("it is dead")
-      f = nil
-    elseif (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then
-      stop(string.format("it is more than %d m from the player", FIGHT_LEASH))
-      f = nil
+  if dpl > FIGHT_LEASH then the_end(string.format("he is more than %d m from the player (the leash)", FIGHT_LEASH)) return false end
+  local A = h.atk
+  if not A then
+    clear_target()
+    if t % 30 ~= 0 then return false end
+    local list = fight_candidates(world, id, h, mode, px, py, pz, nx, ny, nz)
+    if #list == 0 then return false end
+    A = { phase = "pick", list = list, i = 1, tries = 1, t = t }
+    h.atk = A
+    log(string.format("fight %s: the attack sequence starts (%s): %d candidate(s), the nearest %s at %.1f m", name, mode, #list,
+      tostring(list[1].id), list[1].d))
+  end
+  local function hold_still() hold_at(a, nx, ny, nz) return true end
+  local function repick(why)
+    A.phase, A.target, A.list, A.i, A.tries, A.t, A.checking, A.atk, A.blocked_t = "pick", nil, nil, 1, 1, t, nil, nil, nil
+    A.best_d, A.prog_t, A.stall_said = nil, nil, nil
+    A.list = fight_candidates(world, id, h, mode, px, py, pz, nx, ny, nz)
+    log(string.format("fight %s: picks again (%s): %d candidate(s)", name, why, #A.list))
+  end
+  -- picking
+  if A.phase == "pick" then
+    local c = A.list[A.i]
+    while c and not (world:position(c.id) and monster_alive(world, c.id)) do
+      A.i = A.i + 1
+      c = A.list[A.i]
+    end
+    if not c then
+      clear_target()
+      if t - A.t >= PICK_EVERY then
+        if A.tries >= PICK_TRIES then
+          -- the blocked ones are dropped like a target he gave up on (else the sequence starts again on them at once)
+          local n = 0
+          h.fight_skip = h.fight_skip or {}
+          for m in pairs(A.blocked_ids or {}) do h.fight_skip[m], n = t + SKIP_TICKS, n + 1 end
+          the_end(string.format("nothing he can reach after %d tries%s", A.tries,
+            n > 0 and string.format(" (%d blocked one(s) not again for %d s)", n, SKIP_TICKS / 60) or ""))
+          return false
+        end
+        A.tries, A.t, A.i, A.checking = A.tries + 1, t, 1, nil
+        A.list = fight_candidates(world, id, h, mode, px, py, pz, nx, ny, nz)
+        log(string.format("fight %s: try %d: %d candidate(s)", name, A.tries, #A.list))
+      end
+      return hold_still()
+    end
+    if A.checking ~= c.id then
+      A.checking, A.check_t = c.id, t
+      pcall(function() cd.lastTargetId = c.id end)
+      return hold_still()
+    end
+    if t - A.check_t < RAY_WAIT then return hold_still() end
+    local okr, reach = pcall(function() return cd.isTargetReachable end)
+    local okd, rd = pcall(function() return tonumber(cd.distanceToTarget) end)
+    if okr and reach then
+      A.phase, A.target, A.t0, A.atk, A.blocked_t = "fight", c.id, t, nil, nil
+      log(string.format("fight %s: attacks %s (%s; %.1f m from him; ray clear; his health %s/%s; it: %s)", name, tostring(c.id), c.why, c.d,
+        tostring(hp), tostring(hmax), describe(world, c.id)))
+    else
+      log(string.format("fight %s: %s is blocked (the ray hits something at %s m of %.1f m), the next one", name, tostring(c.id),
+        okd and rd and string.format("%.1f", rd) or "?", c.d))
+      A.blocked_ids = A.blocked_ids or {}
+      A.blocked_ids[c.id] = true
+      A.i, A.checking = A.i + 1, nil
+      return hold_still()
     end
   end
-  local back
-  if dpl > FIGHT_LEASH then
-    back = string.format("he is more than %d m from the player", FIGHT_LEASH)
-  elseif mode == "Defensive" and hmax and hmax > 0 and hp / hmax < FIGHT_HURT and dpl > FIGHT_RANGE then
-    back = string.format("he is hurt (%d%%) and the player is %.0f m away", math.floor(hp / hmax * 100), dpl)
+  -- fighting
+  local tg = A.target
+  local mx, my, mz = world:position(tg)
+  if not (mx and monster_alive(world, tg)) then
+    log(string.format("fight %s: %s is dead", name, tostring(tg)))
+    repick("his target is dead")
+    return hold_still()
   end
-  if back then
-    if f then stop("runs back: " .. back) end
-    return false
+  if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then
+    repick(string.format("%s is more than %d m from the player", tostring(tg), FIGHT_LEASH))
+    return hold_still()
   end
-  if not f and t % 30 == 0 then
-    local m, d, why = fight_pick(world, id, h, mode, px, py, pz, nx, ny, nz)
-    if m then
-      f = { target = m, t0 = t }
-      h.fight = f
-      local mhp = "?"
-      pcall(function() mhp = tostring(world:get("NetworkHealth", m).health) end)
-      log(string.format("fight %s: attacks %s (%s; %s; %.1f m from him; his health %s/%s; it: %s)", name, tostring(m), why, mode, d,
-        tostring(hp), tostring(hmax), describe(world, m)))
-    end
-  end
-  if not f then
-    pcall(function() if cd.lastTargetId ~= 0 then cd.lastTargetId = 0 end end)
-    return false
-  end
-  local mx, my, mz = world:position(f.target)
-  hold_at(a, mx, my, mz)  -- the native hook runs him at the monster and stops him 2 m from it
   pcall(function()
-    cd.lastTargetId = f.target
+    cd.lastTargetId = tg
     cd.isTargetInsideLeash = false
     cd.targetOfMyTarget = false
   end)
   local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
-  if d <= FIGHT_BITE or not f.best_d or d < f.best_d - 0.3 then f.best_d, f.prog_t, f.stall_said = math.min(d, f.best_d or d), t, nil end
-  local last_ok = math.max(f.prog_t or f.t0, f.hit_t or 0, f.t0)
-  -- (owner 2026-11-19 07:50: "a new specific "pathing" system to handle obstacles and better navigation on the battle
-  -- field ... I saw him getting stuck on fences and other things") logging: a stall on the way to his target (no
-  -- 0.3 m closer for half a second, not within bite reach): how far and how high it is, his movement state and speed,
-  -- whether his body touches something, the ground under him, and who stands near him; once per stall
-  if t - last_ok > 30 and not f.stall_said then
-    f.stall_said = true
+  local okr, reach = pcall(function() return cd.isTargetReachable end)
+  if okr and not reach then
+    -- blocked: the hop toward it, then SIDE m left, then SIDE m right, then he drops it
+    if not A.blocked_t then
+      A.blocked_t = t
+      local fx, fz = mx - nx, mz - nz
+      local fl = math.max(0.05, math.sqrt(fx * fx + fz * fz))
+      A.left = { x = nx - fz / fl * SIDE, y = ny, z = nz + fx / fl * SIDE }
+      A.right = { x = nx + fz / fl * SIDE, y = ny, z = nz - fx / fl * SIDE }
+      A.hopped = false
+      log(string.format("fight %s: the ray to %s is blocked (%.1f m away): repositioning", name, tostring(tg), d))
+    end
+    local k = math.floor((t - A.blocked_t) / MOVE_STEP)
+    if k == 0 then
+      if not A.hopped then
+        A.hopped = true
+        local fx, fz = mx - nx, mz - nz
+        local fl = math.max(0.05, math.sqrt(fx * fx + fz * fz))
+        local hop = math.min(fl, 2)
+        local vup, vh = launch_speeds(hop, math.max(0, math.min(2, my - ny)))
+        local okv, vx, vz = launch(world, id, fx / fl * hop, fz / fl * hop, hop, vup, vh)
+        edge_off(a)
+        h.djump = { t0 = t, untill = t + DJ_TICKS, x1 = nx + fx / fl * hop, y1 = ny, z1 = nz + fz / fl * hop, hp = hp, vx = vx, vz = vz, vy = vup, up = false }
+        log(string.format("fight %s: hops toward %s (%.1f m/s up)%s", name, tostring(tg), vup, okv and "" or " (could not set his speed)"))
+      end
+      return hold_still()
+    elseif k == 1 or k == 2 then
+      local p = k == 1 and A.left or A.right
+      if not A["said" .. k] then
+        A["said" .. k] = true
+        log(string.format("fight %s: moves %d m to the %s", name, SIDE, k == 1 and "left" or "right"))
+      end
+      hold_at(a, p.x, p.y, p.z)
+      return true
+    else
+      h.fight_skip = h.fight_skip or {}
+      h.fight_skip[tg] = t + SKIP_TICKS
+      log(string.format("fight %s: gives up on %s: still blocked after the hop, left and right (not again for %d s)", name,
+        tostring(tg), SKIP_TICKS / 60))
+      repick("his target stays blocked")
+      return hold_still()
+    end
+  elseif A.blocked_t then
+    log(string.format("fight %s: the ray to %s is clear again after %.1f s", name, tostring(tg), (t - A.blocked_t) / 60))
+    A.blocked_t, A.said1, A.said2 = nil, nil, nil
+  end
+  hold_at(a, mx, my, mz)  -- the native hook runs him at it and stops him 2 m off
+  -- (logging, owner 2026-11-19 07:50 fences) a stall with the ray clear: no 0.3 m closer for half a second, not within
+  -- bite reach (something lower than the ray's line, or the monster keeps away): once per stall
+  if d <= FIGHT_BITE or not A.best_d or d < A.best_d - 0.3 then A.best_d, A.prog_t, A.stall_said = math.min(d, A.best_d or d), t, nil end
+  if t - (A.prog_t or t) > 30 and not A.stall_said then
+    A.stall_said = true
     local st, spd, col = "?", -1, "?"
     pcall(function() st = tostring(world:get("DynamicLocomotion", id).state) end)
     pcall(function() local v = world:get("Velocity", id).velocity spd = math.sqrt(v.x * v.x + v.z * v.z) end)
     pcall(function()
       local r = world:get("MovementCollider", id).results.m_value
-      col = string.format("collider: touching %s, a player %s, last slide side %s; ground %s (%.2f m, walkable %s, normal y %.2f), standing on %s",
+      col = string.format("collider: touching %s, a player %s, last slide side %s; ground %s (%.2f m, walkable %s), standing on %s",
         tostring(r.hasSpheroidCollision), tostring(r.hasPlayerSpheroidCollision), tostring(r.lastCollideAndSlideSide),
-        tostring(r.hasGroundCollision), tonumber(r.groundDistance) or -1, tostring(r.isGroundWalkable),
-        tonumber(r.groundNormal and r.groundNormal.y) or -1, tostring(r.attachmentEntityId))
+        tostring(r.hasGroundCollision), tonumber(r.groundDistance) or -1, tostring(r.isGroundWalkable), tostring(r.attachmentEntityId))
     end)
-    log(string.format("fight %s: stalled on the way to %s: %.1f m away, %.1f m %s him, no closer for %.1f s; his state %s, speed %.1f m/s; %s",
-      name, tostring(f.target), d, math.abs(my - ny), my >= ny and "above" or "below", (t - last_ok) / 60, st, spd, col))
+    log(string.format("fight %s: stalled (ray clear) on the way to %s: %.1f m away, %.1f m %s him, no closer for %.1f s; his state %s, speed %.1f m/s; %s",
+      name, tostring(tg), d, math.abs(my - ny), my >= ny and "above" or "below", (t - A.prog_t) / 60, st, spd, col))
     report_blockers(s, "fight stall", mx - nx, mz - nz)
   end
-  if t - last_ok > REACH_TICKS then
-    h.fight_skip = h.fight_skip or {}
-    h.fight_skip[f.target] = t + SKIP_TICKS
-    stop(string.format("out of reach (%.1f m, no closer and no hit of his on it for %.1f s; skipped for %d s)", d,
-      REACH_TICKS / 60, SKIP_TICKS / 60))
-    return false
-  end
   local act = action_of(world, id)
-  local at = f.atk
+  local at = A.atk
   if at then
     local asked = (tonumber(cd.selectedAttackIndex) or 255) ~= 255
     if not at.started and not asked then at.started = t end
@@ -1843,15 +1921,14 @@ drive_fight = function(s)
       log(string.format("fight %s: %s %s after %.2f s (%s; animation %s)", name, at.ix == 0 and "bite" or "lunge",
         over and "over" or "TIMED OUT", (t - at.t) / 60, at.started and string.format("started after %d tick(s)", at.started - at.t) or "never started",
         tostring(at.anim)))
-      f.atk = nil
-      at = nil
+      A.atk, at = nil, nil
     end
   end
   if not at and d <= FIGHT_LUNGE then
     local ix = d <= FIGHT_BITE and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
-    f.atk = { ix = ix, t = t }
-    log(string.format("fight %s: %s at %s (%.1f m)%s", name, ix == 0 and "bite" or "lunge", tostring(f.target), d, ok and "" or " (could not ask)"))
+    A.atk = { ix = ix, t = t }
+    log(string.format("fight %s: %s at %s (%.1f m)%s", name, ix == 0 and "bite" or "lunge", tostring(tg), d, ok and "" or " (could not ask)"))
   end
   return true
 end
