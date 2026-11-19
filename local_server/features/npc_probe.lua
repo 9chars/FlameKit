@@ -1497,10 +1497,36 @@ local function monster_alive(world, id)
   return not (ok and hp and hp <= 0)
 end
 
+-- (owner 21:20 "does the dog have any armor or defensive numbers, he seemed to die pretty quick", 21:21 "lets just do
+-- more logging first") per companion: what he took and dealt, summed per 10 s while it goes on (fight_watch logs it)
+local fight_sums = {}  -- companion entity -> { took = {type -> amount}, hits_on = n, from = {attacker -> true}, dealt, hits_by }
+local function sum_of(cid)
+  local f = fight_sums[cid]
+  if not f then f = { took = {}, hits_on = 0, from = {}, dealt = 0, hits_by = 0 } fight_sums[cid] = f end
+  return f
+end
+
 -- the hit handler: a monster's hit on a following companion or on his player is a threat for that companion
 local function note_threat(world, hit)
   local a, tg = hit.attacker, hit.target
   if not (a and tg) or a == tg then return end
+  -- (21:21 logging) his hits taken and dealt, and hits on his player for comparison (the same monster's attack on the
+  -- player, who has armor)
+  for cid, h in pairs(drives) do
+    local amount = tonumber(hit.amount) or 0
+    local types = table.concat(hit.types or {}, ",")
+    if tg == cid and a ~= cid then
+      local f = sum_of(cid)
+      f.took[types] = (f.took[types] or 0) + amount
+      f.hits_on, f.from[a] = f.hits_on + 1, true
+    elseif a == cid then
+      local f = sum_of(cid)
+      f.dealt, f.hits_by = f.dealt + amount, f.hits_by + 1
+    elseif tg == h.player and is_monster(world, a) then
+      log(string.format("fight %s: the player took %s (%s, %s) from %s (health %s -> %s)", tostring(name_of[cid] or cid), tostring(hit.amount),
+        types, table.concat(hit.attacks or {}, ","), tostring(a), tostring(hit.health_before), tostring(hit.health_after)))
+    end
+  end
   for cid, h in pairs(drives) do
     if (tg == cid or tg == h.player) and is_monster(world, a) then
       threats[cid] = threats[cid] or {}
@@ -1583,8 +1609,37 @@ local function fight_watch(world)
       log(string.format("fight %s: his Health.dataStorage %s%s (mode %s)", tostring(name_of[cid] or cid), table.concat(parts, " "),
         hurt_now and " (hurt)" or "", fight_mode(cid)))
     end
+    -- (21:21 logging) his defence data, once per body
+    if not h.defence_dumped then
+      h.defence_dumped = true
+      local function arr(cname, n)
+        local ok, v = pcall(function()
+          local d = world:get(cname, cid).dataStorage
+          local p = {}
+          for i = 1, n do p[#p + 1] = string.format("%s", tostring(d[i])) end
+          return table.concat(p, " ")
+        end)
+        return ok and v or "none"
+      end
+      local function has(cname) local ok, v = pcall(world.get, world, cname, cid) return ok and v ~= nil end
+      log(string.format("fight %s: his defence: DamageSusceptibility [%s]; DamageMod [%s]; Armor %s; ArmorPoints %s; Level [%s]; health max %s",
+        tostring(name_of[cid] or cid), arr("DamageSusceptibility", 19), arr("DamageMod", 4), has("Armor") and arr("Armor", 8) or "none",
+        has("ArmorPoints") and arr("ArmorPoints", 8) or "none", arr("Level", 2), tostring(hmax)))
+    end
+    -- (21:21 logging) every 10 s with hits: what he took (per damage type, from how many monsters) and dealt
+    local fs = fight_sums[cid]
+    if fs and world:tick() % 600 < 60 and (fs.hits_on > 0 or fs.hits_by > 0) then
+      local took, n_from = {}, 0
+      for ty, amt in pairs(fs.took) do took[#took + 1] = string.format("%s %d", ty ~= "" and ty or "?", amt) end
+      for _ in pairs(fs.from) do n_from = n_from + 1 end
+      table.sort(took)
+      log(string.format("fight %s: last 10 s: took %d hit(s) from %d monster(s) [%s]; dealt %d in %d hit(s); his health %s/%s",
+        tostring(name_of[cid] or cid), fs.hits_on, n_from, table.concat(took, ", "), fs.dealt, fs.hits_by, tostring(hp), tostring(hmax)))
+      fight_sums[cid] = nil
+    end
   end
   for cid in pairs(threats) do if not drives[cid] then threats[cid] = nil end end
+  for cid in pairs(fight_sums) do if not drives[cid] then fight_sums[cid] = nil end end
 end
 
 -- the monster he picks: the nearest of the candidates (Defensive: a threat; Aggressive: a threat or any monster within
