@@ -1122,6 +1122,15 @@ next restart (no yes for a restart yet).
      he cannot, he stops attempting to fight that target and repeats the attack sequence to find another target and
      continue fighting. the attack sequence ends when he cannot find another target to attack after several tries OR
      until all the monsters are dead."
+     Claude's reading 09:1x: attack mode stops following/returning; nearest first, a C++ ray from his shoulder to the
+     monster's middle, blocked -> next nearest; the ray every tick; faces it every tick; attacks as often as his moves
+     allow until dead; blocked mid-fight -> a hop toward it, then 2 m left, then 2 m right (~1 s each), still blocked
+     -> drop it (not again for 20 s) and pick again; end = nothing reachable on 3 tries 1 s apart, or all dead.
+     **Owner 09:17, verbatim:** "3 tries before giving up on the attack sequence might be too few, but we'll start
+     there. you can keep the 30 m leash for now, but he's not likely to exceed that as the player will typically be
+     close by. I want to get rid of the requirement for the "running back when badly hurt with you far away."
+     mechanic for right now. Defense mode mainly means he attacks only if something attacks us." -> the hurt rule is
+     REMOVED; the 30 m leash stays; Defensive = only what attacked him or the player.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
