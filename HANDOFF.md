@@ -1028,6 +1028,13 @@ next restart (no yes for a restart yet).
    than 15 m away), logged when it changes. Monster = DynamicEnemy01BehaviorState, not ours, faction not 7/8/11; alive
    = NetworkHealth.health > 0. His health: Health.dataStorage [1]=3680 [2]=0 [3]=3680 [8]=3680 at full health: max
    taken as [3], NOT confirmed (the slots are logged again the first time he is hurt).
+   Test 20:26-20:39 (owner 20:39 "we did lots of in and out around monsters"). Log: threats noted for hits on him and on
+   the player; Defensive and Aggressive picks right (faction 4 monsters, health 1788-2168); Aggressive moved on to the
+   next nearest after a kill (20:35:37); the scan: 41,277 entities in 7 steps, 5 monsters within 15 m. Max health
+   CONFIRMED: hurt [1]=3226, [3]=3680, [8]=3680 -> [3]. He died once at 20:35:17 (Defensive, monsters hitting him).
+   Seen for step 3: "nearest to him" flips between monsters as he moves (36361/36362/36363 alternating 20:35:41-56):
+   in the real fight he must keep his target until it dies or is out of reach. 20:40: the log line now only when the
+   mode, the monster or the run-back changes (it was every second: the distances in it changed).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
