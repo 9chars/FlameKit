@@ -1155,6 +1155,17 @@ next restart (no yes for a restart yet).
      every monster within 15 m of the player like Aggressive until the sequence ends (the monster scan runs for him
      while it lasts); the menu's mode stays Defensive, so the next sequence again waits for an attack. Log: "the
      attack sequence starts (Defensive, something attacked: he fights like Aggressive until it ends)".
+     **First test 2026-11-19 10:31 restart (DLL 6990b645 + Lua bf32a0d8).** Owner 10:38 "its not facing the target";
+     "he killed the first target quickly"; "it looks like he hasn't picked a second target and locked on to it"; 10:39
+     "the dog is just standing idle now". Log: 26929 (faction 6) one lunge, 500, dead (10:37:49). 26930 (faction 6, not
+     moving, 0.1 m below him): ray clear, he got from 7 m to exactly 4.0 m and lunged 12 times ~3.3 s apart
+     (10:37:50-10:38:48), no hit on it; at 10:38:48 the lunge hit three objects (2578711003/13/08, health 20/100, for 0:
+     plants or props); then he stood (not closer, no lunge, the stall line once only) until the 10:40:12 reload, which
+     reset the sequence: picked 26930 at 6.1 m, one lunge from 4.0 m, 500, dead. Same as 2026-11-18 21:14 and 21:29
+     (4.0 m, hits on objects for 0): the THIRD time -> a pattern, not a one-off. The ray (0.7 m up to 0.5 m up) misses
+     low things in his way. Logging 10:41 (live): every lunge/bite "he faces x deg off it; it at ..., moving v m/s, n m
+     above/below him; him at ..." and at its end "he moved x m, now d m from it (was d0)".
+     **Owner 10:40, verbatim:** "the dog should stay centered on me within my radius and kill anything in it".
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
