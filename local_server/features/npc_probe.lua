@@ -1803,8 +1803,28 @@ drive_fight = function(s)
     cd.targetOfMyTarget = false
   end)
   local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
-  if d <= FIGHT_BITE or not f.best_d or d < f.best_d - 0.3 then f.best_d, f.prog_t = math.min(d, f.best_d or d), t end
+  if d <= FIGHT_BITE or not f.best_d or d < f.best_d - 0.3 then f.best_d, f.prog_t, f.stall_said = math.min(d, f.best_d or d), t, nil end
   local last_ok = math.max(f.prog_t or f.t0, f.hit_t or 0, f.t0)
+  -- (owner 2026-11-19 07:50: "a new specific "pathing" system to handle obstacles and better navigation on the battle
+  -- field ... I saw him getting stuck on fences and other things") logging: a stall on the way to his target (no
+  -- 0.3 m closer for half a second, not within bite reach): how far and how high it is, his movement state and speed,
+  -- whether his body touches something, the ground under him, and who stands near him; once per stall
+  if t - last_ok > 30 and not f.stall_said then
+    f.stall_said = true
+    local st, spd, col = "?", -1, "?"
+    pcall(function() st = tostring(world:get("DynamicLocomotion", id).state) end)
+    pcall(function() local v = world:get("Velocity", id).velocity spd = math.sqrt(v.x * v.x + v.z * v.z) end)
+    pcall(function()
+      local r = world:get("MovementCollider", id).results.m_value
+      col = string.format("collider: touching %s, a player %s, last slide side %s; ground %s (%.2f m, walkable %s, normal y %.2f), standing on %s",
+        tostring(r.hasSpheroidCollision), tostring(r.hasPlayerSpheroidCollision), tostring(r.lastCollideAndSlideSide),
+        tostring(r.hasGroundCollision), tonumber(r.groundDistance) or -1, tostring(r.isGroundWalkable),
+        tonumber(r.groundNormal and r.groundNormal.y) or -1, tostring(r.attachmentEntityId))
+    end)
+    log(string.format("fight %s: stalled on the way to %s: %.1f m away, %.1f m %s him, no closer for %.1f s; his state %s, speed %.1f m/s; %s",
+      name, tostring(f.target), d, math.abs(my - ny), my >= ny and "above" or "below", (t - last_ok) / 60, st, spd, col))
+    report_blockers(s, "fight stall", mx - nx, mz - nz)
+  end
   if t - last_ok > REACH_TICKS then
     h.fight_skip = h.fight_skip or {}
     h.fight_skip[f.target] = t + SKIP_TICKS
