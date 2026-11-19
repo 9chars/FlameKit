@@ -1144,6 +1144,17 @@ next restart (no yes for a restart yet).
      attack sequence starts/ends ...", "attacks", "is blocked", "repositioning", "hops", "moves 2 m", "gives up",
      "clear again", "is dead", "picks again", "try n", stall lines. The Lua (md5 fdedea51) is staged in
      claude_scratch/seq_npc_probe.lua and goes on the server with the restart (the old DLL never writes the ray).
+     **Owner 10:25, verbatim:** "the only one thing that needs to get added, if the player sets the companion back to
+     "passive" during the fight, the companion should completely stop the attack sequence and return to following the
+     companion. one other small detail, when the companion is in defensive mode and responds to an attack, it should
+     automatically switch to aggressive mode to keep fighting all monsters in the near area as any monsters around
+     won't stop fighting". Built 10:3x (Lua only, md5 in the commit after 6e710d3): Passive (or Put away) ends the
+     sequence the same tick (it already did: the mode check at the top of drive_fight every tick; fake-world test:
+     ends at once, his target cleared, sent back to the player) -> he follows the player ("following the companion"
+     read as the player). Defensive: the sequence starts only on a threat (him or the player hit), then he fights
+     every monster within 15 m of the player like Aggressive until the sequence ends (the monster scan runs for him
+     while it lasts); the menu's mode stays Defensive, so the next sequence again waits for an attack. Log: "the
+     attack sequence starts (Defensive, something attacked: he fights like Aggressive until it ends)".
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

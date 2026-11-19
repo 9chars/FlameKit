@@ -1584,11 +1584,13 @@ local function note_threat(world, hit)
   end
 end
 
--- every step: the scan for monsters near the players of Aggressive companions (a new one every second)
+-- every step: the scan for monsters near the players of Aggressive companions, and of Defensive ones in an attack
+-- sequence (they fight like Aggressive until it ends; owner 2026-11-19 10:25) (a new one every second)
 local function monster_scan_step(world)
   local players = {}
   for cid, h in pairs(drives) do
-    if fight_mode(cid) == "Aggressive" then
+    local fm = fight_mode(cid)
+    if fm == "Aggressive" or (fm == "Defensive" and h.atk and h.atk.wide) then
       local x, y, z = world:position(h.player)
       if x then players[h.player] = { x, y, z } end
     end
@@ -1707,7 +1709,9 @@ end
 -- SKIP_TICKS) and picks again.
 -- The end: nothing reachable on PICK_TRIES tries PICK_EVERY apart (that includes "all dead"), or he is more than
 -- FIGHT_LEASH from the player (the leash, owner 09:17 "keep the 30 m leash for now"). (09:17: the "run back when badly
--- hurt" rule is gone.) Logs "fight <name>: ...".
+-- hurt" rule is gone.) Passive (or Put away) from the menu ends it at once (the top of drive_fight, every tick) and he
+-- follows again. Defensive starts it only on a threat, then fights like Aggressive until it ends (owner 10:25).
+-- Logs "fight <name>: ...".
 local FIGHT_BITE, FIGHT_LUNGE, ATTACK_MAX = 2.5, 4, 180
 local RAY_WAIT = 2                    -- ticks before a candidate's ray result is read (the C++ casts every step)
 local PICK_TRIES, PICK_EVERY = 3, 60  -- (owner 09:17 "3 tries ... might be too few, but we'll start there")
@@ -1769,16 +1773,20 @@ drive_fight = function(s)
     if t % 30 ~= 0 then return false end
     local list = fight_candidates(world, id, h, mode, px, py, pz, nx, ny, nz)
     if #list == 0 then return false end
-    A = { phase = "pick", list = list, i = 1, tries = 1, t = t }
+    -- Defensive: something attacked; he fights every monster near the player until the sequence ends (owner
+    -- 2026-11-19 10:25: "it should automatically switch to aggressive mode to keep fighting all monsters in the near
+    -- area as any monsters around won't stop fighting"); the menu's mode stays Defensive
+    A = { phase = "pick", list = list, i = 1, tries = 1, t = t, wide = mode == "Defensive" }
     h.atk = A
-    log(string.format("fight %s: the attack sequence starts (%s): %d candidate(s), the nearest %s at %.1f m", name, mode, #list,
-      tostring(list[1].id), list[1].d))
+    log(string.format("fight %s: the attack sequence starts (%s%s): %d candidate(s), the nearest %s at %.1f m", name, mode,
+      A.wide and ", something attacked: he fights like Aggressive until it ends" or "", #list, tostring(list[1].id), list[1].d))
   end
   local function hold_still() hold_at(a, nx, ny, nz) return true end
+  local smode = (A.wide and mode == "Defensive") and "Aggressive" or mode
   local function repick(why)
     A.phase, A.target, A.list, A.i, A.tries, A.t, A.checking, A.atk, A.blocked_t = "pick", nil, nil, 1, 1, t, nil, nil, nil
     A.best_d, A.prog_t, A.stall_said = nil, nil, nil
-    A.list = fight_candidates(world, id, h, mode, px, py, pz, nx, ny, nz)
+    A.list = fight_candidates(world, id, h, smode, px, py, pz, nx, ny, nz)
     log(string.format("fight %s: picks again (%s): %d candidate(s)", name, why, #A.list))
   end
   -- picking
@@ -1801,7 +1809,7 @@ drive_fight = function(s)
           return false
         end
         A.tries, A.t, A.i, A.checking = A.tries + 1, t, 1, nil
-        A.list = fight_candidates(world, id, h, mode, px, py, pz, nx, ny, nz)
+        A.list = fight_candidates(world, id, h, smode, px, py, pz, nx, ny, nz)
         log(string.format("fight %s: try %d: %d candidate(s)", name, A.tries, #A.list))
       end
       return hold_still()
