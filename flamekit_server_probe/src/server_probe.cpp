@@ -97,6 +97,22 @@ void write_jumps(emf::World w) {
     }
 }
 
+// one of his action sequences started, the way the game's own code does it (see the bite test above)
+void start_sequence(emf::World w, uint32_t id, emf::gen::ecs::ActorInput* ai, uint32_t seq, const char* why) {
+    auto* tc = reinterpret_cast<uint8_t*>(&ai->triggerContext);
+    std::memset(tc, 0, sizeof(ai->triggerContext));
+    const int64_t now = w.ecs_time_ns();
+    const uint8_t call = ai->triggerCallCounter;
+    std::memcpy(tc + 0, &seq, 4);
+    std::memcpy(tc + 8, &now, 8);
+    std::memcpy(tc + 16, &id, 4);
+    tc[20] = call;
+    const uint16_t trig = 0x18;
+    std::memcpy(tc + 24, &trig, 2);
+    tc[26] = 0x38;
+    EMF_LOG(kMod, "%s: sequence %08x written into %u's trigger (call %u, time %lld)", why, seq, id, call, (long long)now);
+}
+
 void write_bites(emf::World w) {
     std::vector<std::pair<uint32_t, uint32_t>> todo;
     {
@@ -107,18 +123,7 @@ void write_bites(emf::World w) {
     for (auto& b : todo) {
         auto* ai = w.get<emf::gen::ecs::ActorInput>(b.first);
         if (!ai) { EMF_LOG(kMod, "bite: %u has no movement input", b.first); continue; }
-        auto* tc = reinterpret_cast<uint8_t*>(&ai->triggerContext);
-        std::memset(tc, 0, sizeof(ai->triggerContext));
-        const int64_t now = w.ecs_time_ns();
-        const uint8_t call = ai->triggerCallCounter;
-        std::memcpy(tc + 0, &b.second, 4);
-        std::memcpy(tc + 8, &now, 8);
-        std::memcpy(tc + 16, &b.first, 4);
-        tc[20] = call;
-        const uint16_t trig = 0x18;
-        std::memcpy(tc + 24, &trig, 2);
-        tc[26] = 0x38;
-        EMF_LOG(kMod, "bite: sequence %08x written into %u's trigger (call %u, time %lld)", b.second, b.first, call, (long long)now);
+        start_sequence(w, b.first, ai, b.second, "bite");
     }
 }
 
@@ -391,6 +396,16 @@ void drive_post(void* ctx, void*) {
         auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, id));
         if (!st || !ai || !tr || st->enabled || !st->movementTargetIsValid) continue;
         track_jump(w, id, tr);
+        // (owner 2026-11-18 20:09/20:47, the companion's fight) an attack the Lua part asks for: combatData
+        // .selectedAttackIndex 0 = bite (0x63FE3237), 1 = lunge (0xC34733A8) (the skeleton hound's); set back to 255 once
+        // started, which tells the Lua part it began. combatData.lastTargetId = the monster he fights: he faces it.
+        {
+            const uint8_t ask = st->combatData.selectedAttackIndex;
+            if (ask == 0 || ask == 1) {
+                start_sequence(w, id, ai, ask == 0 ? 0x63FE3237u : 0xC34733A8u, ask == 0 ? "fight bite" : "fight lunge");
+                st->combatData.selectedAttackIndex = 255;
+            }
+        }
         const double S = 4294967296.0;
         const double nx = tr->px / S, ny_here = tr->py / S, nz = tr->pz / S;
         const double tx = st->movementTarget.x, tz = st->movementTarget.z;
@@ -431,6 +446,7 @@ void drive_post(void* ctx, void*) {
                 if (it->second.until_ns < w.ecs_time_ns()) g_face.erase(it); else ft = it->second;
             }
         }
+        if (!ft.target && st->combatData.lastTargetId.id != 0) ft.target = st->combatData.lastTargetId.id;  // the fight
         if (ft.target) {
             auto* tt = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, ft.target));
             if (tt) {

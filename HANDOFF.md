@@ -1038,6 +1038,23 @@ next restart (no yes for a restart yet).
    **Owner 20:47 GO for step 3:** "go ahead, he just needs to lock on a target that he picks until its dead, then make a
    new choice". (Claude keeps the owner's 20:09 run-back rules as the only interruptions: 30 m from the player, and
    Defensive hurt + player far; after that he picks again.)
+   **Step 3 built 20:47-21:00 (git), waiting for the restart:**
+   - C++ (`server_probe.cpp`, DLL md5 2f4bc191 installed, the loaded one renamed `.old_2100`): start_sequence (the bite
+     test's trigger code, shared); per driven companion every step: combatData.selectedAttackIndex 0 = bite
+     0x63FE3237, 1 = lunge 0xC34733A8 -> the move starts, the field goes back to 255 ("fight bite/lunge: sequence ...
+     written" in the log); combatData.lastTargetId != 0 -> he faces that entity (like fkprobe.face).
+   - Lua (`npc_probe.lua` md5 dfca9963, installed at the restart): drive_fight (a part after drive_jump_follow; true
+     while he fights): Defensive/Aggressive only; picks the nearest candidate every 0.5 s when he has none
+     (fight_pick: threats; Aggressive also monsters within 15 m of the player) and keeps it until it is dead; ends
+     sooner only by the run-back rules (he is > 30 m from the player; Defensive: under 30% health and the player
+     > 15 m away) or the monster > 30 m from the player; runs at it (homeZone/movementTarget = the monster: the native
+     hook stops him 2 m off; edge stop on), faces it, lunge from 4 m, bite from 2.5 m; the next attack waits until
+     his Actor.currentServerAction.animationStateId is back to 0 (at most 3 s, logged as TIMED OUT). The step 2
+     "would attack" lines are gone (Rule 0n); fight_watch only clears old threats and logs his health slots.
+     Logs: "fight <name>: attacks <id> (...)", "lunge/bite at <id> (x m)", "<move> over after x s (started after n
+     ticks; animation ...)", "stops fighting <id>: it is dead / runs back: ...".
+   - Fake-world test (local_server/tests via /tmp fighttest): lock-on, lunge then bites, waits for each move, next
+     target after the kill; following unchanged (drive_harness: no errors).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
