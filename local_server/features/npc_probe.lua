@@ -1556,6 +1556,21 @@ local function fight_watch(world)
       end
       local hp, hmax = nil, nil
       pcall(function() local d = world:get("Health", cid).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[2]) end)
+      -- (20:25 logging) where his maximum health is: once per body, every slot of Health.dataStorage and NetworkHealth
+      if not h.health_dumped then
+        h.health_dumped = true
+        local parts = {}
+        pcall(function()
+          local d = world:get("Health", cid).dataStorage
+          for i = 1, 8 do parts[#parts + 1] = string.format("[%d]=%s", i, tostring(d[i])) end
+        end)
+        local nh = "-"
+        pcall(function()
+          local n = world:get("NetworkHealth", cid)
+          nh = string.format("health %s, maxHealth %s, max %s", tostring(n.health), tostring(n.maxHealth), tostring(n.max))
+        end)
+        log(string.format("fight %s: his Health.dataStorage %s; NetworkHealth %s", tostring(name_of[cid] or cid), table.concat(parts, " "), nh))
+      end
       local dpl = math.sqrt((px - nx) ^ 2 + (py - ny) ^ 2 + (pz - nz) ^ 2)
       local back
       if dpl > FIGHT_LEASH then
