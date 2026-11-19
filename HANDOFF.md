@@ -1035,6 +1035,9 @@ next restart (no yes for a restart yet).
    Seen for step 3: "nearest to him" flips between monsters as he moves (36361/36362/36363 alternating 20:35:41-56):
    in the real fight he must keep his target until it dies or is out of reach. 20:40: the log line now only when the
    mode, the monster or the run-back changes (it was every second: the distances in it changed).
+   **Owner 20:47 GO for step 3:** "go ahead, he just needs to lock on a target that he picks until its dead, then make a
+   new choice". (Claude keeps the owner's 20:09 run-back rules as the only interruptions: 30 m from the player, and
+   Defensive hurt + player far; after that he picks again.)
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
