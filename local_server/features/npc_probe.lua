@@ -1064,6 +1064,45 @@ local function match_level(world, id, r, player)
   log(string.format("level: %s (%s) set to its owner's level %d", r.name, tostring(id), want))
 end
 
+-- (owner 2026-11-18 21:35 "he definitely needs "Armor"", 21:37 "build it") armor: he takes ARMOR of the damage of every
+-- type: his 19 DamageSusceptibility multipliers (one per damage type) are the base ones times ARMOR. The base is the
+-- template's (world:template), or else the first values seen on this body, so it is never scaled twice. Checked at
+-- setup and every second (the game may set them again, e.g. when it rescales his level); logged when written.
+local ARMOR = 1 / 3
+local armor_err = false  -- an armor failure is logged once
+local armor_base = {}  -- entity -> { 19 base multipliers }
+local function match_armor(world, id, r)
+  local ds = world:get("DamageSusceptibility", id)
+  if not ds then return end
+  local base = armor_base[id]
+  if not base then
+    base = {}
+    local okt, tds = pcall(function() return world:template("DamageSusceptibility", id).dataStorage end)
+    for i = 1, 19 do
+      local v = okt and tds and tonumber(tds[i])
+      base[i] = v or tonumber(ds.dataStorage[i]) or 0
+    end
+    armor_base[id] = base
+    local parts = {}
+    for i = 1, 19 do parts[i] = string.format("%.2f", base[i]) end
+    log(string.format("armor: %s (%s) base susceptibility [%s] (%s)", r.name, tostring(id), table.concat(parts, " "),
+      okt and tds and "the template's" or "the body's"))
+  end
+  local changed = false
+  for i = 1, 19 do
+    local want = base[i] * ARMOR
+    if math.abs((tonumber(ds.dataStorage[i]) or 0) - want) > 0.001 then
+      ds.dataStorage[i] = want
+      changed = true
+    end
+  end
+  if changed then
+    local parts = {}
+    for i = 1, 19 do parts[i] = string.format("%.2f", tonumber(ds.dataStorage[i]) or -1) end
+    log(string.format("armor: %s (%s) susceptibility set to base x %.2f: [%s]", r.name, tostring(id), ARMOR, table.concat(parts, " ")))
+  end
+end
+
 local function bring_to_life(world, r, id, player)
   ent_of[r.name], name_of[id] = id, r.name
   -- a living body again: the death and stuck notices go
@@ -1081,6 +1120,8 @@ local function bring_to_life(world, r, id, player)
   pcall(function() world:get("Faction", id).faction = COMPANION_FACTION end)
   pcall(calm, world, id)
   pcall(emf.offer, world, id, { verb = "Talk" }, function(w, p, npc) on_talk(w, p, npc) end)
+  local oka, erra = pcall(match_armor, world, id, r)
+  if not oka then log("armor: " .. tostring(erra)) end
   local okm, errm = pcall(match_level, world, id, r, player)
   if not okm then log("level: " .. tostring(errm)) end
   if r.mode == "follow" and player then
@@ -2078,6 +2119,16 @@ function F.tick(world)
         if not okm then log("level: " .. tostring(errm)) end
       end
     end
+  end
+  if t % 60 == 0 then  -- armor, every second
+    for name, id in pairs(ent_of) do
+      local r = find(name)
+      if r and world:position(id) then
+        local oka, erra = pcall(match_armor, world, id, r)
+        if not oka and not armor_err then armor_err = true log("armor: " .. tostring(erra)) end
+      end
+    end
+    for id in pairs(armor_base) do if not name_of[id] then armor_base[id] = nil end end
   end
   for id, r in pairs(fullrecs) do
     if t > r.untill or not world:position(id) then
