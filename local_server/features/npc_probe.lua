@@ -1465,6 +1465,32 @@ local function is_monster(world, id)
   return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
 end
 
+-- (21:18 logging, owner 21:17: "he was attacking mushrooms and things that were not monsters I think") what an entity
+-- is, for the log: faction, its model (the template's ModelResource), and which parts it has: legs (DynamicLocomotion),
+-- a route planner (DynamicPathWalker), health (NetworkHealth), Animal
+local function describe(world, id)
+  local out = {}
+  local okf, f = pcall(world.get, world, "Faction", id)
+  out[#out + 1] = "faction " .. (okf and f and tostring(f.faction) or "-")
+  local okm, model = pcall(function() return world:template("ModelResource", id).model end)
+  if okm and model ~= nil then
+    if type(model) == "table" then
+      local parts = {}
+      for k, v in pairs(model) do parts[#parts + 1] = tostring(k) .. "=" .. tostring(v) end
+      table.sort(parts)
+      model = table.concat(parts, ",")
+    end
+    out[#out + 1] = "model " .. tostring(model)
+  end
+  local has = {}
+  for _, c in ipairs({ "DynamicLocomotion", "DynamicPathWalker", "NetworkHealth", "Animal", "MovementCollider" }) do
+    local ok, v = pcall(world.get, world, c, id)
+    if ok and v ~= nil then has[#has + 1] = c end
+  end
+  out[#out + 1] = "has " .. (#has > 0 and table.concat(has, "+") or "none of the movers")
+  return table.concat(out, ", ")
+end
+
 local function monster_alive(world, id)
   if not world:position(id) then return false end
   local ok, hp = pcall(function() return world:get("NetworkHealth", id).health end)
@@ -1479,7 +1505,8 @@ local function note_threat(world, hit)
     if (tg == cid or tg == h.player) and is_monster(world, a) then
       threats[cid] = threats[cid] or {}
       if not threats[cid][a] then
-        log(string.format("fight %s: threat %s (it hit %s)", tostring(name_of[cid] or cid), tostring(a), tg == cid and "him" or "his player"))
+        log(string.format("fight %s: threat %s (it hit %s; %s)", tostring(name_of[cid] or cid), tostring(a), tg == cid and "him" or "his player",
+          describe(world, a)))
       end
       threats[cid][a] = world:tick()
     end
@@ -1647,8 +1674,8 @@ drive_fight = function(s)
       h.fight = f
       local mhp = "?"
       pcall(function() mhp = tostring(world:get("NetworkHealth", m).health) end)
-      log(string.format("fight %s: attacks %s (%s; %s; %.1f m from him; his health %s/%s)", name, tostring(m), why, mode, d,
-        tostring(hp), tostring(hmax)))
+      log(string.format("fight %s: attacks %s (%s; %s; %.1f m from him; his health %s/%s; it: %s)", name, tostring(m), why, mode, d,
+        tostring(hp), tostring(hmax), describe(world, m)))
     end
   end
   if not f then
