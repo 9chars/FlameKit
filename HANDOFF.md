@@ -1089,6 +1089,19 @@ next restart (no yes for a restart yet).
      21:22) recovers bodies the first 21:38 version had already scaled. Live: N1 and N2 at [0 .33 .27 .2 .5 0 0 0 0
      .33 .33 .33 .33 0 .33 .4 .2 .27 .33]. Logs "armor: ...". Expected: physical melee ~55-85 instead of 166-256, fire
      melee ~180 instead of 545, burning ~35 a tick instead of 102-112 (to be checked in the next fight).
+   - 2026-11-19 07:28 the owner rejoined (server up since 20:59); armor applied to each respawned body from the saved
+     base (07:28, 07:29, 07:33). 07:29 and 07:33 (following, not fighting): a 2.7 m step up; he jumped (13 m/s up,
+     0.6 m out), came back down at the bottom, collider "touching" true; one try per crumb -> can't follow -> respawn.
+   - **Owner 2026-11-19 07:50, verbatim:** "I do think we'll need a new specific "pathing" system to handle obstacles
+     and better navigation on the battle field... we need to dial in to make sure he's attacking monsters, etc
+     hopefully you have all the logging in place for this. I saw him getting stuck on fences and other things. he has
+     a good jump ability so we'll need to think about having him jump over that stuff, maybe use some of the older
+     techniques we used in the old pathing system to avoid objects. just some ideas. we'll test things one at a time
+     and improve it one bit by one bit". 07:51 logging (live): "fight <name>: stalled on the way to <id>: x m away, y
+     m above/below him, no closer for 0.5 s; his state, speed; collider: touching, a player, last slide side; ground
+     (distance, walkable, normal y), standing on" + "fight stall: ... in his way: ..." (once per stall). Material from
+     before: the C++ probe has a ground ray and the game's walkable search (fkprobe.gr..., "ground program",
+     PathGridSystem) from the 2026-11-17 experiments.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
