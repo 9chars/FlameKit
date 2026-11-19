@@ -6,7 +6,8 @@
 --     with swimming and diving, jump follow, drops, stuck notices, and put away / back beside the player (glider, fast
 --     travel, can't follow);
 --   - staying: no target, he stands still;
---   - E opens the wheel (Follow me / Stay here / Put away) in the player's game; "Call my companion" (P, Experimental
+--   - E opens the wheel (Follow me / Stay here / Attack / Put away; Attack: the fight modes Passive, Defensive,
+--     Aggressive, Healing) in the player's game; "Call my companion" (P, Experimental
 --     panel) respawns his main companion beside him;
 --   - the minimap's companion dots, the full recorder (fullrec), and console tools for tests.
 -- Console (or emf\commands.txt on the server): flamekit.npc roster ... | drive <npc> <player> | drive <npc> stop |
@@ -1017,7 +1018,7 @@ local function roster_save()
   if not roster.loaded then return false end
   local out = { next_n = roster.next_n, main = roster.main, npcs = {} }
   for _, r in ipairs(roster.list) do
-    out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode,
+    out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight,
       owner = r.owner, controllers = r.controllers, names = r.names, out = r.out, ent = ent_of[r.name] }
   end
   local okj, text = pcall(emf.json.encode, { npc_roster = out })
@@ -1184,8 +1185,8 @@ local function roster_cmd(world, args)
     for _, r in ipairs(roster.list) do
       local who = {}
       for _, a in ipairs(r.controllers or {}) do who[#who + 1] = a .. ((r.names or {})[a] and (" " .. r.names[a]) or "") end
-      log(string.format("roster: %s | %s | %s | leader %s | controllers [%s] | %s | spot %.1f %.1f %.1f", r.name,
-        r.out and ("out as " .. tostring(ent_of[r.name])) or "put away", r.mode, tostring(r.owner), table.concat(who, "; "),
+      log(string.format("roster: %s | %s | %s | %s | leader %s | controllers [%s] | %s | spot %.1f %.1f %.1f", r.name,
+        r.out and ("out as " .. tostring(ent_of[r.name])) or "put away", r.mode, r.fight or "Passive", tostring(r.owner), table.concat(who, "; "),
         r.guid, r.x or 0, r.y or 0, r.z or 0))
     end
     local mains = {}
@@ -1282,8 +1283,12 @@ end
 -- ===== E: the wheel ====================================================================================================
 -- E opens a wheel on the presser's own screen (FlameKit's game side, channel flamekit/npcwheel). The server checks who
 -- may command the companion, again at the pick. There is no other way (a game without FlameKit gets a notice).
+-- (owner 2026-11-18 20:09/20:11) "Attack" opens a second wheel with the fight modes: Passive, Defensive, Aggressive,
+-- Healing. The mode is kept in the roster (r.fight; a companion without one is Passive) until the player changes it.
+-- The game side sends back the label it showed, so a pick is matched by its label.
 local WHEEL = "npcwheel"
-local WHEEL_LABELS = { "Follow me", "Stay here", "Put away" }
+local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Put away" }
+local FIGHT_MODES = { "Passive", "Defensive", "Aggressive", "Healing" }
 
 local function refuse(world, player, rr)
   local who = {}
@@ -1319,6 +1324,25 @@ local function do_away(world, player, npc, rr)
   roster_save()
   log(string.format("E: %s put away", rr.name))
   say(world, player, rr.name .. ": Put away.")
+end
+
+-- the Attack wheel: the four fight modes, the current one named in the title
+local function do_attack_menu(world, player, npc, rr)
+  if not rr then say(world, player, "Not on the list: no fight modes.") return end
+  local oks, sent = pcall(emf.net.send_to, world, player, WHEEL, emf.json.encode({ op = "wheel", npc = npc,
+    title = rr.name .. ": Attack (now " .. (rr.fight or "Passive") .. ")", labels = FIGHT_MODES }))
+  log(string.format("E: attack wheel for %s (%s, now %s) sent to player %s: %s", tostring(npc), rr.name, rr.fight or "Passive",
+    tostring(player), tostring(oks and sent)))
+end
+
+-- a fight mode picked: kept in the roster
+local function set_fight(world, player, npc, rr, mode)
+  if not rr then return end
+  local was = rr.fight or "Passive"
+  rr.fight = mode
+  roster_save()
+  log(string.format("fight: %s (%s) %s -> %s (player %s)", rr.name, tostring(npc), was, mode, tostring(player)))
+  say(world, player, rr.name .. ": " .. mode .. ".")
 end
 
 on_talk = function(world, player, npc)
@@ -1394,7 +1418,11 @@ local function on_pick(world, from, data)
   log(string.format("wheel: player %s picked %s (%s) for %s", tostring(player), tostring(m.choice), tostring(m.label), tostring(npc)))
   if not (npc and world:position(npc)) then return end
   if rr and not may_command(rr, from.account) then refuse(world, player, rr) return end
-  local act = ({ ["Follow me"] = do_follow, ["Stay here"] = do_stay, ["Put away"] = do_away })[WHEEL_LABELS[tonumber(m.choice) or 0] or ""]
+  local label = type(m.label) == "string" and m.label or ""
+  local act = ({ ["Follow me"] = do_follow, ["Stay here"] = do_stay, ["Attack"] = do_attack_menu, ["Put away"] = do_away })[label]
+  for _, mode in ipairs(FIGHT_MODES) do
+    if label == mode then act = function(w, pl, n, r) set_fight(w, pl, n, r, mode) end end
+  end
   if not act then return end
   local ok, err = pcall(act, world, player, npc, rr)
   if not ok then log("wheel: failed: " .. tostring(err)) say(world, player, "Cannot do that (see the server's log).") end
