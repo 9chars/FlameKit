@@ -1009,7 +1009,16 @@ next restart (no yes for a restart yet).
    can expand that later if it makes sense. Campanion stays in whatever mode you set it in until you change it."
    Known from 2026-11-17 tests: bite (attack 0, 0x63FE3237, 2 m) and lunge (attack 1, 0xC34733A8, 4 m) start through
    the C++ trigger (fkprobe.bite) with real damage (faction 11; level 50 bite 420); facing via fkprobe.face; the HIT
-   log has attacker/target/amount for every hit on or by a companion. Claude's restatement + numbers asked 20:1x.
+   log has attacker/target/amount for every hit on or by a companion. Claude's restatement 20:10, owner 20:11 "yes that
+   all lays out right": Defensive = only a monster that hits him or the player; badly hurt (under 30% health) and the
+   player more than 15 m away -> runs back, player near -> keeps fighting. Aggressive = any monster within 15 m of the
+   PLAYER, then the next nearest. Every mode: more than 30 m from the player -> runs back. Lunge from 4 m, bite from
+   2 m, paced by his own animations. Healing: how it heals is decided later. Build order: 1 the menu (no fighting),
+   2 target logging only, 3 Defensive + Aggressive fighting, 4 Healing.
+   **Step 1 done 20:12 (server Lua only, live, no restart; git):** the wheel is Follow me / Stay here / Attack / Put
+   away; Attack opens a second wheel Passive / Defensive / Aggressive / Healing (title shows the current mode); the
+   pick is matched by its label (the game side sends the label back, so no game update); kept in the roster as
+   `fight` (none = Passive, Claude's default); notice "<name>: <mode>."; log "fight: <name> (<id>) <was> -> <mode>".
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
