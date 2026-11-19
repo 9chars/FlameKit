@@ -1428,6 +1428,164 @@ local function on_pick(world, from, data)
   if not ok then log("wheel: failed: " .. tostring(err)) say(world, player, "Cannot do that (see the server's log).") end
 end
 
+-- ===== Fight, step 2: WATCHING ONLY (owner 2026-11-18 20:09/20:11; nothing he does changes yet) ======================
+-- For each following companion, once a second: the monster he WOULD attack in his fight mode and whether he WOULD run
+-- back, into the log whenever that changes ("fight <name> (<mode>): ..."), so the choices can be checked in play.
+-- Defensive: a monster that hit him or his player (a threat, noted by the hit handler); the nearest one to him, alive
+-- and within FIGHT_LEASH of the player. Aggressive: those too, and every monster within FIGHT_RANGE of the player (a
+-- scan over the world's entities, spread over steps within SCAN_BUDGET: the world has some 37,000 entities and EMF
+-- pauses FlameKit when one call runs over 250 ms). Run back: more than FIGHT_LEASH from the player (every mode);
+-- Defensive also when his health is under FIGHT_HURT and the player is more than FIGHT_RANGE away.
+local FIGHT_RANGE, FIGHT_LEASH, FIGHT_HURT = 15, 30, 0.3
+local SCAN_BUDGET, SCAN_MAX = 0.03, 6000
+local threats = {}         -- companion entity -> { monster entity -> tick of its last hit }
+local fight_said = {}      -- companion entity -> the last line logged
+local mscan = nil          -- the scan under way: { list, i, found = { player -> { monster ids } }, steps, t }
+local near_monsters = {}   -- player entity -> { monster ids within FIGHT_RANGE } (the last finished scan)
+local scan_logged = -3600  -- the first scan is logged too
+local clock_ok = pcall(function() return os.clock() end)
+
+local function fight_mode(cid)
+  local r = name_of[cid] and find(name_of[cid])
+  return r and r.fight or "Passive"
+end
+
+-- a monster: the monster AI, not one of ours, and a monster faction (not 7 Player, 8, 11 PlayerAlly)
+local function is_monster(world, id)
+  if name_of[id] then return false end
+  local ok, st = pcall(world.get, world, "DynamicEnemy01BehaviorState", id)
+  if not (ok and st) then return false end
+  local okf, f = pcall(world.get, world, "Faction", id)
+  local fn = okf and f and tonumber(tostring(f.faction))
+  return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
+end
+
+local function monster_alive(world, id)
+  if not world:position(id) then return false end
+  local ok, hp = pcall(function() return world:get("NetworkHealth", id).health end)
+  return not (ok and hp and hp <= 0)
+end
+
+-- the hit handler: a monster's hit on a following companion or on his player is a threat for that companion
+local function note_threat(world, hit)
+  local a, tg = hit.attacker, hit.target
+  if not (a and tg) or a == tg then return end
+  for cid, h in pairs(drives) do
+    if (tg == cid or tg == h.player) and is_monster(world, a) then
+      threats[cid] = threats[cid] or {}
+      if not threats[cid][a] then
+        log(string.format("fight %s: threat %s (it hit %s)", tostring(name_of[cid] or cid), tostring(a), tg == cid and "him" or "his player"))
+      end
+      threats[cid][a] = world:tick()
+    end
+  end
+end
+
+-- every step: the scan for monsters near the players of Aggressive companions (a new one every second)
+local function monster_scan_step(world)
+  local players = {}
+  for cid, h in pairs(drives) do
+    if fight_mode(cid) == "Aggressive" then
+      local x, y, z = world:position(h.player)
+      if x then players[h.player] = { x, y, z } end
+    end
+  end
+  if next(players) == nil then mscan = nil near_monsters = {} return end
+  if not mscan then
+    if world:tick() % 60 ~= 0 then return end
+    mscan = { list = world:entities(), i = 1, found = {}, steps = 0, t = world:tick() }  -- the list now, the walk next
+    return
+  end
+  mscan.steps = mscan.steps + 1
+  local t0, done = clock_ok and os.clock() or 0, 0
+  local r2 = FIGHT_RANGE * FIGHT_RANGE
+  while mscan.i <= #mscan.list do
+    if done >= SCAN_MAX or (clock_ok and os.clock() - t0 > SCAN_BUDGET) then return end
+    local id = mscan.list[mscan.i]
+    mscan.i, done = mscan.i + 1, done + 1
+    local ok, x, y, z = pcall(world.position, world, id)
+    if ok and x then
+      for p, pp in pairs(players) do
+        if (x - pp[1]) ^ 2 + (y - pp[2]) ^ 2 + (z - pp[3]) ^ 2 <= r2 and is_monster(world, id) then
+          mscan.found[p] = mscan.found[p] or {}
+          table.insert(mscan.found[p], id)
+        end
+      end
+    end
+  end
+  near_monsters = mscan.found
+  if world:tick() - scan_logged > 3600 then  -- once a minute: what a scan costs
+    scan_logged = world:tick()
+    local n = 0
+    for _, l in pairs(mscan.found) do n = n + #l end
+    log(string.format("fight scan: %d entities in %d step(s), %d monster(s) within %d m of the players", #mscan.list,
+      mscan.steps, n, FIGHT_RANGE))
+  end
+  mscan = nil
+end
+
+-- once a second: what each following companion would do
+local function fight_watch(world)
+  for cid, h in pairs(drives) do
+    local mode = fight_mode(cid)
+    local px, py, pz = world:position(h.player)
+    local nx, ny, nz = world:position(cid)
+    if px and nx then
+      local th = threats[cid] or {}
+      for m in pairs(th) do
+        local mx, my, mz = world:position(m)
+        if not mx or not monster_alive(world, m) or (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then th[m] = nil end
+      end
+      local best, bestd, why
+      local function consider(m, reason)
+        local mx, my, mz = world:position(m)
+        if not mx then return end
+        local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
+        if not best or d < bestd then best, bestd, why = m, d, reason end
+      end
+      if mode == "Defensive" or mode == "Aggressive" then
+        for m in pairs(th) do consider(m, "it hit you or him") end
+      end
+      if mode == "Aggressive" then
+        for _, m in ipairs(near_monsters[h.player] or {}) do
+          local mx, my, mz = world:position(m)
+          if mx and monster_alive(world, m) and (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 <= FIGHT_RANGE ^ 2 then
+            consider(m, "within " .. FIGHT_RANGE .. " m of you")
+          end
+        end
+      end
+      local hp, hmax = nil, nil
+      pcall(function() local d = world:get("Health", cid).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[2]) end)
+      local dpl = math.sqrt((px - nx) ^ 2 + (py - ny) ^ 2 + (pz - nz) ^ 2)
+      local back
+      if dpl > FIGHT_LEASH then
+        back = string.format("more than %d m from you", FIGHT_LEASH)
+      elseif mode == "Defensive" and best and hp and hmax and hmax > 0 and hp / hmax < FIGHT_HURT and dpl > FIGHT_RANGE then
+        back = string.format("hurt (%d%%) and you are %.0f m away", math.floor(hp / hmax * 100), dpl)
+      end
+      local line
+      if mode == "Passive" or mode == "Healing" then
+        line = mode .. ": never attacks"
+      elseif best then
+        local mhp = "?"
+        pcall(function() mhp = tostring(world:get("NetworkHealth", best).health) end)
+        local okf, f = pcall(world.get, world, "Faction", best)
+        line = string.format("%s: would attack %s (%s; faction %s, health %s; %.1f m from him)", mode, tostring(best), why,
+          okf and f and tostring(f.faction) or "?", mhp, bestd)
+      else
+        line = mode .. ": nothing to attack"
+      end
+      if back then line = line .. "; would run back: " .. back end
+      if line ~= fight_said[cid] then
+        fight_said[cid] = line
+        log(string.format("fight %s: %s (his health %s/%s, %.1f m from you)", tostring(name_of[cid] or cid), line,
+          tostring(hp), tostring(hmax), dpl))
+      end
+    end
+  end
+  for cid in pairs(fight_said) do if not drives[cid] then fight_said[cid] = nil threats[cid] = nil end end
+end
+
 -- ===== Read-only tools =================================================================================================
 local function look(world, id)
   local okf, f = pcall(world.get, world, "Faction", id)
@@ -1444,6 +1602,7 @@ function F.setup(k)
   -- every hit a companion gives or takes: amount, health around it, types, attack kind, reaction
   pcall(emf.on_hit, function(world, hit)
     if not hit or hit.kind ~= "hit" then return end
+    pcall(note_threat, world, hit)  -- (fight, step 2) watching only
     local mine = false
     for _, e in pairs(ent_of) do if e == hit.attacker or e == hit.source or e == hit.target then mine = true break end end
     if hit_watch[hit.attacker or 0] or hit_watch[hit.target or 0] then mine = true end
@@ -1670,6 +1829,13 @@ local companions_core = require("core.companions")  -- the minimap's companion d
 function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()
+  -- (fight, step 2: watching only) the monster scan, and once a second what each companion would do
+  local okw, errw = pcall(monster_scan_step, world)
+  if not okw then mscan = nil log("fight scan failed: " .. tostring(errw)) end
+  if t % 60 == 0 then
+    local okf, errf = pcall(fight_watch, world)
+    if not okf then log("fight watch failed: " .. tostring(errf)) end
+  end
   if t % 30 == 0 then  -- where every companion is, with its owner's character name (the dot's colour)
     local places = {}
     for name, id in pairs(ent_of) do
