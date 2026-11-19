@@ -450,7 +450,23 @@ most sense"
   respawned easily now). The plan: the trail is the only truth; no edge stop and no ray step jump on the trail; ups and
   downs from the crumbs' meta data; one stuck rule = respawn. Owner 18:08: "I mispoke. I meant to say he CAN teleport
   easily now". **Owner 18:35, GO:** "lets do it. if rather have a simplified system that might need some edge cases
-  handled rather than constantly tweaking numbers that dont get us anywhere long term". (Building 18:35-.)
+  handled rather than constantly tweaking numbers that dont get us anywhere long term". **Built 18:35-18:42 (git),
+  waiting for the restart:**
+  - Lua (`local_server/features/npc_probe.lua`, md5 86928d7d, installed on the server at the restart): drive_copy (new:
+    a break = can't follow; a landing of a real jump (jump count 1+ or second push) or a crumb STEP_UP 0.6+ above him =
+    he jumps to it, once per crumb; everything else he walks), drive_jump_follow = only the flight and the settle
+    (settle only after a jump up), drive_pick_target (no drop wait; arrived = within 2 m across AND in height),
+    drive_stuck = the one rule (no progress STUCK_TICKS -> cant_follow; he stands; the player coming to him ends it;
+    TP_AFTER -> respawn), drive_steer (on the trail edge_off; off the trail the native edge stop, drops to 7.5 m only
+    toward a swimming player). h.cant is the one state (land, water, to the water). Removed: floor proof, edge
+    permission, drop wait, the stuck-and-wait state, DJ_AT/DJ_RISE/DJ_WAIT/DJ_REACH, FLOOR_*, DROP_AT, DROP_RESUME,
+    STUCK_MOVED. Log lines: "jump follow ...", "can't follow: <id> <why>: ...", "can't follow: <id> over: ...",
+    "edge <id>: on the trail: edge stop off / ...".
+  - C++ (`server_probe.cpp`, built 18:41, installed as `mods\fk_server_probe\fk_server_probe.dll` md5 269a667e, the
+    loaded one renamed `.old_1841`): the ray step jump and its boost removed; arrived = within kFollowStop across AND
+    in height.
+  - Fake-world check (drive_harness, dump): no errors; jump follows, can't-follow + respawn at the 10 m cliff, the
+    wall at the shore. Behaviour changed on purpose, so only an in-game retest says whether it is right.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].

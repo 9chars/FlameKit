@@ -343,41 +343,6 @@ bool edge_blocked(emf::World w, void* ctx, uint32_t id, const WorldTransform* tr
 
 // (owner 23:36) jump log: per driven companion, every game step once: DynamicLocomotion.state 2 = in the air. Logs the
 // takeoff spot, the highest point and the landing spot: distance and height of each jump.
-// (owner 2026-11-18 07:46/07:47: "the dog should just be able to adjust his jump height ... he won't die by getting up
-// here") a jump sized to the step: maybe_step_jump leaves the push it wants here; track_jump writes it into one of his
-// Impulse slots the step he leaves the ground (the way FlameKit's leap pushes a player, core/leap.lua: an impulse is a
-// push in m/s per second while it lasts, alive while he is Jumping or Falling). His own jump: 9.4 m/s up, 1.76 m high,
-// gravity 25. The peak wanted: the step + JUMP_MARGIN.
-constexpr double kJumpV0 = 9.4, kGravity = 25.0, kJumpMargin = 0.7, kBoostSeconds = 0.2;
-struct PendingBoost { double up; uint32_t tick; };
-std::mutex g_boost_mx;
-std::map<uint32_t, PendingBoost> g_boost;
-void apply_boost(emf::World w, uint32_t id) {
-    PendingBoost b{0, 0};
-    {
-        std::lock_guard<std::mutex> lk(g_boost_mx);
-        auto it = g_boost.find(id);
-        if (it == g_boost.end()) return;
-        b = it->second;
-        g_boost.erase(it);
-    }
-    if (w.tick() - b.tick > 30 || b.up <= 0) return;
-    auto* imp = w.get<emf::gen::ecs::Impulse>(id);
-    if (!imp) { EMF_LOG(kMod, "boost: %u has no Impulse", id); return; }
-    const int64_t now = w.ecs_time_ns();
-    auto* slots = reinterpret_cast<uint8_t*>(imp) + 16;
-    int k = 0;
-    for (int i = 0; i < 4; i++) { int64_t end; std::memcpy(&end, slots + i * 40 + 24, 8); if (end <= now) { k = i; break; } }
-    uint8_t* sl = slots + k * 40;
-    const float v[3] = {0.0f, (float)b.up, 0.0f};
-    std::memcpy(sl, v, 12);
-    sl[12] = 0;
-    const int64_t end = now + (int64_t)(kBoostSeconds * 1e9);
-    const uint64_t keep = (1ull << 1) | (1ull << 32);
-    std::memcpy(sl + 16, &now, 8); std::memcpy(sl + 24, &end, 8); std::memcpy(sl + 32, &keep, 8);
-    EMF_LOG(kMod, "boost: %u pushed up %.1f for %.2f s (slot %d)", id, b.up, kBoostSeconds, k);
-}
-
 struct JumpTrack { uint32_t tick; uint8_t state; double x, y, z, top; };
 std::mutex g_jt_mx;
 std::map<uint32_t, JumpTrack> g_jt;
@@ -394,7 +359,6 @@ void track_jump(emf::World w, uint32_t id, const WorldTransform* tr) {
     j.tick = t;
     if (st == 2 && j.state != 2) {
         j.x = x; j.y = y; j.z = z; j.top = y;
-        apply_boost(w, id);
         EMF_LOG(kMod, "jumplog: %u takes off at %.2f %.2f %.2f", id, x, y, z);
     } else if (st == 2) {
         if (y > j.top) j.top = y;
@@ -405,56 +369,9 @@ void track_jump(emf::World w, uint32_t id, const WorldTransform* tr) {
     j.state = st;
 }
 
-// (owner 23:51) automatic step jump: while he moves on the ground, rays 0.5 m and 1.5 m ahead. The ground right in
-// front of him level with him (within 0.4 m) and 1.5 m ahead a step 0.6-1.6 m higher: he jumps once (the game's
-// jump: ActorInput.externalTriggerJumpType = 1 Default, externalTriggerJumpTime = now; tested 23:35-23:47: about
-// 1.76 m high, 4-9 m forward when running). Not again for 90 steps (1.5 s). A gentle slope never shows such a step.
-struct StepState { uint32_t tick; uint32_t last_jump; };
-std::mutex g_step_mx;
-std::map<uint32_t, StepState> g_step;
-void maybe_step_jump(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::ActorInput* ai, const WorldTransform* tr,
-                     double dx, double dz) {
-    const uint32_t t = w.tick();
-    {
-        std::lock_guard<std::mutex> lk(g_step_mx);
-        auto& e = g_step[id];
-        if (e.tick == t) return;
-        e.tick = t;
-        if (e.last_jump && t - e.last_jump < 90) return;
-    }
-    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
-    auto* fnp = base + kRayCastRva;
-    if (std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) != 0) return;
-    void* col = w.singleton("ecs::ColliderSystem");
-    void* vox = w.singleton("ecs::VoxelGrid");
-    if (!col || !vox) return;
-    const double S = 4294967296.0;
-    const double nx = tr->px / S, ny = tr->py / S, nz = tr->pz / S;
-    auto ray_at = [&](double d, float* hit) {
-        const float from[3] = {(float)(nx + dx * d), (float)(ny + 5.0), (float)(nz + dz * d)};  // (07:47) from 5 m up: steps to 3.6 m
-        const float to[3] = {from[0], (float)(ny - 3.0), from[2]};
-        return ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, 0x7u, (uint16_t)0x100, (uint8_t)0);
-    };
-    float h05[3] = {0, 0, 0}, h15[3] = {0, 0, 0};
-    if (ray_at(0.5, h05) != 1 || std::fabs(h05[1] - ny) > 0.4) return;
-    if (ray_at(1.5, h15) != 1) return;
-    const double up = h15[1] - ny;
-    if (up < 0.6 || up > 3.6) return;  // (owner 07:46) with the Lua jump boost (about 4 m) up to 3.6 m steps
-    auto* raw = reinterpret_cast<uint8_t*>(ai);
-    const int64_t now = w.ecs_time_ns();
-    raw[377] = 1;
-    std::memcpy(raw + 384, &now, 8);
-    { std::lock_guard<std::mutex> lk(g_step_mx); g_step[id].last_jump = t; }
-    const double peak = up + kJumpMargin;
-    const double need = std::sqrt(2.0 * kGravity * peak) - kJumpV0;  // extra m/s up
-    double push = 0;
-    if (need > 0) {
-        push = need / kBoostSeconds;
-        std::lock_guard<std::mutex> lk(g_boost_mx);
-        g_boost[id] = PendingBoost{push, t};
-    }
-    EMF_LOG(kMod, "autojump: %u jumps at %.1f %.1f %.1f: a step %.2f m up 1.5 m ahead (aims %.2f m high, push %.1f)", id, nx, ny, nz, up, peak, push);
-}
+// (owner 2026-11-18 18:35, FOLLOW_PLAN.md) the ray step jump (a ray from 5 m above him, 1.5 m ahead) and its jump boost
+// are gone: steps up come from the player's trail now (npc_probe.lua drive_copy launches him). Under ceilings and
+// overhangs the ray had read the overhang as a step.
 
 void drive_post(void* ctx, void*) {
     emf::World w = emf::server_world();
@@ -475,7 +392,7 @@ void drive_post(void* ctx, void*) {
         if (!st || !ai || !tr || st->enabled || !st->movementTargetIsValid) continue;
         track_jump(w, id, tr);
         const double S = 4294967296.0;
-        const double nx = tr->px / S, nz = tr->pz / S;
+        const double nx = tr->px / S, ny_here = tr->py / S, nz = tr->pz / S;
         const double tx = st->movementTarget.x, tz = st->movementTarget.z;
         const double hx = st->homeZonePosition.x, hz = st->homeZonePosition.z;  // the player
         const double dp = std::sqrt((hx - nx) * (hx - nx) + (hz - nz) * (hz - nz));
@@ -483,14 +400,16 @@ void drive_post(void* ctx, void*) {
         const double dl = std::sqrt(dx * dx + dz * dz);
         uint8_t speed = 0;  // LocomotionSpeedSelector: 0 Zero, 2 Walk, 3 Run, 4 Sprint
         // (owner 2026-11-18 11:10/11:12 "the follow distance needs to be 2 m": tight spots) he stops within kFollowStop
-        if (dp > kFollowStop && dl > 0.05) {
+        // (2026-11-18 18:35) arrived = within kFollowStop across AND in height: a player straight below or above him
+        // (a drop, a ledge) is not "here"
+        const bool here = dp <= kFollowStop && std::fabs(st->homeZonePosition.y - ny_here) <= kFollowStop;
+        if (!here && dl > 0.05) {
             dx /= dl; dz /= dl;
             speed = dp > 12.0 ? 4 : dp > 6.0 ? 3 : 2;
             // (23:41 test) no edge check while he is in the air (DynamicLocomotion.state 2): it measured from his raised
             // height and stopped his legs mid-jump
             auto* loc_now = w.get<emf::gen::ecs::DynamicLocomotion>(id);
             const bool airborne = loc_now && static_cast<uint8_t>(loc_now->state) == 2;
-            if (ctx && !airborne && !st->combatData.targetOfMyTarget) maybe_step_jump(w, ctx, id, ai, tr, dx, dz);
             if (ctx && !airborne && !st->combatData.targetOfMyTarget && edge_blocked(w, ctx, id, tr, dx, dz, st->combatData.isTargetInsideLeash, speed)) {
                 speed = 0;  // edge: stand, still looking that way
                 ai->desiredWorldLookDirection.x = (float)dx; ai->desiredWorldLookDirection.y = 0; ai->desiredWorldLookDirection.z = (float)dz;

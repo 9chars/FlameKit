@@ -107,14 +107,14 @@ end
 local FLOAT_LIFT = 0.45  -- metres
 local FLOAT_PITCH = 28  -- degrees, nose up
 local SWIM_OUT_STOP = 0.8  -- in the water with the player on land, he only stops this close (he has not arrived while he swims)
--- Jump follow (drive_jump_follow): he launches from within DJ_AT of a takeoff crumb toward a landing DJ_RISE or more
--- higher, aiming DJ_MARGIN over it; a flight lasts at most DJ_TICKS. When he makes no progress for DJ_WAIT toward a
--- crumb that is DJ_RISE or more up and at most DJ_REACH away, he jumps up to it too. The launch speed is written for
--- up to DJ_LIFT ticks until the game counts him in the air; after a landing up top he stands still DJ_SETTLE ticks.
-local DJ_AT, DJ_RISE, DJ_MARGIN, DJ_TICKS, DJ_WAIT, DJ_REACH = 1.5, 1.0, 0.7, 150, 60, 6
+-- Jumps (drive_copy, drive_jump_follow): he jumps where the player jumped (the next crumb is a landing) and up every
+-- step of STEP_UP or more the player went up; the launch aims DJ_MARGIN over the crumb, a flight lasts at most DJ_TICKS,
+-- the launch speed is written for up to DJ_LIFT ticks until the game counts him in the air, and after a jump up he
+-- stands still DJ_SETTLE ticks.
+local STEP_UP = 0.6  -- (the old ray step jump's threshold; smaller steps his own legs take)
+local DJ_MARGIN, DJ_TICKS = 0.7, 150
 local DJ_SETTLE = 45
 local DJ_LIFT = 40
-local STUCK_MOVED = 1.5  -- the player must have moved this far since he gave up before "back near him" counts
 -- Put away and back (drive_put_away, F.tick): the glider is the player's locomotion state GLIDE_STATE; still gliding
 -- after GLIDE_WAIT ticks or GLIDE_FAR metres away, he is put away. The player moving more than FAR_JUMP in one tick
 -- (a fast travel) puts him away too, and so does TP_AFTER ticks of not being able to follow. He comes back beside the
@@ -130,31 +130,32 @@ local HOP_TICKS, HOP_HOLD, HOP_EVERY, HOP_MARGIN, HOP_FORWARD = 90, 40, 120, 0.7
 -- breadcrumb trail and writes the next crumb ahead of the hound into his AI data's movementTarget and the player's spot
 -- into homeZonePosition. The C++ server probe (fk_server_probe, after the game's steering step) turns that into his
 -- movement input (direction, look, walk/run/sprint by distance, nothing within DRIVE_STOP of the player), with an edge
--- stop and a step jump of its own; the game's locomotion moves and animates him. combatData.targetOfMyTarget = true
--- turns the native edge stop and step jump off; combatData.isTargetInsideLeash = true lets him drop down (see
--- drive_steer). No route search and no game follow orders.
+-- stop of its own; the game's locomotion moves and animates him. combatData.targetOfMyTarget = true turns the native
+-- edge stop off; combatData.isTargetInsideLeash = true lets it allow drops up to 7.5 m. No route search and no game
+-- follow orders.
+-- (owner 2026-11-18 18:04-18:35, local_server/FOLLOW_PLAN.md) THE TRAIL IS THE TRUTH: he goes where the player went,
+-- the way the player went (the crumbs' meta data says how). On the trail there is no edge stop (where the player
+-- walked there was ground) and no ray step jump; ups come from the crumbs. Whatever he cannot copy, or no progress for
+-- STUCK_TICKS: "can't follow", and after TP_AFTER he is respawned beside the player.
 local drives = {}  -- entity -> his record h: { player, trail = {}, ... }
 -- a hold (console "hold", for tests): he stays where he stands and turns toward a target until the time is up
 local holds = {}  -- entity -> { target, untill (tick) }
 local DRIVE_STOP, DRIVE_STEP = 2, 0.25  -- he stops within 2 m of the player (the C++ kFollowStop matches); a crumb every 0.25 m
 local CRUMB_REACH = 0.3  -- a crumb within this is reached; he aims at the first one further away
-local FLOOR_LINK, FLOOR_REACH = 0.7, 3.6  -- the floor proof, see drive_steer
-local FLOOR_FIRST = 1.5  -- (owner 17:46 "sure") the first link, from where he stands to the nearest crumb, may be this long
 -- Drops and flights: no crumbs while the player is off the ground. A crumb more than DROP_HEIGHT below the one before
 -- (just below his own fall damage: from 8 m, lethal at 16 m), or the first one after more than DROP_AIR_TICKS in the
--- air (a glide, not a jump), starts a new piece of trail (brk): he walks to the last crumb before it and waits there,
--- and goes on when the player is back within DROP_RESUME on his level.
-local DROP_HEIGHT, DROP_RESUME = 7.5, 6
+-- air (a glide, not a jump), is a break (brk): a way he cannot copy. Smaller drops he follows: he walks off as the
+-- player did.
+local DROP_HEIGHT = 7.5
 local DROP_AIR_TICKS = 120
-local DROP_AT = 1.5  -- (owner 17:59 "yes") he is at the last safe crumb within this (the native edge ray looks 1.5 m ahead and holds him back from the lip)
--- the stuck notice says what holds him ("stuck" itself is only for a real clipping problem)
+-- the "can't follow" notice says why ("stuck" itself is only for a real clipping problem)
 local STUCK_TEXT = {
   down = "Companion is afraid to follow (too steep)!",
   drop = "Companion is afraid to follow (drop too high)!",
   up = "Companion can't get up there!",
   blocked = "Companion can't follow you!",
 }
-local STUCK_TICKS = 180  -- 3 s without 0.3 m of progress toward his crumb: he gives up
+local STUCK_TICKS = 180  -- 3 s without 0.3 m of progress toward his crumb: he cannot follow
 local CRUMB_LOG = true  -- every crumb of every companion into the server log
 -- the player is off the ground unless he has ground contact, under 0.1 m from it, and locomotion state 0 (the game keeps
 -- "ground contact" for the first and last part of a jump)
@@ -214,7 +215,7 @@ end
 -- ===== The drive, in parts =============================================================================================
 -- drive_step runs once per tick for each following companion. drive_read puts the tick's facts into one table (s), then
 -- the parts run in order; a part that returns true has decided this tick (he swims, is put away, jumps, holds or
--- waits) and the rest is skipped. The parts share only s and his record h (kept between ticks).
+-- cannot follow) and the rest is skipped. The parts share only s and his record h (kept between ticks).
 
 -- his body upright and turned toward yaw (radians, 0 = +z)
 local function face(world, id, yaw)
@@ -236,7 +237,7 @@ local function health(world, id)
   return hp
 end
 
--- the native edge stop and step jump off for this tick
+-- the native edge stop off for this tick
 local function edge_off(a)
   pcall(function() a.combatData.targetOfMyTarget = true end)
 end
@@ -270,6 +271,27 @@ local function report_blockers(s, what, dx, dz)
   local bk, bline = blockers(s.world, s.id, s.h.player, s.nx, s.ny, s.nz, dx, dz)
   s.h.blocked_by = bk
   log(string.format("%s: %s in his way: %s", what, tostring(s.id), bline))
+end
+
+-- he cannot follow (why: a STUCK_TEXT key): the notice once, he stands (drive_stuck), and drive_put_away respawns him
+-- beside the player after TP_AFTER. h.cant is the one "cannot follow" state, on land and in the water.
+local function cant_follow(s, why, detail)
+  local h = s.h
+  if h.cant then return end
+  h.cant = why
+  log(string.format("can't follow: %s %s: %s (at %.1f %.1f %.1f, player %.1f m away, %.1f m %s)", tostring(s.id), why, detail,
+    s.nx, s.ny, s.nz, math.sqrt((s.px - s.nx) ^ 2 + (s.pz - s.nz) ^ 2), math.abs(s.py - s.ny), s.py >= s.ny and "higher" or "lower"))
+  fullrec_event(s.world, s.id, "drive: can't follow (" .. why .. ")")
+  status(s.world, h.player, "companion_stuck", STUCK_TEXT[why] or STUCK_TEXT.blocked, "#ff9050")
+end
+
+-- the "cannot follow" state is over (he moves again, or something else takes over)
+local function cant_over(s, why)
+  local h = s.h
+  if not h.cant then return end
+  h.cant, h.cant_since = nil, nil
+  log(string.format("can't follow: %s over: %s", tostring(s.id), why))
+  status(s.world, h.player, "companion_stuck", nil)
 end
 
 -- the tick's facts: where the player and the hound are, his AI kept off, and the water both read (currentWaterState
@@ -356,7 +378,8 @@ end
 -- non-swimmer: his height (held at SWIM_DEPTH below the surface, or at the player's height + FLOAT_LIFT while the
 -- player dives), his speed (the game keeps an in-air speed frozen, so it is written every tick: toward the player,
 -- nothing within the stop distance, SWIM_GAIN per metre, at most SWIM_MAX), and his tilt (nose up FLOAT_PITCH, facing
--- where he swims; the yaw is kept in h.swim_yaw because reading it back from a tilted body goes wrong).
+-- where he swims; the yaw is kept in h.swim_yaw because reading it back from a tilted body goes wrong). No progress
+-- while swimming: the climb-out hop, and after STUCK_TICKS "can't follow" (over again when he moves on).
 -- Out of the water: upright again and a fresh trail.
 local function drive_water(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
@@ -377,9 +400,9 @@ local function drive_water(s)
         log(string.format("leap %s: followed the player into the water (health %s, was %s)", tostring(id), tostring(hp), tostring(h.leap.hp)))
         h.leap = nil
       end
-      -- in the water he swims to the player: any stuck or drop wait is over
-      h.stuck, h.waiting, h.prog = nil, nil, nil
-      status(world, h.player, "companion_stuck", nil)
+      -- in the water he swims to the player: a "can't follow" from land is over
+      h.prog = nil
+      cant_over(s, "he is in the water")
       fullrec_event(world, id, "drive: in the water himself (" .. tostring(hw) .. "): swimming")
       log(string.format("drive %s: in the water himself (depth %.2f), swimming", tostring(id), hw))
     end
@@ -413,16 +436,12 @@ local function drive_water(s)
     -- Progress = how far HE has moved along the line to the player since the last mark (keeping pace behind a swimming
     -- player counts; sliding sideways along a bank does not). None for HOP_TICKS while the player is higher: a climb-out
     -- hop (speed straight up for the player's height + HOP_MARGIN, HOP_FORWARD toward him, HOP_HOLD ticks, at most every
-    -- HOP_EVERY). None for STUCK_TICKS: the "can't follow" notice, cleared when he moves again.
+    -- HOP_EVERY). None for STUCK_TICKS: "can't follow" (cant_follow), over when he moves again.
     local along = 0
     if h.wprog and dist > 0.05 then along = ((nx - h.wprog.x) * dx + (nz - h.wprog.z) * dz) / dist end
     if not h.wprog or along > 0.3 or dist <= stop then
       h.wprog = { x = nx, z = nz, t = t }
-      if h.wstuck then
-        h.wstuck = nil
-        status(world, h.player, "companion_stuck", nil)
-        log("stuck (water): " .. tostring(id) .. " moves again")
-      end
+      cant_over(s, "he swims on (water)")
     end
     local still = t - h.wprog.t
     local up_speed
@@ -434,11 +453,9 @@ local function drive_water(s)
         py - ny, dist, up_speed))
       fullrec_event(world, id, string.format("drive (water): hop out, %.1f m/s up", up_speed))
     end
-    if dist > stop and still > STUCK_TICKS and not h.wstuck then
-      h.wstuck = true
-      log(string.format("stuck (water): %s makes no progress (player %.1f m, %.1f m higher)", tostring(id), dist, py - ny))
-      report_blockers(s, "stuck (water)", dx, dz)
-      status(world, h.player, "companion_stuck", "Companion can't follow you!", "#ff9050")
+    if dist > stop and still > STUCK_TICKS and not h.cant then
+      report_blockers(s, "can't follow (water)", dx, dz)
+      cant_follow(s, "blocked", "no progress while swimming")
     end
     if hopping then spd = HOP_FORWARD end
     local okv = pcall(function()
@@ -461,7 +478,7 @@ local function drive_water(s)
   elseif h.water then
     h.water = nil
     h.wprog, h.hop_until = nil, nil
-    if h.wstuck then h.wstuck = nil status(world, h.player, "companion_stuck", nil) end
+    cant_over(s, "out of the water")
     pcall(function()
       local o = world:get("CurrentTransform", id).transform.orientation
       local yaw = h.swim_yaw or math.atan(2 * (o.x * o.z + o.w * o.y), 1 - 2 * (o.x * o.x + o.y * o.y))
@@ -577,8 +594,8 @@ local function drive_track_player(s)
 end
 
 -- Put away (h.go_away; F.tick removes the body and brings him back beside the player once he stands on the ground):
--- a glide still going after GLIDE_WAIT or GLIDE_FAR away, a fast travel (FAR_JUMP in one tick), or TP_AFTER of not
--- being able to follow (stuck, waiting at a drop, or stuck in or on the way to the water).
+-- a glide still going after GLIDE_WAIT or GLIDE_FAR away, a fast travel (FAR_JUMP in one tick), or TP_AFTER after he
+-- could not follow (h.cant).
 local function drive_put_away(s)
   local h, t = s.h, s.t
   local px, pz, nx, nz = s.px, s.pz, s.nx, s.nz
@@ -592,7 +609,7 @@ local function drive_put_away(s)
     return true
   end
   h.last_px, h.last_pz = px, pz
-  if h.stuck or h.waiting or h.sstuck or h.wstuck then
+  if h.cant then
     h.cant_since = h.cant_since or t
     if t - h.cant_since > TP_AFTER then
       h.go_away = "can't follow"
@@ -648,29 +665,26 @@ local function drive_upkeep(s)
   end)
 end
 
--- Jump follow (returns true while a launch flies, he settles, or a new launch starts). Where the player jumped up
--- (double jump: jump count 2+ or a second push mid-air; or any jump when the hound has made no progress there for
--- DJ_WAIT) to a landing DJ_RISE or more higher, the hound launches from that takeoff crumb toward the landing. Also,
--- with no progress for DJ_WAIT toward a crumb DJ_RISE or more up and within DJ_REACH, he jumps up to it. The native
--- edge stop and step jump are off for the flight. Logs "double jump".
+-- A jump in flight and the settle after it (returns true while either runs; drive_copy starts the jumps). In the air the
+-- native edge stop is off; until the game counts him in the air (up to DJ_LIFT ticks) the launch speed is written
+-- again; in the air the speed across is written every tick toward the crumb (up and down left to gravity); over it
+-- (within 0.6 m) the speed across goes and he drops onto it. After a jump UP he settles: stands still DJ_SETTLE ticks
+-- with the edge stop off, so he neither hops nor slides off. Logs "jump follow".
 local function drive_jump_follow(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local nx, ny, nz = s.nx, s.ny, s.nz
-  local pwet, trail = s.pwet, s.trail
   if h.djump then
     local okl, lst = pcall(function() return tonumber(world:get("DynamicLocomotion", id).state) end)
     if okl and lst == 2 and not h.djump.air then
       h.djump.air = true
-      log(string.format("double jump %s: in the air after %d tick(s)", tostring(id), t - h.djump.t0))
+      log(string.format("jump follow %s: in the air after %d tick(s)", tostring(id), t - h.djump.t0))
     end
-    -- until the game counts him in the air (up to DJ_LIFT ticks) the launch speed is written again
     if not h.djump.air and t <= h.djump.t0 + DJ_LIFT then
       pcall(function()
         local v = world:get("Velocity", id).velocity
         v.x, v.y, v.z = h.djump.vx, h.djump.vy, h.djump.vz
       end)
     end
-    -- in the air the speed across is written every tick toward the landing spot (up/down left to gravity)
     if h.djump.air and not h.djump.over then
       local ddx, ddz = h.djump.x1 - nx, h.djump.z1 - nz
       local dd = math.sqrt(ddx * ddx + ddz * ddz)
@@ -682,7 +696,6 @@ local function drive_jump_follow(s)
         end)
       end
     end
-    -- over the landing spot (within 0.6 m): no more speed across, he drops onto it
     if not h.djump.over and (nx - h.djump.x1) ^ 2 + (nz - h.djump.z1) ^ 2 < 0.6 ^ 2 then
       h.djump.over = true
       pcall(function()
@@ -693,17 +706,16 @@ local function drive_jump_follow(s)
     end
     if t > h.djump.untill or (h.djump.air and okl and lst ~= 2) or (not h.djump.air and t > h.djump.t0 + DJ_LIFT) then
       local hp = health(world, id)
-      log(string.format("double jump %s: down at %.1f %.1f %.1f, %.1f m from the player's landing (%.1f m %s it), health %s (was %s)",
+      log(string.format("jump follow %s: down at %.1f %.1f %.1f, %.1f m from the crumb (%.1f m %s it), health %s (was %s)",
         tostring(id), nx, ny, nz, math.sqrt((nx - h.djump.x1) ^ 2 + (nz - h.djump.z1) ^ 2), math.abs(ny - h.djump.y1),
         ny >= h.djump.y1 - 0.5 and "level with" or "below", tostring(hp), tostring(h.djump.hp)))
-      if h.djump.air and ny >= h.djump.y1 - 0.5 then h.djsettle = t + DJ_SETTLE end  -- landed up top: he settles
+      if h.djump.up and h.djump.air and ny >= h.djump.y1 - 0.5 then h.djsettle = t + DJ_SETTLE end
       h.djump = nil
     else
       edge_off(a)
       return true
     end
   end
-  -- the settle: he stands still, step jump and edge stop off, so he neither hops nor slides off
   if h.djsettle then
     if t > h.djsettle then
       h.djsettle = nil
@@ -714,55 +726,6 @@ local function drive_jump_follow(s)
       end)
       edge_off(a)
       hold_at(a, nx, ny, nz)
-      return true
-    end
-  end
-  if not pwet then
-    for i = 1, math.min(#trail, 8) do
-      local cc = trail[i]
-      local sg = cc.takeoff
-      -- the player's jumps up, at the takeoff crumbs among the next 8
-      local blocked_here = h.prog and t - h.prog.t > DJ_WAIT
-      if sg and not sg.used and not sg.water and sg.x1 and sg.rise >= DJ_RISE and (sg.jc >= 2 or sg.double or blocked_here) then
-        if (cc.x - nx) ^ 2 + (cc.z - nz) ^ 2 < DJ_AT ^ 2 and math.abs(ny - cc.y) < 1.0 then
-          local ddx, ddz = sg.x1 - nx, sg.z1 - nz
-          local d = math.sqrt(ddx * ddx + ddz * ddz)
-          local rise = sg.y1 - ny
-          local vup, vh = launch_speeds(d, rise)
-          local hp = health(world, id)
-          local okv, vx, vz = launch(world, id, ddx, ddz, d, vup, vh)
-          edge_off(a)
-          sg.used = true
-          for _ = 1, i do table.remove(trail, 1) end
-          h.stuck, h.waiting, h.prog = nil, nil, nil
-          status(world, h.player, "companion_stuck", nil)
-          h.djump = { t0 = t, untill = t + DJ_TICKS, x1 = sg.x1, y1 = sg.y1, z1 = sg.z1, hp = hp, vx = vx, vz = vz, vy = vup }
-          log(string.format("double jump %s: follows the player's %s: %.1f m up, %.1f m out, %.1f m/s up, %.1f m/s out (health %s)%s",
-            tostring(id), (sg.jc >= 2 or sg.double) and "double jump" or "jump (his own step jump did not get him up)",
-            rise, d, vup, vh, tostring(hp), okv and "" or " (could not set his speed)"))
-          return true
-        end
-        break
-      end
-    end
-  end
-  -- no progress toward a crumb up a ledge (the player got up without a jump the log saw): he jumps up to it
-  if not pwet and not h.djump and h.prog and t - h.prog.t > DJ_WAIT and h.prog.c then
-    local cc = h.prog.c
-    local ddx, ddz = cc.x - nx, cc.z - nz
-    local d = math.sqrt(ddx * ddx + ddz * ddz)
-    local rise = cc.y - ny
-    if rise >= DJ_RISE and rise < 6 and d <= DJ_REACH and not cc.climbed then
-      cc.climbed = true
-      local vup, vh = launch_speeds(d, rise)
-      local _, vx, vz = launch(world, id, ddx, ddz, d, vup, vh)
-      edge_off(a)
-      local hp = health(world, id)
-      h.stuck, h.waiting, h.prog = nil, nil, nil
-      status(world, h.player, "companion_stuck", nil)
-      h.djump = { t0 = t, untill = t + DJ_TICKS, x1 = cc.x, y1 = cc.y, z1 = cc.z, hp = hp, vx = vx, vz = vz, vy = vup }
-      log(string.format("double jump %s: jumps up to his next crumb (%.1f m up, %.1f m out; no progress for %d ticks): %.1f m/s up, %.1f m/s out",
-        tostring(id), rise, d, DJ_WAIT, vup, vh))
       return true
     end
   end
@@ -810,65 +773,52 @@ local function drive_hold(s)
   return false
 end
 
--- His target (s.c, the crumb he heads for; nil = the player). Crumbs behind him and the ones he reached are dropped (the
--- last one before a break stays: he waits there, h.waiting). Within DRIVE_STOP of the player there is no target.
+-- His target (s.c, the crumb he heads for; nil = the player). Crumbs behind him and the ones he reached (within
+-- CRUMB_REACH; the last one stays) are dropped; he heads for the first one further away. He has arrived when he is
+-- within DRIVE_STOP of the player across AND in height (a player straight below or above him is not "here").
 -- At the water: when the player swims and the hound stands at the water's level (at most WATER_NEAR above the surface
 -- the player's depth gives, not more than 1 m below it), or after a leap, and the trail ahead is short (its last crumb
 -- within 3 m, or none), he heads straight for the swimming player (h.to_swimmer) and stays on that while the player is
--- in the water; a stuck there is over. On that way his progress along the line to the player counts; none for
--- STUCK_TICKS: the "can't follow" notice.
+-- in the water. On that way his progress along the line to the player counts; none for STUCK_TICKS: "can't follow".
 local function drive_pick_target(s)
-  local world, id, h, t = s.world, s.id, s.h, s.t
+  local id, h, t = s.id, s.h, s.t
   local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
   local pwater, pwet = s.pwater, s.pwet
   local trail = s.trail
   local dp = math.sqrt((px - nx) ^ 2 + (pz - nz) ^ 2)
+  local here = dp <= DRIVE_STOP and math.abs(py - ny) <= DRIVE_STOP
   local how = "stop"
   local c
-  if dp > DRIVE_STOP then
+  if not here then
     local near, nd = 1, math.huge
     for i, cc in ipairs(trail) do
       local dd = (cc.x - nx) ^ 2 + (cc.z - nz) ^ 2
       if dd < nd then near, nd = i, dd end
     end
     for _ = 1, near - 1 do table.remove(trail, 1) end
-    while #trail > 1 and (trail[1].x - nx) ^ 2 + (trail[1].z - nz) ^ 2 < CRUMB_REACH ^ 2 and not trail[2].brk do
+    while #trail > 1 and (trail[1].x - nx) ^ 2 + (trail[1].z - nz) ^ 2 < CRUMB_REACH ^ 2 do
       table.remove(trail, 1)
     end
     local pick = #trail
     for i = 1, #trail do
       if (trail[i].x - nx) ^ 2 + (trail[i].z - nz) ^ 2 > CRUMB_REACH ^ 2 then pick = i break end
     end
-    h.waiting = nil
-    for i = 2, #trail do
-      if trail[i].brk then
-        if pick >= i then pick = i - 1 end
-        h.waiting = (pick == i - 1)
-        break
-      end
-    end
     c = trail[pick]
     how = string.format("crumb %d of %d", pick, #trail)
-  else
-    h.waiting = nil
   end
   local was_to_swimmer = h.to_swimmer
   h.to_swimmer = nil
   local surface = pwet and (py + pwater) or nil
   local near_water = surface and ny - surface < WATER_NEAR and ny - surface > -1
   local lastc = trail[#trail]
-  if (near_water or h.leap) and dp > DRIVE_STOP and (was_to_swimmer or not lastc or (lastc.x - nx) ^ 2 + (lastc.z - nz) ^ 2 < 3 ^ 2) then
-    c, h.waiting, h.to_swimmer = nil, nil, true
+  if (near_water or h.leap) and not here and (was_to_swimmer or not lastc or (lastc.x - nx) ^ 2 + (lastc.z - nz) ^ 2 < 3 ^ 2) then
+    c, h.to_swimmer = nil, true
     how = "to the swimming player"
-    if h.stuck then
-      h.stuck, h.prog = nil, nil
-      status(world, h.player, "companion_stuck", nil)
-      log(string.format("stuck: %s goes on: the player swims and the water is right here (%.1f m above its surface)", tostring(id), ny - surface))
-    end
   end
   if h.to_swimmer ~= h.to_swimmer_said then
     h.to_swimmer_said = h.to_swimmer
     h.sprog = nil
+    cant_over(s, h.to_swimmer and "straight to the swimming player now" or "back on the trail")
     log(string.format("drive %s: %s", tostring(id), h.to_swimmer and "trail ends at the water: straight to the swimming player" or "back on the trail"))
     log(string.format("drive %s: switch: player wet %s (depth %.2f), surface %s, his height %.2f, near water %s, leap %s, player %.1f m, trail %d crumbs, last crumb %s m, tick %d",  -- every value the switch looked at
       tostring(id), tostring(pwet), pwater, surface and string.format("%.2f", surface) or "-", ny, tostring(near_water), tostring(h.leap ~= nil), dp, #trail,
@@ -881,183 +831,108 @@ local function drive_pick_target(s)
     if h.sprog and td > 0.05 then along = ((nx - h.sprog.x) * tdx + (nz - h.sprog.z) * tdz) / td end
     if not h.sprog or along > 0.3 then
       h.sprog = { x = nx, z = nz, t = t }
-      if h.sstuck then h.sstuck = nil status(world, h.player, "companion_stuck", nil) log("stuck (to the water): " .. tostring(id) .. " moves again") end
-    elseif t - h.sprog.t > STUCK_TICKS and not h.sstuck then
-      h.sstuck = true
-      log(string.format("stuck (to the water): %s makes no progress toward the swimming player (%.1f m)", tostring(id), td))
-      report_blockers(s, "stuck (to the water)", tdx, tdz)
-      status(world, h.player, "companion_stuck", "Companion can't follow you!", "#ff9050")
+    elseif t - h.sprog.t > STUCK_TICKS and not h.cant then
+      report_blockers(s, "can't follow (to the water)", tdx, tdz)
+      cant_follow(s, "blocked", "no progress toward the swimming player")
     end
-  elseif h.sstuck then
-    h.sstuck, h.sprog = nil, nil
-    status(world, h.player, "companion_stuck", nil)
   end
-  s.c, s.how, s.dp = c, how, dp
+  s.c, s.how, s.dp, s.here = c, how, dp, here
 end
 
--- Stuck and waiting (returns true while he stands). Stuck: he heads for a crumb but has not come 0.3 m closer to it for
--- STUCK_TICKS; he stops, the notice says why (STUCK_TEXT: down, up, a drop the player took within 3 m ahead, or
--- blocked), with how far the player is, once a second. He goes on when the player has moved STUCK_MOVED since he gave
--- up and is back within DROP_RESUME on his level (a fresh trail from where HE stands), or with Call.
--- Waiting at a drop: he stands at the last safe crumb with its own notice; the same way on.
+-- Copying the player's way to his next crumb (returns true when he jumps). Only on the ground, on the trail, once per
+-- crumb. A break (a drop over DROP_HEIGHT, a long flight): "can't follow". The player jumped to it (the crumb is the
+-- landing of a jump: jump count 1+ or a second push) or it is STEP_UP or more above him (the player went up without a
+-- jump the log saw): he jumps to it. Everything else (level, a small drop, a ledge the player walked off) he walks,
+-- and falls where the player fell.
+local function drive_copy(s)
+  local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
+  local nx, ny, nz = s.nx, s.ny, s.nz
+  local c = s.c
+  if s.pwet or h.to_swimmer or not c or h.cant or c.jumped then return false end
+  if c.brk then
+    cant_follow(s, c.y < ny - DROP_HEIGHT and "drop" or "blocked", string.format("the player's way to the next crumb cannot be copied (%.1f m %s, %s)",
+      math.abs(c.y - ny), c.y >= ny and "up" or "down", c.y < ny - DROP_HEIGHT and "too high a drop" or "a long flight"))
+    return false
+  end
+  local rise = c.y - ny
+  local jumped = c.landing and ((tonumber(c.landing.jc) or 0) >= 1 or c.landing.double)
+  if not (jumped or rise >= STEP_UP) then return false end
+  local okl, lst = pcall(function() return tonumber(world:get("DynamicLocomotion", id).state) end)
+  if okl and lst == 2 then return false end  -- he is in the air himself: not now
+  local ddx, ddz = c.x - nx, c.z - nz
+  local d = math.sqrt(ddx * ddx + ddz * ddz)
+  local vup, vh = launch_speeds(d, rise)
+  local hp = health(world, id)
+  local okv, vx, vz = launch(world, id, ddx, ddz, d, vup, vh)
+  edge_off(a)
+  c.jumped = true
+  h.prog = nil
+  h.djump = { t0 = t, untill = t + DJ_TICKS, x1 = c.x, y1 = c.y, z1 = c.z, hp = hp, vx = vx, vz = vz, vy = vup, up = rise >= STEP_UP }
+  log(string.format("jump follow %s: %s: %.1f m %s, %.1f m out, %.1f m/s up, %.1f m/s out (health %s)%s", tostring(id),
+    jumped and ("the player jumped here (jump count " .. tostring(c.landing.jc) .. ")") or "a step up",
+    math.abs(rise), rise >= 0 and "up" or "down", d, vup, vh, tostring(hp), okv and "" or " (could not set his speed)"))
+  return true
+end
+
+-- The one stuck rule (returns true while he stands). He heads for a crumb but has not come 0.3 m closer to it for
+-- STUCK_TICKS, for any reason: "can't follow" (the notice says up / too steep / blocked from where the crumb is). While
+-- he cannot follow he stands; the player coming to him ends it, otherwise drive_put_away respawns him beside the player.
 local function drive_stuck(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
-  local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
-  local trail, c, dp = s.trail, s.c, s.dp
+  local nx, ny, nz = s.nx, s.ny, s.nz
+  local c, dp = s.c, s.dp
+  if h.cant then
+    if s.here then
+      cant_over(s, "the player came to him")
+      return false
+    end
+    hold_at(a, nx, ny, nz)
+    if t % 30 == 0 then fullrec_event(world, id, string.format("drive: can't follow, standing, player %.1f m", dp)) end
+    return true
+  end
   local alive = true
   pcall(function() alive = world:get("Health", id).dataStorage[1] > 0 end)
-  if c and alive and not h.waiting and not h.stuck then
+  if c and alive then
     local dc = math.sqrt((c.x - nx) ^ 2 + (c.z - nz) ^ 2)
     if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 then
       h.prog = { c = c, d = dc, t = t }
     elseif t - h.prog.t > STUCK_TICKS then
-      h.stuck = true
-      h.stuck_px, h.stuck_pz = px, pz  -- where the player was when he gave up
       h.prog = nil
       local dy = c.y - ny
-      h.stuck_why = dy < -0.8 and "down" or (dy > 0.6 and "up" or "blocked")
-      for i = 1, #trail do
-        local cc = trail[i]
-        if (cc.x - nx) ^ 2 + (cc.z - nz) ^ 2 > 3 ^ 2 then break end
-        if cc.brk then h.stuck_why = "drop" break end
-      end
-      log(string.format("stuck: %s gave up at %.1f %.1f %.1f (crumb %.1f %.1f %.1f, %.1f m away, player %.1f m)", tostring(id),
-        nx, ny, nz, c.x, c.y, c.z, dc, dp))
-      report_blockers(s, "stuck", c.x - nx, c.z - nz)
-      fullrec_event(world, id, "drive: stuck, gave up")
-      status(world, h.player, "companion_stuck", STUCK_TEXT[h.stuck_why] or "Companion is stuck!", "#ff9050")
-    end
-  elseif not c then
-    h.prog = nil
-  end
-  if h.stuck then
-    local moved = not h.stuck_px or (px - h.stuck_px) ^ 2 + (pz - h.stuck_pz) ^ 2 > STUCK_MOVED ^ 2
-    if moved and (px - nx) ^ 2 + (pz - nz) ^ 2 < DROP_RESUME ^ 2 and math.abs(py - ny) < 2 then
-      h.trail, h.stuck, h.prog = { { x = nx, y = ny, z = nz } }, nil, nil
-      status(world, h.player, "companion_stuck", nil)
-      log("stuck: " .. tostring(id) .. " goes on: the player is back near him")
-      fullrec_event(world, id, "drive: player back near him, stuck over, fresh trail")
-    else
+      report_blockers(s, "can't follow", c.x - nx, c.z - nz)
+      cant_follow(s, dy < -0.8 and "down" or (dy > 0.6 and "up" or "blocked"),
+        string.format("no progress toward his crumb %.1f %.1f %.1f (%.1f m away)", c.x, c.y, c.z, dc))
       hold_at(a, nx, ny, nz)
-      if t % 30 == 0 then fullrec_event(world, id, string.format("drive: stuck, waiting, player %.1f m", dp)) end
-      if t % 60 == 0 then
-        local dy = py - ny
-        status(world, h.player, "companion_stuck", string.format("%s %.1f m away, %.1f m %s (come within %d m, %d m height)",
-          STUCK_TEXT[h.stuck_why] or "Companion is stuck!", dp, math.abs(dy), dy >= 0 and "higher" or "lower", DROP_RESUME, 2), "#ff9050")
-      end
       return true
     end
-  end
-  if h.waiting then
-    -- (17:55 logging) the drop wait's state, whenever it changes: walking to the last safe crumb, or waiting there
-    local wstate
-    if (px - nx) ^ 2 + (pz - nz) ^ 2 < DROP_RESUME ^ 2 and math.abs(py - ny) < 2 then
-      wstate = "over: the player is back near him"
-    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > DROP_AT ^ 2 then
-      wstate = "walks to the last safe crumb first"
-    else
-      wstate = "waits at the last safe crumb"
-    end
-    if wstate ~= h.wait_state then
-      h.wait_state = wstate
-      log(string.format("drop wait %s: %s (that crumb %s m away, player %.1f m, %.1f m %s)", tostring(id), wstate,
-        c and string.format("%.2f", math.sqrt((c.x - nx) ^ 2 + (c.z - nz) ^ 2)) or "-", dp, math.abs(py - ny),
-        py >= ny and "higher" or "lower"))
-    end
-    if (px - nx) ^ 2 + (pz - nz) ^ 2 < DROP_RESUME ^ 2 and math.abs(py - ny) < 2 then
-      h.trail, h.waiting = { { x = nx, y = ny, z = nz } }, nil
-      h.wait_state = nil
-      if h.wait_told then h.wait_told = nil status(world, h.player, "companion_stuck", nil) end
-      fullrec_event(world, id, "drive: player back near him, waiting over, fresh trail")
-    elseif c and (c.x - nx) ^ 2 + (c.z - nz) ^ 2 > DROP_AT ^ 2 then
-      h.waiting = nil
-    else
-      a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z = nx, ny, nz
-      if c then a.movementTarget.x, a.movementTarget.y, a.movementTarget.z = c.x, c.y, c.z end
-      a.movementTargetIsValid = true
-      if t % 30 == 0 then fullrec_event(world, id, string.format("drive: waiting at a drop, player %.1f m", dp)) end
-      if t % 60 == 0 then
-        local dy = py - ny
-        status(world, h.player, "companion_stuck", string.format("Companion is afraid to follow (drop too high)! %.1f m away, %.1f m %s (come within %d m, %d m height)",
-          dp, math.abs(dy), dy >= 0 and "higher" or "lower", DROP_RESUME, 2), "#ff9050")
-        h.wait_told = true
-      end
-      return true
-    end
-  elseif h.wait_state then
-    h.wait_state = nil
+  else
+    h.prog = nil
   end
   return false
 end
 
--- The native hook's inputs: the target (the crumb, or the player) and the player's spot. The edge stop's permission
--- (isTargetInsideLeash): it lets him drop more than 2.5 m only where the player went down himself (a crumb within 12 m
--- ahead, before any break, 0.8 to 7.5 m below him) or the way to the swimming player. The floor proof: an unbroken level
--- trail ahead (the nearest crumb within FLOOR_FIRST of him, each next one within FLOOR_LINK of the one before, none
--- more than 0.8 m above or below him) out to FLOOR_REACH, or all the way to where the player stands on the ground,
--- proves a floor the edge ray cannot see (a closed trap door, a boardwalk): then the native edge stop is off. A jump
--- leaves a gap, so a hole the player jumped over still stops him. While he moves his body faces the target.
+-- The native hook's inputs: the target (the crumb, or the player) and the player's spot. On the trail (a crumb as the
+-- target) the native edge stop is off: where the player walked there was ground (planks, trap doors and overhangs
+-- fooled its ray). Off the trail (straight to a swimming player, or no trail yet) it is on; on the way to the swimming
+-- player it lets him drop up to 7.5 m (into the water). While he moves his body faces the target.
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
-  local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
-  local trail, c, how, dp = s.trail, s.c, s.how, s.dp
+  local px, py, pz, nx, nz = s.px, s.py, s.pz, s.nx, s.nz
+  local c, how, dp = s.c, s.how, s.dp
   a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z = px, py, pz
   local tx, ty, tz = px, py, pz
   if c then tx, ty, tz = c.x, c.y, c.z end
-  local okp, perr = pcall(function()
-    local ok = h.to_swimmer or false
-    for i = 1, #trail do
-      local cc = trail[i]
-      if (cc.x - nx) ^ 2 + (cc.z - nz) ^ 2 > 12 ^ 2 then break end
-      if cc.brk then break end
-      if cc.y < ny - 0.8 and cc.y > ny - 7.5 then ok = true break end
-    end
-    local proof = false
-    if not ok then
-      local lx, lz, far, whole, why = nx, nz, 0, #trail > 0, nil
-      for i = 1, #trail do
-        local cc = trail[i]
-        local link = i == 1 and FLOOR_FIRST or FLOOR_LINK
-        if cc.brk or (cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > link ^ 2 or math.abs(cc.y - ny) > 0.8 then
-          -- why the unbroken level trail ends here (log)
-          why = string.format("; ends at crumb %d of %d: %s", i, #trail, cc.brk and "a break" or
-            ((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2 > link ^ 2 and string.format("%.2f m from %s", math.sqrt((cc.x - lx) ^ 2 + (cc.z - lz) ^ 2), i == 1 and "him" or "the crumb before")
-              or string.format("%.2f m %s him", math.abs(cc.y - ny), cc.y > ny and "above" or "below")))
-          whole = false
-          break
-        end
-        lx, lz = cc.x, cc.z
-        far = math.sqrt((cc.x - nx) ^ 2 + (cc.z - nz) ^ 2)
-        if far >= FLOOR_REACH then proof = true break end
-      end
-      -- the whole trail is one unbroken level piece and it ends where the player stands on the ground (within
-      -- FLOOR_LINK of its last crumb, on his level): the floor goes all the way to the player
-      local to_player = false
-      if not proof and whole and not s.airborne and not s.pwet and (px - lx) ^ 2 + (pz - lz) ^ 2 <= FLOOR_LINK ^ 2
-          and math.abs(py - ny) <= 0.8 then
-        proof, to_player = true, true
-      end
-      if proof ~= (h.floorproof or false) then
-        log(string.format("edge %s: %s (unbroken level trail %.1f m ahead%s%s) at %.1f %.1f %.1f", tostring(id),
-          proof and "floor proven by the trail, native edge stop off" or "no floor proof", far,
-          to_player and ", to the player" or "", proof and "" or (why or (#trail == 0 and "; no trail" or "; the trail ends there, the player is not on it")), nx, ny, nz))
-      end
-      ok = proof
-    end
-    h.floorproof = proof
-    a.combatData.isTargetInsideLeash = ok
-    -- (owner 2026-11-18 17:20 boardwalk, 17:29 "go ahead") a proven floor is one the edge ray cannot see (it goes
-    -- through planks and trap doors and found no ground within 12 m under a boardwalk): the native edge stop (and its
-    -- step jump) is off for this tick, not only the drop limit raised
-    if proof then edge_off(a) end
-  end)
-  if not okp and not h.steer_err then
-    h.steer_err = true
-    log("drive " .. tostring(id) .. ": the edge permission failed: " .. tostring(perr))
+  local on_trail = c ~= nil
+  if on_trail then edge_off(a) end
+  pcall(function() a.combatData.isTargetInsideLeash = (not on_trail and h.to_swimmer) and true or false end)
+  local edge = on_trail and "on the trail: edge stop off" or (h.to_swimmer and "to the swimming player: edge stop on, drops to 7.5 m" or "no trail: edge stop on")
+  if not s.here and edge ~= h.edge_said then
+    h.edge_said = edge
+    log(string.format("edge %s: %s (at %.1f %.1f %.1f)", tostring(id), edge, nx, s.ny, nz))
   end
   a.movementTarget.x, a.movementTarget.y, a.movementTarget.z = tx, ty, tz
   a.movementTargetIsValid = true
-  if dp > DRIVE_STOP then
+  if not s.here then
     local fx, fz = tx - nx, tz - nz
     if fx * fx + fz * fz > 0.04 then
       face(world, id, math.atan(fx, fz))
@@ -1067,6 +942,7 @@ local function drive_steer(s)
     fullrec_event(world, id, string.format("drive: %s, target %.2f %.2f %.2f, player %.1f m", how, tx, ty, tz, dp))
   end
 end
+
 -- one tick of the drive for one companion (F.tick calls it for every entry in drives)
 local function drive_step(world, id, h)
   local s = drive_read(world, id, h)
@@ -1081,6 +957,7 @@ local function drive_step(world, id, h)
   if drive_lure(s) then return end
   if drive_hold(s) then return end
   drive_pick_target(s)
+  if drive_copy(s) then return end
   if drive_stuck(s) then return end
   drive_steer(s)
 end
