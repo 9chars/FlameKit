@@ -1522,6 +1522,7 @@ local function note_threat(world, hit)
     elseif a == cid then
       local f = sum_of(cid)
       f.dealt, f.hits_by = f.dealt + amount, f.hits_by + 1
+      if h.fight and tg == h.fight.target then h.fight.hit_t = world:tick() end  -- his hit landed on his target
     elseif tg == h.player and is_monster(world, a) then
       log(string.format("fight %s: the player took %s (%s, %s) from %s (health %s -> %s)", tostring(name_of[cid] or cid), tostring(hit.amount),
         types, table.concat(hit.attacks or {}, ","), tostring(a), tostring(hit.health_before), tostring(hit.health_after)))
@@ -1653,6 +1654,11 @@ local function fight_pick(world, cid, h, mode, px, py, pz, nx, ny, nz)
     local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
     if not best or d < bestd then best, bestd, why = m, d, reason end
   end
+  local skip = h.fight_skip or {}
+  local now = world:tick()
+  for m, untill in pairs(skip) do if now > untill then skip[m] = nil end end
+  local consider0 = consider
+  consider = function(m, reason) if not skip[m] then consider0(m, reason) end end
   for m in pairs(threats[cid] or {}) do consider(m, "it hit you or him") end
   if mode == "Aggressive" then
     for _, m in ipairs(near_monsters[h.player] or {}) do
@@ -1677,8 +1683,13 @@ end
 -- (the native hook stops him 2 m from it; the edge stop is on: no trail here), faces it (combatData.lastTargetId, the
 -- C++ turns him), lunges from FIGHT_LUNGE and bites from FIGHT_BITE (combatData.selectedAttackIndex 1 / 0; the C++
 -- starts the move and sets it back to 255). The next attack waits until his move is over: his action's animation
--- goes back to 0 (at most ATTACK_MAX, logged). Logs "fight <name>: ...".
+-- goes back to 0 (at most ATTACK_MAX, logged). A target he cannot get at (behind a door or wall) is let go after
+-- REACH_TICKS (see there). Logs "fight <name>: ...".
 local FIGHT_BITE, FIGHT_LUNGE, ATTACK_MAX = 2.5, 4, 180
+-- (owner 21:21-21:35: he hammered a door between him and his target, 21:14 and 21:29; "I'd drop that to like 2
+-- seconds") out of reach: not within bite reach, no 0.3 m closer and no hit of his on it for REACH_TICKS: he lets it go
+-- and does not pick it again for SKIP_TICKS
+local REACH_TICKS, SKIP_TICKS = 120, 1200
 drive_fight = function(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local cd = a.combatData
@@ -1745,6 +1756,15 @@ drive_fight = function(s)
     cd.targetOfMyTarget = false
   end)
   local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
+  if d <= FIGHT_BITE or not f.best_d or d < f.best_d - 0.3 then f.best_d, f.prog_t = math.min(d, f.best_d or d), t end
+  local last_ok = math.max(f.prog_t or f.t0, f.hit_t or 0, f.t0)
+  if t - last_ok > REACH_TICKS then
+    h.fight_skip = h.fight_skip or {}
+    h.fight_skip[f.target] = t + SKIP_TICKS
+    stop(string.format("out of reach (%.1f m, no closer and no hit of his on it for %.1f s; skipped for %d s)", d,
+      REACH_TICKS / 60, SKIP_TICKS / 60))
+    return false
+  end
   local act = action_of(world, id)
   local at = f.atk
   if at then
