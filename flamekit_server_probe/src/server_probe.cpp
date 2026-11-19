@@ -33,6 +33,7 @@ static_assert(sizeof(WorldTransform) == 56, "CurrentTransform is 56 bytes");
 
 // (owner 2026-11-18 11:12) how close he follows the player: within this he stands (was 3 m); Lua DRIVE_STOP matches
 constexpr double kFollowStop = 2.0;
+constexpr double kCatchUp = 6.0;  // (owner 2026-11-19 16:37) sprint when he is this far behind
 // ===== Option 2 (owner 15:58: "now that we've proven better bread crumbs work, get working on option 2") =========
 // FlameKit's Lua picks where a driven NPC goes (his AI off): it writes the next breadcrumb into his AI data's
 // movementTarget and the player's position into homeZonePosition (the AI is off, so nothing else uses them). The game's
@@ -427,7 +428,11 @@ void drive_post(void* ctx, void*) {
         const bool here = dp <= kFollowStop && std::fabs(st->homeZonePosition.y - ny_here) <= kFollowStop;
         if (!here && dl > 0.05) {
             dx /= dl; dz /= dl;
-            speed = dp > 12.0 ? 4 : dp > 6.0 ? 3 : 2;
+            // (owner 2026-11-19 16:37 "I agree #2") his pace from the Lua (the player's at the crumb he heads for, in
+            // combatData.prowlAngle: 2 walk, 3 run, 4 sprint; his AI is off so nothing else writes it); more than
+            // kCatchUp from where he is headed (the player; in a fight the monster): sprint
+            const float pace = st->combatData.prowlAngle;
+            speed = dp > kCatchUp ? 4 : pace >= 3.5f ? 4 : pace >= 2.5f ? 3 : 2;
             // (23:41 test) no edge check while he is in the air (DynamicLocomotion.state 2): it measured from his raised
             // height and stopped his legs mid-jump
             auto* loc_now = w.get<emf::gen::ecs::DynamicLocomotion>(id);

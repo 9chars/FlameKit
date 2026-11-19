@@ -227,6 +227,15 @@ local function face(world, id, yaw)
   o.x, o.y, o.z, o.w = 0, math.sin(yaw / 2), 0, math.cos(yaw / 2)
 end
 
+-- (owner 2026-11-19 16:37, list #8: his pace from the crumb meta data) the pace for the C++ drive, in
+-- combatData.prowlAngle (his game AI is off, so nothing else writes it): 2 walk, 3 run, 4 sprint (LocomotionSpeedSelector).
+-- The player's crumb speeds (6700 crumbs, 2026-11-19): ~2-3 m/s walking, ~4-5 running, ~8-9 sprinting.
+local PACE_WALK, PACE_RUN, PACE_SPRINT = 2, 3, 4
+local PACE_RUN_AT, PACE_SPRINT_AT = 3.5, 7
+local function set_pace(a, pace)
+  pcall(function() a.combatData.prowlAngle = pace end)
+end
+
 -- the native hook's target and its "player" spot both at x, y, z: he stands there
 local function hold_at(a, x, y, z)
   a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z = x, y, z
@@ -936,6 +945,15 @@ local function drive_steer(s)
   end
   a.movementTarget.x, a.movementTarget.y, a.movementTarget.z = tx, ty, tz
   a.movementTargetIsValid = true
+  -- (owner 2026-11-19 16:37 "I agree #2") his pace is the player's at the crumb he is heading for
+  local pace = PACE_WALK
+  if c and c.m and c.m.spd then pace = c.m.spd >= PACE_SPRINT_AT and PACE_SPRINT or (c.m.spd >= PACE_RUN_AT and PACE_RUN or PACE_WALK) end
+  set_pace(a, pace)
+  if pace ~= h.pace_said and not s.here then
+    h.pace_said = pace
+    log(string.format("pace %s: %s (the player at that crumb: %s m/s; player %.1f m away)", tostring(id),
+      pace == PACE_SPRINT and "sprint" or (pace == PACE_RUN and "run" or "walk"), c and c.m and string.format("%.1f", c.m.spd) or "-", dp))
+  end
   if not s.here then
     local fx, fz = tx - nx, tz - nz
     if fx * fx + fz * fz > 0.04 then
@@ -951,6 +969,7 @@ end
 local function drive_step(world, id, h)
   local s = drive_read(world, id, h)
   if not s then return end
+  set_pace(s.a, PACE_WALK)  -- drive_steer sets the trail's pace; the C++ sprints past 6 m from where he is headed
   drive_waterlog(s)
   if drive_water(s) then return end
   drive_track_player(s)
