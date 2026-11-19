@@ -1742,6 +1742,24 @@ local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
   return list
 end
 
+-- (logging, owner 2026-11-19 10:38 "its not facing the target") his facing against the line to the monster, and where the
+-- monster is and how fast it moves: "faces it (x deg off; it at ..., moving v m/s, n m above/below him)"
+local function face_info(world, id, tg, nx, ny, nz, mx, my, mz)
+  local off = "?"
+  pcall(function()
+    local q = world:get("CurrentTransform", id).transform.orientation
+    local yaw = math.atan2(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
+    local want = math.atan2(mx - nx, mz - nz)
+    local dd = math.deg(want - yaw) % 360
+    if dd > 180 then dd = dd - 360 end
+    off = string.format("%.0f", dd)
+  end)
+  local v = -1
+  pcall(function() local w = world:get("Velocity", tg).velocity v = math.sqrt(w.x * w.x + w.y * w.y + w.z * w.z) end)
+  return string.format("he faces %s deg off it; it at %.1f %.1f %.1f moving %.1f m/s, %.1f m %s him; him at %.1f %.1f %.1f", off,
+    mx, my, mz, v, math.abs(my - ny), my >= ny and "above" or "below", nx, ny, nz)
+end
+
 drive_fight = function(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local cd = a.combatData
@@ -1926,17 +1944,19 @@ drive_fight = function(s)
     if at.started and act and act ~= 0 then at.anim = act end
     local over = at.started and at.anim and (act == 0)
     if over or t - at.t > ATTACK_MAX then
-      log(string.format("fight %s: %s %s after %.2f s (%s; animation %s)", name, at.ix == 0 and "bite" or "lunge",
-        over and "over" or "TIMED OUT", (t - at.t) / 60, at.started and string.format("started after %d tick(s)", at.started - at.t) or "never started",
-        tostring(at.anim)))
+      log(string.format("fight %s: %s %s after %.2f s (%s; animation %s); he moved %.1f m, now %.1f m from it (was %.1f); %s", name,
+        at.ix == 0 and "bite" or "lunge", over and "over" or "TIMED OUT", (t - at.t) / 60,
+        at.started and string.format("started after %d tick(s)", at.started - at.t) or "never started", tostring(at.anim),
+        math.sqrt((nx - (at.x or nx)) ^ 2 + (nz - (at.z or nz)) ^ 2), d, at.d or -1, face_info(world, id, tg, nx, ny, nz, mx, my, mz)))
       A.atk, at = nil, nil
     end
   end
   if not at and d <= FIGHT_LUNGE then
     local ix = d <= FIGHT_BITE and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
-    A.atk = { ix = ix, t = t }
-    log(string.format("fight %s: %s at %s (%.1f m)%s", name, ix == 0 and "bite" or "lunge", tostring(tg), d, ok and "" or " (could not ask)"))
+    A.atk = { ix = ix, t = t, x = nx, z = nz, d = d }
+    log(string.format("fight %s: %s at %s (%.1f m)%s; %s", name, ix == 0 and "bite" or "lunge", tostring(tg), d, ok and "" or " (could not ask)",
+      face_info(world, id, tg, nx, ny, nz, mx, my, mz)))
   end
   return true
 end
