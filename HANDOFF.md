@@ -1066,6 +1066,14 @@ next restart (no yes for a restart yet).
      21:18 logging (live): every threat and every target described: faction, the template's model
      (world:template("ModelResource", id).model), and which of DynamicLocomotion / DynamicPathWalker / NetworkHealth /
      Animal / MovementCollider it has (to tell fixed plants from creatures by data).
+   - Owner 21:20 "does the dog have any armor or defensive numbers, he seemed to die pretty quick"; 21:21 "lets just do
+     more logging first". Known: no Armor/ArmorPoints component; his hits taken at 21:11: pierce 238, cut 206 (melee),
+     shroud magic 48-170; ~7 monsters, 25 hits, ~3,700 in about 20 s. 21:22 logging (live): his defence once per body:
+     DamageSusceptibility [0 1 0.8 0.6 1.5 0 0 0 0 1 1 1 1 0 1 1.2 0.6 0.8 1] (19 multipliers, which slot is which
+     damage type NOT known), DamageMod [0.5 0.5 1 0], Armor none, ArmorPoints none, Level [50 105], max 3680; every hit
+     on his player by a monster ("the player took ..."), and every 10 s with hits "last 10 s: took n hit(s) from m
+     monster(s) [type amount ...]; dealt x in y hit(s); his health". Options for later (owner to pick): more health
+     per level, lower susceptibility per type, or both.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
