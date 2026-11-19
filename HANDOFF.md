@@ -1226,6 +1226,18 @@ next restart (no yes for a restart yet).
      to check on later. we'll make sure he can get targets right around him correctly first" -> **LATER LIST:** when
      every candidate is blocked in the pick phase, he hops (up) / repositions toward the nearest to see it, and jumps
      to reach one that is higher. Not now: first the targets right around him.
+     Power cuts 14:10 and ~14:28; restarts 14:19 and 14:37 (the watcher came back by itself at 14:28). **Data 14:06-14:08:**
+     lunges from 3.9-4.0 m: 6 kills at 0.38 s; one miss (the monster moved 1.5 m; at 0.4 s he was 1.7 m from it, moved
+     3.1 m); bites from 0.7-2.4 m: 4 kills at ~1 s. **Data 14:21 (bats, faction 6, 1-2 m above him, up to 6 m/s):**
+     facing 0 deg every time; in the 0.4 s to the hit the bat moved 2.0-2.4 m -> 5 lunges missed, 2 hit plants -> the
+     reposition steps and giving up (26919 twice; it came back by biting him); 26918 killed by one lunge (1.5 m above,
+     so height is not the problem). Also 14:22:04 picked 26920 at 19.5 m, dropped 0.4 s later at the radius edge.
+     Claude proposed (1) aim ahead or (2) wait for it to slow. **Owner 14:52, verbatim:** "yes, bats are a good
+     challenge because they are a hard target. is there a faster attack he can do against bats instead of the
+     lunge?" Answer: only the bite (hit ~1 s) and the lunge (hit 0.38 s) are known; others in the hound's game data
+     were never searched (a later item if the owner wants). **Built 14:5x (option 2, live by reload):** a target faster
+     than FAST 3 m/s and out of bite reach: he stands at lunge reach facing it and lunges when it slows; waiting does
+     not count as "can't deliver attacks" (ok_t reset); logs "waits: X moves v m/s ...", "X slowed to v m/s".
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

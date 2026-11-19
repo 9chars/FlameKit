@@ -1733,6 +1733,16 @@ local NO_HIT = 120                    -- (owner 2026-11-18 21:35 "I'd drop that 
 -- (owner 2026-11-19 11:17 "get the facing fix in asap") between attacks he turns toward it, TURN radians a tick at
 -- most (half a turn in 0.1 s), and attacks only when he faces it within FACE_OK degrees
 local TURN, FACE_OK = math.rad(30), 15
+-- (owner 2026-11-19 14:52 yes; bats at up to 6 m/s moved 2.0-2.4 m in the 0.4 s before a lunge's hit lands) a target
+-- faster than FAST m/s that is out of bite reach: he stands at lunge reach facing it and lunges when it slows down
+-- (a bat slows when it swoops in); while he waits, no "can't deliver attacks"
+local FAST = 3
+
+local function speed_of(world, m)
+  local v = 0
+  pcall(function() local w = world:get("Velocity", m).velocity v = math.sqrt(w.x * w.x + w.y * w.y + w.z * w.z) end)
+  return v
+end
 
 -- he turns toward (fx, fz) by TURN at most this tick; returns how many degrees he is still off afterwards
 local function turn_toward(world, id, fx, fz)
@@ -1789,8 +1799,7 @@ local function face_info(world, id, tg, nx, ny, nz, mx, my, mz)
     if dd > 180 then dd = dd - 360 end
     off = string.format("%.0f", dd)
   end)
-  local v = -1
-  pcall(function() local w = world:get("Velocity", tg).velocity v = math.sqrt(w.x * w.x + w.y * w.y + w.z * w.z) end)
+  local v = speed_of(world, tg)
   return string.format("he faces %s deg off it; it at %.1f %.1f %.1f moving %.1f m/s, %.1f m %s him; him at %.1f %.1f %.1f", off,
     mx, my, mz, v, math.abs(my - ny), my >= ny and "above" or "below", nx, ny, nz)
 end
@@ -1929,6 +1938,19 @@ drive_fight = function(s)
   end
   if hit_tg then A.rep = 0 end
   if hit_tg or not A.ok_d or d < A.ok_d - 0.3 then A.ok_d, A.ok_t = math.min(d, A.ok_d or d), t end
+  local tv = speed_of(world, tg)
+  local waiting = d > FIGHT_BITE and tv > FAST
+  if waiting then
+    A.ok_d, A.ok_t = d, t  -- waiting is not failing
+    if not A.wait_said then
+      A.wait_said = true
+      log(string.format("fight %s: waits: %s moves %.1f m/s (faster than %d); he lunges when it slows (%.1f m away)", name,
+        tostring(tg), tv, FAST, d))
+    end
+  elseif A.wait_said then
+    A.wait_said = nil
+    log(string.format("fight %s: %s slowed to %.1f m/s (%.1f m away)", name, tostring(tg), tv, d))
+  end
   -- a reposition step under way: MOVE_STEP, then he tries again from where he is
   if A.rep_t then
     if t - A.rep_t < MOVE_STEP then
@@ -2030,7 +2052,7 @@ drive_fight = function(s)
     local okt, o = pcall(turn_toward, world, id, mx - nx, mz - nz)
     off = okt and o or 0
   end
-  if not at and d <= FIGHT_LUNGE and math.abs(off) <= FACE_OK then
+  if not at and d <= FIGHT_LUNGE and math.abs(off) <= FACE_OK and not waiting then
     local ix = d <= FIGHT_BITE and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
     A.atk = { ix = ix, t = t, x = nx, z = nz, d = d, mx = mx, mz = mz }
