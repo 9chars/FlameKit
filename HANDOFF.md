@@ -1074,6 +1074,15 @@ next restart (no yes for a restart yet).
      on his player by a monster ("the player took ..."), and every 10 s with hits "last 10 s: took n hit(s) from m
      monster(s) [type amount ...]; dealt x in y hit(s); his health". Options for later (owner to pick): more health
      per level, lower susceptibility per type, or both.
+   - Fight data 21:22-21:30 (owner 21:30 "have a lot at the data"): the same monster's hit on the player vs on him:
+     46515 cut/pierce 41-82 on the player, 166-256 on him; 46555 fire melee 82 on the player, 545 on him. Burning ("fire,
+     other") 102-112 a tick, many ticks: 2,755 in one 10 s at 21:27 (killed him). His bites 420 (600 some). All targets
+     real creatures (faction 4, DynamicLocomotion+DynamicPathWalker+NetworkHealth+MovementCollider). Owner 21:34 "I saw
+     him attacking a door": 21:29:20-33 locked on 46554 behind it, 3.1-3.9 m, 8 lunges, hits on object 2969043268 for 0
+     (its health 160 -> 140); same as 21:14 (4.0 m, object 3055812669). Owner 21:35: "I'd drop that to like 2 seconds
+     and he definitely needs "Armor"". **Done 21:36 (Lua, live, git):** out of reach = not within bite reach (2.5 m),
+     no 0.3 m closer and no hit of his on it for REACH_TICKS 120 (2 s) -> let go ("stops fighting ...: out of reach"),
+     not picked again for SKIP_TICKS 1200 (20 s). Armor: amount/kind asked 21:3x (not built).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
