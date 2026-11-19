@@ -1218,6 +1218,14 @@ next restart (no yes for a restart yet).
      it started"). The radius: asked the owner whether "by 20 m" means a 20 m radius (from 15) or 35 m; not built.
      **Owner 13:58, verbatim:** "you're reading it right: 20 m". Built 14:0x (live): FIGHT_RANGE 20 (the radius he
      fights in, the monster scan, a target leaving it, the end at 20 + 2.5 m from the player).
+     **Owner 14:02:** "theres a bat right in front of me, it hasn't attacked me yet and its a little higher position than
+     were at. the dog doesn't see it?" Log (14:03 logging: positions on a blocked candidate): 26906 at 3005.4 845.0
+     2846.3, 3.7 m above him, 7.9 m away; the ray hits at 2.7 m, ~2 m above his feet (the slope/ledge up to it); he
+     picks it every 20 s, blocked 3 times, the sequence ends. **Owner 14:03:** "it probably looks blocked to him".
+     **Owner 14:05, verbatim:** "if he hopped up he could see it for sure and jump to reach it. lets add that as a step
+     to check on later. we'll make sure he can get targets right around him correctly first" -> **LATER LIST:** when
+     every candidate is blocked in the pick phase, he hops (up) / repositions toward the nearest to see it, and jumps
+     to reach one that is higher. Not now: first the targets right around him.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
