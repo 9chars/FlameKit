@@ -997,6 +997,12 @@ next restart (no yes for a restart yet).
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
    a way for the hound to walk after a glide (find ground he could cross under the flight, or follow the trail in the
    air); the glider put-away and respawn beside the player (13:48, owner 13:54 "it works pretty well") does that job.
+8. **Use more of the crumb meta data (owner 2026-11-18 19:07: "keep it of course. always assume more information is
+   better"):** each crumb stores the player's speed, movement state, up/down speed, facing, water depth; not used in
+   decisions yet. Ideas: his pace from the player's speed at that crumb (walk where the player walked, sprint where he
+   sprinted; now the C++ picks it by distance), react to movement states (climbing, crouching) once their numbers are
+   known. Standing rule from the same message: ideas and information are always kept/added to the list, never
+   dropped by default.
 7. **Companion inventory (owner 2026-11-18 13:06):** "also add to your list: companions can carry extra items for you
    (they have their own inventory like a storage check basically)". (a storage chest the companion carries; later)
    Owner 13:29: "a quick initial assessment of that idea... is it doable with what you know so far?" Assessment
