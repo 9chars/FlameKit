@@ -362,7 +362,7 @@ what you remember is the rebuild's fault, not a decision.
   "#1 get it into get"). The local server's `main.lua` loads `features.npc_probe`, NOT `features.npc_wheel_probe`
   (npc_probe owns channel `npcwheel` there). The old `claude_scratch/npc_probe.before_*.lua` backups named below were
   deleted 2026-11-18 16:10 (owner #6); the full pre-split version with all its history comments is git commit 5f661f1
-  and `claude_scratch/npc_probe.BEFORE_SPLIT_2026-11-18.lua`.
+  (the claude_scratch copy was deleted 19:17, owner: "lets get rid of it, i cant imagine going back to it").
 - C++ server mod: `<work folder>\flamekit_server_probe\src\server_probe.cpp`, in git (`flamekit_server_probe/`)
   since 2026-11-18 15:45 (restart helper `buildprobe`).
 - Client (in the release since 0.15.278): `features/npc_wheel_probe.lua` (status notices, wheel, P key, panel button),
@@ -389,8 +389,8 @@ most sense"
   `local_server/tests/drive_harness.lua` (old vs new in a fake world, every write, log line and notice compared per
   tick): 0 differences in 66 scenarios; every line of the old drive reached except one fallback line. **Owner: retest
   everything in game** (walking, trap door, water in/out, piers, islands, diving, climb-out hop, jumps and double jumps,
-  drops, stuck notices, glider, fast travel, Call). Revert = put `claude_scratch/npc_probe.BEFORE_SPLIT_2026-11-18.lua`
-  back on the server (or git 5f661f1).
+  drops, stuck notices, glider, fast travel, Call). Revert = git 5f661f1 (the claude_scratch copy
+  was deleted 19:17 by the owner's word).
 - #7 done: npc_probe.lua comments say what the code does now (history: this file and git 5f661f1).
 - #6 done: deleted the claude_scratch backups (npc_probe.before_*, client/server .before_*, rel278-rel284,
   server_before_278, dist_md5_*), notes/probes/npc_probe.lua and npc_wheel_probe.lua (superseded copies), the server's
