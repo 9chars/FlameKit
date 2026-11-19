@@ -442,6 +442,13 @@ most sense"
   notice, no TP_AFTER. 17:54 logging (live): "drop wait <id>: walks to the last safe crumb first / waits at the last
   safe crumb / over ..." with the distances. Owner 17:59 "yes": **done 18:0x (Lua, live):** DROP_AT 1.5 m, he counts
   as at the last safe crumb within 1.5 m (the edge ray's reach) instead of 0.6 m.
+- **SIMPLIFY THE FOLLOWING (owner 18:04/18:06), plan in `local_server/FOLLOW_PLAN.md`, NOT BUILT.** Owner 18:04: "I feel
+  like this shell game of numbers tic tac toe is proving this approach might not be working. every time you change the
+  numbers to fix one thing, something else becomes off... if we keep playing this numbers game you're going to have to
+  come up with a simplified solution". 18:06: "write it up, maybe rely more one the new meta data from the bread
+  crumbs... he can't teleport easily now so not ever situation needs to be perfectly handled..." (read as: he CAN be
+  respawned easily now). The plan: the trail is the only truth; no edge stop and no ray step jump on the trail; ups and
+  downs from the crumbs' meta data; one stuck rule = respawn. Waiting for the owner's review.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
