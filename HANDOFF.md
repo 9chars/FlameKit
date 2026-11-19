@@ -1082,7 +1082,13 @@ next restart (no yes for a restart yet).
      (its health 160 -> 140); same as 21:14 (4.0 m, object 3055812669). Owner 21:35: "I'd drop that to like 2 seconds
      and he definitely needs "Armor"". **Done 21:36 (Lua, live, git):** out of reach = not within bite reach (2.5 m),
      no 0.3 m closer and no hit of his on it for REACH_TICKS 120 (2 s) -> let go ("stops fighting ...: out of reach"),
-     not picked again for SKIP_TICKS 1200 (20 s). Armor: amount/kind asked 21:3x (not built).
+     not picked again for SKIP_TICKS 1200 (20 s). Owner 21:37 "build it" (armor = one third of every damage type).
+     **Armor done 21:38-21:40 (Lua, live, git):** match_armor (setup + every second): DamageSusceptibility[i] = base[i]
+     x ARMOR (1/3); the base is read once from a body and kept in the roster as `sus_base` (saved), so a reload never
+     scales twice (world:template("DamageSusceptibility") gave nothing). HOUND_SUS = the hound's own values (logged
+     21:22) recovers bodies the first 21:38 version had already scaled. Live: N1 and N2 at [0 .33 .27 .2 .5 0 0 0 0
+     .33 .33 .33 .33 0 .33 .4 .2 .27 .33]. Logs "armor: ...". Expected: physical melee ~55-85 instead of 166-256, fire
+     melee ~180 instead of 545, burning ~35 a tick instead of 102-112 (to be checked in the next fight).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
