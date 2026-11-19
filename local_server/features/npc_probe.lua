@@ -1730,13 +1730,34 @@ local RAY_WAIT = 2                    -- ticks before a candidate's ray result i
 local PICK_TRIES, PICK_EVERY = 3, 60  -- (owner 09:17 "3 tries ... might be too few, but we'll start there")
 local MOVE_STEP, SIDE = 60, 2
 local NO_HIT = 120                    -- (owner 2026-11-18 21:35 "I'd drop that to like 2 seconds")
+-- (owner 2026-11-19 11:17 "get the facing fix in asap") between attacks he turns toward it, TURN radians a tick at
+-- most (half a turn in 0.1 s), and attacks only when he faces it within FACE_OK degrees
+local TURN, FACE_OK = math.rad(30), 15
+
+-- he turns toward (fx, fz) by TURN at most this tick; returns how many degrees he is still off afterwards
+local function turn_toward(world, id, fx, fz)
+  local q = world:get("CurrentTransform", id).transform.orientation
+  local yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
+  local diff = (math.atan(fx, fz) - yaw + math.pi) % (2 * math.pi) - math.pi
+  local step = math.max(-TURN, math.min(TURN, diff))
+  if math.abs(diff) > 0.01 then face(world, id, yaw + step) end
+  return math.deg(diff - step)
+end
 local SKIP_TICKS = 1200
 
 local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
   local list, seen = {}, {}
   local skip = h.fight_skip or {}
   local now = world:tick()
-  for m, untill in pairs(skip) do if now > untill then skip[m] = nil end end
+  for m, untill in pairs(skip) do
+    local hit_t = threats[cid] and threats[cid][m]
+    if now > untill then skip[m] = nil
+    elseif hit_t and hit_t > untill - SKIP_TICKS then
+      -- (owner 11:17 yes) it hit him or the player again after he gave up on it: it is a candidate again at once
+      skip[m] = nil
+      log(string.format("fight %s: %s is no longer skipped: it hit %s again", tostring(name_of[cid] or cid), tostring(m), "him or the player"))
+    end
+  end
   local function add(m, why)
     if seen[m] or skip[m] then return end
     local mx, my, mz = world:position(m)
@@ -1945,10 +1966,12 @@ drive_fight = function(s)
     hold_at(a, p.x, p.y, p.z)
     return true
   end
-  hold_at(a, mx, my, mz)  -- the native hook runs him at it and stops him 2 m off
+  -- (owner 2026-11-19 11:17 "the companion should only get just as close as they need to be to land the attack and no
+  -- closer": his lunge carries him past it) he runs at it until he is within lunge reach, then stands there
+  if d > FIGHT_LUNGE then hold_at(a, mx, my, mz) else hold_at(a, nx, ny, nz) end
   -- (logging, owner 2026-11-19 07:50 fences) a stall with the ray clear: no 0.3 m closer for half a second, not within
   -- bite reach (something lower than the ray's line, or the monster keeps away): once per stall
-  if d <= FIGHT_BITE or not A.best_d or d < A.best_d - 0.3 then A.best_d, A.prog_t, A.stall_said = math.min(d, A.best_d or d), t, nil end
+  if d <= FIGHT_LUNGE or not A.best_d or d < A.best_d - 0.3 then A.best_d, A.prog_t, A.stall_said = math.min(d, A.best_d or d), t, nil end
   if t - (A.prog_t or t) > 30 and not A.stall_said then
     A.stall_said = true
     local st, spd, col = "?", -1, "?"
@@ -1967,19 +1990,25 @@ drive_fight = function(s)
   local act = action_of(world, id)
   local at = A.atk
   if at then
+    if hit_tg then at.hit = true end
     local asked = (tonumber(cd.selectedAttackIndex) or 255) ~= 255
     if not at.started and not asked then at.started = t end
     if at.started and act and act ~= 0 then at.anim = act end
     local over = at.started and at.anim and (act == 0)
     if over or t - at.t > ATTACK_MAX then
-      log(string.format("fight %s: %s %s after %.2f s (%s; animation %s); he moved %.1f m, now %.1f m from it (was %.1f); %s", name,
-        at.ix == 0 and "bite" or "lunge", over and "over" or "TIMED OUT", (t - at.t) / 60,
+      log(string.format("fight %s: %s %s after %.2f s, %s (%s; animation %s); he moved %.1f m, now %.1f m from it (was %.1f); %s", name,
+        at.ix == 0 and "bite" or "lunge", over and "over" or "TIMED OUT", (t - at.t) / 60, at.hit and "HIT it" or "MISSED it",
         at.started and string.format("started after %d tick(s)", at.started - at.t) or "never started", tostring(at.anim),
         math.sqrt((nx - (at.x or nx)) ^ 2 + (nz - (at.z or nz)) ^ 2), d, at.d or -1, face_info(world, id, tg, nx, ny, nz, mx, my, mz)))
       A.atk, at = nil, nil
     end
   end
-  if not at and d <= FIGHT_LUNGE then
+  local off = 0
+  if not at then
+    local okt, o = pcall(turn_toward, world, id, mx - nx, mz - nz)
+    off = okt and o or 0
+  end
+  if not at and d <= FIGHT_LUNGE and math.abs(off) <= FACE_OK then
     local ix = d <= FIGHT_BITE and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
     A.atk = { ix = ix, t = t, x = nx, z = nz, d = d }

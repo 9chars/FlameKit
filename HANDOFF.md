@@ -1190,6 +1190,21 @@ next restart (no yes for a restart yet).
      7.0 m from it"), hits on plant 2579759654 for 0 -> he gave up on 36988 (11:10:15) and 36978 (11:10:28), skipped 20 s;
      the sequence ended 11:10:31 with both skipped although they were hitting the player; it started again at 11:10:48
      when the skip ran out (the owner's ~10 s wait). Then bites from 2.4 and 1.1 m killed both (420 each).
+     Claude 11:1x proposed (1) facing: he turns himself toward it fast between attacks and attacks only when facing it;
+     (2) a skipped monster comes off the skip list when it hits again. **Owner 11:17, verbatim:** "yes get the facing
+     fix in asap. this is a big problem, keeping at the maximum distance he needs to be at to add the attack will be
+     helpful as well because his lunge attack moves him so much. the closer he is to the target, the further he'll
+     travel past the monster. this should be the default for any companion. the companion should only get just as
+     close as they need to be to land the attack and no closer.... I don't know what that value is, but I'm sure you
+     could tell from the data or I could try to search it, or we could test that range ourselves". **Built 11:2x (Lua,
+     live by reload):** turn_toward: between attacks (not during one) his body turns toward it, at most 30 deg a tick
+     (TURN; 180 deg in 0.1 s; `face` = the instant turn the following uses), and an attack starts only when he is
+     within FACE_OK 15 deg; he runs at it only while farther than FIGHT_LUNGE (4 m, the lunge that hit at 10:40:13 started
+     at 4.0 m), then stands where he is (bite only when it is within 2.5 m anyway); every attack's end logs "HIT it" /
+     "MISSED it" with where it started (to find the real maximum reach from data); a skipped monster that hits him or
+     the player again is a candidate at once ("is no longer skipped: it hit him or the player again"). "Default for any
+     companion": all companions use this one drive_fight. Lunge reach: still to be measured (owner offered to search
+     or test it).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
