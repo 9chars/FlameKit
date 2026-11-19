@@ -1435,7 +1435,8 @@ end
 -- and within FIGHT_LEASH of the player. Aggressive: those too, and every monster within FIGHT_RANGE of the player (a
 -- scan over the world's entities, spread over steps within SCAN_BUDGET: the world has some 37,000 entities and EMF
 -- pauses FlameKit when one call runs over 250 ms). Run back: more than FIGHT_LEASH from the player (every mode);
--- Defensive also when his health is under FIGHT_HURT and the player is more than FIGHT_RANGE away.
+-- Defensive also when his health is under FIGHT_HURT and the player is more than FIGHT_RANGE away. His maximum health:
+-- Health.dataStorage[3] (2026-11-18 20:28/20:34: [1] goes down when he is hurt, [3] and [8] stay at the maximum).
 local FIGHT_RANGE, FIGHT_LEASH, FIGHT_HURT = 15, 30, 0.3
 local SCAN_BUDGET, SCAN_MAX = 0.03, 6000
 local threats = {}         -- companion entity -> { monster entity -> tick of its last hit }
@@ -1555,8 +1556,7 @@ local function fight_watch(world)
         end
       end
       local hp, hmax = nil, nil
-      -- (20:25 log: [1]=3680 [2]=0 [3]=3680 ... [8]=3680 at full health) the maximum is [3] or [8], [3] for now (NOT
-      -- confirmed: the slots are logged again the first time he is hurt, the one that stays full is the maximum)
+      -- [1] his health, [3] his maximum (logged once per body, and again the first time he is hurt)
       pcall(function() local d = world:get("Health", cid).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[3]) end)
       local hurt_now = hp and hmax and hp < hmax
       if not h.health_dumped or (hurt_now and not h.health_dumped_hurt) then
@@ -1595,8 +1595,11 @@ local function fight_watch(world)
         line = mode .. ": nothing to attack"
       end
       if back then line = line .. "; would run back: " .. back end
-      if line ~= fight_said[cid] then
-        fight_said[cid] = line
+      -- (20:40, the 20:34-20:36 log had a line every second: the distances in it change) logged when the mode, the
+      -- monster or the run-back changes
+      local key = mode .. "|" .. tostring(best) .. "|" .. tostring(back ~= nil)
+      if key ~= fight_said[cid] then
+        fight_said[cid] = key
         log(string.format("fight %s: %s (his health %s/%s, %.1f m from you)", tostring(name_of[cid] or cid), line,
           tostring(hp), tostring(hmax), dpl))
       end
