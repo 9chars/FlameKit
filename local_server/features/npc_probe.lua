@@ -1748,8 +1748,8 @@ local function face_info(world, id, tg, nx, ny, nz, mx, my, mz)
   local off = "?"
   pcall(function()
     local q = world:get("CurrentTransform", id).transform.orientation
-    local yaw = math.atan2(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
-    local want = math.atan2(mx - nx, mz - nz)
+    local yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))  -- (Lua 5.4: no math.atan2)
+    local want = math.atan(mx - nx, mz - nz)
     local dd = math.deg(want - yaw) % 360
     if dd > 180 then dd = dd - 360 end
     off = string.format("%.0f", dd)
