@@ -1249,6 +1249,17 @@ next restart (no yes for a restart yet).
      and gets upward speed launch_speeds(0, rise) (rise 0.8 -> ~8.7 m/s), rewritten for up to 6 ticks until he is in
      the air; the attack's forward move is not touched; h.djump NOT used (the follow jump code stays out). Logs
      "jumps into his bite/lunge (up v m/s)", and the 0.4 s line "he is h m higher than at the start, it is x m above him".
+     **Owner 16:35:** "he lags behind me a bit more than I'd like for a dungon run.. anyway to keep him closer to me while
+     running?" Cause: the C++ picked his speed by straight distance only (walk < 6 m, run 6-12, sprint > 12). Claude
+     proposed (1) lower steps, (2) his pace from the crumb meta data (list #8) + sprint when behind. **Owner 16:37:** "I
+     agree #2". The player's crumb speeds (6700 crumbs in the log): ~2-3 m/s walking, ~4-5 running, ~8-9 sprinting.
+     **Built 16:40:** Lua: every tick PACE_WALK into combatData.prowlAngle (his AI is off, nothing else writes it);
+     drive_steer: the crumb he heads for: spd >= 7 sprint, >= 3.5 run, else walk; log "pace <id>: walk/run/sprint (the
+     player at that crumb: v m/s; player d m away)" on a change. C++ (DLL 30da7118, installed for the next start; the one
+     before renamed fk_server_probe.dll.old_1640; .old_0922 and .old_2100 still there): speed = sprint if more than
+     kCatchUp 6 m from where he is headed (the player; in a fight the monster), else the Lua pace; the old 6/12 m steps
+     are gone. drive_harness: identical to the commit before on 9 seeds apart from the pace field. Lua live 16:40 (the
+     old DLL ignores the pace until the restart).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
