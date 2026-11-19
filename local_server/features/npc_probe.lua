@@ -1484,10 +1484,11 @@ end
 -- Defensive and Aggressive run the attack sequence (drive_fight, below). Threats: monsters that hit him or his player
 -- (the hit handler). Aggressive also looks at every monster within FIGHT_RANGE of the player (a scan over the world's
 -- entities, spread over steps within SCAN_BUDGET: the world has some 37,000 entities and EMF pauses FlameKit when one
--- call runs over 250 ms). FIGHT_LEASH: the leash (the attack sequence ends past it). fight_watch clears old threats and
+-- call runs over 250 ms). FIGHT_RANGE is also the radius he fights in (owner 2026-11-19 10:40 "the dog should stay
+-- centered on me within my radius and kill anything in it"; it replaced the 30 m leash). fight_watch clears old threats and
 -- logs his health and defence data. His maximum health: Health.dataStorage[3] (2026-11-18 20:28/20:34: [1] goes down
 -- when he is hurt, [3] and [8] stay at the maximum).
-local FIGHT_RANGE, FIGHT_LEASH = 15, 30
+local FIGHT_RANGE = 15
 local SCAN_BUDGET, SCAN_MAX = 0.03, 6000
 local threats = {}         -- companion entity -> { monster entity -> tick of its last hit }
 local mscan = nil          -- the scan under way: { list, i, found = { player -> { monster ids } }, steps, t }
@@ -1629,7 +1630,16 @@ local function monster_scan_step(world)
   mscan = nil
 end
 
--- once a second: old threats go (dead, gone, or more than FIGHT_LEASH from the player), and his health slots are logged
+-- (the attack sequence) a companion's own hits, for drive_fight: on his target, or on something else (an object in
+-- the way); drive_fight takes them every step
+local function note_my_hit(world, hit)
+  local hh = drives[hit.attacker]
+  if not hh then return end
+  hh.my_hits = hh.my_hits or {}
+  if #hh.my_hits < 20 then hh.my_hits[#hh.my_hits + 1] = { tg = hit.target, t = world:tick(), obj = not is_monster(world, hit.target) } end
+end
+
+-- once a second: old threats go (dead, gone, or more than FIGHT_RANGE from the player), and his health slots are logged
 -- once per body and again the first time he is hurt ([1] his health, [3] his maximum). (The step 2 "would attack"
 -- lines are gone: drive_fight's "attacks / bite / lunge / stops fighting" lines replace them.)
 local function fight_watch(world)
@@ -1639,7 +1649,7 @@ local function fight_watch(world)
     if px and th then
       for m in pairs(th) do
         local mx, my, mz = world:position(m)
-        if not mx or not monster_alive(world, m) or (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then th[m] = nil end
+        if not mx or not monster_alive(world, m) or (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_RANGE ^ 2 then th[m] = nil end
       end
     end
     local hp, hmax
@@ -1699,23 +1709,27 @@ end
 -- Defensive and Aggressive only. Once he has a target, attack mode is on and the following (and coming back to the
 -- player) stops until the sequence ends (drive_fight returns true).
 -- Picking: the candidates, nearest to him first (Defensive: monsters that hit him or the player; Aggressive: those and
--- every monster within FIGHT_RANGE of the player; alive, within FIGHT_LEASH of the player, not skipped). For each one
+-- every monster within FIGHT_RANGE of the player; alive, within FIGHT_RANGE of the player, not skipped). For each one
 -- the C++ shoots a ray from his shoulder to its middle (combatData.lastTargetId -> isTargetReachable, every step);
 -- blocked (a fence, wall, tree or object) -> the next one; the first clear one is his target.
 -- Fighting: locked on until it is dead. The ray every step; he faces it (the C++ turns him to lastTargetId), runs at it
 -- (the native hook stops him 2 m off), lunges from FIGHT_LUNGE and bites from FIGHT_BITE as often as his moves allow
--- (the next one when his move's animation is over, at most ATTACK_MAX). Blocked: he repositions, MOVE_STEP each: a hop
--- toward it, then SIDE m to the left, then SIDE m to the right; still blocked -> he drops it (not picked again for
--- SKIP_TICKS) and picks again.
+-- (the next one when his move's animation is over, at most ATTACK_MAX). He can't deliver attacks (owner 10:43 yes):
+-- the ray is blocked, or his attack hit something else and not it, or no hit on it and no 0.3 m closer for NO_HIT
+-- (owner 2026-11-19 10:38: at 4.0 m from a monster, lunges into plants under the ray's line; then the edge stop held
+-- him and he stood) -> he repositions, one step at a time, MOVE_STEP each, then tries again from there: a hop toward
+-- it, SIDE m to the left, SIDE m to the right; can't again after those three -> he drops it (not picked again for
+-- SKIP_TICKS) and picks again. A hit on it starts the steps over.
+-- Its radius (owner 10:40): a target more than FIGHT_RANGE from the player is dropped (the next one is picked).
 -- The end: nothing reachable on PICK_TRIES tries PICK_EVERY apart (that includes "all dead"), or he is more than
--- FIGHT_LEASH from the player (the leash, owner 09:17 "keep the 30 m leash for now"). (09:17: the "run back when badly
--- hurt" rule is gone.) Passive (or Put away) from the menu ends it at once (the top of drive_fight, every tick) and he
+-- FIGHT_RANGE + FIGHT_BITE from the player (outside the radius). (09:17: the "run back when badly hurt" rule is gone.) Passive (or Put away) from the menu ends it at once (the top of drive_fight, every tick) and he
 -- follows again. Defensive starts it only on a threat, then fights like Aggressive until it ends (owner 10:25).
 -- Logs "fight <name>: ...".
 local FIGHT_BITE, FIGHT_LUNGE, ATTACK_MAX = 2.5, 4, 180
 local RAY_WAIT = 2                    -- ticks before a candidate's ray result is read (the C++ casts every step)
 local PICK_TRIES, PICK_EVERY = 3, 60  -- (owner 09:17 "3 tries ... might be too few, but we'll start there")
 local MOVE_STEP, SIDE = 60, 2
+local NO_HIT = 120                    -- (owner 2026-11-18 21:35 "I'd drop that to like 2 seconds")
 local SKIP_TICKS = 1200
 
 local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
@@ -1727,7 +1741,7 @@ local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
     if seen[m] or skip[m] then return end
     local mx, my, mz = world:position(m)
     if not (mx and monster_alive(world, m)) then return end
-    if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then return end
+    if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_RANGE ^ 2 then return end
     seen[m] = true
     list[#list + 1] = { id = m, why = why, d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2) }
   end
@@ -1784,7 +1798,10 @@ drive_fight = function(s)
   if s.pwet then the_end("the player swims") return false end
   if not hp or hp <= 0 then the_end("he is down") return false end
   local dpl = math.sqrt((px - nx) ^ 2 + (py - ny) ^ 2 + (pz - nz) ^ 2)
-  if dpl > FIGHT_LEASH then the_end(string.format("he is more than %d m from the player (the leash)", FIGHT_LEASH)) return false end
+  if dpl > FIGHT_RANGE + FIGHT_BITE then the_end(string.format("he is %.1f m from the player, outside the %d m radius", dpl, FIGHT_RANGE)) return false end
+  -- his hits since the last step (the hit handler notes them): on his target or on something else
+  local hits = h.my_hits or {}
+  h.my_hits = nil
   local A = h.atk
   if not A then
     clear_target()
@@ -1802,8 +1819,9 @@ drive_fight = function(s)
   local function hold_still() hold_at(a, nx, ny, nz) return true end
   local smode = (A.wide and mode == "Defensive") and "Aggressive" or mode
   local function repick(why)
-    A.phase, A.target, A.list, A.i, A.tries, A.t, A.checking, A.atk, A.blocked_t = "pick", nil, nil, 1, 1, t, nil, nil, nil
+    A.phase, A.target, A.list, A.i, A.tries, A.t, A.checking, A.atk = "pick", nil, nil, 1, 1, t, nil, nil
     A.best_d, A.prog_t, A.stall_said = nil, nil, nil
+    A.rep, A.rep_t, A.ok_d, A.ok_t, A.base = 0, nil, nil, t, nil
     A.list = fight_candidates(world, id, h, smode, px, py, pz, nx, ny, nz)
     log(string.format("fight %s: picks again (%s): %d candidate(s)", name, why, #A.list))
   end
@@ -1841,7 +1859,8 @@ drive_fight = function(s)
     local okr, reach = pcall(function() return cd.isTargetReachable end)
     local okd, rd = pcall(function() return tonumber(cd.distanceToTarget) end)
     if okr and reach then
-      A.phase, A.target, A.t0, A.atk, A.blocked_t = "fight", c.id, t, nil, nil
+      A.phase, A.target, A.t0, A.atk = "fight", c.id, t, nil
+      A.rep, A.rep_t, A.ok_d, A.ok_t, A.base = 0, nil, nil, t, nil
       log(string.format("fight %s: attacks %s (%s; %.1f m from him; ray clear; his health %s/%s; it: %s)", name, tostring(c.id), c.why, c.d,
         tostring(hp), tostring(hmax), describe(world, c.id)))
     else
@@ -1861,8 +1880,8 @@ drive_fight = function(s)
     repick("his target is dead")
     return hold_still()
   end
-  if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_LEASH ^ 2 then
-    repick(string.format("%s is more than %d m from the player", tostring(tg), FIGHT_LEASH))
+  if (mx - px) ^ 2 + (my - py) ^ 2 + (mz - pz) ^ 2 > FIGHT_RANGE ^ 2 then
+    repick(string.format("%s left your %d m radius", tostring(tg), FIGHT_RANGE))
     return hold_still()
   end
   pcall(function()
@@ -1872,50 +1891,59 @@ drive_fight = function(s)
   end)
   local d = math.sqrt((mx - nx) ^ 2 + (my - ny) ^ 2 + (mz - nz) ^ 2)
   local okr, reach = pcall(function() return cd.isTargetReachable end)
-  if okr and not reach then
-    -- blocked: the hop toward it, then SIDE m left, then SIDE m right, then he drops it
-    if not A.blocked_t then
-      A.blocked_t = t
-      local fx, fz = mx - nx, mz - nz
-      local fl = math.max(0.05, math.sqrt(fx * fx + fz * fz))
-      A.left = { x = nx - fz / fl * SIDE, y = ny, z = nz + fx / fl * SIDE }
-      A.right = { x = nx + fz / fl * SIDE, y = ny, z = nz - fx / fl * SIDE }
-      A.hopped = false
-      log(string.format("fight %s: the ray to %s is blocked (%.1f m away): repositioning", name, tostring(tg), d))
-    end
-    local k = math.floor((t - A.blocked_t) / MOVE_STEP)
-    if k == 0 then
-      if not A.hopped then
-        A.hopped = true
-        local fx, fz = mx - nx, mz - nz
-        local fl = math.max(0.05, math.sqrt(fx * fx + fz * fz))
-        local hop = math.min(fl, 2)
-        local vup, vh = launch_speeds(hop, math.max(0, math.min(2, my - ny)))
-        local okv, vx, vz = launch(world, id, fx / fl * hop, fz / fl * hop, hop, vup, vh)
-        edge_off(a)
-        h.djump = { t0 = t, untill = t + DJ_TICKS, x1 = nx + fx / fl * hop, y1 = ny, z1 = nz + fz / fl * hop, hp = hp, vx = vx, vz = vz, vy = vup, up = false }
-        log(string.format("fight %s: hops toward %s (%.1f m/s up)%s", name, tostring(tg), vup, okv and "" or " (could not set his speed)"))
-      end
-      return hold_still()
-    elseif k == 1 or k == 2 then
-      local p = k == 1 and A.left or A.right
-      if not A["said" .. k] then
-        A["said" .. k] = true
-        log(string.format("fight %s: moves %d m to the %s", name, SIDE, k == 1 and "left" or "right"))
-      end
+  local hit_tg, hit_other = false, nil
+  for _, e in ipairs(hits) do
+    if e.tg == tg then hit_tg = true
+    elseif e.obj then hit_other = hit_other or e.tg end  -- an object (another monster is no block)
+  end
+  if hit_tg then A.rep = 0 end
+  if hit_tg or not A.ok_d or d < A.ok_d - 0.3 then A.ok_d, A.ok_t = math.min(d, A.ok_d or d), t end
+  -- a reposition step under way: MOVE_STEP, then he tries again from where he is
+  if A.rep_t then
+    if t - A.rep_t < MOVE_STEP then
+      if A.rep == 1 then return hold_still() end
+      local p = A.rep == 2 and A.base.left or A.base.right
       hold_at(a, p.x, p.y, p.z)
       return true
-    else
+    end
+    A.rep_t, A.ok_t, A.ok_d = nil, t, d
+    log(string.format("fight %s: tries %s again from here (%.1f m away)", name, tostring(tg), d))
+  end
+  local why
+  if okr and not reach then why = "the ray is blocked"
+  elseif hit_other and not hit_tg then why = string.format("his attack hit something else (%s), not it", tostring(hit_other))
+  elseif t - A.ok_t >= NO_HIT then why = string.format("no hit on it and no closer for %d s", NO_HIT / 60) end
+  if why then
+    A.rep = (A.rep or 0) + 1
+    if A.rep > 3 then
       h.fight_skip = h.fight_skip or {}
       h.fight_skip[tg] = t + SKIP_TICKS
-      log(string.format("fight %s: gives up on %s: still blocked after the hop, left and right (not again for %d s)", name,
-        tostring(tg), SKIP_TICKS / 60))
-      repick("his target stays blocked")
+      log(string.format("fight %s: gives up on %s: %s after the hop, left and right (not again for %d s)", name,
+        tostring(tg), why, SKIP_TICKS / 60))
+      repick("he can't deliver attacks on his target")
       return hold_still()
     end
-  elseif A.blocked_t then
-    log(string.format("fight %s: the ray to %s is clear again after %.1f s", name, tostring(tg), (t - A.blocked_t) / 60))
-    A.blocked_t, A.said1, A.said2 = nil, nil, nil
+    A.rep_t, A.atk = t, nil
+    local fx, fz = mx - nx, mz - nz
+    local fl = math.max(0.05, math.sqrt(fx * fx + fz * fz))
+    if A.rep == 1 or not A.base then
+      A.base = { left = { x = nx - fz / fl * SIDE, y = ny, z = nz + fx / fl * SIDE },
+                 right = { x = nx + fz / fl * SIDE, y = ny, z = nz - fx / fl * SIDE } }
+    end
+    log(string.format("fight %s: can't deliver attacks on %s (%s; %.1f m away): %s", name, tostring(tg), why, d,
+      A.rep == 1 and "hops toward it" or A.rep == 2 and string.format("moves %d m to the left", SIDE) or string.format("moves %d m to the right", SIDE)))
+    if A.rep == 1 then
+      local hop = math.min(fl, 2)
+      local vup, vh = launch_speeds(hop, math.max(0, math.min(2, my - ny)))
+      local okv, vx, vz = launch(world, id, fx / fl * hop, fz / fl * hop, hop, vup, vh)
+      edge_off(a)
+      h.djump = { t0 = t, untill = t + DJ_TICKS, x1 = nx + fx / fl * hop, y1 = ny, z1 = nz + fz / fl * hop, hp = hp, vx = vx, vz = vz, vy = vup, up = false }
+      if not okv then log(string.format("fight %s: the hop: could not set his speed", name)) end
+      return hold_still()
+    end
+    local p = A.rep == 2 and A.base.left or A.base.right
+    hold_at(a, p.x, p.y, p.z)
+    return true
   end
   hold_at(a, mx, my, mz)  -- the native hook runs him at it and stops him 2 m off
   -- (logging, owner 2026-11-19 07:50 fences) a stall with the ray clear: no 0.3 m closer for half a second, not within
@@ -1978,6 +2006,7 @@ function F.setup(k)
   pcall(emf.on_hit, function(world, hit)
     if not hit or hit.kind ~= "hit" then return end
     pcall(note_threat, world, hit)  -- (fight, step 2) watching only
+    pcall(note_my_hit, world, hit)
     local mine = false
     for _, e in pairs(ent_of) do if e == hit.attacker or e == hit.source or e == hit.target then mine = true break end end
     if hit_watch[hit.attacker or 0] or hit_watch[hit.target or 0] then mine = true end

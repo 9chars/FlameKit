@@ -1166,6 +1166,21 @@ next restart (no yes for a restart yet).
      low things in his way. Logging 10:41 (live): every lunge/bite "he faces x deg off it; it at ..., moving v m/s, n m
      above/below him; him at ..." and at its end "he moved x m, now d m from it (was d0)".
      **Owner 10:40, verbatim:** "the dog should stay centered on me within my radius and kill anything in it".
+     Claude 10:42 proposed (a) the radius: a 15 m circle around the player that moves with him; only monsters inside
+     it; a target that leaves it is dropped; he ends the sequence outside it; it replaces the 30 m leash; (b) "can't
+     deliver attacks" = his attack lands on an object, or no closer for a while -> the reposition steps. **Owner
+     10:43, verbatim:** "yes. he definitely wasn't "stuck" though. he was idle and didn't come back to me, it looked
+     like he wasn't searching for the next target." Cause found in the log: 10:38:49 the C++ edge stop "27129 stops
+     at ... (ground 1.5 m ahead: a drop the player did not take, 0.88 m down)" (the edge stop is ON in fights,
+     targetOfMyTarget = false) -> he stood; the ray was clear and the target alive, so the sequence kept him "fighting"
+     and nothing moved him. **Built 10:5x (Lua, live by reload, NO restart):** FIGHT_LEASH removed; candidates (threats
+     too) within FIGHT_RANGE 15 m of the player; a target past 15 m from the player is dropped ("left your 15 m
+     radius"); the sequence ends when he is more than 15 + 2.5 m from the player. Can't deliver attacks = the ray
+     blocked, OR his attack hit an object and not it (his hits noted by note_my_hit; another monster is no block), OR
+     no hit on it and no 0.3 m closer for NO_HIT 2 s -> a reposition step (hop / 2 m left / 2 m right), 1 s, then he
+     tries again from there; after the three -> gives up on it (20 s) and picks again; a hit on it starts the steps
+     over. Logs "can't deliver attacks on X (why; d m away): hops/moves", "tries X again from here", "gives up on X:
+     why after the hop, left and right". Not done (to propose): the edge stop off in fights.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
