@@ -1102,6 +1102,26 @@ next restart (no yes for a restart yet).
      (distance, walkable, normal y), standing on" + "fight stall: ... in his way: ..." (once per stall). Material from
      before: the C++ probe has a ground ray and the game's walkable search (fkprobe.gr..., "ground program",
      PathGridSystem) from the 2026-11-17 experiments.
+   - Owner 08:33: "he's trying to go after bats, the bats move around a lot so he's not tracking them very well. he
+     makes some attacks, but a lot of times he's not facing them. I also notice he keeps keeps coming back to me
+     instead of staying locked on a monster." Log 08:31-08:33: bats faction 6, 1.4-2.4 m above him; 28 attacks, one
+     hit the bat 63138 for 350 (killed it), the rest hit objects for 0; the 21:36 out-of-reach rule dropped a bat every
+     2-3 s (~15 times) -> nothing left -> back to following. C++ faces the target only when he stands.
+   - **Owner 09:03, THE ATTACK SEQUENCE SPEC, verbatim:** "we need to keep this simple. let me restate what
+     specifically needs to happen and spell out what I think you need to do exactly: once he detects and goes into
+     "attack mode" the code that makes him follow and return to me needs to stop until he gives up on his attack
+     sequence. attack sequence: he picks the nearest target. he shoots a ray at the target to make sure there's
+     nothing blocking him. he shoots the ray to try and avoid fences, walls, trees, and objects that could block his
+     path to the monster. if the rays gets blocked, he picks the next nearest target until he finds one that isn't
+     blocked. this ray stays up the whole time (or is shoot out repeatedly during the fight) to make sure nothing new
+     blocks him and the monster he is fighting. he locks on to that target, always facing the target no matter how it
+     moves. of the target moves, he moves to face it. he runs to the target attacks as frequently as he can. he does
+     not leave it and attacks it until its dead unless the ray becomes blocked and he can no longer deliver attacks.
+     monsters move around a lot during the fight so he will need to frequently check for a block with his ray. if he
+     gets blocked he can try to jump and move around to reposition himself in an attempt to get around the block. if
+     he cannot, he stops attempting to fight that target and repeats the attack sequence to find another target and
+     continue fighting. the attack sequence ends when he cannot find another target to attack after several tries OR
+     until all the monsters are dead."
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
