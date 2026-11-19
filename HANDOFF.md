@@ -416,7 +416,9 @@ most sense"
   starts just under it instead of 5 m up; nothing overhead = as now; both hits logged per jump. Needs buildprobe + a
   server restart. Owner 17:10: "no, but you maybe right, I would like to find more situations first so we can test
   the fix. currently I don't have a situation where the problem and fix can be tested" -> PARKED until the owner has
-  a spot where it happens (then: build, restart, test there).
+  a spot where it happens (then: build, restart, test there). **2026-11-18 19:10: probably fixed by the simplified
+  following** (the ray step jump that misread the overhang is removed; steps up come from the trail). WATCH on
+  stairs under overhangs.
 - BOARDWALK (owner 17:20): "im on a boardwalk suspended above the air partly that connects to land, when I walk out to
   it, he treats it like its not there, like its a cliff face going downward ... gives me the cant follow then
   teleports". Log 17:17-17:20: five "gave up" with the crumb 0.4-1.1 m away on his level; the native edge stop:
@@ -472,8 +474,9 @@ most sense"
     drops (11.5 m, 24.5 m) -> "can't follow: drop" -> respawn after 2 s; a glide put-away and return; jump follows
     landing within 0.6 m. WATCH: 18:58:18 a jump follow for a landing with jump count 0 but "second push" (the
     double-jump guess fired during a fall); he hopped 3.4 m down, landed fine.
-  - Owner 19:00: "i'm pretty satisfied so far". Old C++ DLL still on the server as
-    `mods\fk_server_probe\fk_server_probe.dll.old_1841` (revert copy) until the owner says.
+  - Owner 19:00: "i'm pretty satisfied so far". Owner 19:10 "lets do the clean up now": the old C++ DLL
+    (`fk_server_probe.dll.old_1841`) deleted; the overhang item marked probably fixed. The pre-change versions are in
+    git (server_probe.cpp before f3229be; npc_probe.lua before f3229be).
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
