@@ -1181,6 +1181,15 @@ next restart (no yes for a restart yet).
      tries again from there; after the three -> gives up on it (20 s) and picks again; a hit on it starts the steps
      over. Logs "can't deliver attacks on X (why; d m away): hops/moves", "tries X again from here", "gives up on X:
      why after the hop, left and right". Not done (to propose): the edge stop off in fights.
+     **Owner 11:11, verbatim:** "the radius change definitely kept him more focused at least the last 2 fights. he still
+     struggles to face the targets however. he attacks, lunges and then takes too long to turn around. now there are 2
+     monsters attacking me and he took like 10 seconds to even respond to that, still better than before". Data
+     11:10:09-11:10:59 (facing logging): degrees off the monster when an attack starts: -5, -23, -156, -121, -42, -119,
+     -136, +93, +101, -23, -89, -79; the monsters mostly standing (0.0 m/s) -> not a moving target: the C++ look
+     direction does not turn him in time while he stands; lunges carried him 4-5 m the wrong way ("moved 4.2 m, now
+     7.0 m from it"), hits on plant 2579759654 for 0 -> he gave up on 36988 (11:10:15) and 36978 (11:10:28), skipped 20 s;
+     the sequence ended 11:10:31 with both skipped although they were hitting the player; it started again at 11:10:48
+     when the skip ran out (the owner's ~10 s wait). Then bites from 2.4 and 1.1 m killed both (420 each).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
