@@ -1022,7 +1022,7 @@ local function roster_save()
   if not roster.loaded then return false end
   local out = { next_n = roster.next_n, main = roster.main, npcs = {} }
   for _, r in ipairs(roster.list) do
-    out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight,
+    out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight, sus_base = r.sus_base,
       owner = r.owner, controllers = r.controllers, names = r.names, out = r.out, ent = ent_of[r.name] }
   end
   local okj, text = pcall(emf.json.encode, { npc_roster = out })
@@ -1065,32 +1065,38 @@ local function match_level(world, id, r, player)
 end
 
 -- (owner 2026-11-18 21:35 "he definitely needs "Armor"", 21:37 "build it") armor: he takes ARMOR of the damage of every
--- type: his 19 DamageSusceptibility multipliers (one per damage type) are the base ones times ARMOR. The base is the
--- template's (world:template), or else the first values seen on this body, so it is never scaled twice. Checked at
--- setup and every second (the game may set them again, e.g. when it rescales his level); logged when written.
+-- type: his 19 DamageSusceptibility multipliers (one per damage type) are the base ones times ARMOR. The base is read
+-- once from a body and kept in the roster (r.sus_base), so it is never scaled twice (the template's half is not
+-- readable: world:template gave nothing, 21:38). Checked at setup and every second (the game may set them again, e.g.
+-- when it rescales his level); logged when written.
 local ARMOR = 1 / 3
+-- the skeleton hound's own multipliers (logged 21:22); the 21:38 version scaled the live bodies without keeping the
+-- base: values that are exactly these times ARMOR are taken back to these once
+local HOUND_SUS = { 0, 1, 0.8, 0.6, 1.5, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1.2, 0.6, 0.8, 1 }
 local armor_err = false  -- an armor failure is logged once
-local armor_base = {}  -- entity -> { 19 base multipliers }
 local function match_armor(world, id, r)
   local ds = world:get("DamageSusceptibility", id)
   if not ds then return end
-  local base = armor_base[id]
-  if not base then
-    base = {}
-    local okt, tds = pcall(function() return world:template("DamageSusceptibility", id).dataStorage end)
+  local base = r.sus_base
+  if type(base) ~= "table" or #base < 19 then
+    local v, scaled = {}, true
     for i = 1, 19 do
-      local v = okt and tds and tonumber(tds[i])
-      base[i] = v or tonumber(ds.dataStorage[i]) or 0
+      v[i] = tonumber(ds.dataStorage[i]) or 0
+      if math.abs(v[i] - HOUND_SUS[i] * ARMOR) > 0.001 then scaled = false end
     end
-    armor_base[id] = base
+    base = scaled and HOUND_SUS or v
+    r.sus_base = {}
+    for i = 1, 19 do r.sus_base[i] = base[i] end
+    base = r.sus_base
+    roster_save()
     local parts = {}
     for i = 1, 19 do parts[i] = string.format("%.2f", base[i]) end
-    log(string.format("armor: %s (%s) base susceptibility [%s] (%s)", r.name, tostring(id), table.concat(parts, " "),
-      okt and tds and "the template's" or "the body's"))
+    log(string.format("armor: %s (%s) base susceptibility kept in the roster: [%s]%s", r.name, tostring(id), table.concat(parts, " "),
+      scaled and " (the body was already armored: the hound's own values)" or " (from the body)"))
   end
   local changed = false
   for i = 1, 19 do
-    local want = base[i] * ARMOR
+    local want = (tonumber(base[i]) or 0) * ARMOR
     if math.abs((tonumber(ds.dataStorage[i]) or 0) - want) > 0.001 then
       ds.dataStorage[i] = want
       changed = true
@@ -2128,7 +2134,6 @@ function F.tick(world)
         if not oka and not armor_err then armor_err = true log("armor: " .. tostring(erra)) end
       end
     end
-    for id in pairs(armor_base) do if not name_of[id] then armor_base[id] = nil end end
   end
   for id, r in pairs(fullrecs) do
     if t > r.untill or not world:position(id) then
