@@ -1019,6 +1019,15 @@ next restart (no yes for a restart yet).
    away; Attack opens a second wheel Passive / Defensive / Aggressive / Healing (title shows the current mode); the
    pick is matched by its label (the game side sends the label back, so no game update); kept in the roster as
    `fight` (none = Passive, Claude's default); notice "<name>: <mode>."; log "fight: <name> (<id>) <was> -> <mode>".
+   Owner 20:22: "looks good for now seems to work" (log: Healing -> Passive -> Defensive).
+   **Step 2 (watching only) live 20:24-20:26 (server Lua, git):** threats from the hit handler (a monster's hit on a
+   following companion or his player); a monster scan for Aggressive companions (world:entities() once a second, walked
+   over steps within 30 ms / 6000 entities; "fight scan: ..." once a minute); once a second per following companion
+   "fight <name>: <mode>: would attack <id> (<why>; faction, health; m from him)" / "nothing to attack" / "never
+   attacks", "; would run back: ..." (more than 30 m from the player; Defensive: hurt under 30% and the player more
+   than 15 m away), logged when it changes. Monster = DynamicEnemy01BehaviorState, not ours, faction not 7/8/11; alive
+   = NetworkHealth.health > 0. His health: Health.dataStorage [1]=3680 [2]=0 [3]=3680 [8]=3680 at full health: max
+   taken as [3], NOT confirmed (the slots are logged again the first time he is hurt).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
