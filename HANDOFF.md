@@ -472,6 +472,8 @@ most sense"
     drops (11.5 m, 24.5 m) -> "can't follow: drop" -> respawn after 2 s; a glide put-away and return; jump follows
     landing within 0.6 m. WATCH: 18:58:18 a jump follow for a landing with jump count 0 but "second push" (the
     double-jump guess fired during a fall); he hopped 3.4 m down, landed fine.
+  - Owner 19:00: "i'm pretty satisfied so far". Old C++ DLL still on the server as
+    `mods\fk_server_probe\fk_server_probe.dll.old_1841` (revert copy) until the owner says.
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
