@@ -448,7 +448,9 @@ most sense"
   come up with a simplified solution". 18:06: "write it up, maybe rely more one the new meta data from the bread
   crumbs... he can't teleport easily now so not ever situation needs to be perfectly handled..." (read as: he CAN be
   respawned easily now). The plan: the trail is the only truth; no edge stop and no ray step jump on the trail; ups and
-  downs from the crumbs' meta data; one stuck rule = respawn. Waiting for the owner's review.
+  downs from the crumbs' meta data; one stuck rule = respawn. Owner 18:08: "I mispoke. I meant to say he CAN teleport
+  easily now". **Owner 18:35, GO:** "lets do it. if rather have a simplified system that might need some edge cases
+  handled rather than constantly tweaking numbers that dont get us anywhere long term". (Building 18:35-.)
 
 ### Body, side and stats
 - Body: Enemy_Skeleton_Hound `18eefd30-da1d-49f5-a6d8-7da8f2d01f43` (owner's pick) [L].
