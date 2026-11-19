@@ -1885,8 +1885,14 @@ drive_fight = function(s)
       log(string.format("fight %s: attacks %s (%s; %.1f m from him; ray clear; his health %s/%s; it: %s)", name, tostring(c.id), c.why, c.d,
         tostring(hp), tostring(hmax), describe(world, c.id)))
     else
-      log(string.format("fight %s: %s is blocked (the ray hits something at %s m of %.1f m), the next one", name, tostring(c.id),
-        okd and rd and string.format("%.1f", rd) or "?", c.d))
+      -- (owner 2026-11-19 14:02 a bat a little higher, "the dog doesn't see it?") where it and he are, and its model
+      local cx, cy, cz = world:position(c.id)
+      local model = "?"
+      pcall(function() model = tostring(world:template("ModelResource", c.id).model) end)
+      log(string.format("fight %s: %s is blocked (the ray hits something at %s m of %.1f m), the next one; it at %s, %s; him at %.1f %.1f %.1f; its model %s",
+        name, tostring(c.id), okd and rd and string.format("%.1f", rd) or "?", c.d,
+        cx and string.format("%.1f %.1f %.1f", cx, cy, cz) or "?", cy and string.format("%.1f m %s him", math.abs(cy - ny), cy >= ny and "above" or "below") or "?",
+        nx, ny, nz, model))
       A.blocked_ids = A.blocked_ids or {}
       A.blocked_ids[c.id] = true
       A.i, A.checking = A.i + 1, nil
