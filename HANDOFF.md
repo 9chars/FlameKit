@@ -1205,6 +1205,17 @@ next restart (no yes for a restart yet).
      the player again is a candidate at once ("is no longer skipped: it hit him or the player again"). "Default for any
      companion": all companions use this one drive_fight. Lunge reach: still to be measured (owner offered to search
      or test it).
+     Power cut 11:38 (no fights after the 11:19 install); files checked intact; restart 12:47 via the helper (its watcher
+     had to be started by the owner first: restart_watch.cmd). **Test 12:56-12:58:** switching works (12:57:13-37 five
+     kills in a row, nearest first); facing FIXED (17 attacks, 0 deg off at the start, worst 12; before up to 156);
+     9 lunges MISSED from 2.7-4.0 m: the monsters (faction 6) often moving up to 6 m/s, the lunge carries him ~5 m and
+     ends past it, the monster behind him (the overshoot the owner predicted); a kill reset the attack, so killing
+     attacks had no "HIT/MISSED" line. Weak spots told: all candidates blocked -> he stands 3 s and ends (as the spec
+     says); he gave up on 26963 after lunges into a plant. **Owner 13:57, verbatim:** "yes log it, maybe increase his
+     attack range by 20 m around me which will help". Logging built 13:58 (live): each hit as it lands ("his lunge's
+     hit landed x s after the start on it/object/monster: he is d m from it, moved m"), his lunge at 0.4 s ("he is d
+     m from it (d0 at the start), moved m; it moved m"), the killing attack ("his lunge from d m killed it x s after
+     it started"). The radius: asked the owner whether "by 20 m" means a 20 m radius (from 15) or 35 m; not built.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
