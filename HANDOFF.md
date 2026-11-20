@@ -1672,6 +1672,11 @@ next restart (no yes for a restart yet).
    no fish, flying birds, tests, deprecated), "Pets" first in the Kind drop-down; server ui_kind accepts them (reply
    says pets do not follow yet); still_ours accepts a companion-faction body with DynamicAnimal (no monster AI) so a
    reload does not spawn a second animal. A pet body runs its own animal AI: drive_read errors once per body (logged).
+   Owner 11:53 "why did you leave out flying birds?" (my own call, unasked) / 11:55 "yes add them.. everything is
+   untested so we won't know until we figure it out --- the cats and dogs, do you label what each type is or...?":
+   0.15.314 adds Animal_Wildlife_Flying_Bird 0eaf60f1-... as "Bird (flying)" (the only flying one). Fish still out.
+   Cats/dogs are labelled by the colour in their template names (Dog bright/dotted/dark/black/white, Cat
+   black/striped/bright).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
