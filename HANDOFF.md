@@ -1648,6 +1648,13 @@ next restart (no yes for a restart yet).
    Enter sends, Esc/click elsewhere drops); Layer::chr + WM_CHAR in the overlay's window proc. Tests: invtest (server
    actions), a client rows check, run.lua ALL PASSED. Needs a server restart (new channel + the open event) and a game
    restart (update ready 10:14:38). Per-kind profiles / attacks (task 2 of the plan): NOT built yet.
+   Restart both 10:31 (owner "yes"): 0.15.309 runs on both. **Owner 10:47 "okay I see the screen... but.. how do I add
+   a new entry?"** / 10:48 "theres no buttons at the top" / 11:12 "sure, but there's a new hitch in the design.....
+   some players wants pet as their main companions too.. so with that complicate how the companion roster works?"
+   0.15.310 (Development 11:15, DLL edfa2ee4; server reloaded 11:13): "New companion" button at the top (op do what=new
+   -> roster_cmd new <asking player>: a hound of his, next to him, following); fix: label rows need {label = true,
+   text = ...} (they were blank). Pets as mains: proposed a type per roster entry (companion/pet), Kind list by type,
+   New companion / New pet, main stays one per player; ASKED: one main total or one main companion + one main pet.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
