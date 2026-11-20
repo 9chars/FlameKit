@@ -1613,6 +1613,9 @@ next restart (no yes for a restart yet).
    DynamicEnemy01BehaviorState fields, also drive_scan's filter), no attack moves. Untested in game.
    **Owner 09:51: "yes pets are a weaker companion, they don't die, but they don't fight, maybe they can heal and hold
    small inventory".** So far: no death, no fighting; maybe heals and a small inventory (smaller chest). Not built.
+   **Owner 09:52: "ok lets make sure we can resuse all that code. before we add pets, I want to finish building out the
+   roster management system"**: order = roster management (item 9) first, pets after, and the companion code (healing,
+   chest, follow) kept reusable for pets. Waiting for the owner's spec of the roster tab.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
