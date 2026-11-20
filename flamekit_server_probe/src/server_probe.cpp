@@ -486,8 +486,12 @@ void fight_step(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::DynamicEnem
         prev = e;
     }
     const uint8_t ask = st->combatData.selectedAttackIndex;
-    if (ask == 0 || ask == 1) {
-        start_sequence(w, id, ai, ask == 0 ? 0x63FE3237u : 0xC34733A8u, ask == 0 ? "fight bite" : "fight lunge");
+    // 0 bite, 1 lunge (the wolf's attacks), 2 the heal cue: Wolf Shout 0x89A1BC53 (owner 2026-11-19 20:59/21:01 "I want
+    // Wolf Shout", "every heal would be a good queue that its happening")
+    if (ask == 0 || ask == 1 || ask == 2) {
+        static const uint32_t kSeq[3] = { 0x63FE3237u, 0xC34733A8u, 0x89A1BC53u };
+        static const char* kWhy[3] = { "fight bite", "fight lunge", "heal shout" };
+        start_sequence(w, id, ai, kSeq[ask], kWhy[ask]);
         st->combatData.selectedAttackIndex = 255;
     }
     const uint32_t target = st->combatData.lastTargetId.id;

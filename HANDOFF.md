@@ -1325,6 +1325,20 @@ next restart (no yes for a restart yet).
      (replaces Lick Wounds; asked again: for every heal?).
      **Owner 21:01, verbatim:** "every heal would be a good queue that its happening" -> Wolf Shout plays on EVERY heal
      (his own and the player's), as the cue that a heal happens.
+     **Owner 21:01, verbatim:** "yeah lets build it now". **Built 21:1x (needs the restart for the shout):** Lua
+     `drive_heal` (called every tick after drive_upkeep, never takes over the movement): mana_of[name] (FlameKit's own,
+     MANA_MAX 800, refill MANA_REFILL 10/s in every mode, full again after a Lua reload); a heal = emf.attribute_add
+     "health" 25 % (HEAL_PART) of the target's max, 200 mana (HEAL_COST), HEAL_GAP 4 s apart, plays Wolf Shout
+     (combatData.selectedAttackIndex 2); Healing: the player below 60 % (HEAL_BELOW) within 20 m first, else himself
+     below 60 %; Defensive/Aggressive: himself below 40 % (HEAL_BELOW_FIGHT); Passive: no heals, recovers 2 % of his max
+     a second (RECOVER_PART) after 10 s without a hit (RECOVER_AFTER; h.hit_t set in note_threat), no mana, no shout.
+     Not while one of his attacks plays; the fight starts no attack while a move is asked or within SHOUT_TICKS 1.5 s of
+     a heal; the heal waits for the fight's first step (it clears selectedAttackIndex). His health from
+     Health.dataStorage [1]/[3]; the player's from emf.attribute "health"/"max_health". Logs "heal <name>: heals the
+     player/himself +n (... before; mode); mana a -> b of 800; Wolf Shout", "would heal ... but has n mana",
+     "recovers ...", "recovered". C++: selectedAttackIndex 2 -> start_sequence 0x89A1BC53 "heal shout". Fake world:
+     Healing/Aggressive/Passive as above; drive_harness identical on 5 seeds. Not proven in game: emf.attribute_add
+     "health" on the hound's body.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
