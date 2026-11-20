@@ -1672,6 +1672,11 @@ local function on_call(world, from)
     say(world, player, "You have no companion yet.")
     return
   end
+  if inv.open[r.name] then  -- (owner 2026-11-20 08:13) no call while his chest is open
+    say(world, player, r.name .. ": Close the chest first.")
+    log(string.format("call: %s refused for %s: his chest is open", r.name, tostring(account)))
+    return
+  end
   local old = ent_of[r.name]
   if old then
     drives[old], name_of[old] = nil, nil
