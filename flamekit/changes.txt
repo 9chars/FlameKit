@@ -1,3 +1,6 @@
+0.15.332 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt is set as the animal's default action too (the game kept clearing it before an E press was handled). Needs a server restart. Server only: no game change.
+
 0.15.331 Nov 20, 2026
 - Companions (test, local server only): a pet's "Talk" prompt is also kept in place when the game checks the E press, so pressing it opens the companion wheel. Needs a server restart. Server only: no game change.
 

@@ -452,13 +452,18 @@ void pet_offers(int where) {
         if (!o) continue;
         if (where != 3) {
             const bool ours = o->overrideSequence.value == kTouchSeq && o->overrideVerbLocaId.value == kTalkVerb &&
+                              o->defaultSequence.value == kTouchSeq && o->defaultVerbId.value == kTalkVerb &&
                               o->isOffered && !o->isDisabled;
             if (!ours && where == 2 && now >= g_reset_log_at.load()) {
                 g_reset_log_at.store(now + 10000);
-                EMF_LOG(kMod, "pet offer %u before interaction_attempt: the game's again (seq %08x verb %08x offered %d "
-                        "disabled %d): set back", id, o->overrideSequence.value, o->overrideVerbLocaId.value,
-                        (int)o->isOffered, (int)o->isDisabled);
+                EMF_LOG(kMod, "pet offer %u before interaction_attempt: the game's again (seq %08x/%08x verb %08x/%08x "
+                        "offered %d disabled %d): set back", id, o->defaultSequence.value, o->overrideSequence.value,
+                        o->defaultVerbId.value, o->overrideVerbLocaId.value, (int)o->isOffered, (int)o->isDisabled);
             }
+            // (14:37: before the press check the override was 0 again: a reset program clears the override, so with
+            // the default at 0 the press had no sequence to play) the default is ours too
+            o->defaultSequence.value = kTouchSeq;
+            o->defaultVerbId.value = kTalkVerb;
             o->overrideSequence.value = kTouchSeq;
             o->overrideVerbLocaId.value = kTalkVerb;
             o->isOffered = true;
