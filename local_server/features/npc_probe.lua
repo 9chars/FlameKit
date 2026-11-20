@@ -983,6 +983,15 @@ local function drive_steer(s)
         end)
         tx = px + math.cos(yaw) * o[1] + math.sin(yaw) * o[2]
         tz = pz - math.sin(yaw) * o[1] + math.cos(yaw) * o[2]
+        -- (12:24: they still stood together) the C++ stops him within 2 m of homeZonePosition (the player): for a slot
+        -- that point is put 1.5 m past his place, on his way there, so he stops about 0.5 m from his place
+        local ux, uz = tx - nx, tz - nz
+        local ud = math.sqrt(ux * ux + uz * uz)
+        if ud > 0.01 then
+          a.homeZonePosition.x, a.homeZonePosition.z = tx + ux / ud * 1.5, tz + uz / ud * 1.5
+        else
+          a.homeZonePosition.x, a.homeZonePosition.z = tx + 1.5, tz
+        end
       end
     end
   end
