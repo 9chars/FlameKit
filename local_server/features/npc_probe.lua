@@ -1540,7 +1540,10 @@ function inv.close(world, r, why)
   local gone = not world:position(c.chest)  -- removed by something else: his record keeps the last save
   if gone then log(string.format("inventory %s: chest %s is gone; his record keeps the last save", r.name, tostring(c.chest))) end
   if not gone then pcall(inv.log_gear, world, r.name, c.chest, "closing") end
-  if c.state == "open" and not gone and not inv.snapshot(world, r, c) then
+  -- within SAVE_EVERY of the filling the new gear may not be set up yet: his record from before the opening stays
+  local fresh = c.ready_t and world:tick() < c.ready_t
+  if fresh then log(string.format("inventory %s: closed right after the filling: his record from before stays", r.name)) end
+  if c.state == "open" and not gone and not fresh and not inv.snapshot(world, r, c) then
     log(string.format("inventory %s: the chest could not be read: it stays open for now", r.name))
     return false
   end
@@ -1573,11 +1576,11 @@ function inv.tick(world)
       if t >= c.at and not c.busy then
         local e = table.remove(c.queue, 1)
         if not e then
-          c.state = "open"
+          -- (2026-11-20 08:24:10 in game: read at once, a fresh gear piece showed level 0 / rarity 0 / damage 0, item
+          -- state 64; right 0.5 s later) the first save waits SAVE_EVERY after the filling
+          c.state, c.ready_t = "open", t + inv.SAVE_EVERY
           r.chest.state = "open"
-          inv.snapshot(world, r, c)
           roster_save()
-          pcall(inv.log_gear, world, name, c.chest, "filled")
           log(string.format("inventory %s: chest filled%s", name, #c.rest > 0 and string.format(" (%d stack(s) did not fit: kept in his record)", #c.rest) or ""))
         else
           c.busy = true
@@ -1606,7 +1609,11 @@ function inv.tick(world)
     else
       if t - c.t0 >= inv.OPEN_MAX then
         inv.close(world, r, "after 5 minutes")
-      elseif (t - c.t0) % inv.SAVE_EVERY == 0 then
+      elseif c.ready_t and t >= c.ready_t and not c.gear_logged then
+        c.gear_logged = true
+        pcall(inv.log_gear, world, name, c.chest, "filled")
+        inv.snapshot(world, r, c)
+      elseif (not c.ready_t or t >= c.ready_t) and (t - c.t0) % inv.SAVE_EVERY == 0 then
         inv.snapshot(world, r, c)
       end
     end

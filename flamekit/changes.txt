@@ -1,3 +1,6 @@
+0.15.293 Nov 20, 2026
+- Companions (test, local server only): fix: the companion's chest no longer saves its contents in the first second after filling, when a fresh gear piece can still read as level 0 and common; a crash in that moment could have saved it that way. Server only: no game change.
+
 0.15.292 Nov 20, 2026
 - Companions (test, local server only): while the companion's chest is open, E on the companion closes the chest at once (no wheel), and its prompt shows the game's door "Close" word (test: if it shows only "E", the word's id is wrong). Server only: no game change.
 

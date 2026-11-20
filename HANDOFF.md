@@ -1495,6 +1495,13 @@ next restart (no yes for a restart yet).
      ad7e2be5); UNPROVEN: FNV-1a of its offToOnVerb (0af70198-...) = 0x4E82E309, not EMF_VERB_OPEN 0x0C2E4515, so the
      door's words may be other entries or the hash another; TEST: the prompt shows "E Close" or just "E". Language data:
      not in enshrouded.kfc's 60 biggest resources (the .dat files hold the rest).
+     **In game 08:23-08:24 (the owner's round trip):** a weapon level 46, rarity 3, perks 4/0 unlocked, base damage 51
+     went out and came back the same (08:23:14 closing, 08:24:22 closing). It had 0 unlocked, so the unlocked-perks
+     question is still OPEN (needs a piece with unlocked > 0). BUG found there: at 08:24:10.555 (the filling's own tick)
+     the fresh copy read level 0 / rarity 0 / damage 0, item state 64, and the snapshot SAVED that (correct again 0.5 s
+     later): a crash in that window would have made it common. 0.15.293: after the filling c.ready_t = t + SAVE_EVERY;
+     the first snapshot and the "filled" gear log wait for it; a close before it keeps the record from before the
+     opening. The "Close" prompt (0.15.292) not seen yet: the chest was closed before that install.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
