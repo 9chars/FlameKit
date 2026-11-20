@@ -2442,14 +2442,14 @@ function F.setup(k)
         local c = n and HEAL_FX[n]
         if not c then emf.reply("npc healfx: 1-" .. #HEAL_FX) return end
         local okp, ids = pcall(players.ids, world)
-        local pid = okp and ids and ids[1]
+        local pid = tonumber(args[3]) or (okp and ids and ids[1])  -- (22:17) healfx <n> [entity]: on that body
         if not pid then emf.reply("npc healfx: no player") return end
         local x, y, z = world:position(pid)
         if not x then emf.reply("npc healfx: no player") return end
         local oks, fid = pcall(emf.spawn, world, c[2], x, y, z)
         if oks and fid and fid ~= 0 then
           heal_fx_shown[#heal_fx_shown + 1] = { id = fid, at = world:tick() + 600 }
-          log(string.format("heal fx %d (%s) shown on the player as entity %s", n, c[1], tostring(fid)))
+          log(string.format("heal fx %d (%s) shown on %s as entity %s", n, c[1], tostring(pid), tostring(fid)))
           emf.reply("healfx " .. n .. ": " .. c[1])
         else
           log(string.format("heal fx %d (%s) refused (%s)", n, c[1], tostring(fid)))
