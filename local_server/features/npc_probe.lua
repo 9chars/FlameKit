@@ -1688,6 +1688,8 @@ function inv.on_accept(world, e)
           tostring(guest), tostring(acc)))
         inv.close(world, r, "someone else opened it")
         if guest then say(world, guest, name .. "'s chest: only the companion's owner can open it.") end
+      else  -- (09:24) proof the game's open event reaches us for this chest (the check above rests on it)
+        log(string.format("inventory %s: chest %s opened by its owner (player %s)", name, tostring(host), tostring(guest)))
       end
       return
     end
