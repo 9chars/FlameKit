@@ -1920,6 +1920,11 @@ next restart (no yes for a restart yet).
    the boost (cause not known: the hook after locomotion_execution, its Velocity write, or its log from a worker
    thread). The DLL put back: e7000094 (29afa6fa kept as .bad_1650). 0.15.352: server_probe.cpp back to 0.15.346's
    (8e22ed7a). Needs a restart. Option 1 needs another way (or option 2).
+   Restart 16:52 (owner "restart it"): the helper FAILED (no save within 90 s: the hung server could not save; it
+   never force-stops); the owner ended the server (16:56 "done"); up 16:57:05 on e7000094. Owner 17:00 "was it a bug
+   orrr?" (yes: ours; the freeze came at the first real boost) / **17:00 "can we find out? dont care if we crash it
+   again?"**. 0.15.353 test A: 0.15.351's boost without the EMF_LOG inside the hook (counters only; boost_report on the
+   server's on_tick logs "pet boost: N boosts so far ..." every 5 s). Freeze again = the Velocity write itself.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
