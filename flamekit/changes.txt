@@ -1,3 +1,6 @@
+0.15.350 Nov 20, 2026
+- Companions (test, local server only): fixed: since 0.15.349 companions and pets stopped following (an error in the new "near the player" check). Server only: no game change.
+
 0.15.349 Nov 20, 2026
 - Experimental tab, Debug: "Companion follow notices" (off by default). The companion notices about following (can't follow you, can't get up there, afraid to follow) only show with it on; they are for finding problems.
 - Companions (test, local server only): a companion within 6 m of you and level with you is never "can't follow" (one stood 1.6 m from its place and was respawned every 5 s while you stood still). Server part: no game change.

@@ -1897,6 +1897,11 @@ next restart (no yes for a restart yet).
    4) stood 1.6 m from his place (SLOT_AT 1.5), 3.3 m from the player, never closer: can't follow -> respawn at the
    same spot every 5 s. 0.15.349: drive_stuck: within SLOT_NEAR 6 m of the player and NEAR_LEVEL 1.5 m level with him
    = progress (never can't follow there); settle counts a place within SETTLE_PLACE 2.5 m as reached.
+   0.15.349 server Lua 16:22:41 (the loop stopped); Development release 0.15.349 (sig good); restart 16:24 (owner
+   "yes"), client v0.15.349. **Owner 16:28: "I ran from my pets and none of the mare following me or teleporting to
+   me....?"**: 16:26:42 "drive <id>: npc_probe.lua:980: attempt to compare number with nil" = drive_stuck read
+   SLOT_NEAR, declared further down (a global nil). 0.15.350: SLOT_NEAR / SLOT_GAP declared above drive_stuck. Check
+   from now on: texluac -l -p <file> | grep '_ENV "' must list only real globals.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

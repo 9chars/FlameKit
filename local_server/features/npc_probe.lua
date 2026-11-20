@@ -950,6 +950,9 @@ end
 local SHOUT_HOLD = 120
 local SLOT_AT = 1.5  -- (15:55) metres from his place around the player that count as "there" (see drive_stuck)
 local NEAR_LEVEL = 1.5  -- (16:20) within SLOT_NEAR of the player and this much higher or lower: no "can't follow"
+-- (16:28: drive_stuck used SLOT_NEAR before it was declared further down: nil, every follower's drive failed) the
+-- followers' places (drive_steer) are used within SLOT_NEAR of the player, at least SLOT_GAP apart
+local SLOT_NEAR, SLOT_GAP = 6, 2.5
 local function drive_stuck(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local nx, ny, nz = s.nx, s.ny, s.nz
@@ -1006,7 +1009,7 @@ end
 -- bunch right up on me"; 16:00 "pets and companion monsters too") the places 1.5 times as far out (were 1.6-3.3 m from
 -- the player, 1.5 m apart), SLOT_NEAR 6 (was 4) so the farther places are still used, and on the trail TRAIL_GAP
 local SLOTS = { { -2.4, -1.2 }, { 2.4, -1.2 }, { 0, -3.3 }, { -3.6, -3.3 }, { 3.6, -3.3 } }  -- (12:22) followers 2..6
-local SLOT_NEAR, SLOT_GAP = 6, 2.5
+-- (SLOT_NEAR, SLOT_GAP: declared above drive_stuck, which uses SLOT_NEAR too)
 local TRAIL_GAP_GO = 3.5  -- (16:02) a waiting follower goes on once the one ahead is this far
 -- (owner 16:08 "the spacing changes made it hard for me to go up to one of the pets, the run around a lot when I try
 -- to move ... maybe theres a small radius we can add so as long as they're in that radius around me, they don't move
