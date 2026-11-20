@@ -1952,6 +1952,13 @@ next restart (no yes for a restart yet).
    that change, also 20 second skip might be too long a wait also? drop it down to like 10 seconds?"**. 0.15.357:
    SKIP_TICKS 600 (10 s, was 1200); fight_candidates: a skipped monster within F.SKIP_NEAR 6 m of the player is a
    candidate again ("... is no longer skipped: it is within 6 m of the player"); a hit already did that.
+   Owner 17:31 "nothing was blocking the companion that I could see" (the straight ray, 4.8 m down, likely hit the
+   slope at 3.8 m; offered a more forgiving ray: not answered). **Owner 17:32 "maybe you reverted a previous change, but
+   chests aren't labeled by he pets name now"**: not a revert: 17:12:54 N1-N5 registered (5 names), 17:13:45 "N2..N5 is
+   NO LONGER in the server's table (133 names)" = once the world's own player strings had loaded, ours were gone
+   (N1 stayed: in the save); 17:31:30 N4's chest key 0. Same as the 14:47 miss (WATCH solved). 0.15.358: names_tick
+   registers a name again when it is no longer there (log "names: '<n>' registered again"; the file read once more).
+   Needs the probe DLL (restart).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

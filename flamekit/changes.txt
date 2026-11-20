@@ -1,3 +1,6 @@
+0.15.358 Nov 20, 2026
+- Companions (test, local server only): fixed: companion chests often had no name after a server start (the server dropped the names when the world's own names loaded); a lost name is now put back. Needs a server restart. Server only: no game change.
+
 0.15.357 Nov 20, 2026
 - Companions (test, local server only): a monster the companion could not reach is skipped for 10 s (was 20 s), and no longer at all once it comes within 6 m of you (a crab walked up and attacked while it was still skipped). Server only: no game change.
 

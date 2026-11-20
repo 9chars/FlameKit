@@ -860,6 +860,21 @@ void names_tick(emf::World w) {
                 last[kv.first] = k;
             }
         }
+        // (owner 2026-11-20 17:32 "chests aren't labeled by he pets name now") 17:13:45: the names registered at 17:12:54
+        // were gone once the world's own names had loaded (5 -> 133 names; only N1 stayed, it is in the save): a name that
+        // is no longer there is registered again (below, from the file read once more)
+        bool gone = false;
+        for (auto it2 = g_names_done.begin(); it2 != g_names_done.end();) {
+            if (it2->second && name_known(sysw, it2->second) == 0) {
+                EMF_LOG(kMod, "names: '%s' registered again", it2->first.c_str());
+                last.erase(it2->first);
+                it2 = g_names_done.erase(it2);
+                gone = true;
+            } else {
+                ++it2;
+            }
+        }
+        if (gone) g_names_seen = FILETIME{};
     }
     static const std::wstring file = names_file();
     WIN32_FILE_ATTRIBUTE_DATA fa{};
