@@ -557,6 +557,129 @@ void drive_scan(emf::World w) {
         EMF_LOG(kMod, "drive: %zu driven NPC(s) (movement input written %llu times so far)", found.size(),
                 (unsigned long long)g_drive_writes.load());
 }
+// ---- (owner 2026-11-20 08:51 "when the chest spawns and opens I just want it to have the companions name on it")
+// The game's floating names (CustomPlayerString.stringId on a chest or altar) are looked up in the server singleton
+// "CustomPlayerStringsSystem". Found in enshrouded_server.exe (sha256 f0d824be7fcd48eb..., 2026-11-20):
+//   0x140915b80 setString(out, sys, u64 oldKey, const {char* p; u64 n}* text): the server's own rename (used by the
+//     CustomPlayerStringClientMessage handler at 0x1407bde90): key = FNV-1a 64 of the text (checked: "Private Stash"
+//     = 0x2E2B803BEE877B55, the key on the owner's chest); takes a reference on the text's entry (making it when new,
+//     refcount at entry +0x138) and drops one on oldKey's; out +0 byte 0 = done, out +8 the key.
+//   Its hash map: sys +0x198 bit set (u64 words), +0x1a0 slot count (power of 2), +0x1b8 keys, +0x1d0 entries,
+//     +0x1e4 count; slot = low 32 bits of the key & (count - 1), linear probing (lookup 0x140953040, which ALSO takes a
+//     reference: not used here).
+//   custom_player_string_init (0x1400c1970) sets an entity's key to 0 when the key is not in the map at spawn, so the
+//     name has to be there BEFORE the chest is spawned.
+// FlameKit (Lua) writes the names in emf\mods\flamekit\custom_names.txt, one per line; each new one is registered here
+// once per server run (that reference is ours and is never dropped, so a destroyed chest cannot free the name).
+constexpr uintptr_t kSetStringRva = 0x915b80;
+const uint8_t kSetStringStart[] = {0x48, 0x89, 0x5C, 0x24, 0x10, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41, 0x57, 0x48, 0x83,
+                                   0xEC, 0x30, 0x4D, 0x8B, 0x59, 0x08, 0x45, 0x33, 0xE4, 0x49, 0x8B, 0x39, 0x4D, 0x8B,
+                                   0xF9, 0x48, 0x8B, 0xEA, 0x48, 0x8B, 0xF1, 0x48, 0xBB, 0x25, 0x23, 0x22, 0x84, 0xE4,
+                                   0x9C, 0xF2, 0xCB};
+using SetStringFn = void (*)(void* out, void* sys, uint64_t old_key, const void* text);
+struct TextRef { const char* p; uint64_t n; };
+std::map<std::string, uint64_t> g_names_done;  // world thread only
+int64_t g_names_tick = -1000;
+FILETIME g_names_seen{};
+
+uint64_t fnv1a64(const std::string& s) {
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (unsigned char c : s) { h ^= c; h *= 0x100000001b3ull; }
+    return h;
+}
+
+// -1 = the map does not look like one (or faulted), 0 = not there, 1 = there. Reads only.
+int name_known(void* sys, uint64_t key) {
+    __try {
+        auto* b = static_cast<uint8_t*>(sys);
+        const uint64_t n = *(uint64_t*)(b + 0x1a0);
+        const uint64_t* bits = *(uint64_t**)(b + 0x198);
+        const uint64_t* keys = *(uint64_t**)(b + 0x1b8);
+        const uint32_t count = *(uint32_t*)(b + 0x1e4);
+        if (n == 0 || (n & (n - 1)) != 0 || n > 0x100000 || count > n || !bits || !keys) return -1;
+        if (count == 0) return 0;
+        uint64_t i = (uint32_t)key & (n - 1);
+        for (uint64_t steps = 0; steps < n && ((bits[i >> 6] >> (i & 63)) & 1); ++steps) {
+            if (keys[i] == key) return 1;
+            i = (i + 1 < n) ? i + 1 : 0;
+        }
+        return 0;
+    } __except (1) {
+        return -1;
+    }
+}
+
+int set_string_guarded(SetStringFn fn, void* sys, const char* p, uint64_t n, uint64_t* key) {
+    __try {
+        alignas(16) uint8_t out[0x20] = {};
+        TextRef t{p, n};
+        fn(out, sys, 0, &t);
+        *key = *(uint64_t*)(out + 8);
+        return out[0] == 0 ? 1 : 0;
+    } __except (1) {
+        return -1;
+    }
+}
+
+std::wstring names_file() {
+    HMODULE me = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       reinterpret_cast<LPCWSTR>(&fnv1a64), &me);
+    wchar_t path[MAX_PATH] = {};
+    GetModuleFileNameW(me, path, MAX_PATH);
+    std::wstring s(path);
+    s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods\fk_server_probe
+    s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods
+    return s + L"\\flamekit\\custom_names.txt";
+}
+
+void names_tick(emf::World w) {
+    const int64_t t = (int64_t)w.tick();
+    if (t - g_names_tick < 30) return;
+    g_names_tick = t;
+    static const std::wstring file = names_file();
+    WIN32_FILE_ATTRIBUTE_DATA fa{};
+    if (!GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &fa)) return;
+    if (CompareFileTime(&fa.ftLastWriteTime, &g_names_seen) == 0) return;
+    FILE* f = _wfopen(file.c_str(), L"rb");
+    if (!f) return;
+    std::vector<std::string> names;
+    char line[512];
+    while (std::fgets(line, sizeof line, f)) {
+        std::string s(line);
+        while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+        if (!s.empty() && s.size() <= 0xff) names.push_back(s);
+    }
+    std::fclose(f);
+    g_names_seen = fa.ftLastWriteTime;
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kSetStringRva;
+    void* sys = w.singleton("CustomPlayerStringsSystem");
+    static bool said_build = false;
+    if (std::memcmp(fnp, kSetStringStart, sizeof(kSetStringStart)) != 0) {
+        if (!said_build) EMF_LOG(kMod, "names: setString is not at +0x%llx in this game build: no names", (unsigned long long)kSetStringRva);
+        said_build = true;
+        return;
+    }
+    if (!sys) { EMF_LOG(kMod, "names: no CustomPlayerStringsSystem"); return; }
+    for (const auto& n : names) {
+        if (g_names_done.count(n)) continue;
+        const uint64_t want = fnv1a64(n);
+        const int before = name_known(sys, want);
+        if (before < 0) {
+            EMF_LOG(kMod, "names: the server's name table does not look as expected (%p): '%s' not registered", sys, n.c_str());
+            g_names_done[n] = 0;
+            continue;
+        }
+        uint64_t key = 0;
+        const int r = set_string_guarded(reinterpret_cast<SetStringFn>(fnp), sys, n.data(), n.size(), &key);
+        g_names_done[n] = key;
+        EMF_LOG(kMod, "names: '%s' %s (key 0x%016llX, expected 0x%016llX, was %s, now %s, %u names)", n.c_str(),
+                r > 0 ? "registered" : (r < 0 ? "FAULTED (caught)" : "refused"), (unsigned long long)key,
+                (unsigned long long)want, before ? "there" : "new", name_known(sys, want) > 0 ? "there" : "MISSING",
+                *(uint32_t*)(static_cast<uint8_t*>(sys) + 0x1e4));
+    }
+}
 }  // namespace
 
 extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
@@ -565,6 +688,7 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     const bool hooked = emf::api()->hook_program && emf::api()->hook_program("steering_locomotion", nullptr, drive_post, nullptr);
     EMF_LOG(kMod, "drive: hook after steering_locomotion %s", hooked ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) { drive_scan(w); });
+    emf::on_tick([](emf::World w) { if (w.is_server()) names_tick(w); });  // (2026-11-20) companion chest names
     emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {
         size_t n;
         { std::lock_guard<std::mutex> lk(g_drive_mx); n = g_driven.size(); }
@@ -641,6 +765,6 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                          { std::lock_guard<std::mutex> lk(g_walk_mx); g_walk.push_back(a); }
                          EMF_REPLY("walk %.1f %.1f %.1f queued", a.p[0], a.p[1], a.p[2]);
                      });
-    EMF_LOG(kMod, "loaded (drive, bite, facing, ground ray and walkable search tests; commands: fkprobe.drive, fkprobe.bite, fkprobe.face, fkprobe.ground, fkprobe.walk)");
+    EMF_LOG(kMod, "loaded (drive, bite, facing, ground ray and walkable search tests, chest names; commands: fkprobe.drive, fkprobe.bite, fkprobe.face, fkprobe.ground, fkprobe.walk)");
     return true;
 }

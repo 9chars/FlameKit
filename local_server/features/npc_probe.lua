@@ -1074,8 +1074,33 @@ local function controls(r, account)
 end
 local function may_command(r, account) return account and (controls(r, account) or is_admin(account)) end
 
+-- (owner 2026-11-20 08:51 "when the chest spawns and opens I just want it to have the companions name on it") the
+-- game's floating name: the chest is spawned with CustomPlayerString.stringId = FNV-1a 64 of his name (the game's own
+-- key for a text); the server probe (C++) puts each name of custom_names.txt into the server's name table, which the
+-- key needs BEFORE the chest is spawned (the game clears a key it does not know)
+function inv.name_key(text)
+  local h = 0xcbf29ce484222325
+  for i = 1, #text do h = (h ~ text:byte(i)) * 0x100000001b3 end
+  return h
+end
+function inv.write_names()
+  if not emf.dir then return end
+  local list = {}
+  for _, r in ipairs(roster.list) do list[#list + 1] = r.name end
+  table.sort(list)
+  local text = table.concat(list, "\n") .. "\n"
+  if text == inv.names_text then return end
+  local f = io.open(emf.dir .. "\\custom_names.txt", "w")
+  if not f then return end
+  f:write(text)
+  f:close()
+  inv.names_text = text
+  log("names: custom_names.txt now has " .. #list .. " name(s) for the chest labels")
+end
+
 local function roster_save()
   if not roster.loaded then return false end
+  pcall(inv.write_names)
   local out = { next_n = roster.next_n, main = roster.main, npcs = {} }
   for _, r in ipairs(roster.list) do
     out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight, sus_base = r.sus_base, inv = r.inv, chest = r.chest,
@@ -1537,7 +1562,11 @@ inv.open_chest = function(world, player, npc, rr)
     yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
   end)
   local cx, cz = x + math.cos(yaw) * 1.5, z - math.sin(yaw) * 1.5  -- 1.5 m to his right
-  local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz)
+  local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz, { CustomPlayerString = { stringId = inv.name_key(rr.name) } })
+  if not (oks and chest and chest ~= 0) then  -- (names) without the label rather than no chest
+    log(string.format("inventory %s: the chest with his name label was refused (%s): spawned without it", rr.name, tostring(chest)))
+    oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz)
+  end
   if not (oks and chest and chest ~= 0) then
     log(string.format("inventory %s: the chest could not be spawned (%s)", rr.name, tostring(chest)))
     say(world, player, rr.name .. ": The chest could not be opened.")
@@ -1606,6 +1635,13 @@ function inv.tick(world)
           r.chest.state = "open"
           roster_save()
           log(string.format("inventory %s: chest filled%s", name, #c.rest > 0 and string.format(" (%d stack(s) did not fit: kept in his record)", #c.rest) or ""))
+          pcall(function()  -- (names) 0 here: the server did not know his name when the chest was spawned
+            local k = world:get("CustomPlayerString", c.chest)
+            k = k and k.stringId
+            if type(k) ~= "number" and k then k = k.value end
+            log(string.format("inventory %s: name label key on the chest %s (his name's 0x%016X)", name,
+              k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.name_key(name)))
+          end)
         else
           c.busy = true
           local opts = (e.level or e.rarity) and { level = e.level, rarity = e.rarity } or nil

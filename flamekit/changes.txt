@@ -1,3 +1,6 @@
+0.15.297 Nov 20, 2026
+- Companions (test, local server only): the companion's chest shows his name floating over it, the way the game shows a name you give your own chest. Needs the server probe from this version (loads at the next server start); before that the chest opens without the name. Server only: no game change.
+
 0.15.296 Nov 20, 2026
 - Companions (test, local server only): "flamekit.npc names spawn <entity>" puts a test chest (gone after 60 s) next to the player carrying that entity's name, to see the game's floating name on a chest the mod made. Server only: no game change.
 
