@@ -1603,6 +1603,14 @@ next restart (no yes for a restart yet).
    buttons, clicks go back and the server checks may_command/admin): every companion with owner (name), mode, out/away,
    items, chest open; give/share/unshare/main/away/back/delete; players picked by name (names remembered per account at
    join, for offline players). A game-side change: Development build. Not started.
+10. **Pets (owner 2026-11-20 09:47-09:49, idea only, nothing to build yet):** "can the template guid be like an "animal"
+   in the game or it must be a monster?" / "wouldn't steering it be 100% the same?" / "i'm thinking anything that an
+   "animal" we'd call "pets" and they'd work and function differently from a full on companion". Facts found:
+   templates.csv: 102 animal/tame templates, peaceful ones (dogs AG2, cats, goats, yak, capybara, bunnies, birds, fish)
+   have NO monster AI (no DynamicEnemy01BehaviorState); animal_behavior writes ActorInput/DynamicLocomotion/PathWalker
+   and they run steering_locomotion like the hound, so the probe's ActorInput write after steering_locomotion should
+   steer them the same; different: their brain-off switch (unknown), the Lua -> C++ target hand-over (now through
+   DynamicEnemy01BehaviorState fields, also drive_scan's filter), no attack moves. Untested in game.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
