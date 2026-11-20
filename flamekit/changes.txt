@@ -1,3 +1,12 @@
+0.15.285 Nov 20, 2026
+- Companions (test, local server only): following rebuilt around your trail: the companion walks the way you walked, jumps where you jumped and steps up where you stepped up. When it can't follow, it is put back beside you at once and "Companion can't follow you!" shows for 5 seconds.
+- Companions (test): it keeps your pace: it walks, runs or sprints the way you did at each spot, and sprints whenever it is more than 6 m behind.
+- Companions (test): the E menu has an Attack menu: Passive (never fights), Defensive (fights once something attacks you or it), Aggressive (fights every monster within 20 m of you) and Healing (never fights, keeps you healed).
+- Companions (test): in a fight it picks the nearest monster it has a clear line to, turns to face it, runs in to lunge range (4 m) and attacks with the wolf's bite and lunge until the monster is dead, then picks the next one. When something blocks it or its attacks don't land, it hops, steps left, then right, and otherwise moves on to the next monster. It stays within 20 m of you, keeps following you while it looks for a target, and goes back to following when no monster is left. Setting Passive ends a fight at once; in Defensive, once attacked it fights every monster around you.
+- Companions (test): fast monsters such as bats: it waits at lunge range until they slow down; floating monsters: it jumps into a lunge. Only real monsters (with health) are targets.
+- Companions (test): armour: it takes a third of the damage it used to.
+- Companions (test): healing: it has its own 800 mana, refilling 10 a second. In Healing mode it keeps you at full health, then heals itself. In Defensive and Aggressive it heals itself in a fight when below 40 %, and heals you and itself to full once the fight is over. In Passive it slowly recovers its own health between fights. Each heal restores 25 % of the target's health (200 mana, at most every 4 s) with a Wolf Shout and the game's healing sparkle, and "Companion heals you for <number>!" shows in green. Server only: no game change.
+
 0.15.284 Nov 18, 2026
 - Fast travel: FlameKit's UI now hides 2 seconds later (5.3 s after you pick the destination instead of 3.3 s), so it stays up through the travel animation, and it stays hidden for the whole loading screen even when loading takes long. Server only: no game change.
 

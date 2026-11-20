@@ -1382,6 +1382,13 @@ next restart (no yes for a restart yet).
      same words (STUCK_TEXT[h.cant]) as a 5 s notice in #ff9050 (the stuck status is cleared at the put-away, so it would
      have shown for one tick). The 3 s of no progress before "can't follow" is unchanged.
      **Owner 22:26:** "it works well".
+     Claude offered a Development build, then withdrew it (Rule 0d: all of it runs only on the server). **Owner
+     2026-11-20 06:17, verbatim:** "update the changes.txt and make sure everything is checked into git for dev" ->
+     **0.15.285 (server only, like 0.15.280):** flamekit/mod.json 0.15.285 (flamekit_native stays 0.15.284: no client
+     change, no dist-test), changes.txt: one entry for all companion work since 0.15.279 (rebuilt following, pace,
+     Attack menu modes, the attack sequence, bats/floaters, armour, healing, instant respawn). Copied to the server and
+     the work folder. Git: every server file (npc_probe.lua, npc_fields.lua, main.lua) and server_probe.cpp matched the
+     repo (md5) before the commit.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
