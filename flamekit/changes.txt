@@ -1,3 +1,6 @@
+0.15.354 Nov 20, 2026
+- Companions (test, local server only): pet speed boost, test B: found why the server froze (the boost was applied about 20 times per game step, so the pet's speed grew to infinity); now once per step and at most 10 m/s. Needs a server restart. Server only: no game change.
+
 0.15.353 Nov 20, 2026
 - Companions (test, local server only): test A for the pet speed boost (a pet more than 8 m behind you 1.6 times as fast): the boost again, without the log line from inside the game's step. Needs a server restart. Server only: no game change.
 

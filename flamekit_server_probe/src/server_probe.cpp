@@ -13,6 +13,7 @@
 #include <mutex>
 #include <atomic>
 #include <cmath>
+#include <algorithm>
 #include "emf/generated/components.hpp"
 
 #include "emf/emf.hpp"
@@ -500,6 +501,13 @@ constexpr float kBoost = 1.6f;
 std::atomic<uint64_t> g_boost_n{0}, g_boost_calls{0};
 std::atomic<uint32_t> g_boost_last_id{0};
 std::atomic<float> g_boost_last_d{0}, g_boost_last_v{0};
+// (17:05, test A froze too; its counters: the hook ran 152,551 times in about 110 s, ~20 times per step, on several
+// threads, and the last boosts read "inf -> inf m/s": every run multiplied the same velocity by 1.6 again, ~1.6^20 a
+// step, to infinity) the boost is done once per pet per step (g_boosted: entity -> the step it was boosted in) and
+// never above kBoostMax.
+constexpr float kBoostMax = 10.0f;
+std::mutex g_boost_mx;
+std::map<uint32_t, int64_t> g_boosted;
 void pet_boost(void*, void*) {
     g_boost_calls.fetch_add(1);
     emf::World w = emf::server_world();
@@ -517,9 +525,18 @@ void pet_boost(void*, void*) {
         const double x = (double)tr->px / 4294967296.0, z = (double)tr->pz / 4294967296.0;
         const double d = std::sqrt((p.hx - x) * (p.hx - x) + (p.hz - z) * (p.hz - z));
         const float hs = std::sqrt(v->velocity.x * v->velocity.x + v->velocity.z * v->velocity.z);
-        if (d <= kBoostFrom || hs < 1.0f) continue;
-        v->velocity.x *= kBoost;
-        v->velocity.z *= kBoost;
+        if (d <= kBoostFrom || hs < 1.0f || !std::isfinite(hs)) continue;
+        {
+            const int64_t step = (int64_t)w.tick();
+            std::lock_guard<std::mutex> lk(g_boost_mx);
+            auto it = g_boosted.find(id);
+            if (it != g_boosted.end() && it->second == step) continue;  // already boosted this step
+            g_boosted[id] = step;
+        }
+        const float k = std::min(kBoost, kBoostMax / hs);
+        if (k <= 1.0f) continue;
+        v->velocity.x *= k;
+        v->velocity.z *= k;
         g_boost_n.fetch_add(1);
         g_boost_last_id.store(id);
         g_boost_last_d.store((float)d);
@@ -535,7 +552,7 @@ void boost_report(emf::World w) {
     if (n == seen) return;
     EMF_LOG(kMod, "pet boost: %llu boosts so far (hook ran %llu times); last %u at %.1f m from the player, %.1f -> %.1f m/s",
             (unsigned long long)n, (unsigned long long)g_boost_calls.load(), g_boost_last_id.load(), g_boost_last_d.load(),
-            g_boost_last_v.load(), g_boost_last_v.load() * kBoost);
+            g_boost_last_v.load(), std::min(g_boost_last_v.load() * kBoost, kBoostMax));
     seen = n;
 }
 
