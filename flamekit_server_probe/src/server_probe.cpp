@@ -397,7 +397,7 @@ void track_jump(emf::World w, uint32_t id, const WorldTransform* tr) {
 // "<entity> <target x y z> <player spot x y z> <code>" (code: pace 2/3/4, + 10 edge stop off, + 20 drops allowed; under
 // 1.5 not driven). Read again whenever the file changes. (The first try kept them in the animal's own AnimalSaved /
 // DynamicWildlife spawn positions: the game moved the dog by them, 20 m jumps.)
-struct PetIn { double tx, ty, tz, hx, hy, hz; float code; };
+struct PetIn { double tx, ty, tz, hx, hy, hz; float code; int mode; };  // mode (9th field, 14:59): 1 = the game's pet action
 std::mutex g_pet_mx;
 std::map<uint32_t, PetIn> g_pets;
 std::wstring flamekit_file(const wchar_t* name);
@@ -414,7 +414,7 @@ void read_pets() {
     while (std::fgets(line, sizeof line, f)) {
         unsigned id = 0;
         PetIn p{};
-        if (std::sscanf(line, "%u %lf %lf %lf %lf %lf %lf %f", &id, &p.tx, &p.ty, &p.tz, &p.hx, &p.hy, &p.hz, &p.code) == 8) got[id] = p;
+        if (std::sscanf(line, "%u %lf %lf %lf %lf %lf %lf %f %d", &id, &p.tx, &p.ty, &p.tz, &p.hx, &p.hy, &p.hz, &p.code, &p.mode) >= 8) got[id] = p;
     }
     std::fclose(f);
     seen = fa.ftLastWriteTime;
@@ -431,6 +431,10 @@ void read_pets() {
 // InteractionAcceptedEvent, which the Lua turns into his wheel. After it: the client copy is checked (and logged).
 constexpr uint32_t kTouchSeq = 0x3E5189BFu;   // EMF_SEQUENCE_TOUCH
 constexpr uint32_t kTalkVerb = 0xD9861C4Bu;   // EMF_VERB_TALK
+// (owner 14:59 "lets try it": "Pet" in a pet's wheel) while the Lua asks for it (mode 1): the game's own pet action, as
+// a tame animal has it (petlog 14:11:55)
+constexpr uint32_t kPetSeq = 0xB1EB4A70u;
+constexpr uint32_t kPetVerb = 0x6D5B6297u;    // EMF_VERB_PET
 std::atomic<uint64_t> g_offer_log_at{0};
 std::atomic<uint64_t> g_reset_log_at{0};
 // where: 0 = before interaction_offer, 1 = after interaction_taming, 2 = before interaction_attempt (14:32: E on the
@@ -439,20 +443,21 @@ std::atomic<uint64_t> g_reset_log_at{0};
 void pet_offers(int where) {
     emf::World w = emf::server_world();
     if (!w) return;
-    std::vector<uint32_t> ids;
+    std::vector<std::pair<uint32_t, int>> ids;
     {
         std::lock_guard<std::mutex> lk(g_pet_mx);
-        for (auto& kv : g_pets) ids.push_back(kv.first);
+        for (auto& kv : g_pets) ids.push_back({kv.first, kv.second.mode});
     }
     const uint64_t now = GetTickCount64();
     const bool say = where == 3 && now >= g_offer_log_at.load();
     if (say) g_offer_log_at.store(now + 10000);
-    for (uint32_t id : ids) {
+    for (auto [id, mode] : ids) {
         auto* o = w.get<emf::gen::ecs::InteractionOfferRuntime>(id);
         if (!o) continue;
+        const uint32_t seq = mode == 1 ? kPetSeq : kTouchSeq, verb = mode == 1 ? kPetVerb : kTalkVerb;
         if (where != 3) {
-            const bool ours = o->overrideSequence.value == kTouchSeq && o->overrideVerbLocaId.value == kTalkVerb &&
-                              o->defaultSequence.value == kTouchSeq && o->defaultVerbId.value == kTalkVerb &&
+            const bool ours = o->overrideSequence.value == seq && o->overrideVerbLocaId.value == verb &&
+                              o->defaultSequence.value == seq && o->defaultVerbId.value == verb &&
                               o->isOffered && !o->isDisabled && o->offerId != 0;
             if (!ours && where == 2 && now >= g_reset_log_at.load()) {
                 g_reset_log_at.store(now + 10000);
@@ -462,10 +467,10 @@ void pet_offers(int where) {
             }
             // (14:37: before the press check the override was 0 again: a reset program clears the override, so with
             // the default at 0 the press had no sequence to play) the default is ours too
-            o->defaultSequence.value = kTouchSeq;
-            o->defaultVerbId.value = kTalkVerb;
-            o->overrideSequence.value = kTouchSeq;
-            o->overrideVerbLocaId.value = kTalkVerb;
+            o->defaultSequence.value = seq;
+            o->defaultVerbId.value = verb;
+            o->overrideSequence.value = seq;
+            o->overrideVerbLocaId.value = verb;
             o->isOffered = true;
             o->isDisabled = false;
             // (14:43 petlog: the wild offer has offerId 0; the tame one, whose E worked at 14:07, had 1)
@@ -769,6 +774,22 @@ void names_tick(emf::World w) {
     const int64_t t = (int64_t)w.tick();
     if (t - g_names_tick < 30) return;
     g_names_tick = t;
+    // (owner 14:49 "it wasn't labeling the inventory chest with the pets name": N2's key was 0 on its chest 2 min
+    // after "registered ... now there") every 30 ticks: is each registered name still in the server's table?
+    if (void* sysw = w.singleton("CustomPlayerStringsSystem")) {
+        static std::map<std::string, int> last;
+        for (const auto& kv : g_names_done) {
+            if (!kv.second) continue;
+            const int k = name_known(sysw, kv.second);
+            auto it = last.find(kv.first);
+            if (it == last.end() || it->second != k) {
+                EMF_LOG(kMod, "names: '%s' (0x%016llX) %s in the server's table (%u names)", kv.first.c_str(),
+                        (unsigned long long)kv.second, k > 0 ? "is" : (k < 0 ? "?? (table unreadable)" : "is NO LONGER"),
+                        *(uint32_t*)(static_cast<uint8_t*>(sysw) + 0x1e4));
+                last[kv.first] = k;
+            }
+        }
+    }
     static const std::wstring file = names_file();
     WIN32_FILE_ATTRIBUTE_DATA fa{};
     if (!GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &fa)) return;

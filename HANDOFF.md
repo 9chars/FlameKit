@@ -1796,6 +1796,14 @@ next restart (no yes for a restart yet).
    0x09207E07B5B5ABB9 registered 14:44:57 "now there"); N1's chest at 14:47:11 had its key. Not pet-specific so far.
    The game offers no call to play its petting animation; idea: wheel "Pet" switches his E to the game's pet sequence
    0xB1EB4A70 / verb Pet for a few seconds (that E plays the animation), then back to Talk.
+   **Owner 14:58 "awww no way to call it directly?" / 14:59 "lets try it"** (the server sends the accept itself; falls
+   back to the press-E plan if the animation does not play). 0.15.335: PET_WHEEL {Follow me, Stay here, Pet, Inventory,
+   Put away} for DynamicWildlife bodies without monster AI; roster.do_pet sets roster.pet_mode[npc] -> pet_drive.txt
+   9th field 1 -> the probe's pet_offers writes seq 0xB1EB4A70 / verb Pet; after PET_SEND 6 ticks Lua emf.emit
+   AcceptOfferedInteractionEvent {guest = player, host = pet, offerId 1} (emf.emits in F.setup: needs a restart);
+   InteractionAcceptedEvent while pet_mode: logged "petting accepted", no wheel; after PET_HOLD 240 ticks back to Talk.
+   Chest name: Lua logs the key right after the chest spawn; the probe logs when a registered name leaves the
+   server's table ("names: 'N2' ... is NO LONGER in the server's table").
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

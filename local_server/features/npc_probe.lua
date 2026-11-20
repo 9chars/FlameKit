@@ -1793,6 +1793,13 @@ function inv.open_at(world, player, npc, rr, cx, y, cz)
     log(string.format("inventory %s: the chest with his name label was refused (%s): spawned without it", rr.name, tostring(chest)))
     oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz)
   end
+  pcall(function()  -- (owner 14:49 "it wasn't labeling the inventory chest with the pets name") the key at the spawn
+    local k = world:get("CustomPlayerString", chest)
+    k = k and k.stringId
+    if type(k) ~= "number" and k then k = k.value end
+    log(string.format("inventory %s: name label key right after the spawn %s (his name's 0x%016X)", rr.name,
+      k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.name_key(rr.name)))
+  end)
   if not (oks and chest and chest ~= 0) then
     log(string.format("inventory %s: the chest could not be spawned (%s)", rr.name, tostring(chest)))
     say(world, player, rr.name .. ": The chest could not be opened.")
@@ -1964,6 +1971,9 @@ end
 local WHEEL = "npcwheel"
 local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Inventory", "Put away" }
 inv.WHEEL = { "Close Chest" }  -- (owner 08:02) while his chest is open the wheel offers only this
+-- (owner 14:49 "the wheel for pets would need to be different than the wheel for the monster companions"; 14:59 "lets
+-- try it") a pet's wheel: no Attack (pets do not fight), and Pet (roster.do_pet: the game's petting, started by the server)
+local PET_WHEEL = { "Follow me", "Stay here", "Pet", "Inventory", "Put away" }
 local FIGHT_MODES = { "Passive", "Defensive", "Aggressive", "Healing" }
 
 local function refuse(world, player, rr)
@@ -2040,7 +2050,8 @@ on_talk = function(world, player, npc)
     return
   end
   local oks, sent = pcall(emf.net.send_to, world, player, WHEEL, emf.json.encode({ op = "wheel", npc = npc,
-    title = rr and rr.name or "Companion", labels = (rr and inv.open[rr.name]) and inv.WHEEL or WHEEL_LABELS }))
+    title = rr and rr.name or "Companion", labels = (rr and inv.open[rr.name]) and inv.WHEEL
+      or (world:get("DynamicWildlife", npc) and not world:get("DynamicEnemy01BehaviorState", npc)) and PET_WHEEL or WHEEL_LABELS }))
   log(string.format("E: wheel for %s sent to player %s: %s", tostring(npc), tostring(player), tostring(oks and sent)))
 end
 
@@ -2105,7 +2116,8 @@ local function on_pick(world, from, data)
   if rr and not may_command(rr, from.account) then refuse(world, player, rr) return end
   local label = type(m.label) == "string" and m.label or ""
   local act = ({ ["Follow me"] = do_follow, ["Stay here"] = do_stay, ["Attack"] = do_attack_menu, ["Put away"] = do_away,
-    ["Inventory"] = inv.open_chest, ["Close Chest"] = inv.close_chest })[label]
+    ["Inventory"] = inv.open_chest, ["Close Chest"] = inv.close_chest,
+    ["Pet"] = function(w, pl, n, r) roster.do_pet(w, pl, n, r) end })[label]
   if rr and inv.open[rr.name] and label ~= "Close Chest" then act = nil end  -- an old wheel: only "Close Chest" now
   for _, mode in ipairs(FIGHT_MODES) do
     if label == mode then act = function(w, pl, n, r) set_fight(w, pl, n, r, mode) end end
@@ -2899,10 +2911,17 @@ function F.setup(k)
     end)
     log(okl and line or ("HIT: " .. tostring(line)))
   end)
+  -- (14:59) "Pet" in a pet's wheel: the server accepts the game's pet offer in the player's name (roster.do_pet)
+  local oke, saide = pcall(emf.emits, { "AcceptOfferedInteractionEvent" }, "server")
+  log("pets: AcceptOfferedInteractionEvent to send: " .. tostring(oke and saide) .. (oke and "" or (" " .. tostring(saide))))
   pcall(emf.on_event, "InteractionAcceptedEvent", function(world, e)  -- (09:21) only the owner opens his chest
     -- (13:57) the game's own E on a pet of ours (an animal): his wheel, as E on a companion
     local host, guest = rawget(e, "hostEntityId"), rawget(e, "guestEntityId")
-    if host and guest and name_of[host] and not world:get("DynamicEnemy01BehaviorState", host) then
+    if host and guest and roster.pet_mode[host] then  -- (14:59) the accept the server sent for "Pet": no wheel
+      log(string.format("pet %s (%s): petting accepted (player %s, offer %s)", tostring(name_of[host]), tostring(host),
+        tostring(guest), tostring(rawget(e, "offerId"))))
+      roster.pet_mode[host].accepted = true
+    elseif host and guest and name_of[host] and not world:get("DynamicEnemy01BehaviorState", host) then
       log(string.format("pet %s (%s): the game's E pressed by player %s: his wheel", tostring(name_of[host]), tostring(host), tostring(guest)))
       local okt, errt = pcall(on_talk, world, guest, host)
       if not okt then log("pet E: " .. tostring(errt)) end
@@ -3243,6 +3262,7 @@ function F.tick(world)
   local t = world:tick()
   if t % 60 == 13 and next(roster.subs) then pcall(roster.ui_tick, world) end  -- (roster window) changes to its viewers
   if roster.petlog and t % 30 == 0 then pcall(roster.petlog_tick, world) end  -- (pets) the animal AI watched
+  if next(roster.pet_mode) then pcall(roster.pet_mode_tick, world) end  -- (pets) a "Pet" from the wheel under way
   if #heal_fx_shown > 0 then  -- (healfx preview) effects go after 10 s
     local keep = {}
     for _, f in ipairs(heal_fx_shown) do
@@ -3608,14 +3628,42 @@ end
 -- z> <player spot x y z> <code>" (code: pace 2 walk / 3 run / 4 sprint, + 10 edge stop off, + 20 drops allowed; 0 = not
 -- driven), written each tick it changes; its drive_post reads it. (13:04: the first try kept them in the animal's own
 -- AnimalSaved / DynamicWildlife spawn positions: the game moved the dog by them, 20 m jumps every half second.)
+-- (owner 14:49 / 14:59 "lets try it") "Pet" in a pet's wheel. The game offers no call that plays its petting; the try:
+-- the pet's offer is switched to the game's pet action (the server probe, 9th field of pet_drive.txt = 1; sequence
+-- 0xB1EB4A70, verb Pet), then the server sends AcceptOfferedInteractionEvent {player, pet, offer 1} as if he pressed E,
+-- and after PET_HOLD ticks the offer is Talk again. The accept is logged ("petting accepted"), not turned into his
+-- wheel. Unknown: whether the game then plays the petting on the player (his own game may start it before the event).
+roster.pet_mode = {}   -- pet entity -> { player, at = tick set, sent = bool, accepted = bool }
+roster.PET_SEND, roster.PET_HOLD = 6, 240
+function roster.do_pet(world, player, npc, rr)
+  roster.pet_mode[npc] = { player = player, at = world:tick() }
+  log(string.format("pet %s (%s): Pet picked by player %s: his offer goes to the game's pet action", tostring(rr and rr.name), tostring(npc), tostring(player)))
+end
+function roster.pet_mode_tick(world)
+  local t = world:tick()
+  for npc, m in pairs(roster.pet_mode) do
+    if not world:position(npc) then
+      roster.pet_mode[npc] = nil
+    elseif not m.sent and t - m.at >= roster.PET_SEND then
+      m.sent = true
+      local ok, err = pcall(emf.emit, "server", "AcceptOfferedInteractionEvent",
+        { guestEntityId = m.player, hostEntityId = npc, offerId = 1 })
+      log(string.format("pet %s: accept sent for player %s: %s", tostring(npc), tostring(m.player), tostring(ok and (err == nil or err)) .. (ok and "" or (" " .. tostring(err)))))
+    elseif t - m.at >= roster.PET_HOLD then
+      log(string.format("pet %s: back to Talk (accepted %s)", tostring(npc), tostring(m.accepted or false)))
+      roster.pet_mode[npc] = nil
+    end
+  end
+end
+
 roster.pet_lines = {}
 function roster.pet_flush(world, id, h)
   local a = h.shim
   local cd = a.combatData
   local code = a.movementTargetIsValid and ((tonumber(cd.prowlAngle) or 2) + (cd.targetOfMyTarget and 10 or 0)
     + (cd.isTargetInsideLeash and 20 or 0)) or 0
-  roster.pet_lines[id] = string.format("%d %.3f %.3f %.3f %.3f %.3f %.3f %g", id, a.movementTarget.x, a.movementTarget.y,
-    a.movementTarget.z, a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z, code)
+  roster.pet_lines[id] = string.format("%d %.3f %.3f %.3f %.3f %.3f %.3f %g %d", id, a.movementTarget.x, a.movementTarget.y,
+    a.movementTarget.z, a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z, code, roster.pet_mode[id] and 1 or 0)
   cd.targetOfMyTarget = false  -- set again each tick where the edge stop is off (edge_off)
 end
 function roster.pet_write()
