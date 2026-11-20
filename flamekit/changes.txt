@@ -1,3 +1,6 @@
+0.15.287 Nov 20, 2026
+- Companions (test, local server only): the companion carries items for you. "Inventory" on its E wheel puts a large chest next to it with everything it carries; take out and put in what you like, then "Close Chest" (the only choice on its wheel while the chest is open) stores it all and the chest goes away. A chest left open closes itself after 5 minutes, keeping everything. While the chest is open the companion stays where it is and does nothing. Gear keeps its level and quality; a gem socketed into a weapon comes back as a separate gem next to the weapon. Server only: no game change.
+
 0.15.286 Nov 20, 2026
 - Companions (test, local server only): a fall safety net: when the companion falls more than 7.5 m below where it left the ground (a jump of yours it could not make), it is brought back beside you before it lands, so a missed jump no longer kills it. Server only: no game change.
 

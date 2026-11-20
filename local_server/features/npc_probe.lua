@@ -223,6 +223,9 @@ end
 -- the fight (defined with the fight code further down; returns true while he fights)
 local drive_fight
 local drive_heal
+-- (inventory, see "Inventory" below) inv.open: companion name -> his open chest (he is frozen while it exists); the
+-- functions and settings live in this one table (the file is at Lua's 200 locals)
+local inv = { open = {} }
 
 -- his body upright and turned toward yaw (radians, 0 = +z)
 local function face(world, id, yaw)
@@ -995,6 +998,13 @@ local function drive_step(world, id, h)
   local s = drive_read(world, id, h)
   if not s then return end
   set_pace(s.a, PACE_WALK)  -- drive_steer sets the trail's pace; the C++ sprints past 6 m from where he is headed
+  -- (owner 2026-11-20 08:02 "make it so the companion can't move or do anything until the chest is closed")
+  if inv.frozen and inv.frozen(id) then  -- (name_of is declared further down: the inventory part answers)
+    hold_at(s.a, s.nx, s.ny, s.nz)
+    h.atk = nil
+    pcall(function() s.a.combatData.lastTargetId = 0 s.a.combatData.selectedAttackIndex = 255 end)
+    return
+  end
   drive_waterlog(s)
   if drive_water(s) then return end
   drive_track_player(s)
@@ -1067,7 +1077,7 @@ local function roster_save()
   if not roster.loaded then return false end
   local out = { next_n = roster.next_n, main = roster.main, npcs = {} }
   for _, r in ipairs(roster.list) do
-    out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight, sus_base = r.sus_base,
+    out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight, sus_base = r.sus_base, inv = r.inv, chest = r.chest,
       owner = r.owner, controllers = r.controllers, names = r.names, out = r.out, ent = ent_of[r.name] }
   end
   local okj, text = pcall(emf.json.encode, { npc_roster = out })
@@ -1225,6 +1235,7 @@ local function roster_loaded(world, text)
   end
   roster.loaded = true
   log(string.format("roster: loaded, %d NPC(s)", #roster.list))
+  for _, r in ipairs(roster.list) do if r.chest and inv.adopt then pcall(inv.adopt, world, r) end end
   for _, r in ipairs(roster.list) do
     local ent = r.ent
     r.ent = nil
@@ -1377,13 +1388,202 @@ local function roster_cmd(world, args)
 end
 
 -- ===== E: the wheel ====================================================================================================
+-- ===== Inventory (owner 2026-11-20 07:54/08:02) ===========================================================================
+-- "Inventory" on his wheel spawns a large chest next to him with everything he carries; while it is open he is frozen
+-- and his wheel offers only "Close Chest", which saves what is in it and removes the chest. A chest left open closes
+-- itself after inv.OPEN_MAX the same way. Spawned entities are not saved by the game (a server restart loses them), so his
+-- items live in his roster record (r.inv: {item, count, level, rarity}, in the world's data): the chest is only a view.
+-- Filling: the items are put into the new chest one after another (inv.PUT_WAIT after the spawn, inv.RETRIES tries on a
+-- fresh chest); r.inv is not touched until every put has answered. Open: every inv.SAVE_EVERY his record becomes the
+-- chest's contents (core/bag.lua) plus what did not fit, saved when it changed, so a server restart loses at most that
+-- much. Gear keeps its level and rarity (tested 2026-11-15, core/ground_loot.lua); a gem socketed into a weapon cannot be
+-- put back into the socket (EMF's put knows only level and rarity), so it is kept as a separate item next to the weapon.
+-- r.chest = {id, session, state} survives a script reload: the same server run takes the chest up again (an "open" one)
+-- or removes it ("filling": r.inv still holds everything); a new server run has lost it (r.inv is the last save).
+inv.CHEST = "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec"  -- Prop_Decoration_T5_Storage_40_Chest (40 slots, core/loot_chest.lua)
+inv.OPEN_MAX = 5 * 60 * 60   -- ticks: closes itself after 5 minutes (owner 08:02 "maybe go with 5 minutes for now?")
+inv.PUT_WAIT, inv.RETRIES, inv.SAVE_EVERY = 30, 3, 60
+
+-- his chest is open: he is frozen (drive_step)
+function inv.frozen(id) local n = name_of[id] return n ~= nil and inv.open[n] ~= nil end
+
+function inv.list(world, chest)
+  -- only a chest that is there and set up is read (bag.entity_stacks gives an empty list for anything else, which
+  -- would empty his record)
+  if not world:position(chest) then return nil end
+  local okset, setup = pcall(world.get, world, "InventorySetup", chest)
+  if not (okset and setup) then return nil end
+  inv.bag = inv.bag or require("core.bag")
+  local ok, stacks = pcall(inv.bag.entity_stacks, world, chest)
+  if not (ok and type(stacks) == "table") then return nil end
+  local out = {}
+  for _, st in ipairs(stacks) do
+    out[#out + 1] = { item = st.item, count = st.count, level = st.level, rarity = st.rarity }
+    if st.gem and st.gem ~= 0 then out[#out + 1] = { item = st.gem, count = 1 } end  -- a socketed gem: kept on its own
+  end
+  return out
+end
+
+function inv.sig(list)
+  local parts = {}
+  for _, e in ipairs(list or {}) do parts[#parts + 1] = table.concat({ e.item, e.count, e.level or "", e.rarity or "" }, ":") end
+  table.sort(parts)
+  return table.concat(parts, ",")
+end
+
+function inv.count(list) local n = 0 for _, e in ipairs(list or {}) do n = n + (e.count or 0) end return n end
+
+-- his record from the open chest (plus what did not fit into it); false when the chest could not be read
+function inv.snapshot(world, r, c)
+  local list = inv.list(world, c.chest)
+  if not list then return false end
+  for _, e in ipairs(c.rest) do list[#list + 1] = e end
+  local sig = inv.sig(list)
+  if sig ~= c.sig then
+    c.sig, r.inv = sig, list
+    roster_save()
+    log(string.format("inventory %s: saved %d stack(s), %d item(s)", r.name, #list, inv.count(list)))
+  end
+  return true
+end
+
+inv.open_chest = function(world, player, npc, rr)
+  if not rr then say(world, player, "Not on the list: no inventory.") return end
+  if inv.open[rr.name] then return end
+  local x, y, z = world:position(npc)
+  if not x then return end
+  local yaw = 0
+  pcall(function()
+    local q = world:get("CurrentTransform", npc).transform.orientation
+    yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
+  end)
+  local cx, cz = x + math.cos(yaw) * 1.5, z - math.sin(yaw) * 1.5  -- 1.5 m to his right
+  local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz)
+  if not (oks and chest and chest ~= 0) then
+    log(string.format("inventory %s: the chest could not be spawned (%s)", rr.name, tostring(chest)))
+    say(world, player, rr.name .. ": The chest could not be opened.")
+    return
+  end
+  local okr, rule = pcall(emf.hit_rule, { to = chest, cancel = true })  -- no damage to it
+  local t = world:tick()
+  local queue = {}
+  for _, e in ipairs(rr.inv or {}) do queue[#queue + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity, tries = 0 } end
+  inv.open[rr.name] = { chest = chest, player = player, t0 = t, state = "filling", queue = queue, rest = {}, at = t + inv.PUT_WAIT,
+    rule = okr and rule or nil }
+  rr.chest = { id = chest, session = emf.session(), state = "filling" }
+  roster_save()
+  log(string.format("inventory %s: chest %s opened at %.1f %.1f %.1f with %d stack(s), %d item(s) to put in", rr.name, tostring(chest),
+    cx, y, cz, #queue, inv.count(rr.inv)))
+  say(world, player, rr.name .. ": Inventory open.")
+end
+
+-- why: "the player" or "after 5 minutes"
+function inv.close(world, r, why)
+  local c = inv.open[r.name]
+  if not c then return end
+  local gone = not world:position(c.chest)  -- removed by something else: his record keeps the last save
+  if gone then log(string.format("inventory %s: chest %s is gone; his record keeps the last save", r.name, tostring(c.chest))) end
+  if c.state == "open" and not gone and not inv.snapshot(world, r, c) then
+    log(string.format("inventory %s: the chest could not be read: it stays open for now", r.name))
+    return false
+  end
+  -- still filling: r.inv still holds everything (nothing saved from the chest yet)
+  if c.rule then pcall(emf.hit_rule_remove, c.rule) end
+  pcall(emf.destroy, world, c.chest)
+  inv.open[r.name] = nil
+  r.chest = nil
+  roster_save()
+  log(string.format("inventory %s: chest %s closed (%s): %d stack(s), %d item(s) kept", r.name, tostring(c.chest), why,
+    #(r.inv or {}), inv.count(r.inv)))
+  local p = c.player
+  if p and world:position(p) then say(world, p, r.name .. ": Inventory closed" .. (why == "the player" and "." or " (" .. why .. ").")) end
+  return true
+end
+
+inv.close_chest = function(world, player, npc, rr)
+  if rr then inv.close(world, rr, "the player") end
+end
+
+-- every tick: fill new chests, keep open ones saved, close forgotten ones
+function inv.tick(world)
+  local t = world:tick()
+  for name, c in pairs(inv.open) do
+    local r = find(name)
+    if not r then
+      inv.open[name] = nil
+    elseif c.state == "filling" then
+      if t >= c.at and not c.busy then
+        local e = table.remove(c.queue, 1)
+        if not e then
+          c.state = "open"
+          r.chest.state = "open"
+          inv.snapshot(world, r, c)
+          roster_save()
+          log(string.format("inventory %s: chest filled%s", name, #c.rest > 0 and string.format(" (%d stack(s) did not fit: kept in his record)", #c.rest) or ""))
+        else
+          c.busy = true
+          local opts = (e.level or e.rarity) and { level = e.level, rarity = e.rarity } or nil
+          local okp = pcall(emf.put, world, c.chest, e.item, e.count, function(w, added)
+            added = tonumber(added) or 0
+            c.busy = false
+            if added >= e.count then return end
+            e.count = e.count - added
+            if added == 0 and e.tries < inv.RETRIES then  -- a fresh chest refuses at first: again in a moment
+              e.tries = e.tries + 1
+              table.insert(c.queue, 1, e)
+              c.at = world:tick() + inv.PUT_WAIT
+            else
+              c.rest[#c.rest + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity }
+              log(string.format("inventory %s: %d of item %s did not fit into the chest (kept in his record)", name, e.count, tostring(e.item)))
+            end
+          end, opts)
+          if not okp then
+            c.busy = false
+            c.rest[#c.rest + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity }
+            log(string.format("inventory %s: emf.put refused item %s (kept in his record)", name, tostring(e.item)))
+          end
+        end
+      end
+    else
+      if t - c.t0 >= inv.OPEN_MAX then
+        inv.close(world, r, "after 5 minutes")
+      elseif (t - c.t0) % inv.SAVE_EVERY == 0 then
+        inv.snapshot(world, r, c)
+      end
+    end
+  end
+end
+
+-- (a script reload) his chest of this server run: an open one is taken up again, a half-filled one removed (r.inv still
+-- holds everything); one of another server run is gone with it (r.inv is the last save)
+inv.adopt = function(world, r)
+  local ch = r.chest
+  if not (type(ch) == "table" and ch.id) then r.chest = nil return end
+  if ch.session ~= emf.session() or not world:position(ch.id) then
+    log(string.format("inventory %s: the chest of an earlier server run is gone; his record keeps %d item(s)", r.name, inv.count(r.inv)))
+    r.chest = nil
+    return
+  end
+  if ch.state ~= "open" then
+    pcall(emf.destroy, world, ch.id)
+    r.chest = nil
+    log(string.format("inventory %s: a half-filled chest %s removed after a reload (his record keeps everything)", r.name, tostring(ch.id)))
+    return
+  end
+  local okr, rule = pcall(emf.hit_rule, { to = ch.id, cancel = true })
+  inv.open[r.name] = { chest = ch.id, player = player_of(world, r.owner), t0 = world:tick(), state = "open", queue = {}, rest = {},
+    rule = okr and rule or nil }
+  log(string.format("inventory %s: chest %s taken up again after a reload", r.name, tostring(ch.id)))
+end
+
 -- E opens a wheel on the presser's own screen (FlameKit's game side, channel flamekit/npcwheel). The server checks who
 -- may command the companion, again at the pick. There is no other way (a game without FlameKit gets a notice).
 -- (owner 2026-11-18 20:09/20:11) "Attack" opens a second wheel with the fight modes: Passive, Defensive, Aggressive,
 -- Healing. The mode is kept in the roster (r.fight; a companion without one is Passive) until the player changes it.
 -- The game side sends back the label it showed, so a pick is matched by its label.
 local WHEEL = "npcwheel"
-local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Put away" }
+local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Inventory", "Put away" }
+inv.WHEEL = { "Close Chest" }  -- (owner 08:02) while his chest is open the wheel offers only this
 local FIGHT_MODES = { "Passive", "Defensive", "Aggressive", "Healing" }
 
 local function refuse(world, player, rr)
@@ -1456,7 +1656,7 @@ on_talk = function(world, player, npc)
     return
   end
   local oks, sent = pcall(emf.net.send_to, world, player, WHEEL, emf.json.encode({ op = "wheel", npc = npc,
-    title = rr and rr.name or "Companion", labels = WHEEL_LABELS }))
+    title = rr and rr.name or "Companion", labels = (rr and inv.open[rr.name]) and inv.WHEEL or WHEEL_LABELS }))
   log(string.format("E: wheel for %s sent to player %s: %s", tostring(npc), tostring(player), tostring(oks and sent)))
 end
 
@@ -1515,7 +1715,9 @@ local function on_pick(world, from, data)
   if not (npc and world:position(npc)) then return end
   if rr and not may_command(rr, from.account) then refuse(world, player, rr) return end
   local label = type(m.label) == "string" and m.label or ""
-  local act = ({ ["Follow me"] = do_follow, ["Stay here"] = do_stay, ["Attack"] = do_attack_menu, ["Put away"] = do_away })[label]
+  local act = ({ ["Follow me"] = do_follow, ["Stay here"] = do_stay, ["Attack"] = do_attack_menu, ["Put away"] = do_away,
+    ["Inventory"] = inv.open_chest, ["Close Chest"] = inv.close_chest })[label]
+  if rr and inv.open[rr.name] and label ~= "Close Chest" then act = nil end  -- an old wheel: only "Close Chest" now
   for _, mode in ipairs(FIGHT_MODES) do
     if label == mode then act = function(w, pl, n, r) set_fight(w, pl, n, r, mode) end end
   end
@@ -2547,6 +2749,10 @@ function F.tick(world)
       if f.at <= t then pcall(emf.destroy, world, f.id) else keep[#keep + 1] = f end
     end
     heal_fx_shown = keep
+  end
+  if next(inv.open) then  -- (inventory) fill new chests, keep open ones saved, close forgotten ones
+    local oki, erri = pcall(inv.tick, world)
+    if not oki then log("inventory: tick failed: " .. tostring(erri)) end
   end
   -- (fight, step 2: watching only) the monster scan, and once a second what each companion would do
   local okw, errw = pcall(monster_scan_step, world)

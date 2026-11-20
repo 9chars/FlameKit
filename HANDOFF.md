@@ -1450,6 +1450,24 @@ next restart (no yes for a restart yet).
      the body). **Rule for Claude: check HANDOFF and the code comments for our own tests before quoting EMF docs.**
      Asked: a weapon with a socketed gem (store the gem as a separate item / refuse the piece), auto-close 10 min?,
      the chest beside the companion?
+     **Owner 07:59:** "the EMF docs are frequently wrong, as we've learned" (our own tests beat the docs). **Owner 08:02,
+     verbatim:** "1. how is the gem thing an issue? 2. maybe go with 5 minutes for now? 3. yes make it spawn next to the
+     companion, maybe also make it so the companion can't move or do anything until the chest is closed? when the chest
+     is open, make the "E" menu just say "close chest" so we can get rid of the whole inventory menu and just have one
+     "Inventory" option on the main wheel. clicking that spawns the chest with items" (gem: EMF's put cannot socket a gem,
+     so it is kept as a separate item next to the weapon). **Built 0.15.287 (Lua, live by reload; tested in a fake world:
+     local_server/tests/fight/invtest.lua with the real core/bag.lua):** wheel {Follow me, Stay here, Attack, Inventory,
+     Put away}; while his chest is open {Close Chest} only (an old wheel's other picks are ignored). `inv` table (the
+     file is at Lua's 200 top-level locals): inv.open[name] = {chest, player, t0, state filling/open, queue, rest, rule};
+     r.inv = [{item, count, level, rarity}] and r.chest = {id, session, state} in the roster (world data). Open: chest
+     inv.CHEST (Prop_Decoration_T5_Storage_40_Chest) 1.5 m to his right, a hit rule (no damage), puts one by one
+     (PUT_WAIT 0.5 s, RETRIES 3 on a fresh chest, what does not fit kept in c.rest/the record); r.inv untouched until
+     every put answered; then every SAVE_EVERY 1 s r.inv = chest (bag.entity_stacks; a socketed gem as its own entry) +
+     rest, saved when changed; only a chest that exists and has InventorySetup is read. Close / OPEN_MAX 5 min: final
+     save, hit rule off, emf.destroy; a vanished chest closes keeping the last save. Script reload: inv.adopt takes an
+     "open" chest of the same session up again, removes a "filling" one; another session: gone, r.inv = last save. Frozen:
+     drive_step holds him (hold_at), no fight/heal/follow (inv.frozen; name_of is declared below drive_step: a first
+     version read it there and the drive_harness caught the error). Notices "<name>: Inventory open." / "Inventory closed.".
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
