@@ -221,3 +221,12 @@ local before = #T.roster.list
 emf.json.encode = function(t) return t.op == "result" and ("result: " .. tostring(t.text)) or "state" end
 act("new", "", nil)
 print("new: list grew", #T.roster.list - before)
+-- (0.15.311) Bring back: next to the clicking player
+local nr = T.roster.list[#T.roster.list]
+act("away", nr.name, nil)
+nr.mode = "stay"
+comps[1] = comps[1] or {}
+comps[1].CurrentTransform = { transform = { orientation = { x = 0, y = 0, z = 0, w = 1 } } }
+act("back", nr.name, nil)
+print("back: spot", nr.x, nr.y, nr.z, "out", nr.out)
+act("back", nr.name, nil)

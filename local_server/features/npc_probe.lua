@@ -3354,6 +3354,33 @@ function roster.ui_kind(world, r, guid, pid)
   return r.name .. " is now a " .. kind[2] .. " (" .. kind[1] .. ").", true
 end
 
+-- (owner 11:26 "can you make "Bring back" spawn the companion next to the player? I just put N2 away and brought back
+-- and its not near me") next to the player who clicked, 0.3 m to his right and facing his way (as Call): a follower
+-- follows him, a stayer stays at that new spot
+function roster.ui_back(world, r, pid)
+  if r.out and still_ours(world, ent_of[r.name]) then return r.name .. " is already out.", false end
+  local x, y, z = world:position(pid)
+  if not x then return "You are not in the world.", false end
+  local yaw
+  pcall(function()
+    local o = world:get("CurrentTransform", pid).transform.orientation
+    yaw = math.atan(2 * (o.x * o.z + o.w * o.y), 1 - 2 * (o.x * o.x + o.y * o.y))
+    x, z = x + math.cos(yaw) * 0.3, z - math.sin(yaw) * 0.3
+  end)
+  if r.mode == "stay" then r.x, r.y, r.z = x, y, z end
+  r.face_yaw = yaw
+  local id = spawn_body(world, r, x, y + 0.5, z, r.mode == "follow" and pid or nil)
+  if id and yaw then
+    pcall(function()
+      local o = world:get("CurrentTransform", id).transform.orientation
+      o.x, o.y, o.z, o.w = 0, math.sin(yaw / 2), 0, math.cos(yaw / 2)
+    end)
+  end
+  roster_save()
+  if not id then return r.name .. " could not be spawned.", false end
+  return r.name .. " is back next to you" .. (r.mode == "stay" and " (staying there)." or ", following you."), true
+end
+
 function roster.ui_do(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
   if not (okd and type(m) == "table") then return end
@@ -3382,10 +3409,11 @@ function roster.ui_do(world, from, data)
     said, good = roster.ui_rename(world, r, arg)
   elseif what == "kind" then
     said, good = roster.ui_kind(world, r, tostring(arg or ""), pid)
+  elseif what == "back" then
+    said, good = roster.ui_back(world, r, pid)
   else
     local args
     if what == "away" or what == "delete" then args = { "roster", what, r.name }
-    elseif what == "back" then args = { "roster", "back", r.name, tostring(player_of(world, r.owner) or pid) }
     elseif what == "give" or what == "share" or what == "unshare" then args = { "roster", what, r.name, tostring(arg or "") }
     elseif what == "main" then args = r.owner and { "roster", "main", r.name, r.owner } end
     if not args then

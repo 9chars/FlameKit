@@ -135,7 +135,7 @@ function F.roster_rows(world)
       disabled = c.main or c.o == "", tooltip = "His owner's main companion: the one Call my companion (P) brings." }
     rows[#rows + 1] = { button = (c.out and "ros:away:" or "ros:back:") .. c.n, text = c.out and "Put away" or "Bring back",
       same_line = true, tooltip = c.out and "His body goes; he stays on the roster with his items." or
-        "A follower comes back next to his owner (or you), a stayer at his spot." }
+        "He comes back next to you, facing your way: a follower follows you, a stayer stays there." }
     local armed = ros.confirm[c.n] and t - ros.confirm[c.n] < 300
     rows[#rows + 1] = { button = "ros:delete:" .. c.n, text = armed and "Click again to delete" or "Delete", same_line = true,
       color = "#ff7060", tooltip = "Removes him for good (refused while his chest is open or he carries items)." }
