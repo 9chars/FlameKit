@@ -1633,6 +1633,21 @@ next restart (no yes for a restart yet).
    Untuned kinds: **"I would go with #2.. once the roster system is done we'll test and develop some "tuned" behaviors
    that work with the humanoid templates and see how it goes...."** = an untuned kind plays its own attack moves looked
    up in the game data (its first melee attack), may look wrong until tuned.
+   **0.15.309 (Development + local server, 10:14; DLL c810aefb built 10:12):** server npc_probe.lua: channel
+   flamekit/roster (max 16384): {op=get} -> {op=roster, list={n,k guid,o owner,m,f,out,it items,ch chest,main,c
+   controllers}, players={a,n,on}}; {op=do, what=rename|kind|give|share|unshare|main|away|back|delete, name, arg} ->
+   {op=result,text,ok} + a push to every viewer (10 min after their last ask; F.tick every 60 ticks pushes changes);
+   roster.known (account -> name, saved in the roster) for offline players; rename re-keys ent_of/returning/mana_of/
+   waiting/name_of/roster.main (refused with the chest open; 1-20 of letters digits space - _ ' .); kind = any
+   non-boss core/monsters.lua entry, replaces an out body at its spot (r.sus_base reset); the rest reuses roster_cmd
+   (emf.reply captured). All in the `roster` table (Lua local limit). Client npc_wheel_probe.lua: "Companion Roster"
+   button same line as Call (writes ui_roster_toggle.request + asks), F.roster_rows / F.roster_click (two-click
+   Delete); native_ui.lua: ui_roster.dat + "ros" clicks (text box: gen/num/hex). DLL: ExperimentalLayer has a second
+   constructor (id companion_roster, ui_roster.dat, verb ros, toggled by the request file, hidden at first, centred,
+   above FlameKit's window in the layer order) and row kind e (text box: click = keyboard to the overlay, WM_CHAR typed,
+   Enter sends, Esc/click elsewhere drops); Layer::chr + WM_CHAR in the overlay's window proc. Tests: invtest (server
+   actions), a client rows check, run.lua ALL PASSED. Needs a server restart (new channel + the open event) and a game
+   restart (update ready 10:14:38). Per-kind profiles / attacks (task 2 of the plan): NOT built yet.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
