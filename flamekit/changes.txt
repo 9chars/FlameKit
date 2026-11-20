@@ -1,3 +1,6 @@
+0.15.296 Nov 20, 2026
+- Companions (test, local server only): "flamekit.npc names spawn <entity>" puts a test chest (gone after 60 s) next to the player carrying that entity's name, to see the game's floating name on a chest the mod made. Server only: no game change.
+
 0.15.295 Nov 20, 2026
 - Companions (test, local server only): new console command "flamekit.npc names" lists the game's own floating names (the names players give chests and altars); "names copy <from> <to>" puts one entity's name on another, to see if the companion's chest can carry a name. Server only: no game change.
 

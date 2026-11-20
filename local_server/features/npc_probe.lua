@@ -2804,7 +2804,25 @@ function F.setup(k)
           if math.type(v) == "integer" then return string.format("0x%016X", v) end
           return string.format("%.0f (float)", v)
         end
-        if args[2] == "copy" or args[2] == "set" then
+        if args[2] == "spawn" then  -- (08:47: our spawned chest has no CustomPlayerString, emf.add_component only
+          -- takes 2 kinds, emf.spawn takes any) spawn <from>: a test chest 2 m from the player with <from>'s name key, 60 s
+          local v = key_of(tonumber(args[3]) or 0)
+          local okp, ids = pcall(players.ids, world)
+          local pid = okp and ids and ids[1]
+          local x, y, z
+          if pid then x, y, z = world:position(pid) end
+          if not (v and x) then emf.reply("npc names: spawn <entity with a name> (near a player)") return end
+          local ok, fid = pcall(emf.spawn, world, inv.CHEST, x + 2, y, z, { CustomPlayerString = { stringId = v } })
+          if not ok then ok, fid = pcall(emf.spawn, world, inv.CHEST, x + 2, y, z, { CustomPlayerString = { stringId = { value = v } } }) end
+          if ok and fid and fid ~= 0 then
+            heal_fx_shown[#heal_fx_shown + 1] = { id = fid, at = world:tick() + 3600 }
+            log(string.format("names: test chest %s spawned with %s's key %s (reads %s), gone in 60 s", tostring(fid), args[3], hex(v), hex(key_of(fid))))
+            emf.reply("npc names: test chest " .. tostring(fid))
+          else
+            log("names: test chest refused: " .. tostring(fid))
+            emf.reply("npc names: refused")
+          end
+        elseif args[2] == "copy" or args[2] == "set" then
           local from, to = tonumber(args[3]), tonumber(args[4])
           local v = args[2] == "copy" and from and key_of(from) or (args[2] == "set" and math.tointeger(tonumber(args[4])))
           if args[2] == "set" then to = from end
