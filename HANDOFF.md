@@ -1943,6 +1943,9 @@ next restart (no yes for a restart yet).
    bunnies, turkey, desert bird, flying bird), F.is_small(id); drive_read: a small pet swims over F.SWIM_ENTER_SMALL
    0.25 m; drive_water holds it F.SWIM_DEPTH_SMALL 0.3 m below the surface (was 0.9). npc_probe.lua is AT the 200
    top-level locals: new values go into F or tables.
+   Asked: bring a can't-follow companion back beside a swimming player at once? **Owner 17:27 "yes"**. 0.15.356: the
+   returning loop: after rt.why "can't follow" a swimming player (depth > 0.5) counts as ready (LAND_TICKS as before);
+   glide / fast travel / falling still wait for the ground.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

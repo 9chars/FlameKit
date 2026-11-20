@@ -3569,7 +3569,10 @@ function F.tick(world)
       -- and his game reports it has loaded (PlayerInput.fromClientIsReadyForGameplay is false from the teleport until
       -- the loading screen is over)
       local okr, ready = pcall(function() return world:get("PlayerInput", rt.player).fromClientIsReadyForGameplay end)
-      local on_ground = not player_airborne(world, rt.player) and not (okw and (w or 0) > 0.5) and not (okr and ready == false)
+      -- (owner 17:27 "yes": pets swim now) after a "can't follow" he comes back beside a swimming player at once too
+      local swimming = okw and (w or 0) > 0.5
+      local on_ground = not (okr and ready == false) and ((swimming and rt.why == "can't follow")
+        or (not swimming and not player_airborne(world, rt.player)))
       if on_ground then
         rt.ground = rt.ground or t
         if t - rt.ground >= LAND_TICKS then

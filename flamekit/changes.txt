@@ -1,3 +1,6 @@
+0.15.356 Nov 20, 2026
+- Companions (test, local server only): a companion or pet that can't follow you while you swim comes back beside you in the water (it waited until you stood on land). Server only: no game change.
+
 0.15.355 Nov 20, 2026
 - Companions (test, local server only): small pets (cats, bunnies, birds, the turkey) start swimming in shallower water (0.25 m, was 0.5 m) and swim nearer the surface; the cat got stuck at the water's edge. Server only: no game change.
 
