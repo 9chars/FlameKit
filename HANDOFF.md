@@ -1931,6 +1931,9 @@ next restart (no yes for a restart yet).
    threads), so the same Velocity was multiplied by 1.6 ~20 times a step -> infinity (then the step hung). 0.15.354 test
    B: once per pet per step (g_boosted entity -> w.tick(), under g_boost_mx), never above kBoostMax 10 m/s, skipped
    when the speed is not finite. Lesson: a hook_program post runs many times per step.
+   Build fix ((std::min) against windows.h' min); DLL 305065ab (test A's kept as .bad_1706); restart 17:12 (owner
+   "yes"), up 17:13:47. **Owner 17:15 "not crashing so thats good"**: log 17:15:24-39 "pet boost: 17 -> 488 boosts ...
+   8.0-9.5 m from the player, 8.2-9.5 -> 10.0 m/s" (at the cap), no can't-follow. Whether they keep up: asked.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
