@@ -1,3 +1,100 @@
+0.15.346 Nov 20, 2026
+- Companions (test, local server only): while a pet's chest is open, its E prompt says "Close" (it said "Talk"). Needs a server restart. Server only: no game change.
+
+0.15.345 Nov 20, 2026
+- Companion Roster: the baby animals are no longer in the Pets list (the game makes them tame, so they could be picked up, and they did not follow).
+- Companions (test, local server only): once a companion or pet has reached you, it stays where it stands while you are within 6 m of it, so you can walk up to it; further away it follows again. Changing a kind to a pet no longer says pets do not follow.
+
+0.15.344 Nov 20, 2026
+- Companions (test, local server only): a follower waiting behind another goes on once there is 3.5 m between them (it stopped and started several times a second at 2.5 m). Server only: no game change.
+
+0.15.343 Nov 20, 2026
+- Companions (test, local server only): several companions or pets keep more room: their places around you are farther out (2.5-5 m, at least 2.5 m apart), and while you run each one stays at least 2.5 m behind the one ahead. Server only: no game change.
+
+0.15.342 Nov 20, 2026
+- Companions (test, local server only): with several companions out, one standing at its place around you no longer counts as stuck (it said "Companion can't follow you!" and respawned every few seconds). Server only: no game change.
+
+0.15.341 Nov 20, 2026
+- Companions (test, local server only): a companion or pet that can't follow you while swimming is now brought back beside you, as on land (it only showed the notice). Server only: no game change.
+
+0.15.340 Nov 20, 2026
+- Companions (test, local server only): a "Companions" entry in every companion's and pet's wheel opens a wheel of all your companions and pets (name and kind); picking one brings it next to you, following you (one already out is moved to you). Server only: no game change.
+
+0.15.339 Nov 20, 2026
+- Companions (test, local server only): a pet dives all the way down with you (it was held about 3 m above you). Pets only. Server only: no game change.
+
+0.15.338 Nov 20, 2026
+- Companions (test, local server only): pets heal you like a companion in Healing mode, always: the same mana, heals, sparkle and notice (no shout, and they never heal themselves since they take no damage). Server only: no game change.
+
+0.15.337 Nov 20, 2026
+- Companions (test, local server only): a companion's heal costs 100 of his 800 mana (was 200): 8 heals from full, about one every 10 s over a long fight. Server only: no game change.
+
+0.15.336 Nov 20, 2026
+- Companions (test, local server only): Pet in a pet's wheel now says "Press E to pet <name>"; that E plays the game's petting, then his E is Talk again (the server can't start the petting by itself). Server only: no game change.
+
+0.15.335 Nov 20, 2026
+- Companions (test, local server only): pets get their own wheel (Follow me, Stay here, Pet, Inventory, Put away; no Attack). Pet is a try: the server starts the game's own petting for you. The chest name is watched in the log. Needs a server restart. Server only: no game change.
+
+0.15.334 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt gets an offer number like the game's own prompts (it had none, so the E press was not taken). Needs a server restart. Server only: no game change.
+
+0.15.333 Nov 20, 2026
+- Companions (test, local server only): the pet log also shows what can refuse an E press on the animal (its locks). Server only: no game change.
+
+0.15.332 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt is set as the animal's default action too (the game kept clearing it before an E press was handled). Needs a server restart. Server only: no game change.
+
+0.15.331 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt is also kept in place when the game checks the E press, so pressing it opens the companion wheel. Needs a server restart. Server only: no game change.
+
+0.15.330 Nov 20, 2026
+- Companions (test, local server only): a pet's E prompt ("Talk", opens the companion wheel) is now set by the server probe right before the game shows prompts, since the game turned the mod's prompt off again every step. Needs a server restart. Server only: no game change.
+
+0.15.329 Nov 20, 2026
+- Companions (test, local server only): pets are spawned wild again (the game's pick-up comes with tame animals); their E prompt is switched on by the mod and opens the companion wheel. Server only: no game change.
+
+0.15.328 Nov 20, 2026
+- Companions (test, local server only): our pets no longer get the game's "Pet" prompt and pick-up: their E is a plain "Talk" that opens the companion wheel. Server only: no game change.
+
+0.15.327 Nov 20, 2026
+- Companions (test, local server only): the pet log also shows the game's E offer on the animal (which action and word it shows), to take the game's pick-up and "Pet" off our pets. Server only: no game change.
+
+0.15.326 Nov 20, 2026
+- Companions (test, local server only): pets are spawned tame, so the game gives them its own "E Pet" prompt; pressing it opens the companion wheel (as E on a companion). Server only: no game change.
+
+0.15.325 Nov 20, 2026
+- Companions (test, local server only): fix: pets no longer shoot 10-30 m in a moment while catching up to you (animals cannot sprint: pets run at most). Needs the server probe from this version (next server start). Server only: no game change.
+
+0.15.324 Nov 20, 2026
+- Companions (test, local server only): fix: pets no longer jump around erratically while following (their follow target went through the animal's own spawn position, which the game also moves it by). Needs the server probe from this version (next server start). Server only: no game change.
+
+0.15.323 Nov 20, 2026
+- Companions (test, local server only): pets follow you with the same follow code as the companions (the animal's own AI is kept idle); they never fight and take no damage. Needs the server probe from this version (next server start). Server only: no game change.
+
+0.15.322 Nov 20, 2026
+- Companions (test, local server only): console "flamekit.npc petlog <entity> [seconds]" logs what an animal's own AI does (for making pets follow). Server only: no game change.
+
+0.15.321 Nov 20, 2026
+- Companions (test, local server only): fix: after fast travel or a glide every companion that followed you comes back (only your main one came, twice). Server only: no game change.
+
+0.15.320 Nov 20, 2026
+- Companions (test, local server only): fix: an extra follower picks a place next to you that is at least 1.5 m from the followers before him (his first place could be where another one already stood). Server only: no game change.
+
+0.15.319 Nov 20, 2026
+- Companions (test, local server only): the server log notes each follower's place next to the player when it changes (to find why two followers still stand together). Server only: no game change.
+
+0.15.318 Nov 20, 2026
+- Companions (test, local server only): fix for 0.15.317: the extra followers also take their own place when they are already close to you. Server only: no game change.
+
+0.15.317 Nov 20, 2026
+- Companions (test, local server only): fix for 0.15.316: the second and third followers really walk to their own place next to you (they still stopped together). Server only: no game change.
+
+0.15.316 Nov 20, 2026
+- Companions (test, local server only): fix: two or more companions following the same player no longer stand inside each other: they are spawned apart, and when they reach you the second, third ... each stop at their own place around you (left-behind, right-behind, behind ...). Server only: no game change.
+
+0.15.315 Nov 20, 2026
+- Companions (test, local server only): the companion's chest is put on the ground: the server looks for the ground at four places around him (his left first, then his right, behind him, in front) and takes the first one at about his height, not on top of another chest or down a drop. Needs the server probe from this version (next server start); before that it opens at his left at his height as before. Server only: no game change.
+
 0.15.314 Nov 20, 2026
 - Companions (test): the Pets section also has the flying bird.
 

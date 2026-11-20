@@ -22,13 +22,16 @@ return {
   { "Pets", "Bird (flying)", "0eaf60f1-7ab9-4936-9cd0-17233fb339ea" },    -- Animal_Wildlife_Flying_Bird (0.15.314, owner 11:55)
   { "Pets", "Yak", "ae8c6943-f581-43ed-8e66-d1b07b2ea4f5" },              -- Animal_Wildlife_T5_Yak_AG2
   { "Pets", "Capybara", "df787789-d005-42e8-a18f-f4fe2e5d2e42" },         -- Animal_Wildlife_T6_Capybara_AG2
-  { "Pets", "Baby goat", "f105a553-de24-444b-b7e7-0abe250e0b2a" },        -- Animal_Baby_T1_Goat
-  { "Pets", "Baby mountain goat", "8e24c10f-2d19-4ed6-9875-68f87fa91580" },  -- Animal_Baby_T5_Mountaingoat
-  { "Pets", "Baby bunny", "4d81f8c5-a230-406c-8bb1-df9f6e66cf2d" },       -- Animal_Baby_T2_Bunny
-  { "Pets", "Baby cat-deer", "072eed62-d51e-4fb6-a899-589aed709f84" },    -- Animal_Baby_T2_CatDeer
-  { "Pets", "Baby turkey", "042266d3-e887-4ff4-9d22-dc9338aa76be" },      -- Animal_Baby_T3_Turkey
-  { "Pets", "Baby desert bird", "3f5fe59f-7f28-44ec-80e1-d946f6028d7d" },  -- Animal_Baby_T4_Bird_Desert
-  { "Pets", "Baby sanddigger", "fc546ff6-6117-46d6-b3c2-fdf97c47b7a0" },  -- Animal_Baby_T4_Sanddigger
-  { "Pets", "Baby yak", "e8b4ebb2-3dec-4a2a-b6ed-d6116cd53918" },         -- Animal_Baby_T5_Yak
-  { "Pets", "Baby capybara", "7a5757d8-2bc0-403e-a556-92f6c39c50f7" },    -- Animal_Baby_T6_Capybara
 }
+-- (0.15.345, owner 2026-11-20 16:08 "yeah that the babies out") the babies are off the list: the game makes them tame
+-- from birth (its own Pet prompt and pick-up), they have no wildlife AI for the drive, and they grow up. Kept here:
+--   { "Pets", "Baby goat", "f105a553-de24-444b-b7e7-0abe250e0b2a" },        -- Animal_Baby_T1_Goat
+--   { "Pets", "Baby mountain goat", "8e24c10f-2d19-4ed6-9875-68f87fa91580" },  -- Animal_Baby_T5_Mountaingoat
+--   { "Pets", "Baby bunny", "4d81f8c5-a230-406c-8bb1-df9f6e66cf2d" },       -- Animal_Baby_T2_Bunny
+--   { "Pets", "Baby cat-deer", "072eed62-d51e-4fb6-a899-589aed709f84" },    -- Animal_Baby_T2_CatDeer
+--   { "Pets", "Baby turkey", "042266d3-e887-4ff4-9d22-dc9338aa76be" },      -- Animal_Baby_T3_Turkey
+--   { "Pets", "Baby desert bird", "3f5fe59f-7f28-44ec-80e1-d946f6028d7d" },  -- Animal_Baby_T4_Bird_Desert
+--   { "Pets", "Baby sanddigger", "fc546ff6-6117-46d6-b3c2-fdf97c47b7a0" },  -- Animal_Baby_T4_Sanddigger
+--   { "Pets", "Baby yak", "e8b4ebb2-3dec-4a2a-b6ed-d6116cd53918" },         -- Animal_Baby_T5_Yak
+--   { "Pets", "Baby capybara", "7a5757d8-2bc0-403e-a556-92f6c39c50f7" },    -- Animal_Baby_T6_Capybara
+
