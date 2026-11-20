@@ -1808,6 +1808,9 @@ next restart (no yes for a restart yet).
    accepted (the 2 accepted ones, offer 4 and 7, came ~2 s later = his own E). **Owner 15:06: "when I press the 'Pet'
    option from the wheel, it lets me press E again for the pet"**. 0.15.336 (the press-E plan): the emit removed;
    Pet says "Press E to pet <name>"; back to Talk PET_AFTER 30 ticks after that accept, or PET_HOLD 600 without it.
+   Offered (15:08 "anyway for the 'Pet' action on the wheel to make the petting happen?"): the client mod presses E
+   itself after Pet (native SendInput; facing him, E only). **Owner 15:10: "its probably fine how it is now I think, at
+   least the player can still do it"** = not built; Pet stays as in 0.15.336 (idea kept on the list).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
