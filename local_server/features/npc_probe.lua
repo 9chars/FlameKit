@@ -3644,7 +3644,28 @@ function roster.pets_quiet(world)
       if wl.state ~= 3 then wl.state = 3 end
       local pw = world:get("DynamicPathWalker", id)
       if pw and pw.isWalkingActive ~= false then pw.isWalkingActive = false end
+      pcall(roster.pet_offer, world, id)
     end
+  end
+end
+
+-- (owner 14:09 "yeah we need to remove the pick up and pet option, the pet option could be put in the wheel") a tame
+-- pet's game offer is verb Pet (0x6D5B6297) with the game's pet sequence (0xB1EB4A70; petlog 14:11:55), which also lets
+-- a player pick him up (14:07:42: the body was gone). It is replaced by the plain touch sequence (no screen, EMF's
+-- EMF_SEQUENCE_TOUCH) and the word Talk, so E only fires InteractionAcceptedEvent (his wheel, in F.setup).
+roster.TOUCH_SEQ, roster.TALK_VERB = 0x3E5189BF, 0xD9861C4B
+roster.offer_fixes = {}
+function roster.pet_offer(world, id)
+  local o = world:get("InteractionOfferRuntime", id)
+  if not o then return end
+  if o.overrideSequence == roster.TOUCH_SEQ and o.overrideVerbLocaId == roster.TALK_VERB then return end
+  local before = string.format("seq %s verb %s", tostring(o.overrideSequence), tostring(o.overrideVerbLocaId))
+  o.overrideSequence = roster.TOUCH_SEQ
+  o.overrideVerbLocaId = roster.TALK_VERB
+  local n = (roster.offer_fixes[id] or 0) + 1
+  roster.offer_fixes[id] = n
+  if n == 1 or n % 100 == 0 then
+    log(string.format("pet %s (%d): the game's offer (%s) set to touch / Talk (time %d)", tostring(name_of[id]), id, before, n))
   end
 end
 

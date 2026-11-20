@@ -1754,6 +1754,10 @@ next restart (no yes for a restart yet).
    write InteractionOfferRuntime (fields defaultSequence, overrideSequence, defaultVerbId, overrideVerbLocaId, offerId,
    isOffered, isDisabled); animal_upgrade_interaction (a player program: SelectedTargets, other-read IsTame) may be the
    pick-up. 14:07:42 pick-up came with no InteractionAcceptedEvent. 0.15.327: petlog also logs the offer runtime.
+   petlog 14:11:55 (N2 87125, tame): default seq 0 verb 0, override seq 0xB1EB4A70 verb 0x6D5B6297 (= EMF_VERB_PET),
+   offerId 1, offered. 0.15.328: roster.pet_offer (from pets_quiet, every tick) writes override seq EMF_SEQUENCE_TOUCH
+   0x3E5189BF + verb EMF_VERB_TALK 0xD9861C4B; logs the first fix and every 100th (shows whether the game rewrites it).
+   Untested: whether the pick-up goes with the sequence. Next (owner's idea): "Pet" in his wheel.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
