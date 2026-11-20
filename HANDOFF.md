@@ -1547,6 +1547,10 @@ next restart (no yes for a restart yet).
      0.15.298: inv.gear_list reads it, his record keeps `unlocked`, the put records a fix, inv.apply_unlocked writes it
      on the new piece at ready_t (before the first snapshot). 0.15.299: `flamekit.npc unlock <companion> <item> <n>`;
      09:02:16 N1's record item 3412482507 level 47 set to 1 unlocked (the owner's weapon). NOT yet seen in game.
+     **Server restart 09:05 (owner 09:05 "yeah bounce it"):** probe DLL 27d76044 loaded; 09:05:40 'N1'/'N2' registered
+     BEFORE the world loaded (table count 1, 2) and they survived the load: 09:11:57 chest 28184 kept key
+     0x09207B07B5B5A6A0 (not zeroed); 09:11:58 "upgrades put back on item 3412482507 (level 47): unlocked 0 -> 1",
+     gear log 4/1; the owner took the weapon out at 09:12:03. In-game look not confirmed by the owner yet.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
