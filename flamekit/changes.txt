@@ -1,3 +1,6 @@
+0.15.295 Nov 20, 2026
+- Companions (test, local server only): new console command "flamekit.npc names" lists the game's own floating names (the names players give chests and altars); "names copy <from> <to>" puts one entity's name on another, to see if the companion's chest can carry a name. Server only: no game change.
+
 0.15.294 Nov 20, 2026
 - Companions (test, local server only): fix: the companion had no E prompt after his chest opened or closed (the game refused the new prompt in the same moment the old one was taken off); the new prompt is now made a moment later and retried until it is taken. Server only: no game change.
 

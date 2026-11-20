@@ -2789,6 +2789,51 @@ function F.setup(k)
           log(string.format("heal fx %d (%s) refused (%s)", n, c[1], tostring(fid)))
           emf.reply("healfx " .. n .. ": refused")
         end
+      elseif what == "names" then  -- names [copy <from> <to> | set <entity> <id>]: the game's own floating names
+        -- (CustomPlayerString.stringId, the key of a name players gave a chest or altar; owner 08:41 "research the
+        -- first point and see what it looks like?") lists every entity with one, or copies one onto another
+        local function key_of(id)
+          local ok, c = pcall(world.get, world, "CustomPlayerString", id)
+          if not ok or not c then return nil end
+          local k = c.stringId
+          if type(k) ~= "number" then k = k.value end  -- (a HashKey64 may read as a number or as {value})
+          return k
+        end
+        local function hex(v)
+          if v == nil then return "none" end
+          if math.type(v) == "integer" then return string.format("0x%016X", v) end
+          return string.format("%.0f (float)", v)
+        end
+        if args[2] == "copy" or args[2] == "set" then
+          local from, to = tonumber(args[3]), tonumber(args[4])
+          local v = args[2] == "copy" and from and key_of(from) or (args[2] == "set" and math.tointeger(tonumber(args[4])))
+          if args[2] == "set" then to = from end
+          local c = to and world:get("CustomPlayerString", to)
+          if not (v and c) then emf.reply("npc names: copy <from> <to> | set <entity> <number> (both need the component)") return end
+          local was = key_of(to)
+          if type(c.stringId) == "number" then c.stringId = v else c.stringId.value = v end
+          log(string.format("names: %s stringId %s -> %s (now reads %s)", tostring(to), hex(was), hex(v), hex(key_of(to))))
+          emf.reply("npc names: set")
+        else
+          local px, py, pz
+          pcall(function() local ids = players.ids(world) px, py, pz = world:position(ids[1]) end)
+          local n, named = 0, 0
+          for _, id in ipairs(world:entities()) do
+            local v = key_of(id)
+            if v ~= nil then
+              n = n + 1
+              local x, y, z = world:position(id)
+              local d = (px and x) and math.sqrt((x - px) ^ 2 + (y - py) ^ 2 + (z - pz) ^ 2) or -1
+              if v ~= 0 or d >= 0 and d < 30 then
+                if v ~= 0 then named = named + 1 end
+                local okm, m = pcall(function() return world:template("ModelResource", id).model end)
+                log(string.format("names: %s key %s at %.0f m (model %s)", tostring(id), hex(v), d, okm and tostring(m) or "?"))
+              end
+            end
+          end
+          log(string.format("names: %d entities have the component, %d with a name key", n, named))
+          emf.reply(string.format("npc names: %d / %d", named, n))
+        end
       elseif what == "hold" then  -- hold <npc> <target> [seconds]: stays put and faces the target (drive_hold)
         local id, tg, sec = tonumber(args[2]), tonumber(args[3]), tonumber(args[4]) or 10
         if not (id and tg) then emf.reply("npc: hold <npc> <target> [seconds]") return end
