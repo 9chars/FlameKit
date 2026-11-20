@@ -1423,6 +1423,24 @@ next restart (no yes for a restart yet).
      built (offered, not chosen): the glider rule (a jump where the player opened the glider = a break), level/armour set
      on the spawn tick.
      -> **0.15.286 (server only):** flamekit/mod.json + changes.txt line for the fall safety net.
+     **Owner 07:54, verbatim (the next step, companion inventory):** "the next step will be adding an inventory option.
+     I'd like you to start working on that while I test out the changes. we already learned A LOT about inventory items
+     so some of the questions you have about it, I already have answers to. so I'd like the "E" menu to have
+     "Inventory" menu. In this menu, it has "Open Chest", "Close Chest". "Open Chest" will spawn a large chest on the
+     ground. all of their inventory items the companion has on them will appear. I guess EMF has some system for this
+     already, so you'll need to explain that to me. When the player is done they can choose "Close Chest" and it will
+     move their inventory out to a space spot (EMF has something?) and the chest despawns... there probably should be a
+     backup option where if the user forgets to close it, it despawns within a specified time (but items cannot be lost
+     when that despawn happens)". **Research (nothing built):** (1) spawned entities are NOT saved by the game (EMF
+     re_villages.md; core/loot_chest.lua): a hidden chest as storage loses everything on a server restart -> the
+     companion's items must live in FlameKit's own file (the roster). (2) emf.put/take/move = take + put: plain stacks
+     exact; GEAR has a per-item data entity (pide: level, perks, durability, gem) that a take destroys: put back = same
+     item, level and rarity (passable), perks re-rolled, the socketed gem gone (EMF guide.md/cookbook.md). The engine's
+     moveStack (op 4, 0x14040da50) keeps the pide between two containers (re_take_items.md 4b) but EMF does not offer it
+     and both containers must exist (no saved one to move into). (3) core/bag.lua reads every stack: item, count, gear,
+     rarity, level, gem id (not the perks). (4) The chest: core/loot_chest.lua's Prop_Decoration_T5_Storage_40_Chest
+     (40 slots), PUT_WAIT 0.5 s before the first put, a hit rule so it takes no damage. Questions asked: gear handling,
+     the auto-close time, where the chest appears.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
