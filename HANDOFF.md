@@ -1852,6 +1852,11 @@ next restart (no yes for a restart yet).
    follow -> respawn, every 8 s (18 times since 15:40; likely also the 14:11-14:19 loop). 0.15.342: drive_steer keeps
    h.slot_at {x, z, t}; drive_stuck counts a follower within SLOT_AT 1.5 m of his place (slot set in the last 30
    ticks) as progress.
+   **Owner 15:59: "anyway to space out the pets a little bit more from each other, when they run or I stop they all
+   just bunch right up on me"**; offered (places x1.5, 2.5 m apart; a 2.5 m queue on the trail); **owner 16:00 "pets
+   and companion monsters too"**. 0.15.343: SLOTS x1.5, SLOT_GAP 2.5, SLOT_NEAR 6 (was 4); drive_steer, on the trail
+   beyond SLOT_NEAR: a follower holds (hold_at, h.gap_t) while another of the player's followers is within TRAIL_GAP
+   2.5 m and closer to the player (log "gap <id>: waits for ..." / "goes on"); drive_stuck counts that wait as progress.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

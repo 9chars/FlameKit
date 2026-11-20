@@ -1,3 +1,6 @@
+0.15.343 Nov 20, 2026
+- Companions (test, local server only): several companions or pets keep more room: their places around you are farther out (2.5-5 m, at least 2.5 m apart), and while you run each one stays at least 2.5 m behind the one ahead. Server only: no game change.
+
 0.15.342 Nov 20, 2026
 - Companions (test, local server only): with several companions out, one standing at its place around you no longer counts as stuck (it said "Companion can't follow you!" and respawned every few seconds). Server only: no game change.
 

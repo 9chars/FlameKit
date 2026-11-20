@@ -962,7 +962,8 @@ local function drive_stuck(s)
     -- again every 8 s. A follower standing within SLOT_AT of his place (set by drive_steer this half second) has arrived.
     local sa = h.slot_at
     local at_slot = sa and t - sa.t < 30 and (sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SLOT_AT * SLOT_AT
-    if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD or at_slot then
+    local gap_wait = t - (h.gap_t or -1e9) < 30  -- (16:00) waiting for the follower ahead (drive_steer, TRAIL_GAP)
+    if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD or at_slot or gap_wait then
       h.prog = { c = c, d = dc, t = t }
     elseif t - h.prog.t > STUCK_TICKS then
       h.prog = nil
@@ -983,8 +984,13 @@ end
 -- target) the native edge stop is off: where the player walked there was ground (planks, trap doors and overhangs
 -- fooled its ray). Off the trail (straight to a swimming player, or no trail yet) it is on; on the way to the swimming
 -- player it lets him drop up to 7.5 m (into the water). While he moves his body faces the target.
-local SLOTS = { { -1.6, -0.8 }, { 1.6, -0.8 }, { 0, -2.2 }, { -2.4, -2.2 }, { 2.4, -2.2 } }  -- (12:22) followers 2..6
-local SLOT_NEAR, SLOT_GAP = 4, 1.5
+-- (owner 15:59 "anyway to space out the pets a little bit more from each other, when they run or I stop they all just
+-- bunch right up on me"; 16:00 "pets and companion monsters too") the places 1.5 times as far out (were 1.6-3.3 m from
+-- the player, 1.5 m apart), SLOT_NEAR 6 (was 4) so the farther places are still used, and on the trail TRAIL_GAP
+local SLOTS = { { -2.4, -1.2 }, { 2.4, -1.2 }, { 0, -3.3 }, { -3.6, -3.3 }, { 3.6, -3.3 } }  -- (12:22) followers 2..6
+local SLOT_NEAR, SLOT_GAP = 6, 2.5
+local TRAIL_GAP = 2.5  -- (16:00) on the trail a follower stands while another of the player's is closer to the player
+                       -- and within this of him (a queue instead of a bunch); drive_stuck counts that as no stuck
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local px, py, pz, nx, nz = s.px, s.py, s.pz, s.nx, s.nz
@@ -1050,6 +1056,32 @@ local function drive_steer(s)
         log(string.format("slot %s: follower %d of %d for player %s%s", tostring(id), k + 1, #mine, tostring(h.player),
           o and string.format(", place %d: %.1f %.1f (%.1f m from him now)", h.slot_i, tx, tz, math.sqrt((tx - nx) ^ 2 + (tz - nz) ^ 2)) or ", next to him"))
       end
+    end
+  end
+  -- (owner 15:59 / 16:00) on the trail, further than SLOT_NEAR: he waits while another follower of the same player is
+  -- within TRAIL_GAP of him and closer to the player
+  if c and dp and dp > SLOT_NEAR then
+    local wait_for
+    for oid, oh in pairs(drives) do
+      if oid ~= id and oh.player == h.player then
+        local ox, _, oz = world:position(oid)
+        if ox and (ox - nx) ^ 2 + (oz - nz) ^ 2 < TRAIL_GAP * TRAIL_GAP and (ox - px) ^ 2 + (oz - pz) ^ 2 < dp * dp then
+          wait_for = oid
+          break
+        end
+      end
+    end
+    if wait_for then
+      h.gap_t = t
+      if not h.gap_said then
+        h.gap_said = true
+        log(string.format("gap %s: waits for %s (within %.1f m of him, closer to the player)", tostring(id), tostring(wait_for), TRAIL_GAP))
+      end
+      hold_at(a, nx, s.ny, nz)
+      return
+    elseif h.gap_said then
+      h.gap_said = nil
+      log(string.format("gap %s: goes on", tostring(id)))
     end
   end
   local on_trail = c ~= nil
