@@ -1404,6 +1404,33 @@ inv.CHEST = "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec"  -- Prop_Decoration_T5_Storag
 inv.OPEN_MAX = 5 * 60 * 60   -- ticks: closes itself after 5 minutes (owner 08:02 "maybe go with 5 minutes for now?")
 inv.PUT_WAIT, inv.RETRIES, inv.SAVE_EVERY = 30, 3, 60
 
+-- (owner 2026-11-20 08:19 "we'll have to test the unlocked parts") every gear piece in the chest: its level, rarity,
+-- perks (PerkContainerNew: available/unlocked), durability-broken and gem, logged when the chest is filled and when it
+-- closes, so one round trip shows what came back changed. `when`: "filled" or "closing".
+function inv.log_gear(world, name, chest, when)
+  local okset, setup = pcall(world.get, world, "InventorySetup", chest)
+  if not (okset and setup) then return end
+  local n = 0
+  for i = 1, #(setup.linksEntities or {}) do
+    local okv, invc = pcall(world.get, world, "Inventory", setup.linksEntities[i])
+    for k = 1, #((okv and invc and invc.slots) or {}) do
+      local sl = invc.slots[k]
+      local pide = sl.data and sl.data.pide or 0
+      if sl.id ~= 0 and pide ~= 0 then
+        local st, pc, gs
+        pcall(function() st = world:get("ItemState", pide) end)
+        pcall(function() pc = world:get("PerkContainerNew", pide) end)
+        pcall(function() gs = world:get("WeaponGemSlot", pide) end)
+        n = n + 1
+        log(string.format("inventory %s gear (%s): item %s level %s rarity %s perks %s/%s unlocked, gem %s, base damage %s, item state %s", name, when,
+          tostring(sl.id), tostring(st and st.itemLevelUi), tostring(st and st.itemRarityUi), tostring(pc and pc.availablePerks),
+          tostring(pc and pc.unlockedPerks), tostring(gs and gs.weaponGem and gs.weaponGem.id), tostring(st and st.baseDamageUi), tostring(st and st.itemState)))
+      end
+    end
+  end
+  if n == 0 then log(string.format("inventory %s gear (%s): none", name, when)) end
+end
+
 -- his chest is open: he is frozen (drive_step)
 function inv.frozen(id) local n = name_of[id] return n ~= nil and inv.open[n] ~= nil end
 
@@ -1483,6 +1510,7 @@ function inv.close(world, r, why)
   if not c then return end
   local gone = not world:position(c.chest)  -- removed by something else: his record keeps the last save
   if gone then log(string.format("inventory %s: chest %s is gone; his record keeps the last save", r.name, tostring(c.chest))) end
+  if not gone then pcall(inv.log_gear, world, r.name, c.chest, "closing") end
   if c.state == "open" and not gone and not inv.snapshot(world, r, c) then
     log(string.format("inventory %s: the chest could not be read: it stays open for now", r.name))
     return false
@@ -1519,6 +1547,7 @@ function inv.tick(world)
           r.chest.state = "open"
           inv.snapshot(world, r, c)
           roster_save()
+          pcall(inv.log_gear, world, name, c.chest, "filled")
           log(string.format("inventory %s: chest filled%s", name, #c.rest > 0 and string.format(" (%d stack(s) did not fit: kept in his record)", #c.rest) or ""))
         else
           c.busy = true

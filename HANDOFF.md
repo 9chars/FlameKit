@@ -1475,6 +1475,13 @@ next restart (no yes for a restart yet).
      Close the chest first."). Death: the chest stays (asked whether it should close itself when he dies).
      **Owner 08:15, verbatim:** "yes if the companion dies with the chest open, the chest needs to despawn" -> 0.15.289:
      F.tick's death check (dead_told) calls inv.close(world, r, "he died") (saves first). invtest.lua: closed, record kept.
+     **Owner 08:17:** "so what stats specifically were you worried about not transferring back on items?" Listed: level and
+     rarity tested (yes); socketed gem (no: kept separately); UNKNOWN: unlocked perks (PerkContainerNew {availablePerks,
+     unlockedPerks}; rarity = availablePerks - 1, unlockedPerks may reset on a fresh copy), durability/broken, fuel,
+     custom colour/name. **Owner 08:19, verbatim:** "we'll have to test the unlocked parts, I don't think we tested that
+     yet" -> **TO TEST** (owner): a perked weapon through his chest (close, reopen, compare). 0.15.290 logging (live):
+     inv.log_gear at "filled" and "closing": "inventory <name> gear (<when>): item, level, rarity, perks a/u unlocked,
+     gem, base damage, item state" per gear piece.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
