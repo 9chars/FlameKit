@@ -533,7 +533,7 @@ void pet_boost(void*, void*) {
             if (it != g_boosted.end() && it->second == step) continue;  // already boosted this step
             g_boosted[id] = step;
         }
-        const float k = std::min(kBoost, kBoostMax / hs);
+        const float k = (std::min)(kBoost, kBoostMax / hs);
         if (k <= 1.0f) continue;
         v->velocity.x *= k;
         v->velocity.z *= k;
@@ -552,7 +552,7 @@ void boost_report(emf::World w) {
     if (n == seen) return;
     EMF_LOG(kMod, "pet boost: %llu boosts so far (hook ran %llu times); last %u at %.1f m from the player, %.1f -> %.1f m/s",
             (unsigned long long)n, (unsigned long long)g_boost_calls.load(), g_boost_last_id.load(), g_boost_last_d.load(),
-            g_boost_last_v.load(), std::min(g_boost_last_v.load() * kBoost, kBoostMax));
+            g_boost_last_v.load(), (std::min)(g_boost_last_v.load() * kBoost, kBoostMax));
     seen = n;
 }
 
