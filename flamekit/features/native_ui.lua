@@ -117,11 +117,13 @@ end
 local function rows_lines(rows)
   local body, map = {}, {}
   for _, r in ipairs(rows) do
-    local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or r.options and "d" or r.label and "l"
-      or (r.button or r.slot) and "b" or "t"
+    -- (0.15.309) kind e: a text box (r.edit = its click key, r.text = the text in it); the typed text comes back with
+    -- the click ("<generation>/<number>/<text as hex>")
+    local kind = r.separator and "s" or r.heading and "h" or r.item and "i" or r.options and "d" or r.edit and "e"
+      or r.label and "l" or (r.button or r.slot) and "b" or "t"
     local number = 0
-    if (kind == "b" or kind == "i") and (r.button or r.slot) then
-      map[#map + 1] = r.button or r.slot
+    if (kind == "b" or kind == "i" or kind == "e") and (r.button or r.slot or r.edit) then
+      map[#map + 1] = r.button or r.slot or r.edit
       number = #map
     end
     local colour = type(r.color) == "string" and r.color:match("^#?(%x%x%x%x%x%x)$") or "-"
@@ -206,6 +208,37 @@ local function write_exp(world)
   kit.debug("debug", "native ui: ui_exp.dat: %d row(s), generation %d", #rows, exp_gen)
 end
 
+-- (0.15.309, owner 2026-11-20 10:00: "Companion Roster needs to be its own complete window") the Companion Roster
+-- window: the same kind of window as the Experimental one, its rows from features/npc_wheel_probe.lua F.roster_rows in
+-- ui_roster.dat; a click comes back as "ros <generation>/<button number>[/<typed text as hex>]" and goes to
+-- F.roster_click(world, key, text). The DLL shows and hides it when ui_roster_toggle.request appears (written by the
+-- feature's button).
+local ros_gen, ros_keys, last_ros, ros_now = 0, {}, nil, true
+local function write_ros(world)
+  local f = feature("npc_wheel_probe")
+  local rows = f and kit.enabled(f) and f.roster_rows and kit.call(f, "roster_rows", world)
+  if type(rows) ~= "table" then rows = {} end
+  local text, map = rows_lines(rows)
+  if text == last_ros then return end
+  last_ros = text
+  ros_gen = ros_gen + 1
+  ros_keys[ros_gen] = map
+  ros_keys[ros_gen - 3] = nil
+  local out = io.open(emf.dir .. "\\ui_roster.dat", "w")
+  if not out then
+    kit.debug("warn", "native ui: ui_roster.dat could not be written")
+    last_ros = nil
+    return
+  end
+  out:write("gen\t" .. ros_gen .. "\n" .. text .. (text ~= "" and "\n" or "") .. "end\n")
+  out:close()
+  kit.debug("debug", "native ui: ui_roster.dat: %d row(s), generation %d", #rows, ros_gen)
+end
+
+local function unhex(h)
+  return (tostring(h or ""):gsub("%x%x", function(c) return string.char(tonumber(c, 16)) end))
+end
+
 local function act(world, what, arg)
   kit.debug("info", "native ui: click from FlameKit's window: %s %s", tostring(what), tostring(arg))
   if what == "junk" or what == "keep" then
@@ -246,6 +279,17 @@ local function act(world, what, arg)
     end
     exp_now = true
     tabs_now = true
+  elseif what == "ros" then  -- a click in the Companion Roster window (a text box's Enter carries the text)
+    local gen, number, typed = tostring(arg):match("^(%d+)/(%d+)/?(%x*)$")
+    local map = gen and ros_keys[tonumber(gen)]
+    local key = map and map[tonumber(number)]
+    local f = feature("npc_wheel_probe")
+    if f and key and f.roster_click then
+      kit.call(f, "roster_click", world, key, typed ~= "" and unhex(typed) or nil)
+    else
+      kit.debug("info", "native ui: a click in the Companion Roster window on %s was dropped (it changed before it arrived)", tostring(arg))
+    end
+    ros_now = true
   elseif what == "key" then  -- a key pressed in the window: the setting waiting for a key (any tab's Change) takes it
     local settings = feature("settings")
     if settings and require("features.settings").capturing() then
@@ -294,6 +338,10 @@ function F.client_tick(world)
   if steps % 10 == 7 or exp_now then
     exp_now = false
     write_exp(world)
+  end
+  if steps % 10 == 3 or ros_now then
+    ros_now = false
+    write_ros(world)
   end
 end
 
