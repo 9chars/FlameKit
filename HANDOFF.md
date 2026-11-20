@@ -1706,6 +1706,10 @@ next restart (no yes for a restart yet).
    12:29:50 apart (N2 next to the player, N1 ~3 m away). **Owner 12:35 "yeah thats good, ideally you'd have different
    ones" / 12:36 "first one. we dont need different paths"** = ideally a player's companions are different kinds (set
    with Kind); no separate follow paths wanted.
+   **Owner 12:37: "when I teleported I only see N1 again"**: 12:37:14 both returning entries called on_call (the
+   player's MAIN companion): N1 spawned twice (34173, 34174), N2 never. 0.15.321: the return calls roster.ui_back for
+   that companion (beside the player, 0.3 m right; spawn_body keeps them 1.2 m apart); the "Companion has spawned near
+   you!" notice only for the main one. Cleanup: the extra N1 body removed, N2 brought back by console.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

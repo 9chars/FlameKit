@@ -1,3 +1,6 @@
+0.15.321 Nov 20, 2026
+- Companions (test, local server only): fix: after fast travel or a glide every companion that followed you comes back (only your main one came, twice). Server only: no game change.
+
 0.15.320 Nov 20, 2026
 - Companions (test, local server only): fix: an extra follower picks a place next to you that is at least 1.5 m from the followers before him (his first place could be where another one already stood). Server only: no game change.
 

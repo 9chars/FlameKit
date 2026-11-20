@@ -3362,8 +3362,18 @@ function F.tick(world)
         if t - rt.ground >= LAND_TICKS then
           returning[name] = nil
           log(string.format("away: %s back beside player %s (%s over)", name, tostring(rt.player), tostring(rt.why)))
-          local okc, errc = pcall(on_call, world, { player = rt.player, account = rt.account })
-          if not okc then log("away: call failed: " .. tostring(errc)) end
+          -- (owner 2026-11-20 12:37 "when I teleported I only see N1 again": this called on_call, which brings the
+          -- player's MAIN companion, so N1 came twice and N2 not at all) this companion himself comes back beside him
+          local r = find(name)
+          if r then
+            local okc, said = pcall(roster.ui_back, world, r, rt.player)
+            log(string.format("away: %s: %s", name, tostring(said)))
+            status(world, rt.player, "companion_away", nil)
+            status(world, rt.player, "companion_stuck", nil)
+            if okc and roster.main[rt.account or ""] == name then
+              pcall(function() require("features.chat").notice_to(world, rt.player, "Companion has spawned near you!", "#8cd2ff", 5) end)
+            end
+          end
         end
       else
         rt.ground = nil
