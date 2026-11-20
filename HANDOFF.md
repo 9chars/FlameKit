@@ -1389,6 +1389,15 @@ next restart (no yes for a restart yet).
      Attack menu modes, the attack sequence, bats/floaters, armour, healing, instant respawn). Copied to the server and
      the work folder. Git: every server file (npc_probe.lua, npc_fields.lua, main.lua) and server_probe.cpp matched the
      repo (md5) before the commit.
+     **Owner 06:19, verbatim:** "I just want to make sure all the new source is checked into git.. thats all". Full
+     compare of the work folder (69 files) with git: all game source identical (flamekit/, flamekit_native/src,
+     server_probe.cpp, local_server/); 4 notes files newer in git (the work copies are 2026-11-13..16). Never in git
+     until now, added (fe2689d): `tools/gamedata/` (kfc.py reader, template tools, arsenal*.py, tplcomp.py, the action
+     sequence search seqs*.py + seqnames.tsv, templates.csv, monsters.tsv; README), `local_server/tests/fight/` (the
+     fake-world fight/heal tests seqtest*/healtest*/fighttest/doortest/armortest/watchtest, harness.lua, syn.lua,
+     helper .py; README), `flamekit_native/notes/map_marker_registry.json`. Left out on purpose: the work folder's
+     old `notes/probes/npc_probe.lua` / `npc_wheel_probe.lua` (2026-11-17 copies, superseded; their history is in git)
+     and `npc_fields.lua` (identical to local_server's).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
