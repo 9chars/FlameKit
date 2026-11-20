@@ -1,3 +1,7 @@
+0.15.349 Nov 20, 2026
+- Experimental tab, Debug: "Companion follow notices" (off by default). The companion notices about following (can't follow you, can't get up there, afraid to follow) only show with it on; they are for finding problems.
+- Companions (test, local server only): a companion within 6 m of you and level with you is never "can't follow" (one stood 1.6 m from its place and was respawned every 5 s while you stood still). Server part: no game change.
+
 0.15.348 Nov 20, 2026
 - Companions (test, local server only): 0.15.347 taken out again (the owner: zoning in does not need a fix); companions far away come back through "can't follow" as before. Server only: no game change.
 

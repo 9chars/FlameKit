@@ -22,6 +22,14 @@ end
 
 -- a notice in the player's Notices window that stays until it is taken back (clear = true): the stuck and death
 -- notices stay on the screen until the condition is over (client: npc_wheel_probe.lua)
+-- (owner 2026-11-20 16:20) the "can't follow" notices only for players who switched them on (the client's Experimental
+-- tab, Debug: "Companion follow notices", default off; it sends op "prefs" on npcwheel): account -> true
+F.notice_pref = {}
+function F.follow_notices(world, player)
+  local ok, acc = pcall(world.account, world, player)
+  return ok and acc and F.notice_pref[acc] == true or false
+end
+
 local function status(world, player, tag, text, colour)
   if not player then return end
   local msg = text and { op = "status", tag = tag, text = text, colour = colour } or { op = "status", tag = tag, clear = true }
@@ -302,7 +310,9 @@ local function cant_follow(s, why, detail)
   log(string.format("can't follow: %s %s: %s (at %.1f %.1f %.1f, player %.1f m away, %.1f m %s)", tostring(s.id), why, detail,
     s.nx, s.ny, s.nz, math.sqrt((s.px - s.nx) ^ 2 + (s.pz - s.nz) ^ 2), math.abs(s.py - s.ny), s.py >= s.ny and "higher" or "lower"))
   fullrec_event(s.world, s.id, "drive: can't follow (" .. why .. ")")
-  status(s.world, h.player, "companion_stuck", STUCK_TEXT[why] or STUCK_TEXT.blocked, "#ff9050")
+  if F.follow_notices(s.world, h.player) then  -- (owner 16:20) a Debug option, default off
+    status(s.world, h.player, "companion_stuck", STUCK_TEXT[why] or STUCK_TEXT.blocked, "#ff9050")
+  end
 end
 
 -- the "cannot follow" state is over (he moves again, or something else takes over)
@@ -939,6 +949,7 @@ end
 -- stuck timer starts over (21:33 and 21:38: two shouts 4 s apart made "can't follow: blocked" 0.5 m from his crumb)
 local SHOUT_HOLD = 120
 local SLOT_AT = 1.5  -- (15:55) metres from his place around the player that count as "there" (see drive_stuck)
+local NEAR_LEVEL = 1.5  -- (16:20) within SLOT_NEAR of the player and this much higher or lower: no "can't follow"
 local function drive_stuck(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local nx, ny, nz = s.nx, s.ny, s.nz
@@ -962,6 +973,12 @@ local function drive_stuck(s)
     -- again every 8 s. A follower standing within SLOT_AT of his place (set by drive_steer this half second) has arrived.
     local sa = h.slot_at
     local at_slot = sa and t - sa.t < 30 and (sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SLOT_AT * SLOT_AT
+    -- (owner 16:20 "I'm still getting a ton of errors with them saying they can't follow and then they respawn back...
+    -- I'm just standing here") 16:20-16:21: N1, follower 5 of 5, stood 1.6 m from his place and 3.3 m from the player,
+    -- level with him, never got closer: can't follow, respawned at the same spot every 5 s. Within SLOT_NEAR of the
+    -- player and level with him (NEAR_LEVEL) he is with the player: never "can't follow" there
+    local with_player = dp and dp <= SLOT_NEAR and math.abs(s.py - ny) < NEAR_LEVEL
+    at_slot = at_slot or with_player
     local gap_wait = t - (h.gap_t or -1e9) < 30 or t - (h.settle_t or -1e9) < 30  -- (16:00) waiting for the follower
     -- ahead (drive_steer, TRAIL_GAP); (16:08) settled near the player
     if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD or at_slot or gap_wait then
@@ -995,7 +1012,7 @@ local TRAIL_GAP_GO = 3.5  -- (16:02) a waiting follower goes on once the one ahe
 -- to move ... maybe theres a small radius we can add so as long as they're in that radius around me, they don't move
 -- around so much?") once a follower has arrived (the first within SETTLE_ARRIVE of the player, the others at their
 -- place), he stays where he stands while the player is within SETTLE_R of him; past it he follows again
-local SETTLE_R, SETTLE_ARRIVE = 6, 2.7
+local SETTLE_R, SETTLE_ARRIVE, SETTLE_PLACE = 6, 2.7, 2.5
 local TRAIL_GAP = 2.5  -- (16:00) on the trail a follower stands while another of the player's is closer to the player
                        -- and within this of him (a queue instead of a bunch); drive_stuck counts that as no stuck
 local function drive_steer(s)
@@ -1072,7 +1089,8 @@ local function drive_steer(s)
   end
   if not h.settled and dp and dp <= SETTLE_R then
     local sa = h.slot_at
-    local at_place = (sa and sa.t == t) and ((sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SLOT_AT * SLOT_AT) or (not (sa and sa.t == t) and dp <= SETTLE_ARRIVE)
+    -- (16:20: N1 stopped 1.6 m from his place) a place counts as reached within SETTLE_PLACE
+    local at_place = (sa and sa.t == t) and ((sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SETTLE_PLACE * SETTLE_PLACE) or (not (sa and sa.t == t) and dp <= SETTLE_ARRIVE)
     if at_place then
       h.settled = true
       log(string.format("settle %s: arrived (%.1f m from the player): stays while the player is within %.1f m", tostring(id), dp, SETTLE_R))
@@ -2197,6 +2215,13 @@ end
 local function on_pick(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
   if okd and type(m) == "table" and m.op == "call" then return on_call(world, from) end
+  if okd and type(m) == "table" and m.op == "prefs" then  -- (owner 16:20) the player's "Companion follow notices"
+    if from.account and (F.notice_pref[from.account] == true) ~= (m.notices == true) then
+      F.notice_pref[from.account] = m.notices == true or nil
+      log(string.format("prefs: player %s (%s): follow notices %s", tostring(from.player), tostring(from.account), m.notices == true and "on" or "off"))
+    end
+    return
+  end
   if not (okd and type(m) == "table" and m.op == "pick") then return end
   local npc, player = tonumber(m.npc), from.player
   local rr = npc and name_of[npc] and find(name_of[npc])
@@ -3348,7 +3373,8 @@ local function put_away_for(world, id, h)
   pcall(emf.destroy, world, id)
   if r then ent_of[r.name], r.out = nil, false roster_save() end
   status(world, h.player, "companion_stuck", nil)
-  if h.go_away == "can't follow" then  -- (owner 22:22 "show the error") the same words for 5 s, as he is respawned at once
+  if h.go_away == "can't follow" and F.follow_notices(world, h.player) then  -- (owner 22:22 "show the error") the same
+    -- words for 5 s, as he is respawned at once; (owner 2026-11-20 16:20) only with the Debug option on
     say(world, h.player, STUCK_TEXT[h.cant] or STUCK_TEXT.blocked, "#ff9050")
   end
   if h.go_away == "glide" then

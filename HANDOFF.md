@@ -1884,6 +1884,19 @@ next restart (no yes for a restart yet).
    within 1-8 s; it only removed the notices; made without asking first) / **16:18 "dont make any changes for that
    then.."** (whether to take 0.15.347 out: being confirmed).
    **Owner 16:18: "that doesn't require a fix"** = 0.15.347 out. 0.15.348: FAR_AWAY and its check removed (as 0.15.346).
+   **Owner 16:19: "zoning in shows the notices again"** (confirmed: out). 0.15.348 installed 16:19:33.
+   **Owner 16:20: "were going to add an option that turns all those "cant follow" "can't reach", "afraid to jump", etc
+   messages and default it off... players don't need to see that, its mostly for me and for debugging, so put that
+   option under the debug section"**. 0.15.349: core/companion_notices.lua (on() / set(), companion_notices.json, off by
+   default); Experimental tab Debug row "Companion follow notices" (dbg:fnotices); npc_wheel_probe.client_tick sends
+   {op = "prefs", notices} on npcwheel at once on a change and every 1800 ticks; server F.notice_pref[account],
+   F.follow_notices(world, player): cant_follow's status "companion_stuck" and put_away_for's can't-follow notice
+   only when on. Not gated: the glide notice and "Companion has spawned near you!".
+   **Owner 16:20: "I'm still getting a ton of errors with them saying they can't follow and then they respawn back...
+   I'm just standing here.. so theres definitely a problem still with that"**: 16:20-16:21 N1 (follower 5 of 5, place
+   4) stood 1.6 m from his place (SLOT_AT 1.5), 3.3 m from the player, never closer: can't follow -> respawn at the
+   same spot every 5 s. 0.15.349: drive_stuck: within SLOT_NEAR 6 m of the player and NEAR_LEVEL 1.5 m level with him
+   = progress (never can't follow there); settle counts a place within SETTLE_PLACE 2.5 m as reached.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

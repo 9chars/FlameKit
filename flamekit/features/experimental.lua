@@ -2329,6 +2329,11 @@ local function debug_rows(world, rows)
   rows[#rows + 1] = { button = "dbg:fakeboard", text = (fake and "On    " or "Off   ") .. "Test leaderboard data", selected = fake,
     tooltip = "Fills your PvP Leaderboard with made-up players (only in your game; the server's real board is not touched). "
       .. "Switch it off to see the real board again." }
+  -- (0.15.349, owner 2026-11-20 16:20) the companion "can't follow" notices: off by default (core/companion_notices)
+  local fn = require("core.companion_notices").on()
+  rows[#rows + 1] = { button = "dbg:fnotices", text = (fn and "On    " or "Off   ") .. "Companion follow notices", selected = fn,
+    tooltip = "Shows the companion notices about following (can't follow you, can't get up there, afraid to follow). "
+      .. "For finding problems; players do not need them." }
   local level = kit.debug_level(true)
   rows[#rows + 1] = { text = "FlameKit's log level (Ctrl+Shift+F12 in the game also switches it):" }
   for i, l in ipairs({ { "off", "Off", "Errors and warnings only" }, { "normal", "Normal", "Also what happens: windows, updates, clicks" },
@@ -2598,6 +2603,11 @@ function F.click(world, key)
     else
       ask(msg)
     end
+    return
+  end
+  if key == "dbg:fnotices" then  -- (0.15.349) the companion follow notices; npc_wheel_probe tells the server
+    local cn = require("core.companion_notices")
+    cn.set(not cn.on())
     return
   end
   if key == "dbg:fakeboard" then
