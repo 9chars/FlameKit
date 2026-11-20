@@ -1,3 +1,6 @@
+0.15.327 Nov 20, 2026
+- Companions (test, local server only): the pet log also shows the game's E offer on the animal (which action and word it shows), to take the game's pick-up and "Pet" off our pets. Server only: no game change.
+
 0.15.326 Nov 20, 2026
 - Companions (test, local server only): pets are spawned tame, so the game gives them its own "E Pet" prompt; pressing it opens the companion wheel (as E on a companion). Server only: no game change.
 

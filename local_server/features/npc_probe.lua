@@ -3591,6 +3591,20 @@ function roster.petlog_tick(world)
   local an = rd(function() local a = world:get("DynamicAnimal", id) return "animal state " .. tostring(a.state) end)
   log(string.format("petlog %d at %.1f %.1f %.1f: %s | %s | %s | %s | time %s", id, x, y, z, tostring(wl), tostring(ai), tostring(pw),
     tostring(an), tostring(rd(function() return world:get("SpawnTime", id).time end))))
+  -- (owner 14:09 "remove the pick up and pet option") the game's offer on the animal: which sequence / verb it shows
+  local function sv(v)
+    if type(v) ~= "table" then return tostring(v) end
+    local t = {}
+    for k, x in pairs(v) do t[#t + 1] = tostring(k) .. "=" .. sv(x) end
+    table.sort(t)
+    return "{" .. table.concat(t, " ") .. "}"
+  end
+  local of = rd(function() local o = world:get("InteractionOfferRuntime", id) if not o then return "none" end
+    return string.format("default seq %s verb %s, override seq %s verb %s, offerId %s, offered %s, disabled %s, last guest %s offer %s",
+      sv(o.defaultSequence), sv(o.defaultVerbId), sv(o.overrideSequence), sv(o.overrideVerbLocaId), sv(o.offerId),
+      sv(o.isOffered), sv(o.isDisabled), sv(rd(function() return o.lastAcceptData.guestId end)), sv(rd(function() return o.lastAcceptData.offerId end))) end)
+  log(string.format("petlog %d offer: %s | tame %s | emf offer %s", id, tostring(of),
+    tostring(rd(function() return world:get("IsTame", id) ~= nil end)), tostring(rd(function() return emf.offered and emf.offered(world, id) end))))
 end
 
 -- (pets) the drive's inputs for the server probe, in pet_drive.txt beside the mod: a line per pet "<entity> <target x y
