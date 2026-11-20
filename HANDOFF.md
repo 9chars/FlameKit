@@ -1345,6 +1345,11 @@ next restart (no yes for a restart yet).
      message that says Companion heals you for <number>!" -> built (live by reload): on a heal of the player, say()
      "Companion heals you for <n>!" (the 5 s chat notice, features.chat notice_to).
      **Owner 21:31:** "maybe make the text green colored?" -> say() takes a colour; the heal notice is #5ad25a (live).
+     **Owner 21:48:** "seems to be working, what do you see?" 21:31-21:48 (Healing mode): 4 heals of the player (+629, 2
+     pairs 4 s apart, mana right, every shout played), no errors; but both pairs line up with a "can't follow: blocked"
+     0.5-0.6 m from his crumb on flat ground (21:33:30, 21:38:46) -> respawn: the Wolf Shout holds him in place, two
+     4 s apart = the stuck rule. Other respawns: 3 glide, 1 fast travel, 3 can't follow (steps, long jumps). **Owner
+     21:54:** "yes" -> built (live): drive_stuck restarts its progress timer for SHOUT_HOLD 2 s after a heal (h.heal_t).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

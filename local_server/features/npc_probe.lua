@@ -891,6 +891,9 @@ end
 -- The one stuck rule (returns true while he stands). He heads for a crumb but has not come 0.3 m closer to it for
 -- STUCK_TICKS, for any reason: "can't follow" (the notice says up / too steep / blocked from where the crumb is). While
 -- he cannot follow he stands; the player coming to him ends it, otherwise drive_put_away respawns him beside the player.
+-- (owner 2026-11-19 21:54 yes) the heal's Wolf Shout holds him in place while it plays: for SHOUT_HOLD after a heal the
+-- stuck timer starts over (21:33 and 21:38: two shouts 4 s apart made "can't follow: blocked" 0.5 m from his crumb)
+local SHOUT_HOLD = 120
 local function drive_stuck(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local nx, ny, nz = s.nx, s.ny, s.nz
@@ -908,7 +911,7 @@ local function drive_stuck(s)
   pcall(function() alive = world:get("Health", id).dataStorage[1] > 0 end)
   if c and alive then
     local dc = math.sqrt((c.x - nx) ^ 2 + (c.z - nz) ^ 2)
-    if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 then
+    if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD then
       h.prog = { c = c, d = dc, t = t }
     elseif t - h.prog.t > STUCK_TICKS then
       h.prog = nil
