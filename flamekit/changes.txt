@@ -1,3 +1,6 @@
+0.15.320 Nov 20, 2026
+- Companions (test, local server only): fix: an extra follower picks a place next to you that is at least 1.5 m from the followers before him (his first place could be where another one already stood). Server only: no game change.
+
 0.15.319 Nov 20, 2026
 - Companions (test, local server only): the server log notes each follower's place next to the player when it changes (to find why two followers still stand together). Server only: no game change.
 

@@ -957,7 +957,7 @@ end
 -- fooled its ray). Off the trail (straight to a swimming player, or no trail yet) it is on; on the way to the swimming
 -- player it lets him drop up to 7.5 m (into the water). While he moves his body faces the target.
 local SLOTS = { { -1.6, -0.8 }, { 1.6, -0.8 }, { 0, -2.2 }, { -2.4, -2.2 }, { 2.4, -2.2 } }  -- (12:22) followers 2..6
-local SLOT_NEAR = 4
+local SLOT_NEAR, SLOT_GAP = 4, 1.5
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local px, py, pz, nx, nz = s.px, s.py, s.pz, s.nx, s.nz
@@ -977,15 +977,35 @@ local function drive_steer(s)
       table.sort(mine)
       local k = 0
       for i, oid in ipairs(mine) do if oid == id then k = i - 1 end end
-      local o = k > 0 and SLOTS[(k - 1) % #SLOTS + 1]
-      if o then
+      -- (12:28: his first place was where the other one already stood) his place: the first of SLOTS (his own first)
+      -- at least SLOT_GAP from every follower before him; kept while it stays that way
+      local o
+      if k > 0 then
         local yaw = 0
         pcall(function()
           local q = world:get("CurrentTransform", h.player).transform.orientation
           yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
         end)
-        tx = px + math.cos(yaw) * o[1] + math.sin(yaw) * o[2]
-        tz = pz - math.sin(yaw) * o[1] + math.cos(yaw) * o[2]
+        local function point(i)
+          local p = SLOTS[i]
+          return px + math.cos(yaw) * p[1] + math.sin(yaw) * p[2], pz - math.sin(yaw) * p[1] + math.cos(yaw) * p[2]
+        end
+        local function free(x, z)
+          for j = 1, k do
+            local ox, _, oz = world:position(mine[j])
+            if ox and (ox - x) ^ 2 + (oz - z) ^ 2 < SLOT_GAP * SLOT_GAP then return false end
+          end
+          return true
+        end
+        local pick = h.slot_i and free(point(h.slot_i)) and h.slot_i
+        for n = 0, #SLOTS - 1 do
+          if pick then break end
+          local i = (k - 1 + n) % #SLOTS + 1
+          if free(point(i)) then pick = i end
+        end
+        pick = pick or ((k - 1) % #SLOTS + 1)
+        h.slot_i, o = pick, SLOTS[pick]
+        tx, tz = point(pick)
         -- (12:24: they still stood together) the C++ stops him within 2 m of homeZonePosition (the player): for a slot
         -- that point is put 1.5 m past his place, on his way there, so he stops about 0.5 m from his place
         local ux, uz = tx - nx, tz - nz
@@ -996,10 +1016,11 @@ local function drive_steer(s)
           a.homeZonePosition.x, a.homeZonePosition.z = tx + 1.5, tz
         end
       end
-      if (o and k or 0) ~= h.slot_said then  -- (12:27) logged when his place changes
-        h.slot_said = o and k or 0
+      local said = o and (k * 10 + h.slot_i) or 0
+      if said ~= h.slot_said then  -- (12:27) logged when his place changes
+        h.slot_said = said
         log(string.format("slot %s: follower %d of %d for player %s%s", tostring(id), k + 1, #mine, tostring(h.player),
-          o and string.format(", his place %.1f %.1f (%.1f m from him now)", tx, tz, math.sqrt((tx - nx) ^ 2 + (tz - nz) ^ 2)) or ", next to him"))
+          o and string.format(", place %d: %.1f %.1f (%.1f m from him now)", h.slot_i, tx, tz, math.sqrt((tx - nx) ^ 2 + (tz - nz) ^ 2)) or ", next to him"))
       end
     end
   end
