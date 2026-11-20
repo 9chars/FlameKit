@@ -1,3 +1,6 @@
+0.15.319 Nov 20, 2026
+- Companions (test, local server only): the server log notes each follower's place next to the player when it changes (to find why two followers still stand together). Server only: no game change.
+
 0.15.318 Nov 20, 2026
 - Companions (test, local server only): fix for 0.15.317: the extra followers also take their own place when they are already close to you. Server only: no game change.
 
