@@ -1426,7 +1426,9 @@ end
 -- put back into the socket (EMF's put knows only level and rarity), so it is kept as a separate item next to the weapon.
 -- r.chest = {id, session, state} survives a script reload: the same server run takes the chest up again (an "open" one)
 -- or removes it ("filling": r.inv still holds everything); a new server run has lost it (r.inv is the last save).
-inv.CHEST = "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec"  -- Prop_Decoration_T5_Storage_40_Chest (40 slots, core/loot_chest.lua)
+-- (owner 2026-11-20 09:25 "anyway to make this chest a gigantic chest instead of this small one?") the game's biggest
+-- storage chest; before: Prop_Decoration_T5_Storage_40_Chest 0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec (40 slots)
+inv.CHEST = "bc834cbd-58f1-494a-97fb-0dc0248eb738"  -- Prop_Decoration_T6_Storage_72_Magic (72 slots)
 inv.PUT_WAIT, inv.RETRIES, inv.SAVE_EVERY = 30, 3, 60
 
 -- (owner 2026-11-20 08:19 "we'll have to test the unlocked parts") every gear piece in the chest: its level, rarity,

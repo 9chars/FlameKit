@@ -1,3 +1,6 @@
+0.15.304 Nov 20, 2026
+- Companions (test, local server only): the companion's chest is now the game's biggest storage chest (72 slots) instead of the 40-slot one. Server only: no game change.
+
 0.15.303 Nov 20, 2026
 - Companions (test, local server only): the server log notes when the owner opens the companion's chest (checks that the owner-only rule sees it). Server only: no game change.
 

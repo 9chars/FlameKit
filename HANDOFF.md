@@ -1570,6 +1570,11 @@ next restart (no yes for a restart yet).
      emf.on_event("InteractionAcceptedEvent") (guestEntityId = player, hostEntityId = chest): a guest whose account is
      not r.owner closes the chest at once (inv.close "someone else opened it", record saved) and gets a notice; the
      owner is not affected; r.owner nil = anyone. invtest covers both. Not tested in game (needs a second player).
+     Owner 09:24 "still works" (his own opening). 0.15.303: log "chest X opened by its owner" (proof the event fires).
+     **Owner 09:25 "anyway to make this chest a gigantic chest instead of this small one?"** 0.15.304: inv.CHEST =
+     Prop_Decoration_T6_Storage_72_Magic bc834cbd-58f1-494a-97fb-0dc0248eb738 (72 slots, the biggest storage template;
+     others: T4_Storage_56 fae7a62e..., T3_Storage_40 bdebd6a9...). Not seen in game yet. A bigger LOOK would be
+     ScaleComponent in emf.spawn's components (untested on a prop).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
