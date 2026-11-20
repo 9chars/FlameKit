@@ -191,6 +191,21 @@ function F.click(world, key)
   end
 end
 
+-- (0.15.349, owner 16:20) the server sends the companion "can't follow" notices only to players who switched them on
+-- (Experimental tab, Debug: core/companion_notices): the choice goes to it now and then and at once when it changes
+local prefs_sent, prefs_at = nil, -1e9
+function F.client_tick(world)
+  local on = require("core.companion_notices").on()
+  local t = world:tick()
+  if on == prefs_sent and t - prefs_at < 1800 then return end
+  local oks, sent = pcall(emf.net.send, CHANNEL, emf.json.encode({ op = "prefs", notices = on }))
+  prefs_at = t
+  if oks and sent then
+    if on ~= prefs_sent then log("prefs: follow notices " .. (on and "on" or "off") .. " sent to the server") end
+    prefs_sent = on
+  end
+end
+
 function F.setup(k)
   kit = k
   local ok = emf.net.channel(CHANNEL, { version = 1, to = "both", max = 1024, per_10s = 60,
