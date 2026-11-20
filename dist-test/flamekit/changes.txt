@@ -1,3 +1,6 @@
+0.15.311 Nov 20, 2026
+- Companions (test): "Bring back" in the Companion Roster brings him next to you (0.3 m to your right, facing your way): a follower follows you, a stayer stays at that new spot.
+
 0.15.310 Nov 20, 2026
 - Companions (test): the Companion Roster window has a "New companion" button at the top (a hound of yours, next to you, following you). Fix: the "Name" and "Kind" labels in the window were blank.
 
