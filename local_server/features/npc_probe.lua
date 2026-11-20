@@ -1959,6 +1959,18 @@ drive_heal = function(s)
   pcall(function() a.combatData.selectedAttackIndex = 2 end)  -- Wolf Shout
   mana_of[name] = m - HEAL_COST
   h.heal_t = t
+  -- (owner 2026-11-19 22:18 "when the dog heals himself he can do the effect, when he heals the player he can do the
+  -- effect on himself and me to highly the heal") the game's health-gain effect (HEAL_FX 1, the only one the owner saw)
+  if okh and res then
+    local function sparkle(e)
+      local x, y, z = world:position(e)
+      if not x then return end
+      local oks, fid = pcall(emf.spawn, world, HEAL_FX[1][2], x, y, z)
+      if oks and fid and fid ~= 0 then heal_fx_shown[#heal_fx_shown + 1] = { id = fid, at = t + 600 } end
+    end
+    sparkle(id)
+    if who == h.player then sparkle(h.player) end
+  end
   -- (owner 2026-11-19 21:29 "can you add a notice message that says Companion heals you for <number>!")
   if who == h.player and okh and res then say(world, h.player, string.format("Companion heals you for %d!", amount), "#5ad25a") end  -- green (owner 21:31)
   log(string.format("heal %s: heals %s +%d (%d/%d before; %s mode); mana %d -> %d of %d; Wolf Shout%s", name, whom, amount, whp, wmax,

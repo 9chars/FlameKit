@@ -1366,6 +1366,12 @@ next restart (no yes for a restart yet).
      VFX_Skill_Martyr_Heal 21443035-..., 6 VFX_Ability_Casting_Heal_Channel af4436da-..., 7
      VFX_Spell_ChainHeal_SourceTarget_player fc4f8028-..., 8 ..._NoTarget c15e5bc4-... Shown on the owner 22:12:29-
      22:14:31 (all 8 spawned, a message as each started); which looked good: asked the owner.
+     **Owner 22:15-22:16:** "show me #1 again"; "#1 is the only one I saw do anything, can you run that one again?";
+     22:17 "run the effect on the dog now so I can see it there" (healfx got an optional target: healfx <n> [entity];
+     shown on N1 127633 22:17:47; the effect stays where it was spawned). **Owner 22:18, verbatim:** "yeah thats good, so
+     when the dog heals himself he can do the effect, when he heals the player he can do the effect on himself and me to
+     highly the heal" -> built (live): after a heal HEAL_FX[1] VFX_Resource_Increase_Health on him, and on the player too
+     when it was the player's heal; removed after 10 s (heal_fx_shown).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
