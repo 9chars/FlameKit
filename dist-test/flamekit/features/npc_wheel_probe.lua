@@ -82,6 +82,14 @@ function F.roster_rows(world)
   rows[#rows + 1] = { button = "ros:new:", text = "New companion",
     tooltip = "Makes a new companion (a hound) next to you that follows you; rename it, change its kind or give it away below." }
   if ros.result then rows[#rows + 1] = { text = ros.result, color = ros.ok and "#7fd67f" or "#ff9050" } end
+  -- (0.15.312, owner 11:31: after a game restart the window, still shown from before, stayed at "Asking the server")
+  -- the roster is asked for whenever there is none yet (every 5 s), and again every 9 minutes (the server sends changes
+  -- for 10 minutes after an ask)
+  local now = world:tick()
+  if not ros.asked or now - ros.asked > (ros.list and 32400 or 300) or now < ros.asked then
+    ros.asked = now
+    roster_send({ op = "get" })
+  end
   if not ros.list then
     rows[#rows + 1] = { text = "Asking the server for the roster... (a server without the companion code does not answer)", dim = true }
     return rows
@@ -172,6 +180,7 @@ function F.click(world, key)
   if key == "npc:roster" then  -- the Companion Roster window: the DLL shows or hides it; the roster is asked for again
     local f = emf.dir and io.open(emf.dir .. "\\ui_roster_toggle.request", "w")
     if f then f:write("toggle\n") f:close() end
+    ros.asked = world:tick()
     roster_send({ op = "get" })
     log("roster: window toggled, roster asked for")
   end
