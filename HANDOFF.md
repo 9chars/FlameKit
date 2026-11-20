@@ -1770,6 +1770,9 @@ next restart (no yes for a restart yet).
    runtime offer into ClientInteractionOffer): pre = each g_pets id's runtime offer set to touch seq 0x3E5189BF + verb
    Talk 0xD9861C4B, isOffered 1, isDisabled 0; post = logs runtime + client copy every 10 s ("pet offer ..."). Needs the
    probe DLL (server restart).
+   Probe DLL 0dd8a1f0 installed (old 781c4e64 kept as .old_1425); restart 14:25 (owner "yes"); "pets: hook on
+   interaction_offer installed". Log 14:28: N2 22654 runtime override 3e5189bf/d9861c4b offered 1, client verb
+   d9861c4b offered 1. **Owner 14:28: "I see just the 'Talk' option"** (no Pet, no Pick up). E -> wheel: not yet pressed.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
