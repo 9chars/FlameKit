@@ -1710,6 +1710,20 @@ next restart (no yes for a restart yet).
    player's MAIN companion): N1 spawned twice (34173, 34174), N2 never. 0.15.321: the return calls roster.ui_back for
    that companion (beside the player, 0.3 m right; spawn_body keeps them 1.2 m apart); the "Companion has spawned near
    you!" notice only for the main one. Cleanup: the extra N1 body removed, N2 brought back by console.
+   (Correction: the extra N1 body was already gone: on_call destroys the old one; N2 brought back 12:38:59 by console.)
+   **Pets (owner 12:43):** "next I'd like to try getting pets working as those should be pretty easy. it might make
+   sense to have "arch types" for behavior so dog like templates all share the same stuff. humanoids, flying stuff,
+   etc... not sure how practical that is tho as each one has different animations? pets should be mostly the same";
+   12:48 "n2 is a dog now" (N2 = 36028, Dog (bright)); **12:49 "yeah dont use anything for the built in AI, it should
+   just use what we made already"**. 0.15.322: `flamekit.npc petlog <entity> [s]`. 12:49:31-51 petlog of the dog: its
+   AI is program "wildlife" (DynamicWildlife: state 3 idle, 6 walking to a roaming target currentTargetPosition via the
+   DynamicPathWalker, which writes ActorInput move ~0.3 at speed 2). The dog has Animal + Wildlife + FleeSensor, no
+   DynamicEnemy01BehaviorState. 0.15.323: Lua drive_read uses a shim table (h.shim, same fields as the monster AI's)
+   for a pet; roster.pet_flush writes AnimalSaved.spawnPosition = target, DynamicWildlife.spawnPosition = player spot,
+   DynamicWildlife.runAwayDistance = pace + 10 edge off + 20 drops ok (0 = not driven); roster.pets_quiet keeps
+   wildlife state 3, its roaming target at the pet, the path walker off; pets skip drive_fight / drive_heal; an
+   emf.hit_rule cancel makes pet bodies take no damage. C++ drive_scan takes faction-11 DynamicWildlife bodies with
+   runAwayDistance >= 1.5; drive_post reads those carriers (same steering, edge stop, pace; no fight_step). Untested.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

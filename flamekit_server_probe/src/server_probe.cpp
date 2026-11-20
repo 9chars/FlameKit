@@ -409,15 +409,41 @@ void drive_post(void* ctx, void*) {
         auto* st = w.get<emf::gen::ecs::DynamicEnemy01BehaviorState>(id);
         auto* ai = w.get<emf::gen::ecs::ActorInput>(id);
         auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, id));
-        if (!st || !ai || !tr || st->enabled || !st->movementTargetIsValid) continue;
+        if (!ai || !tr) continue;
+        // (2026-11-20 12:49, owner: pets "should just use what we made already") the same drive for a pet (an animal: no
+        // monster AI). The Lua writes its inputs into fields the animal's own AI leaves alone while it is kept idle:
+        // AnimalSaved.spawnPosition = the target, DynamicWildlife.spawnPosition = the player's spot, and
+        // DynamicWildlife.runAwayDistance = pace (2 walk, 3 run, 4 sprint) + 10 (edge stop off) + 20 (drops allowed);
+        // under 1.5: not driven now.
+        double tx, tz, hx, hy, hz;
+        float pace;
+        bool edge_off, drop_ok;
+        if (st) {
+            if (st->enabled || !st->movementTargetIsValid) continue;
+            tx = st->movementTarget.x, tz = st->movementTarget.z;
+            hx = st->homeZonePosition.x, hy = st->homeZonePosition.y, hz = st->homeZonePosition.z;
+            pace = st->combatData.prowlAngle;
+            edge_off = st->combatData.targetOfMyTarget;
+            drop_ok = st->combatData.isTargetInsideLeash;
+        } else {
+            auto* wl = w.get<emf::gen::ecs::DynamicWildlife>(id);
+            auto* as = w.get<emf::gen::ecs::AnimalSaved>(id);
+            if (!wl || !as || wl->runAwayDistance < 1.5f) continue;
+            float code = wl->runAwayDistance;
+            drop_ok = code >= 20.0f;
+            if (drop_ok) code -= 20.0f;
+            edge_off = code >= 10.0f;
+            if (edge_off) code -= 10.0f;
+            pace = code;
+            tx = as->spawnPosition.x, tz = as->spawnPosition.z;
+            hx = wl->spawnPosition.x, hy = wl->spawnPosition.y, hz = wl->spawnPosition.z;
+        }
         track_jump(w, id, tr);
         // (the companion's fight) the attack asked for and the ray to his target, once per step (fight_step); combatData
         // .lastTargetId = the monster he fights: he faces it (below)
-        fight_step(w, ctx, id, st, ai, tr);
+        if (st) fight_step(w, ctx, id, st, ai, tr);
         const double S = 4294967296.0;
         const double nx = tr->px / S, ny_here = tr->py / S, nz = tr->pz / S;
-        const double tx = st->movementTarget.x, tz = st->movementTarget.z;
-        const double hx = st->homeZonePosition.x, hz = st->homeZonePosition.z;  // the player
         const double dp = std::sqrt((hx - nx) * (hx - nx) + (hz - nz) * (hz - nz));
         double dx = tx - nx, dz = tz - nz;
         const double dl = std::sqrt(dx * dx + dz * dz);
@@ -425,19 +451,18 @@ void drive_post(void* ctx, void*) {
         // (owner 2026-11-18 11:10/11:12 "the follow distance needs to be 2 m": tight spots) he stops within kFollowStop
         // (2026-11-18 18:35) arrived = within kFollowStop across AND in height: a player straight below or above him
         // (a drop, a ledge) is not "here"
-        const bool here = dp <= kFollowStop && std::fabs(st->homeZonePosition.y - ny_here) <= kFollowStop;
+        const bool here = dp <= kFollowStop && std::fabs(hy - ny_here) <= kFollowStop;
         if (!here && dl > 0.05) {
             dx /= dl; dz /= dl;
             // (owner 2026-11-19 16:37 "I agree #2") his pace from the Lua (the player's at the crumb he heads for, in
             // combatData.prowlAngle: 2 walk, 3 run, 4 sprint; his AI is off so nothing else writes it); more than
             // kCatchUp from where he is headed (the player; in a fight the monster): sprint
-            const float pace = st->combatData.prowlAngle;
             speed = dp > kCatchUp ? 4 : pace >= 3.5f ? 4 : pace >= 2.5f ? 3 : 2;
             // (23:41 test) no edge check while he is in the air (DynamicLocomotion.state 2): it measured from his raised
             // height and stopped his legs mid-jump
             auto* loc_now = w.get<emf::gen::ecs::DynamicLocomotion>(id);
             const bool airborne = loc_now && static_cast<uint8_t>(loc_now->state) == 2;
-            if (ctx && !airborne && !st->combatData.targetOfMyTarget && edge_blocked(w, ctx, id, tr, dx, dz, st->combatData.isTargetInsideLeash, speed)) {
+            if (ctx && !airborne && !edge_off && edge_blocked(w, ctx, id, tr, dx, dz, drop_ok, speed)) {
                 speed = 0;  // edge: stand, still looking that way
                 ai->desiredWorldLookDirection.x = (float)dx; ai->desiredWorldLookDirection.y = 0; ai->desiredWorldLookDirection.z = (float)dz;
                 dx = dz = 0;
@@ -458,7 +483,7 @@ void drive_post(void* ctx, void*) {
                 if (it->second.until_ns < w.ecs_time_ns()) g_face.erase(it); else ft = it->second;
             }
         }
-        if (!ft.target && st->combatData.lastTargetId.id != 0) ft.target = st->combatData.lastTargetId.id;  // the fight
+        if (!ft.target && st && st->combatData.lastTargetId.id != 0) ft.target = st->combatData.lastTargetId.id;  // the fight
         if (ft.target) {
             auto* tt = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, ft.target));
             if (tt) {
@@ -541,9 +566,14 @@ void drive_scan(emf::World w) {
     g_drive_scan_tick = t;
     std::vector<uint32_t> found;
     w.for_each_entity([&](uint32_t id) {
-        auto* st = w.get<emf::gen::ecs::DynamicEnemy01BehaviorState>(id);
-        if (!st || st->enabled || !st->movementTargetIsValid) return;
         auto* f = static_cast<const uint8_t*>(w.get_raw(0xa1f30f21u, id));
+        auto* st = w.get<emf::gen::ecs::DynamicEnemy01BehaviorState>(id);
+        if (!st) {  // (2026-11-20) a pet: an animal of ours that the Lua drives (see drive_post)
+            auto* wl = w.get<emf::gen::ecs::DynamicWildlife>(id);
+            if (wl && f && *f == 11 && wl->runAwayDistance >= 1.5f) found.push_back(id);
+            return;
+        }
+        if (st->enabled || !st->movementTargetIsValid) return;
         if (!f || (*f != 11 && *f != 7)) return;  // (owner 19:31) companions are PlayerAlly 11; 7 = bodies from before
         found.push_back(id);
     });

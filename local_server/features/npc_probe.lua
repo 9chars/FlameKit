@@ -321,6 +321,16 @@ local function drive_read(world, id, h)
   if not (px and nx) then drives[id] = nil log("drive " .. tostring(id) .. ": gone, stopped") return nil end
   local t = world:tick()
   local a = world:get("DynamicEnemy01BehaviorState", id)
+  local pet = false
+  if not a then
+    -- (2026-11-20 12:49, owner: pets "should just use what we made already") a pet (an animal: no monster AI): the
+    -- drive works on a table with the same fields (h.shim); roster.pet_flush hands it to the server probe each tick
+    if not world:get("DynamicWildlife", id) then error("neither a monster nor an animal") end
+    h.shim = h.shim or { movementTarget = { x = nx, y = ny, z = nz }, homeZonePosition = { x = px, y = py, z = pz },
+      movementTargetIsValid = false, enabled = false, disabledFeatures = 0,
+      combatData = { prowlAngle = 2, targetOfMyTarget = false, isTargetInsideLeash = false, lastTargetId = 0, selectedAttackIndex = 255 } }
+    a, pet = h.shim, true
+  end
   if a.enabled ~= false then a.enabled = false fullrec_event(world, id, "drive: his AI switched off") end
   local okw, pw = pcall(function() return tonumber(world:get("DynamicLocomotion", h.player).currentWaterState) end)
   -- the player swims (pwet) when his depth is over 0.5; the hound swims (swim) on his OWN depth
@@ -330,7 +340,7 @@ local function drive_read(world, id, h)
   hw = okh and hw or 0
   local swim = hw > SWIM_ENTER
   return { world = world, id = id, h = h, a = a, t = t, px = px, py = py, pz = pz, nx = nx, ny = ny, nz = nz,
-           pwater = pwater, pwet = pwet, hw = hw, swim = swim }
+           pwater = pwater, pwet = pwet, hw = hw, swim = swim, pet = pet }
 end
 
 -- the water log (measuring only): once a second while the player or the hound reads any water, and 5 s after; both
@@ -1073,9 +1083,9 @@ local function drive_step(world, id, h)
   if drive_put_away(s) then return end
   drive_lay_crumb(s)
   drive_upkeep(s)
-  if drive_heal then drive_heal(s) end  -- never takes over the movement
+  if drive_heal and not s.pet then drive_heal(s) end  -- never takes over the movement (pets: no healing yet)
   if drive_jump_follow(s) then return end
-  if drive_fight and drive_fight(s) then return end
+  if drive_fight and not s.pet and drive_fight(s) then return end  -- (pets never fight: owner 09:51)
   if drive_lure(s) then return end
   if drive_hold(s) then return end
   drive_pick_target(s)
@@ -1267,6 +1277,15 @@ local function bring_to_life(world, r, id, player)
   end
   pcall(function() world:get("Faction", id).faction = COMPANION_FACTION end)
   pcall(calm, world, id)
+  -- (pets, owner 09:51 "they don't die") an animal body takes no damage
+  if not world:get("DynamicEnemy01BehaviorState", id) and world:get("DynamicWildlife", id) then
+    roster.pet_rules = roster.pet_rules or {}
+    if not roster.pet_rules[id] then
+      local okr, rule = pcall(emf.hit_rule, { to = id, cancel = true })
+      roster.pet_rules[id] = okr and rule or false
+      log(string.format("pet %s (%s): takes no damage (%s)", r.name, tostring(id), tostring(okr and rule)))
+    end
+  end
   inv.prompt(world, id, inv.open[r.name] ~= nil)
   local oka, erra = pcall(match_armor, world, id, r)
   if not oka then log("armor: " .. tostring(erra)) end
@@ -3322,7 +3341,9 @@ function F.tick(world)
   for id, h in pairs(drives) do
     local okd, errd = pcall(drive_step, world, id, h)
     if not okd and not h.err_said then h.err_said = true log("drive " .. tostring(id) .. ": " .. tostring(errd)) end
+    if h.shim then pcall(roster.pet_flush, world, id, h) end  -- (pets) the drive's answer to the server probe
   end
+  pcall(roster.pets_quiet, world)  -- (pets) their own AI kept idle
   for id, h in pairs(drives) do
     if h.go_away then
       local okp, errp = pcall(put_away_for, world, id, h)
@@ -3551,6 +3572,33 @@ function roster.petlog_tick(world)
   local an = rd(function() local a = world:get("DynamicAnimal", id) return "animal state " .. tostring(a.state) end)
   log(string.format("petlog %d at %.1f %.1f %.1f: %s | %s | %s | %s | time %s", id, x, y, z, tostring(wl), tostring(ai), tostring(pw),
     tostring(an), tostring(rd(function() return world:get("SpawnTime", id).time end))))
+end
+
+-- (pets) the drive's inputs for the server probe (its drive_post reads them; see there) and the animal's own AI kept
+-- idle (wildlife state 3, as the petlog showed between its walks; 6 = walking to a roaming target)
+function roster.pet_flush(world, id, h)
+  local a = h.shim
+  local wl, as = world:get("DynamicWildlife", id), world:get("AnimalSaved", id)
+  if not (wl and as) then return end
+  as.spawnPosition.x, as.spawnPosition.y, as.spawnPosition.z = a.movementTarget.x, a.movementTarget.y, a.movementTarget.z
+  wl.spawnPosition.x, wl.spawnPosition.y, wl.spawnPosition.z = a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z
+  local cd = a.combatData
+  wl.runAwayDistance = a.movementTargetIsValid and ((tonumber(cd.prowlAngle) or 2) + (cd.targetOfMyTarget and 10 or 0)
+    + (cd.isTargetInsideLeash and 20 or 0)) or 0
+  cd.targetOfMyTarget = false  -- set again each tick where the edge stop is off (edge_off)
+end
+
+function roster.pets_quiet(world)
+  for _, id in pairs(ent_of) do
+    local wl = world:get("DynamicWildlife", id)
+    if wl and not world:get("DynamicEnemy01BehaviorState", id) then
+      if wl.state ~= 3 then wl.state = 3 end
+      wl.currentTargetPosition.x, wl.currentTargetPosition.y, wl.currentTargetPosition.z = world:position(id)
+      if not drives[id] and wl.runAwayDistance ~= 0 then wl.runAwayDistance = 0 end
+      local pw = world:get("DynamicPathWalker", id)
+      if pw and pw.isWalkingActive ~= false then pw.isWalkingActive = false end
+    end
+  end
 end
 
 function roster.ui_do(world, from, data)

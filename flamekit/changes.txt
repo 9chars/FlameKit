@@ -1,3 +1,6 @@
+0.15.323 Nov 20, 2026
+- Companions (test, local server only): pets follow you with the same follow code as the companions (the animal's own AI is kept idle); they never fight and take no damage. Needs the server probe from this version (next server start). Server only: no game change.
+
 0.15.322 Nov 20, 2026
 - Companions (test, local server only): console "flamekit.npc petlog <entity> [seconds]" logs what an animal's own AI does (for making pets follow). Server only: no game change.
 
