@@ -1589,6 +1589,12 @@ next restart (no yes for a restart yet).
      world's data file, not the character. **Owner 09:35 "yes delete should refuse it"** (after I found: roster delete
      dropped r.inv, and an open chest stayed behind ownerless): 0.15.308 delete refuses while inv.open[name] or
      inv.count(r.inv) > 0; `away` closes an open chest first (without his body nothing could close it). invtest covers it.
+     Owner 09:38 opened chest 32632: NO "opened by its owner" line: EMF says on every reload since 09:22 "on_event
+     (InteractionAcceptedEvent) is new since the game started: restart the game to receive it" (an event asked for
+     after the server started needs a server restart; I missed the log line). The owner-only rule is NOT live until the
+     next server restart (asked 09:39, not answered yet). **Owner 09:40/09:41 on running commands: chat commands need
+     [chat] admins in the server's emf\emf_core.ini (the local server has none); "nah its probably best no one can use
+     the commands like that"**: no emf_core.ini, commands only through emf\commands.txt (me) / the server log.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
