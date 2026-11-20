@@ -1703,6 +1703,9 @@ next restart (no yes for a restart yet).
    0.15.319: log "slot <id>: follower k of n ..."; 12:28:12 N1's place was 0.4 m from where both stood (the player's
    facing put left-behind right there). 0.15.320: the place = the first of SLOTS (starting at his own) at least
    SLOT_GAP 1.5 m from every follower before him (their current positions), kept while free (h.slot_i).
+   12:29:50 apart (N2 next to the player, N1 ~3 m away). **Owner 12:35 "yeah thats good, ideally you'd have different
+   ones" / 12:36 "first one. we dont need different paths"** = ideally a player's companions are different kinds (set
+   with Kind); no separate follow paths wanted.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
