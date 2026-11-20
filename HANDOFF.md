@@ -1563,6 +1563,13 @@ next restart (no yes for a restart yet).
      when the player is gone (drive_read: player position nil), the game AI stays off so he stands; roster_joined drives
      him again and inv.frozen pins him back to c.pin; E still closes it. 0.15.301: inv.close(world, r, why, by): the
      closed notice goes to the player who pressed E (c.player is an old entity id after a rejoin). Not tested in game.
+     **Owner 09:19 "so while im offline someone can move him around?" / 09:21 "yeah it needs to be pinned for all players
+     so if I log off no one can mess with it.. is there a way to make a check so ONLY the player who owns the companion
+     can open the chest?"** 0.15.302: inv.tick pins ent_of[name] every tick (drive_step's frozen branch no longer pins);
+     EMF has no per-player interaction lock (InteractionLock is template: required item / requiredPermission), so
+     emf.on_event("InteractionAcceptedEvent") (guestEntityId = player, hostEntityId = chest): a guest whose account is
+     not r.owner closes the chest at once (inv.close "someone else opened it", record saved) and gets a notice; the
+     owner is not affected; r.owner nil = anyone. invtest covers both. Not tested in game (needs a second player).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

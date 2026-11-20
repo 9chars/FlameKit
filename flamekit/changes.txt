@@ -1,3 +1,6 @@
+0.15.302 Nov 20, 2026
+- Companions (test, local server only): while his chest is open the companion is held in place for everyone, also while his owner is offline. Only the companion's owner can open his chest: when anyone else opens it, it closes at once and everything stays safe with the companion. Server only: no game change.
+
 0.15.301 Nov 20, 2026
 - Companions (test, local server only): fix: after logging off and back on with the companion's chest open, the "Inventory closed" notice goes to you again. Server only: no game change.
 

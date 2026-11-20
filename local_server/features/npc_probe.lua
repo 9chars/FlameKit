@@ -999,8 +999,8 @@ local function drive_step(world, id, h)
   if not s then return end
   set_pace(s.a, PACE_WALK)  -- drive_steer sets the trail's pace; the C++ sprints past 6 m from where he is headed
   -- (owner 2026-11-20 08:02 "make it so the companion can't move or do anything until the chest is closed")
-  if inv.frozen and inv.frozen(id) then  -- (name_of is declared further down: the inventory part answers)
-    pcall(inv.pin, world, id)
+  if inv.frozen and inv.frozen(id) then  -- (name_of is declared further down: the inventory part answers; the pin
+    -- itself is done by inv.tick, for the owner online or not)
     hold_at(s.a, s.nx, s.ny, s.nz)
     h.atk = nil
     pcall(function() s.a.combatData.lastTargetId = 0 s.a.combatData.selectedAttackIndex = 255 end)
@@ -1673,11 +1673,34 @@ inv.close_chest = function(world, player, npc, rr)
   if rr then inv.close(world, rr, "the player", player) end
 end
 
--- every tick: fill new chests, keep open ones saved, close forgotten ones
+-- (owner 2026-11-20 09:21 "is there a way to make a check so ONLY the player who owns the companion can open the
+-- chest?") the game has no owner lock on a chest a mod spawns; when anyone else opens it (the game's
+-- InteractionAcceptedEvent, guest = the player, host = the chest) it is closed at once: everything goes back into his
+-- record and the chest is gone before they can take anything
+function inv.on_accept(world, e)
+  local host, guest = rawget(e, "hostEntityId"), rawget(e, "guestEntityId")
+  for name, c in pairs(inv.open) do
+    if c.chest == host then
+      local r = find(name)
+      local acc = guest and world:account(guest)
+      if r and r.owner and acc ~= r.owner then
+        log(string.format("inventory %s: chest %s opened by player %s (account %s), not the owner: closed", name, tostring(host),
+          tostring(guest), tostring(acc)))
+        inv.close(world, r, "someone else opened it")
+        if guest then say(world, guest, name .. "'s chest: only the companion's owner can open it.") end
+      end
+      return
+    end
+  end
+end
+
+-- every tick: fill new chests, keep open ones saved, pin him (09:21: "it needs to be pinned for all players so if I log
+-- off no one can mess with it")
 function inv.tick(world)
   local t = world:tick()
   for name, c in pairs(inv.open) do
     local r = find(name)
+    if ent_of[name] then pcall(inv.pin, world, ent_of[name]) end
     if not r then
       inv.open[name] = nil
     elseif c.state == "filling" then
@@ -2703,6 +2726,11 @@ function F.setup(k)
     end)
     log(okl and line or ("HIT: " .. tostring(line)))
   end)
+  pcall(emf.on_event, "InteractionAcceptedEvent", function(world, e)  -- (09:21) only the owner opens his chest
+    if not next(inv.open) then return end
+    local oka, erra = pcall(inv.on_accept, world, e)
+    if not oka then log("inventory: open check failed: " .. tostring(erra)) end
+  end, "server")
   pcall(emf.on_player_joined, function(world, p)
     log(string.format("join: player %s (account %s)", tostring(p.player), tostring(p.account)))
     local okr, errr = pcall(roster_joined, world, p)

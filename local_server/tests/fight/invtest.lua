@@ -153,3 +153,18 @@ for _ = 1, 20 do step() end
 print("he died: open?", T.inv.open.N1 ~= nil, "chest still there?", pos[c.chest] ~= nil)
 show("record after his death", r)
 for _, l in ipairs(logs) do if l:find("died") or l:find("he died") then print(l) end end
+-- (09:21) only the owner opens his chest: anyone else closes it at once (record kept), the owner does not
+T.ent_of.N1 = nil
+comps[500].Health = nil
+r.owner = "acc"
+T.inv.open_chest(W, 1, 500, r)
+for _ = 1, 120 do step() end
+c = T.inv.open.N1
+T.inv.on_accept(W, { hostEntityId = c.chest, guestEntityId = 1 })
+print("owner opened it: still open?", T.inv.open.N1 ~= nil)
+local real_account = W.account
+W.account = function(_, id) return id == 7 and "other" or "acc" end
+T.inv.on_accept(W, { hostEntityId = c.chest, guestEntityId = 7 })
+print("someone else opened it: still open?", T.inv.open.N1 ~= nil, "chest still there?", pos[c.chest] ~= nil)
+show("record after someone else opened it", r)
+W.account = real_account
