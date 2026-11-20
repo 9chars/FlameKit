@@ -956,6 +956,7 @@ end
 -- target) the native edge stop is off: where the player walked there was ground (planks, trap doors and overhangs
 -- fooled its ray). Off the trail (straight to a swimming player, or no trail yet) it is on; on the way to the swimming
 -- player it lets him drop up to 7.5 m (into the water). While he moves his body faces the target.
+local SLOTS = { { -1.6, -0.8 }, { 1.6, -0.8 }, { 0, -2.2 }, { -2.4, -2.2 }, { 2.4, -2.2 } }  -- (12:22) followers 2..6
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local px, py, pz, nx, nz = s.px, s.py, s.pz, s.nx, s.nz
@@ -963,6 +964,28 @@ local function drive_steer(s)
   a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z = px, py, pz
   local tx, ty, tz = px, py, pz
   if c then tx, ty, tz = c.x, c.y, c.z end
+  -- (owner 2026-11-20 12:22 "N2 didn't spawn with me": it had, at N1's exact spot, and both stopped on the same
+  -- point) more than one follower of the same player: going to the player himself (no crumb), the 2nd, 3rd ...
+  -- (by entity id) stop at their own place around him (SLOTS: metres right / forward of his facing)
+  if not c then
+    local mine = {}
+    for oid, oh in pairs(drives) do if oh.player == h.player then mine[#mine + 1] = oid end end
+    if #mine > 1 then
+      table.sort(mine)
+      local k = 0
+      for i, oid in ipairs(mine) do if oid == id then k = i - 1 end end
+      local o = k > 0 and SLOTS[(k - 1) % #SLOTS + 1]
+      if o then
+        local yaw = 0
+        pcall(function()
+          local q = world:get("CurrentTransform", h.player).transform.orientation
+          yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
+        end)
+        tx = px + math.cos(yaw) * o[1] + math.sin(yaw) * o[2]
+        tz = pz - math.sin(yaw) * o[1] + math.cos(yaw) * o[2]
+      end
+    end
+  end
   local on_trail = c ~= nil
   if on_trail then edge_off(a) end
   pcall(function() a.combatData.isTargetInsideLeash = (not on_trail and h.to_swimmer) and true or false end)
@@ -1220,6 +1243,16 @@ local function bring_to_life(world, r, id, player)
 end
 
 local function spawn_body(world, r, x, y, z, player)
+  -- (12:22) not inside another companion: 1.2 m further along x for each one already within 1 m of the spot
+  for _ = 1, 6 do
+    local busy = false
+    for n, e in pairs(ent_of) do
+      local ex, _, ez = world:position(e)
+      if n ~= r.name and ex and (ex - x) ^ 2 + (ez - z) ^ 2 < 1 then busy = true break end
+    end
+    if not busy then break end
+    x = x + 1.2
+  end
   local ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
   if not (ok and id and id ~= 0) then
     log(string.format("roster: %s could not be spawned (%s)", r.name, tostring(id)))

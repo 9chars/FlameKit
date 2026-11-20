@@ -1,3 +1,6 @@
+0.15.316 Nov 20, 2026
+- Companions (test, local server only): fix: two or more companions following the same player no longer stand inside each other: they are spawned apart, and when they reach you the second, third ... each stop at their own place around you (left-behind, right-behind, behind ...). Server only: no game change.
+
 0.15.315 Nov 20, 2026
 - Companions (test, local server only): the companion's chest is put on the ground: the server looks for the ground at four places around him (his left first, then his right, behind him, in front) and takes the first one at about his height, not on top of another chest or down a drop. Needs the server probe from this version (next server start); before that it opens at his left at his height as before. Server only: no game change.
 

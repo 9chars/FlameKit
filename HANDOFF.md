@@ -1689,7 +1689,12 @@ next restart (no yes for a restart yet).
    each companion needs to have its own chest?" / "not sure"**: my opinion (one inventory per player: items belong
    to the player, fits one main, no stranded items, pets a smaller chest) -> **owner 12:16 "hold off on #2 for now"**
    (kept on the list, not built). Owner 12:16 "yeah it was standing on the chest" (the cause). Server probe DLL
-   35370f20 copied in 12:15 (27d76044 renamed .old_1215): loads at the next server start (asked, not answered yet).
+   35370f20 copied in 12:15 (27d76044 renamed .old_1215): loaded at the server restart 12:18 (owner "sure").
+   **Owner 12:22: "N2 didn't spawn with me and it was set to follow when I logged off"**: it had (12:22:17 at the
+   join), at N1's exact spot, and both followed to the same point (12:22:55 both at 6358.2 986.5 5378.2). 0.15.316:
+   spawn_body moves a spawn 1.2 m along x per other companion within 1 m; drive_steer: with several followers of one
+   player, going to the player (no crumb), the 2nd.. (by entity id) aim at SLOTS around him (right/forward metres of
+   his facing: -1.6/-0.8, 1.6/-0.8, 0/-2.2, -2.4/-2.2, 2.4/-2.2). While walking the trail they still share the crumbs.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
