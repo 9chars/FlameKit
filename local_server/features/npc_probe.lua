@@ -1453,10 +1453,34 @@ end
 -- GUID of Base_Door's InteractionToggle (da5990c2-f8f0-413c-bb4d-fe057f4b4ca1), UNPROVEN: the same hash of its
 -- offToOnVerb is not EMF's Open id, so the prompt may show "E" with no word (then the id is wrong).
 inv.CLOSE_VERB = 0x3959A87F
+-- (owner 2026-11-20 08:32 "the companion doesn't have an E button at all now": EMF refuses a new offer in the same
+-- step the old one is taken off, "an earlier offer is still being taken off it: try again in a moment") the old offer
+-- comes off now, the new one is made from the next steps on until EMF takes it (inv.want, F.tick)
+inv.want = {}  -- entity -> { verb, at, tries }
 function inv.prompt(world, id, open)
   pcall(emf.offer_remove, world, id)
-  local ok, res = pcall(emf.offer, world, id, { verb = open and inv.CLOSE_VERB or "Talk" }, function(w, p, npc) on_talk(w, p, npc) end)
-  if open then log(string.format("inventory: E on %s now closes the chest (verb %s: %s)", tostring(id), string.format("0x%08X", inv.CLOSE_VERB), tostring(ok and res))) end
+  inv.want[id] = { verb = open and inv.CLOSE_VERB or "Talk", at = world:tick() + 2, tries = 0 }
+end
+function inv.want_tick(world)
+  local t = world:tick()
+  for id, w in pairs(inv.want) do
+    if not world:position(id) then
+      inv.want[id] = nil
+    elseif t >= w.at then
+      local ok, res = pcall(emf.offer, world, id, { verb = w.verb }, function(ww, p, npc) on_talk(ww, p, npc) end)
+      w.tries = w.tries + 1
+      if ok and res then
+        inv.want[id] = nil
+        log(string.format("prompt: E on %s offered (%s) after %d try(s)", tostring(id),
+          w.verb == "Talk" and "Talk" or string.format("verb 0x%08X", w.verb), w.tries))
+      elseif w.tries >= 50 then
+        inv.want[id] = nil
+        log(string.format("prompt: E on %s could NOT be offered after %d tries (%s)", tostring(id), w.tries, tostring(res)))
+      else
+        w.at = t + 6
+      end
+    end
+  end
 end
 
 -- his chest is open: he is frozen (drive_step)
@@ -2825,6 +2849,7 @@ function F.tick(world)
     end
     heal_fx_shown = keep
   end
+  if next(inv.want) then pcall(inv.want_tick, world) end  -- (his E prompt) made once EMF takes it
   if next(inv.open) then  -- (inventory) fill new chests, keep open ones saved, close forgotten ones
     local oki, erri = pcall(inv.tick, world)
     if not oki then log("inventory: tick failed: " .. tostring(erri)) end
