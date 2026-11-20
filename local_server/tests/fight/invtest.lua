@@ -3,7 +3,7 @@
 -- texlua invtest.lua ../../features/npc_probe.lua ../../../flamekit/core/bag.lua
 local file, bagfile = arg[1], arg[2]
 local f = assert(io.open(file)) local text = f:read("a") f:close()
-text = text:gsub("\nreturn F%s*$", "\nF._t = { inv = inv, roster = roster, find = find, ent_of = ent_of, drive_step = drive_step, drives = drives, name_of = name_of, roster_cmd = roster_cmd }\nreturn F\n")
+text = text:gsub("\nreturn F%s*$", "\nF._t = { inv = inv, roster = roster, find = find, ent_of = ent_of, drive_step = drive_step, drives = drives, name_of = name_of, roster_cmd = roster_cmd, admins = admins }\nreturn F\n")
 local logs, saved = {}, {}
 TICK = 0
 local comps, pos = {}, {}
@@ -184,7 +184,7 @@ local sent = {}
 emf.net.send_to = function(w, pid, ch, text) sent[#sent + 1] = text return true end
 emf.json.decode = function(d) return d end
 local enc = emf.json.encode
-emf.json.encode = function(t) return t.op == "result" and ("result: " .. tostring(t.text)) or "state" end
+emf.json.encode = function(t) return (t.op == "result" or t.op == "denied") and (t.op .. ": " .. tostring(t.text)) or "state" end
 env.require = function(n)
   if n == "core.bag" then return bag end
   if n == "core.pets" then return { { "Pets", "Dog (bright)", "5d9c1829-69fc-4339-8bcc-5e62e63e9a31" } } end
@@ -194,6 +194,10 @@ env.require = function(n)
 end
 local R = T.roster
 local from = { player = 1, account = "acc" }
+-- (0.15.359) the roster window is for admins only: a non-admin is refused, then "acc" is made an admin
+R.ui_do(W, { player = 2, account = "nobody" }, { op = "do", what = "rename", name = "N1", arg = "X" })
+print("non-admin refused:", tostring(sent[#sent]):find("denied") ~= nil, "N1 kept:", T.find("N1") ~= nil)
+T.admins[#T.admins + 1] = "acc"
 local function act(what, name, arg)
   R.ui_do(W, from, { op = "do", what = what, name = name, arg = arg })
   local last
@@ -219,7 +223,7 @@ emf.json.encode = enc
 -- (0.15.310) New companion from the window
 pos[1] = { 5, 0, 5 }
 local before = #T.roster.list
-emf.json.encode = function(t) return t.op == "result" and ("result: " .. tostring(t.text)) or "state" end
+emf.json.encode = function(t) return (t.op == "result" or t.op == "denied") and (t.op .. ": " .. tostring(t.text)) or "state" end
 act("new", "", nil)
 print("new: list grew", #T.roster.list - before)
 -- (0.15.311) Bring back: next to the clicking player

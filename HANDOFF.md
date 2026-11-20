@@ -1966,6 +1966,13 @@ next restart (no yes for a restart yet).
    second-player tests, today's untested fixes, line check, admin, per-kind tuning, shared inventory, versions).
    **Owner 17:42: "E close on chests worked, small pets swim. I think the Companion Roster needs to be protected by
    admin rights"** (wording being confirmed).
+   Restated (admins only; greyed out for others, the server refuses; admin = the owner for now; wheels and Companions
+   stay for everyone). **Owner 17:46: "yes. also you need to tell me how to add companions to other plays because all
+   those drop down were grayed out/disabled"**. 0.15.359: roster.ui_do refuses non-admins ({op = "denied"}, no
+   subscription); the prefs reply on npcwheel sends {op = "admin", admin}; the client's Roster button is disabled
+   unless admin (tooltip says why), its click is ignored, the window shows the refusal. Admin = is_admin (store
+   "npc_admins", default OWNER_ACCOUNT: must change for other servers before a release). invtest: non-admin case.
+   Give/Share lists = roster.known (players the server has seen join): the other player must join once.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

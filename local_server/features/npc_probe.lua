@@ -2245,6 +2245,8 @@ local function on_pick(world, from, data)
       F.notice_pref[from.account] = m.notices == true or nil
       log(string.format("prefs: player %s (%s): follow notices %s", tostring(from.player), tostring(from.account), m.notices == true and "on" or "off"))
     end
+    -- (owner 17:46) the answer: whether he is an admin (his game greys the Companion Roster button out otherwise)
+    pcall(emf.net.send_to, world, from.player, WHEEL, emf.json.encode({ op = "admin", admin = is_admin(from.account) }))
     return
   end
   if not (okd and type(m) == "table" and m.op == "pick") then return end
@@ -3912,6 +3914,13 @@ function roster.ui_do(world, from, data)
   if not (okd and type(m) == "table") then return end
   local pid = from.player
   if not pid then return end
+  -- (owner 17:42 "I think the Companion Roster needs to be protected by admin rights"; 17:46 "yes": only admins use it,
+  -- the server refuses everyone else; the game greys the button out from {op = "admin"} on npcwheel)
+  if not is_admin(from.account) then
+    roster.ui_send(world, pid, emf.json.encode({ op = "denied", text = "Only admins can use the Companion Roster." }))
+    log(string.format("roster window: player %s is not an admin: %s refused", tostring(pid), tostring(m.op)))
+    return
+  end
   roster.subs[pid] = world:tick()
   if m.op == "get" then
     roster.ui_known(world)

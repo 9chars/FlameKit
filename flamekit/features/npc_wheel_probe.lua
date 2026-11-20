@@ -11,8 +11,15 @@ local function log(s) emf.log("[flamekit] npc wheel: " .. s) end
 
 local kit  -- set in F.setup
 
+local admin = false  -- (0.15.359, owner 2026-11-20 17:46) the server says whether this player is an admin ({op = "admin"})
+
 local function on_message(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
+  if okd and type(m) == "table" and m.op == "admin" then
+    if (m.admin == true) ~= admin then log("admin: " .. tostring(m.admin == true)) end
+    admin = m.admin == true
+    return
+  end
   -- (owner 2026-11-18 07:30: "that one needs to stay on the screen until the condition is cleared... same with the
   -- Companion death") a status notice from the server: shown until the server takes it back (no time limit)
   if okd and type(m) == "table" and m.op == "status" and type(m.tag) == "string" and kit then
@@ -37,8 +44,9 @@ end
 function F.panel_rows(world)
   return { { button = "npc:call", text = "Call my companion",
     tooltip = "Brings your companion to you and has it follow you (put away or far away: it comes back next to you)." },
-    { button = "npc:roster", text = "Companion Roster", same_line = true,
-      tooltip = "Opens or closes the Companion Roster window: every companion on this server, to rename, change, give, share or put away." },
+    { button = "npc:roster", text = "Companion Roster", same_line = true, disabled = not admin,
+      tooltip = admin and "Opens or closes the Companion Roster window: every companion on this server, to rename, change, give, share or put away."
+        or "Only the server's admins can use the Companion Roster." },
     { separator = true } }
 end
 
@@ -61,6 +69,8 @@ local function on_roster(world, from, data)
   if not (okd and type(m) == "table") then return end
   if m.op == "roster" and type(m.list) == "table" then
     ros.list, ros.players = m.list, type(m.players) == "table" and m.players or {}
+  elseif m.op == "denied" then  -- (0.15.359) not an admin: the server refused
+    ros.denied, ros.result, ros.ok = true, tostring(m.text or "Only admins can use the Companion Roster."), false
   elseif m.op == "result" then
     ros.result, ros.ok = tostring(m.text or ""), m.ok and true or false
     log("roster: " .. ros.result)
@@ -91,6 +101,7 @@ function F.roster_rows(world)
     ros.asked = now
     roster_send({ op = "get" })
   end
+  if ros.denied and not admin then return { { text = ros.result, color = "#ff9050" } } end
   if not ros.list then
     rows[#rows + 1] = { text = "Asking the server for the roster... (a server without the companion code does not answer)", dim = true }
     return rows
@@ -182,6 +193,7 @@ end
 
 function F.click(world, key)
   if key == "npc:call" then send_call("button") end
+  if key == "npc:roster" and not admin then log("roster: not an admin") return end  -- (0.15.359) admins only
   if key == "npc:roster" then  -- the Companion Roster window: the DLL shows or hides it; the roster is asked for again
     local f = emf.dir and io.open(emf.dir .. "\\ui_roster_toggle.request", "w")
     if f then f:write("toggle\n") f:close() end
