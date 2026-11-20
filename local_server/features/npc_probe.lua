@@ -612,9 +612,28 @@ end
 -- Put away (h.go_away; F.tick removes the body and brings him back beside the player once he stands on the ground):
 -- a glide still going after GLIDE_WAIT or GLIDE_FAR away, a fast travel (FAR_JUMP in one tick), or TP_AFTER after he
 -- could not follow (h.cant).
+-- (owner 2026-11-20 06:53 "I think safety net is a good idea") the fall safety net: in the air (locomotion state 2) he
+-- remembers the height he left the ground at; more than FALL_SAFE below it, he is put away before he lands and comes back
+-- beside the player (his fall damage starts at 8 m). 2026-11-19 21:47 and 21:57: copied jumps that missed (a narrow
+-- ledge; a jump the player finished with the glider) fell 20.7 m and 22.5 m and killed him at full health.
+local FALL_SAFE = 7.5
 local function drive_put_away(s)
   local h, t = s.h, s.t
   local px, pz, nx, nz = s.px, s.pz, s.nx, s.nz
+  local lst
+  pcall(function() lst = tonumber(s.world:get("DynamicLocomotion", s.id).state) end)
+  if lst == 2 then
+    h.fall_y0 = h.fall_y0 or s.ny
+    if s.ny < h.fall_y0 - FALL_SAFE then
+      log(string.format("fall net %s: %.1f m below where he left the ground (%.1f -> %.1f): put away before he lands",
+        tostring(s.id), h.fall_y0 - s.ny, h.fall_y0, s.ny))
+      h.fall_y0 = nil
+      h.go_away = "falling"
+      return true
+    end
+  else
+    h.fall_y0 = nil
+  end
   local dog_d = math.sqrt((px - nx) ^ 2 + (pz - nz) ^ 2)
   if h.aseg and h.aseg.states[GLIDE_STATE] and (t - h.aseg.t0 > GLIDE_WAIT or dog_d > GLIDE_FAR) then
     h.go_away = "glide"

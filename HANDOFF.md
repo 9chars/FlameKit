@@ -1406,6 +1406,22 @@ next restart (no yes for a restart yet).
      restart 6 edge stops, all in fights, each ONE tick ("goes on" right after), none left him stuck. **Owner 06:37:**
      "keep it as a watch item, how did it get on the list?" -> **WATCH: the edge stop in fights** (look again only if it
      actually keeps him from a monster again).
+     **Owner 06:42:** "I think I as more concerned with the times he killed himself ... can you check every time he
+     died yesterday ... see if there is a pattern to why? nothing might need to be changed". 8 deaths on 2026-11-19 (the
+     client logs, every session; the server log only from 21:15): (1) killed right after a respawn, 0.2-0.3 s
+     (15:57, 18:56, 21:38): 21:38 a 725 hit on the new body before FlameKit set level 50 and the armour (0.2-0.5 s after
+     the spawn); (2) falls after a copied jump: 21:47 (the player stepped 4.4 m down onto a narrow ledge 0.9 m out; his
+     jump went 9.7 m forward, fell 20.7 m), 21:57 (the player double-jumped and glided 2.5 s / 17 m, 4.7 m lower: not a
+     break because glides are excluded from the 2 s flight rule and 4.7 < 7.5 m; his jump fell short, 22.5 m), 18:30 and
+     19:06 likely the same (just after "afraid to follow (drop too high)"); 18:33 unknown. **Owner 06:44:** "he didn't
+     detect that the jump would kill him? why didn't he just teleport?" (no check of his own jump; nothing watches him
+     in the air). **Owner 06:52:** "its common to jump before popping out the glider". **Owner 06:53, verbatim:** "I think
+     safety net is a good idea" -> built (live): drive_put_away: in the air (his DynamicLocomotion.state 2) h.fall_y0 =
+     the height he left the ground at; more than FALL_SAFE 7.5 m below it -> put away ("falling"), back beside the
+     player once the player stands (LAND_TICKS). Log "fall net <id>: x m below where he left the ground ...".
+     drive_harness: identical on 9 seeds apart from the new field (seed 7: the net fired at 7.7 m down, correct). Not
+     built (offered, not chosen): the glider rule (a jump where the player opened the glider = a break), level/armour set
+     on the spawn tick.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
