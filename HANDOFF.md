@@ -1512,6 +1512,16 @@ next restart (no yes for a restart yet).
      client programs ui_custom_name / ui_custom_name_visibility draw it with a line-of-sight check, from the
      CustomPlayerStringsSystem); never touched by us, how a string gets into that system is unknown (research). The
      chest's own E prompt words would need a content mod (a game update, not server only).
+     Owner 08:41 "research the first point and see what it looks like?". Found: our own client notes already have it
+     (flamekit_native/notes/memory_layouts.md, read_custom_names in flamekit_native.cpp, used by the minimap): the
+     names players give flame altars and chests; CustomPlayerStringsSystem pool of 0x140-byte entries {key +0x10 =
+     the entity's CustomPlayerString.stringId, text at +0x38, length +0x20}; the client only has the names of things
+     near the player. Only program that sys-writes it: custom_player_string_init. 0.15.295: console command
+     `flamekit.npc names` (list) / `names copy <from> <to>` / `names set <entity> <n>`. 08:43:53 on the local server:
+     135 entities have the component, 125 with a key (keys look random 64-bit; those >= 2^63 read as floats in Lua and
+     cannot be copied exactly). 2112, 11 m from the player, is a chest (Inventory, ToggleAnimation, UiOffsets) with key
+     0x2E2B803BEE877B55 (copyable). Next test: copy 2112's key onto the companion's open chest and see if 2112's name
+     floats over it; then making our own text needs a new entry in the server's string pool (C++).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
