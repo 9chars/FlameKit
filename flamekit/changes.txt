@@ -1,3 +1,6 @@
+0.15.325 Nov 20, 2026
+- Companions (test, local server only): fix: pets no longer shoot 10-30 m in a moment while catching up to you (animals cannot sprint: pets run at most). Needs the server probe from this version (next server start). Server only: no game change.
+
 0.15.324 Nov 20, 2026
 - Companions (test, local server only): fix: pets no longer jump around erratically while following (their follow target went through the animal's own spawn position, which the game also moves it by). Needs the server probe from this version (next server start). Server only: no game change.
 

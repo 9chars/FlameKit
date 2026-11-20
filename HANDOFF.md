@@ -1733,6 +1733,9 @@ next restart (no yes for a restart yet).
    **E prompt on pets (owner 12:54 "I noticed this pet doesn't have an 'E' button, will that change?"):** emf.offer is
    refused ("it has its own offer from the game"); ideas: spawn the pet tame so the game's "E Pet" shows and open our
    wheel on its InteractionAcceptedEvent. Not built.
+   Restart 13:07 (owner "yes"); **owner 13:22 "it still glitches out a bit"**: petlog 13:23:25-60 (wildlife state 13):
+   10-33 m in 0.5 s whenever the drive gave speed 4 (sprint), normal at 2/3; jumplog "takes off ... lands 33.6 m
+   forward". Animal locomotion has no sprint. 0.15.325: C++ caps pets at speed 3 (run).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

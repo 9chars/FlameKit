@@ -490,6 +490,9 @@ void drive_post(void* ctx, void*) {
             // combatData.prowlAngle: 2 walk, 3 run, 4 sprint; his AI is off so nothing else writes it); more than
             // kCatchUp from where he is headed (the player; in a fight the monster): sprint
             speed = dp > kCatchUp ? 4 : pace >= 3.5f ? 4 : pace >= 2.5f ? 3 : 2;
+            // (2026-11-20 13:23, pets) the dog shot 10-30 m in half a second whenever he was given sprint (4): an animal's
+            // locomotion has no sprint; run (3) and walk (2) moved him normally. Pets run at most.
+            if (!st && speed > 3) speed = 3;
             // (23:41 test) no edge check while he is in the air (DynamicLocomotion.state 2): it measured from his raised
             // height and stopped his legs mid-jump
             auto* loc_now = w.get<emf::gen::ecs::DynamicLocomotion>(id);
