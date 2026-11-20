@@ -1880,6 +1880,19 @@ local HEAL_BELOW, HEAL_BELOW_FIGHT = 0.6, 0.4
 local HEAL_FULL = 0.99                                    -- "full": a heal only when 1 % or more is missing
 local RECOVER_AFTER, RECOVER_PART = 600, 0.02             -- Passive: 10 s without a hit, then 2 % of his maximum a second
 local mana_of = {}                                        -- companion name -> mana
+-- (owner 2026-11-19 22:09 "is there way to add an healing spakle animations?") the game's heal effects (VFX templates),
+-- for the console preview "flamekit.npc healfx <n>" (spawned on the player for 10 s)
+local HEAL_FX = {
+  { "VFX_Resource_Increase_Health", "2c411630-8a38-41a3-b3d2-a263609a1bdb" },
+  { "VFX_Resource_Increase_Health_NoSound", "b8e9aca9-8713-4c4c-b51c-1591e74873b4" },
+  { "VFX_Enemy_Skeleton_Melee_Elite_Heal_Ally_Player_Companion", "35183e7f-6b43-45da-a58c-c057f0c2f82e" },
+  { "VFX_Enemy_Skeleton_Melee_Elite_Heal_Ally", "100772b0-a866-4d80-b9a8-a6052ccd0149" },
+  { "VFX_Skill_Martyr_Heal", "21443035-d89f-40c5-bf61-009b8aaa413a" },
+  { "VFX_Ability_Casting_Heal_Channel", "af4436da-8e80-436a-aa35-5cdf1f0b994e" },
+  { "VFX_Spell_ChainHeal_SourceTarget_player", "fc4f8028-078d-4051-8cf1-33ddb08e72a6" },
+  { "VFX_Spell_ChainHeal_SourceTarget_NoTarget", "c15e5bc4-6dc7-4b86-a27c-91d1db7cd5aa" },
+}
+local heal_fx_shown = {}
 local SHOUT_TICKS = 90                                    -- the shout plays this long before his next attack
 
 drive_heal = function(s)
@@ -2424,6 +2437,23 @@ function F.setup(k)
         st.enabled = false
         log("still: " .. tostring(id) .. " AI off")
         emf.reply("npc: still")
+      elseif what == "healfx" then  -- healfx <n>: heal effect candidate n on the nearest player for 10 s (owner 22:09)
+        local n = tonumber(args[2])
+        local c = n and HEAL_FX[n]
+        if not c then emf.reply("npc healfx: 1-" .. #HEAL_FX) return end
+        local okp, ids = pcall(players.ids, world)
+        local pid = okp and ids and ids[1]
+        local x, y, z = pid and world:position(pid)
+        if not x then emf.reply("npc healfx: no player") return end
+        local oks, fid = pcall(emf.spawn, world, c[2], x, y, z)
+        if oks and fid and fid ~= 0 then
+          heal_fx_shown[#heal_fx_shown + 1] = { id = fid, at = world:tick() + 600 }
+          log(string.format("heal fx %d (%s) shown on the player as entity %s", n, c[1], tostring(fid)))
+          emf.reply("healfx " .. n .. ": " .. c[1])
+        else
+          log(string.format("heal fx %d (%s) refused (%s)", n, c[1], tostring(fid)))
+          emf.reply("healfx " .. n .. ": refused")
+        end
       elseif what == "hold" then  -- hold <npc> <target> [seconds]: stays put and faces the target (drive_hold)
         local id, tg, sec = tonumber(args[2]), tonumber(args[3]), tonumber(args[4]) or 10
         if not (id and tg) then emf.reply("npc: hold <npc> <target> [seconds]") return end
@@ -2474,6 +2504,13 @@ local companions_core = require("core.companions")  -- the minimap's companion d
 function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()
+  if #heal_fx_shown > 0 then  -- (healfx preview) effects go after 10 s
+    local keep = {}
+    for _, f in ipairs(heal_fx_shown) do
+      if f.at <= t then pcall(emf.destroy, world, f.id) else keep[#keep + 1] = f end
+    end
+    heal_fx_shown = keep
+  end
   -- (fight, step 2: watching only) the monster scan, and once a second what each companion would do
   local okw, errw = pcall(monster_scan_step, world)
   if not okw then mscan = nil log("fight scan failed: " .. tostring(errw)) end
