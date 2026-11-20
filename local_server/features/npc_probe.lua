@@ -1083,7 +1083,7 @@ local function drive_step(world, id, h)
   if drive_put_away(s) then return end
   drive_lay_crumb(s)
   drive_upkeep(s)
-  if drive_heal and not s.pet then drive_heal(s) end  -- never takes over the movement (pets: no healing yet)
+  if drive_heal then drive_heal(s) end  -- never takes over the movement (pets too: always Healing, owner 15:22)
   if drive_jump_follow(s) then return end
   if drive_fight and not s.pet and drive_fight(s) then return end  -- (pets never fight: owner 09:51)
   if drive_lure(s) then return end
@@ -2523,12 +2523,16 @@ local SHOUT_TICKS = 90                                    -- the shout plays thi
 drive_heal = function(s)
   local world, id, h, t, a = s.world, s.id, s.h, s.t, s.a
   local name = tostring(name_of[id] or id)
-  local mode = fight_mode(id)
+  -- (owner 2026-11-20 15:22 "lets give the pets the same heal ability, same sparkle and that mode is just always
+  -- active") a pet is always in Healing mode: the same mana, heals and sparkle; no Wolf Shout (an animal has none) and
+  -- no self heal (pets take no damage)
+  local pet = s.pet
+  local mode = pet and "Healing" or fight_mode(id)
   local m = math.min(MANA_MAX, (mana_of[name] or MANA_MAX) + MANA_REFILL / 60)
   mana_of[name] = m
   local hp, hmax
   pcall(function() local d = world:get("Health", id).dataStorage hp, hmax = tonumber(d[1]), tonumber(d[3]) end)
-  if not (hp and hmax and hp > 0) then return end
+  if not pet and not (hp and hmax and hp > 0) then return end
   if mode == "Passive" then
     if hp < hmax and t - (h.hit_t or -1e9) >= RECOVER_AFTER then
       if t % 60 == 0 then
@@ -2546,7 +2550,7 @@ drive_heal = function(s)
     return
   end
   if t - (h.heal_t or -1e9) < HEAL_GAP then return end
-  if not h.fight_init then return end  -- the fight's first step clears any move asked for: the shout would be lost
+  if not pet and not h.fight_init then return end  -- the fight's first step clears any move asked for: the shout would be lost
   local who, whp, wmax, whom
   local php, pmax = tonumber(emf.attribute(world, h.player, "health")), tonumber(emf.attribute(world, h.player, "max_health"))
   local px, py, pz = world:position(h.player)
@@ -2555,7 +2559,7 @@ drive_heal = function(s)
   if mode == "Healing" then
     if player_hurt then
       who, whp, wmax, whom = h.player, php, pmax, "the player"
-    elseif hp < hmax * HEAL_BELOW then
+    elseif not pet and hp < hmax * HEAL_BELOW then
       who, whp, wmax, whom = id, hp, hmax, "himself"
     end
   elseif mode == "Defensive" or mode == "Aggressive" then
@@ -2577,11 +2581,13 @@ drive_heal = function(s)
   end
   h.nomana_said = nil
   if h.atk and h.atk.atk then return end  -- one of his attacks is playing: after it
-  local okq, asked = pcall(function() return (tonumber(a.combatData.selectedAttackIndex) or 255) ~= 255 end)
-  if okq and asked then return end
+  if not pet then
+    local okq, asked = pcall(function() return (tonumber(a.combatData.selectedAttackIndex) or 255) ~= 255 end)
+    if okq and asked then return end
+  end
   local amount = math.ceil(wmax * HEAL_PART)
   local okh, res = pcall(emf.attribute_add, world, who, "health", amount)
-  pcall(function() a.combatData.selectedAttackIndex = 2 end)  -- Wolf Shout
+  if not pet then pcall(function() a.combatData.selectedAttackIndex = 2 end) end  -- Wolf Shout
   mana_of[name] = m - HEAL_COST
   h.heal_t = t
   -- (owner 2026-11-19 22:18 "when the dog heals himself he can do the effect, when he heals the player he can do the
@@ -2598,8 +2604,9 @@ drive_heal = function(s)
   end
   -- (owner 2026-11-19 21:29 "can you add a notice message that says Companion heals you for <number>!")
   if who == h.player and okh and res then say(world, h.player, string.format("Companion heals you for %d!", amount), "#5ad25a") end  -- green (owner 21:31)
-  log(string.format("heal %s: heals %s +%d (%d/%d before; %s mode); mana %d -> %d of %d; Wolf Shout%s", name, whom, amount, whp, wmax,
-    mode, math.floor(m), math.floor(m - HEAL_COST), MANA_MAX, (okh and res) and "" or " (could not add health: " .. tostring(res) .. ")"))
+  log(string.format("heal %s: heals %s +%d (%d/%d before; %s mode%s); mana %d -> %d of %d%s%s", name, whom, amount, whp, wmax,
+    mode, pet and ", pet" or "", math.floor(m), math.floor(m - HEAL_COST), MANA_MAX, pet and "" or "; Wolf Shout",
+    (okh and res) and "" or " (could not add health: " .. tostring(res) .. ")"))
 end
 
 drive_fight = function(s)
