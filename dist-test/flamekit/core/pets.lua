@@ -1,7 +1,8 @@
 -- pets.lua (0.15.313, owner 2026-11-20 11:40: "can you add the Pets section and add all the available pets into?"):
 -- the game's peaceful animals a companion can be (the Companion Roster's Kind list shows them as its "Pets" section).
 -- From the game's template names (tools/gamedata/templates.csv, 2026-11-14): Animal_Wildlife_* and Animal_Baby_*,
--- without fish, flying birds, tests and deprecated ones. { group, name, template GUID }
+-- without fish, tests and deprecated ones (the flying bird added 0.15.314, owner 11:55: "yes add them.. everything is
+-- untested so we won't know until we figure it out"). { group, name, template GUID }
 return {
   { "Pets", "Dog (bright)", "5d9c1829-69fc-4339-8bcc-5e62e63e9a31" },     -- Animal_Wildlife_Dog_01_bright_AG2
   { "Pets", "Dog (dotted)", "74bda2f0-74ab-4bad-851e-2328c808daf0" },     -- Animal_Wildlife_Dog_02_dotted_AG2
@@ -18,6 +19,7 @@ return {
   { "Pets", "Cat-deer", "b562b0b2-6779-4172-ab01-06136a1b6693" },         -- Animal_Wildlife_T2_Catdeer_AG2
   { "Pets", "Turkey", "5b609722-0dae-444b-b96c-283054a05495" },           -- Animal_Wildlife_T3_Bird_Turkey_AG2
   { "Pets", "Desert bird", "4757dca8-d76b-4d1c-8215-cb1e7ee533a2" },      -- Animal_Wildlife_T4_Bird_Desert_AG2
+  { "Pets", "Bird (flying)", "0eaf60f1-7ab9-4936-9cd0-17233fb339ea" },    -- Animal_Wildlife_Flying_Bird (0.15.314, owner 11:55)
   { "Pets", "Yak", "ae8c6943-f581-43ed-8e66-d1b07b2ea4f5" },              -- Animal_Wildlife_T5_Yak_AG2
   { "Pets", "Capybara", "df787789-d005-42e8-a18f-f4fe2e5d2e42" },         -- Animal_Wildlife_T6_Capybara_AG2
   { "Pets", "Baby goat", "f105a553-de24-444b-b7e7-0abe250e0b2a" },        -- Animal_Baby_T1_Goat
