@@ -1,3 +1,6 @@
+0.15.348 Nov 20, 2026
+- Companions (test, local server only): 0.15.347 taken out again (the owner: zoning in does not need a fix); companions far away come back through "can't follow" as before. Server only: no game change.
+
 0.15.347 Nov 20, 2026
 - Companions (test, local server only): a companion or pet more than 80 m from you (for example after you log in somewhere else) comes back beside you at once, without the "Companion can't get up there!" notice. Server only: no game change.
 

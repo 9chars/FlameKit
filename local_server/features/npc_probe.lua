@@ -124,7 +124,6 @@ local DJ_LIFT = 40
 -- (owner 2026-11-19 22:22 "get rid of the 2 seconds, show the error, but teleport him immediately") TP_AFTER 0: put
 -- away the moment he cannot follow; the notice then shows 5 s on its own (put_away_for)
 local GLIDE_STATE, GLIDE_WAIT, GLIDE_FAR, LAND_TICKS, TP_AFTER, FAR_JUMP = 4, 240, 30, 60, 0, 50
-local FAR_AWAY = 80  -- (owner 16:15) metres from the player: put away quietly and back beside him (drive_put_away)
 local WATER_NEAR = 2  -- metres above the swimming player's water surface that still count as "at the water"
 local DIVE_PLAYER = 1.8  -- the player's depth from which he dives with him (at the surface the player reads about 1.3)
 local SWIM_ENTER, SWIM_DEPTH = 0.5, 0.9  -- he swims while his own depth is over 0.5 m, and is held at about 0.9 m
@@ -659,15 +658,6 @@ local function drive_put_away(s)
     h.fall_y0 = nil
   end
   local dog_d = math.sqrt((px - nx) ^ 2 + (pz - nz) ^ 2)
-  -- (owner 16:15 "I'm getting a lot of "Companion cant get up there" errors on zoning in... related to having a bunch of
-  -- companions and pets out") 16:14: after the player logged in 4700 m from where they stood, each one in turn ran
-  -- into "can't follow: up" (no progress toward a crumb 4700 m away), with the notice, then came back beside him. Far
-  -- from the player he is put away at once, quietly, as after a fast travel.
-  if dog_d > FAR_AWAY then
-    log(string.format("far %s: the player is %.0f m away: put away (back beside him)", tostring(s.id), dog_d))
-    h.go_away = "far away"
-    return true
-  end
   if h.aseg and h.aseg.states[GLIDE_STATE] and (t - h.aseg.t0 > GLIDE_WAIT or dog_d > GLIDE_FAR) then
     h.go_away = "glide"
     return true
