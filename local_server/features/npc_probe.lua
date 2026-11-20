@@ -989,6 +989,7 @@ end
 -- the player, 1.5 m apart), SLOT_NEAR 6 (was 4) so the farther places are still used, and on the trail TRAIL_GAP
 local SLOTS = { { -2.4, -1.2 }, { 2.4, -1.2 }, { 0, -3.3 }, { -3.6, -3.3 }, { 3.6, -3.3 } }  -- (12:22) followers 2..6
 local SLOT_NEAR, SLOT_GAP = 6, 2.5
+local TRAIL_GAP_GO = 3.5  -- (16:02) a waiting follower goes on once the one ahead is this far
 local TRAIL_GAP = 2.5  -- (16:00) on the trail a follower stands while another of the player's is closer to the player
                        -- and within this of him (a queue instead of a bunch); drive_stuck counts that as no stuck
 local function drive_steer(s)
@@ -1062,10 +1063,12 @@ local function drive_steer(s)
   -- within TRAIL_GAP of him and closer to the player
   if c and dp and dp > SLOT_NEAR then
     local wait_for
+    -- (16:02: at exactly 2.5 m he stopped and went on several times a second) a waiting one goes on past GAP_GO
+    local gap = h.gap_said and TRAIL_GAP_GO or TRAIL_GAP
     for oid, oh in pairs(drives) do
       if oid ~= id and oh.player == h.player then
         local ox, _, oz = world:position(oid)
-        if ox and (ox - nx) ^ 2 + (oz - nz) ^ 2 < TRAIL_GAP * TRAIL_GAP and (ox - px) ^ 2 + (oz - pz) ^ 2 < dp * dp then
+        if ox and (ox - nx) ^ 2 + (oz - nz) ^ 2 < gap * gap and (ox - px) ^ 2 + (oz - pz) ^ 2 < dp * dp then
           wait_for = oid
           break
         end

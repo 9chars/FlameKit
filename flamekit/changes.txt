@@ -1,3 +1,6 @@
+0.15.344 Nov 20, 2026
+- Companions (test, local server only): a follower waiting behind another goes on once there is 3.5 m between them (it stopped and started several times a second at 2.5 m). Server only: no game change.
+
 0.15.343 Nov 20, 2026
 - Companions (test, local server only): several companions or pets keep more room: their places around you are farther out (2.5-5 m, at least 2.5 m apart), and while you run each one stays at least 2.5 m behind the one ahead. Server only: no game change.
 

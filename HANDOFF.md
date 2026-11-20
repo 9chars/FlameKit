@@ -1857,6 +1857,8 @@ next restart (no yes for a restart yet).
    and companion monsters too"**. 0.15.343: SLOTS x1.5, SLOT_GAP 2.5, SLOT_NEAR 6 (was 4); drive_steer, on the trail
    beyond SLOT_NEAR: a follower holds (hold_at, h.gap_t) while another of the player's followers is within TRAIL_GAP
    2.5 m and closer to the player (log "gap <id>: waits for ..." / "goes on"); drive_stuck counts that wait as progress.
+   16:02:22-23: "waits" / "goes on" several times a second at the border. 0.15.344: a waiting one goes on past
+   TRAIL_GAP_GO 3.5 m.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
