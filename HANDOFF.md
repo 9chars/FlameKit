@@ -1698,6 +1698,8 @@ next restart (no yes for a restart yet).
    Owner 12:23 "yeah we can't have that". 12:24:36 after the reload both still at 6360.4 986.0 5376.7: the C++ stops
    him within kFollowStop 2 m of homeZonePosition (the player), not of his target. 0.15.317: a slotted follower's
    homeZonePosition = his slot point + 1.5 m on his way there (stops ~0.5 m from his place).
+   12:26 still together: a reload starts each trail with a crumb at the player's feet, so c was never nil near him.
+   0.15.318: the slot also applies within SLOT_NEAR 4 m of the player, crumb or not.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

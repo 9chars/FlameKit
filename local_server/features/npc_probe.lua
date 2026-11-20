@@ -957,6 +957,7 @@ end
 -- fooled its ray). Off the trail (straight to a swimming player, or no trail yet) it is on; on the way to the swimming
 -- player it lets him drop up to 7.5 m (into the water). While he moves his body faces the target.
 local SLOTS = { { -1.6, -0.8 }, { 1.6, -0.8 }, { 0, -2.2 }, { -2.4, -2.2 }, { 2.4, -2.2 } }  -- (12:22) followers 2..6
+local SLOT_NEAR = 4
 local function drive_steer(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local px, py, pz, nx, nz = s.px, s.py, s.pz, s.nx, s.nz
@@ -967,7 +968,9 @@ local function drive_steer(s)
   -- (owner 2026-11-20 12:22 "N2 didn't spawn with me": it had, at N1's exact spot, and both stopped on the same
   -- point) more than one follower of the same player: going to the player himself (no crumb), the 2nd, 3rd ...
   -- (by entity id) stop at their own place around him (SLOTS: metres right / forward of his facing)
-  if not c then
+  -- (12:26: a reload starts each trail with a crumb at the player's feet, so near him there was still a crumb) also
+  -- on the trail once within SLOT_NEAR of the player
+  if not c or (dp and dp <= SLOT_NEAR) then
     local mine = {}
     for oid, oh in pairs(drives) do if oh.player == h.player then mine[#mine + 1] = oid end end
     if #mine > 1 then

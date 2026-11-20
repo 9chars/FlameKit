@@ -1,3 +1,6 @@
+0.15.318 Nov 20, 2026
+- Companions (test, local server only): fix for 0.15.317: the extra followers also take their own place when they are already close to you. Server only: no game change.
+
 0.15.317 Nov 20, 2026
 - Companions (test, local server only): fix for 0.15.316: the second and third followers really walk to their own place next to you (they still stopped together). Server only: no game change.
 
