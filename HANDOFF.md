@@ -1973,6 +1973,9 @@ next restart (no yes for a restart yet).
    unless admin (tooltip says why), its click is ignored, the window shows the refusal. Admin = is_admin (store
    "npc_admins", default OWNER_ACCOUNT: must change for other servers before a release). invtest: non-admin case.
    Give/Share lists = roster.known (players the server has seen join): the other player must join once.
+   Development release 0.15.359 (sig good). **Owner 17:58: "Rename "Call my companion" to just "Call Companion" and get
+   rid of one of the extra divider lines below it, theres two in a row..."**. 0.15.360: the button text; npc_wheel_
+   probe.panel_rows no longer ends with a separator (experimental.lua adds its own).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
