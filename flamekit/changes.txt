@@ -1,3 +1,6 @@
+0.15.312 Nov 20, 2026
+- Companions (test): fix: after a game restart the Companion Roster window (still open from before) stayed at "Asking the server for the roster"; it now asks the server by itself.
+
 0.15.311 Nov 20, 2026
 - Companions (test): "Bring back" in the Companion Roster brings him next to you (0.3 m to your right, facing your way): a follower follows you, a stayer stays at that new spot.
 

@@ -1664,6 +1664,9 @@ next restart (no yes for a restart yet).
    **Owner 11:26: "can you make "Bring back" spawn the companion next to the player? I just put N2 away and brought
    back and its not near me"** (N2 is a stayer: it came back at its spot). 0.15.311: roster.ui_back: next to the
    clicking player, 0.3 m right, his facing (as Call); follower follows the clicker, a stayer's spot becomes there.
+   **Owner 11:31: "I restarted the client and something is broke.. "Companion Roster" is stuck saying "asking the server
+   for the roster""**: the window was still shown from before the restart and "get" was only sent by the button.
+   0.15.312: roster_rows asks when there is no list (every 5 s) and again every 9 minutes.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
