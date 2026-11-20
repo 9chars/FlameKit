@@ -1358,6 +1358,14 @@ next restart (no yes for a restart yet).
      himself below 60 %; Defensive/Aggressive: during an attack sequence (h.atk) only himself below 40 %; with none
      going on, the player and then himself up to full. Passive unchanged. The heal itself unchanged (25 %, 200 mana,
      4 s apart, Wolf Shout, the green notice for the player).
+     **Owner 22:09:** "is there way to add an healing spakle animations?" The game's heal VFX templates (claude_scratch/
+     tpl/templates.csv) spawn with emf.spawn (as the loot mark, ground_loot.lua MARK_FX). Built (live 22:12): console
+     `flamekit.npc healfx <n>` spawns HEAL_FX[n] on the nearest player for 10 s (emf.destroy in F.tick): 1
+     VFX_Resource_Increase_Health 2c411630-8a38-41a3-b3d2-a263609a1bdb, 2 ..._NoSound b8e9aca9-..., 3
+     VFX_Enemy_Skeleton_Melee_Elite_Heal_Ally_Player_Companion 35183e7f-..., 4 ..._Heal_Ally 100772b0-..., 5
+     VFX_Skill_Martyr_Heal 21443035-..., 6 VFX_Ability_Casting_Heal_Channel af4436da-..., 7
+     VFX_Spell_ChainHeal_SourceTarget_player fc4f8028-..., 8 ..._NoTarget c15e5bc4-... Shown on the owner 22:12:29-
+     22:14:31 (all 8 spawned, a message as each started); which looked good: asked the owner.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
