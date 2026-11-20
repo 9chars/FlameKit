@@ -1,3 +1,6 @@
+0.15.298 Nov 20, 2026
+- Companions (test, local server only): fix: gear upgrades (unlocked perks) are no longer lost when gear goes through the companion's chest; they are kept in his record and put back on the piece when the chest opens. Server only: no game change.
+
 0.15.297 Nov 20, 2026
 - Companions (test, local server only): the companion's chest shows his name floating over it, the way the game shows a name you give your own chest. Needs the server probe from this version (loads at the next server start); before that the chest opens without the name. Server only: no game change.
 

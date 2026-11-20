@@ -1511,6 +1511,52 @@ end
 -- his chest is open: he is frozen (drive_step)
 function inv.frozen(id) local n = name_of[id] return n ~= nil and inv.open[n] ~= nil end
 
+-- (owner 2026-11-20 08:57 "upgraded items don't appear to be preserved :( it definitely stripped the upgrades off it")
+-- emf.put remakes gear with its level and rarity only: the upgrades (PerkContainerNew.unlockedPerks; 08:56:41 out
+-- "perks 4/1", 08:56:47 back "4/0") are now kept in his record and written back onto the new piece once the chest is
+-- filled (inv.apply_unlocked)
+function inv.gear_list(world, chest)
+  local out = {}
+  local okset, setup = pcall(world.get, world, "InventorySetup", chest)
+  if not (okset and setup) then return out end
+  for i = 1, #(setup.linksEntities or {}) do
+    local okv, invc = pcall(world.get, world, "Inventory", setup.linksEntities[i])
+    for k = 1, #((okv and invc and invc.slots) or {}) do
+      local sl = invc.slots[k]
+      local pide = sl.data and sl.data.pide or 0
+      if sl.id ~= 0 and pide ~= 0 then
+        local st, pc
+        pcall(function() st = world:get("ItemState", pide) end)
+        pcall(function() pc = world:get("PerkContainerNew", pide) end)
+        out[#out + 1] = { item = sl.id, pide = pide, level = st and st.itemLevelUi, rarity = st and st.itemRarityUi,
+          unlocked = pc and pc.unlockedPerks or 0 }
+      end
+    end
+  end
+  return out
+end
+
+function inv.apply_unlocked(world, name, c)
+  local gear = inv.gear_list(world, c.chest)
+  for _, f in ipairs(c.fix or {}) do
+    local done = false
+    for _, g in ipairs(gear) do
+      if not g.used and g.item == f.item and (f.level == nil or g.level == f.level) and (g.unlocked or 0) < f.unlocked then
+        g.used = true
+        local ok, err = pcall(function() world:get("PerkContainerNew", g.pide).unlockedPerks = f.unlocked end)
+        local now
+        pcall(function() now = world:get("PerkContainerNew", g.pide).unlockedPerks end)
+        log(string.format("inventory %s: upgrades put back on item %s (level %s): unlocked %s -> %s%s", name, tostring(f.item),
+          tostring(g.level), tostring(g.unlocked), tostring(now), ok and "" or (" FAILED: " .. tostring(err))))
+        done = true
+        break
+      end
+    end
+    if not done then log(string.format("inventory %s: upgrades for item %s (level %s, %d unlocked) found no piece to go on", name, tostring(f.item), tostring(f.level), f.unlocked)) end
+  end
+  c.fix = nil
+end
+
 function inv.list(world, chest)
   -- only a chest that is there and set up is read (bag.entity_stacks gives an empty list for anything else, which
   -- would empty his record)
@@ -1521,8 +1567,18 @@ function inv.list(world, chest)
   local ok, stacks = pcall(inv.bag.entity_stacks, world, chest)
   if not (ok and type(stacks) == "table") then return nil end
   local out = {}
+  local gear = inv.gear_list(world, chest)
   for _, st in ipairs(stacks) do
     out[#out + 1] = { item = st.item, count = st.count, level = st.level, rarity = st.rarity }
+    if st.gear then  -- (upgrades) from the matching piece
+      for _, g in ipairs(gear) do
+        if not g.used and g.item == st.item and g.level == st.level then
+          g.used = true
+          if (g.unlocked or 0) > 0 then out[#out].unlocked = g.unlocked end
+          break
+        end
+      end
+    end
     if st.gem and st.gem ~= 0 then out[#out + 1] = { item = st.gem, count = 1 } end  -- a socketed gem: kept on its own
   end
   return out
@@ -1530,7 +1586,7 @@ end
 
 function inv.sig(list)
   local parts = {}
-  for _, e in ipairs(list or {}) do parts[#parts + 1] = table.concat({ e.item, e.count, e.level or "", e.rarity or "" }, ":") end
+  for _, e in ipairs(list or {}) do parts[#parts + 1] = table.concat({ e.item, e.count, e.level or "", e.rarity or "", e.unlocked or "" }, ":") end
   table.sort(parts)
   return table.concat(parts, ",")
 end
@@ -1575,7 +1631,7 @@ inv.open_chest = function(world, player, npc, rr)
   local okr, rule = pcall(emf.hit_rule, { to = chest, cancel = true })  -- no damage to it
   local t = world:tick()
   local queue = {}
-  for _, e in ipairs(rr.inv or {}) do queue[#queue + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity, tries = 0 } end
+  for _, e in ipairs(rr.inv or {}) do queue[#queue + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity, unlocked = e.unlocked, tries = 0 } end
   inv.open[rr.name] = { chest = chest, player = player, t0 = t, state = "filling", queue = queue, rest = {}, at = t + inv.PUT_WAIT,
     rule = okr and rule or nil }
   rr.chest = { id = chest, session = emf.session(), state = "filling" }
@@ -1648,6 +1704,10 @@ function inv.tick(world)
           local okp = pcall(emf.put, world, c.chest, e.item, e.count, function(w, added)
             added = tonumber(added) or 0
             c.busy = false
+            if added > 0 and (e.unlocked or 0) > 0 then  -- (upgrades) written back once the piece reads right
+              c.fix = c.fix or {}
+              c.fix[#c.fix + 1] = { item = e.item, level = e.level, unlocked = e.unlocked }
+            end
             if added >= e.count then return end
             e.count = e.count - added
             if added == 0 and e.tries < inv.RETRIES then  -- a fresh chest refuses at first: again in a moment
@@ -1655,13 +1715,13 @@ function inv.tick(world)
               table.insert(c.queue, 1, e)
               c.at = world:tick() + inv.PUT_WAIT
             else
-              c.rest[#c.rest + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity }
+              c.rest[#c.rest + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity, unlocked = e.unlocked }
               log(string.format("inventory %s: %d of item %s did not fit into the chest (kept in his record)", name, e.count, tostring(e.item)))
             end
           end, opts)
           if not okp then
             c.busy = false
-            c.rest[#c.rest + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity }
+            c.rest[#c.rest + 1] = { item = e.item, count = e.count, level = e.level, rarity = e.rarity, unlocked = e.unlocked }
             log(string.format("inventory %s: emf.put refused item %s (kept in his record)", name, tostring(e.item)))
           end
         end
@@ -1671,6 +1731,7 @@ function inv.tick(world)
         inv.close(world, r, "after 5 minutes")
       elseif c.ready_t and t >= c.ready_t and not c.gear_logged then
         c.gear_logged = true
+        if c.fix then pcall(inv.apply_unlocked, world, name, c) end
         pcall(inv.log_gear, world, name, c.chest, "filled")
         inv.snapshot(world, r, c)
       elseif (not c.ready_t or t >= c.ready_t) and (t - c.t0) % inv.SAVE_EVERY == 0 then
@@ -2825,6 +2886,12 @@ function F.setup(k)
           log(string.format("heal fx %d (%s) refused (%s)", n, c[1], tostring(fid)))
           emf.reply("healfx " .. n .. ": refused")
         end
+      elseif what == "unlock" then  -- unlock <chest> <item> <n>: (08:57) puts the upgrades back on a piece in a chest
+        local ch, item, n = tonumber(args[2]), tonumber(args[3]), tonumber(args[4])
+        if not (ch and item and n) then emf.reply("npc: unlock <chest> <item> <n>") return end
+        local c = { chest = ch, fix = { { item = item, unlocked = math.floor(n) } } }
+        inv.apply_unlocked(world, "command", c)
+        emf.reply("npc: unlock done (see the log)")
       elseif what == "names" then  -- names [copy <from> <to> | set <entity> <id>]: the game's own floating names
         -- (CustomPlayerString.stringId, the key of a name players gave a chest or altar; owner 08:41 "research the
         -- first point and see what it looks like?") lists every entity with one, or copies one onto another
