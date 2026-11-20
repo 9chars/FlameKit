@@ -1240,6 +1240,8 @@ local function still_ours(world, id)
   local ok, yes = pcall(function()
     local a = world:get("DynamicEnemy01BehaviorState", id)
     local f = world:get("Faction", id)
+    -- (0.15.313) a pet (an animal: no monster AI) of ours: companion faction and the animal's own data
+    if not a then return f and f.faction == COMPANION_FACTION and world:get("DynamicAnimal", id) ~= nil end
     return a and f and (f.faction == COMPANION_FACTION or f.faction == 7) and ((tonumber(a.disabledFeatures) or 0) & CALM) == CALM
   end)
   return ok and yes
@@ -3335,6 +3337,8 @@ end
 function roster.ui_kind(world, r, guid, pid)
   local kind
   for _, m in ipairs(require("core.monsters")) do if m[3] == guid then kind = m end end
+  -- (0.15.313, owner 11:40) the Pets section: the game's peaceful animals (core/pets.lua); not driven yet (pets come next)
+  for _, m in ipairs(require("core.pets")) do if m[3] == guid then kind = m end end
   if not kind then return "Unknown kind.", false end
   if kind[4] then return "Bosses cannot be companions.", false end
   if inv.open[r.name] then return r.name .. ": close his chest first.", false end
@@ -3351,6 +3355,7 @@ function roster.ui_kind(world, r, guid, pid)
   end
   roster_save()
   log(string.format("roster window: %s is now %s / %s (%s, was %s)", r.name, kind[1], kind[2], guid, tostring(was)))
+  if kind[1] == "Pets" then return r.name .. " is now a pet: " .. kind[2] .. ". Pets do not follow yet (they come next).", true end
   return r.name .. " is now a " .. kind[2] .. " (" .. kind[1] .. ").", true
 end
 

@@ -1667,6 +1667,11 @@ next restart (no yes for a restart yet).
    **Owner 11:31: "I restarted the client and something is broke.. "Companion Roster" is stuck saying "asking the server
    for the roster""**: the window was still shown from before the restart and "get" was only sent by the button.
    0.15.312: roster_rows asks when there is no list (every 5 s) and again every 9 minutes.
+   **Owner 11:40: "can you add the Pets section and add all the available pets into?"** 0.15.313: core/pets.lua (26:
+   Animal_Wildlife_* dogs/cats/goat/mountain goat/bunny x2/cat-deer/turkey/desert bird/yak/capybara + Animal_Baby_*;
+   no fish, flying birds, tests, deprecated), "Pets" first in the Kind drop-down; server ui_kind accepts them (reply
+   says pets do not follow yet); still_ours accepts a companion-faction body with DynamicAnimal (no monster AI) so a
+   reload does not spawn a second animal. A pet body runs its own animal AI: drive_read errors once per body (logged).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

@@ -187,6 +187,7 @@ local enc = emf.json.encode
 emf.json.encode = function(t) return t.op == "result" and ("result: " .. tostring(t.text)) or "state" end
 env.require = function(n)
   if n == "core.bag" then return bag end
+  if n == "core.pets" then return { { "Pets", "Dog (bright)", "5d9c1829-69fc-4339-8bcc-5e62e63e9a31" } } end
   if n == "core.monsters" then return { { "Undead", "Hound", "18eefd30-da1d-49f5-a6d8-7da8f2d01f43", false },
     { "Vukah", "Melee", "d5d05217-52dc-467a-9192-26b4f661d8d9", false }, { "Vukah", "Brawler boss", "9c8e2008", true } } end
   return setmetatable({}, { __index = function() return function() return {} end end })
@@ -230,3 +231,5 @@ comps[1].CurrentTransform = { transform = { orientation = { x = 0, y = 0, z = 0,
 act("back", nr.name, nil)
 print("back: spot", nr.x, nr.y, nr.z, "out", nr.out)
 act("back", nr.name, nil)
+-- (0.15.313) a pet kind
+act("kind", nr.name, "5d9c1829-69fc-4339-8bcc-5e62e63e9a31")

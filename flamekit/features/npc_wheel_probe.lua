@@ -68,6 +68,7 @@ local function on_roster(world, from, data)
 end
 
 local function kind_of(guid)
+  for _, m in ipairs(require("core.pets")) do if m[3] == guid then return m end end  -- (0.15.313) the Pets section
   for _, m in ipairs(require("core.monsters")) do if m[3] == guid then return m end end
 end
 
@@ -111,7 +112,11 @@ function F.roster_rows(world)
     rows[#rows + 1] = { edit = "ros:rename:" .. c.n, text = c.n, same_line = true,
       tooltip = "Click, type a new name (up to 20 letters, digits, spaces, - _ ' .) and press Enter. Esc cancels." }
     -- the kinds: every monster that is not a boss, by group
-    local kinds, group = {}, nil
+    -- (0.15.313, owner 11:20/11:40) the Pets section first, then the monsters
+    local kinds, group = { { text = "Pets", heading = true } }, "Pets"
+    for _, m in ipairs(require("core.pets")) do
+      kinds[#kinds + 1] = { text = m[2], key = "ros:kind:" .. c.n .. ":" .. m[3], selected = m[3] == c.k }
+    end
     for _, m in ipairs(require("core.monsters")) do
       if not m[4] then
         if m[1] ~= group then
@@ -123,7 +128,7 @@ function F.roster_rows(world)
     end
     rows[#rows + 1] = { label = true, text = "Kind", same_line = true }
     rows[#rows + 1] = { options = kinds, text = k and k[2] or "unknown", same_line = true,
-      tooltip = "What he is: any monster that is not a boss. A body that is out is replaced at once." }
+      tooltip = "What he is: a pet (the peaceful animals) or any monster that is not a boss. A body that is out is replaced at once." }
     local give, share, unshare = {}, {}, {}
     for _, p in ipairs(ros.players) do
       local name = p.n .. (p.on and " (online)" or "")
