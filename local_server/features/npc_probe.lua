@@ -2443,7 +2443,8 @@ function F.setup(k)
         if not c then emf.reply("npc healfx: 1-" .. #HEAL_FX) return end
         local okp, ids = pcall(players.ids, world)
         local pid = okp and ids and ids[1]
-        local x, y, z = pid and world:position(pid)
+        if not pid then emf.reply("npc healfx: no player") return end
+        local x, y, z = world:position(pid)
         if not x then emf.reply("npc healfx: no player") return end
         local oks, fid = pcall(emf.spawn, world, c[2], x, y, z)
         if oks and fid and fid ~= 0 then
