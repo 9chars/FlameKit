@@ -1616,6 +1616,16 @@ next restart (no yes for a restart yet).
    **Owner 09:52: "ok lets make sure we can resuse all that code. before we add pets, I want to finish building out the
    roster management system"**: order = roster management (item 9) first, pets after, and the companion code (healing,
    chest, follow) kept reusable for pets. Waiting for the owner's spec of the roster tab.
+   **Owner 10:00 (the spec):** ""Companion Roster" needs to be its own complete window. for now you can just add a
+   button under the "Experimental" tab in the settings window next to the "Call my companion" button. I'll let you
+   implement as you described and will see if that's good enough or if it needs to be reworked. I'll want to be able to
+   change any players "main" companion to any of the available monster templates that are not bosses. The companion
+   system has to be able to handle small tweaks to how they function between the templates.. for instance the how the
+   dog is position in water will NOT work for a humanoid template... We don't need and "admin" checks or restrictions
+   at this time, but probably in the future, we'll be adding a lot of admin restrictions throughout the mod, but that is
+   another task for another day". So: its own window (opened by a button next to "Call my companion" in the
+   Experimental tab), the list + actions as sketched 09:52, change a player's main companion's template to any non-boss
+   monster template, per-template behaviour tweaks (water position etc.), NO admin checks for now.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
