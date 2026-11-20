@@ -2793,6 +2793,9 @@ function F.tick(world)
             status(world, p, "companion_stuck", nil)
             status(world, p, "companion_dead", "Companion has died!", "#ff4040")
           end
+          -- (owner 2026-11-20 08:15 "if the companion dies with the chest open, the chest needs to despawn") closed the
+          -- usual way: what is in it is saved first
+          if r and inv.open[r.name] then pcall(inv.close, world, r, "he died") end
         end
       end
     end

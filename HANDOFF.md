@@ -1473,6 +1473,8 @@ next restart (no yes for a restart yet).
      **Owner 08:13, verbatim:** "can the that call my companion feature be disabled when the chest is open? if he gets
      killed does the chest despawn automatically too?" -> 0.15.288: on_call refuses while inv.open[r.name] ("<name>:
      Close the chest first."). Death: the chest stays (asked whether it should close itself when he dies).
+     **Owner 08:15, verbatim:** "yes if the companion dies with the chest open, the chest needs to despawn" -> 0.15.289:
+     F.tick's death check (dead_told) calls inv.close(world, r, "he died") (saves first). invtest.lua: closed, record kept.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

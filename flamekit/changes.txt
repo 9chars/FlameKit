@@ -1,3 +1,6 @@
+0.15.289 Nov 20, 2026
+- Companions (test, local server only): when the companion dies with its chest open, the chest closes at once, keeping everything that was in it. Server only: no game change.
+
 0.15.288 Nov 20, 2026
 - Companions (test, local server only): while the companion's chest is open, "Call my companion" (P) is refused with "Close the chest first." Server only: no game change.
 

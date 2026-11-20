@@ -3,7 +3,7 @@
 -- texlua invtest.lua ../../features/npc_probe.lua ../../../flamekit/core/bag.lua
 local file, bagfile = arg[1], arg[2]
 local f = assert(io.open(file)) local text = f:read("a") f:close()
-text = text:gsub("\nreturn F%s*$", "\nF._t = { inv = inv, roster = roster, find = find, drive_step = drive_step, drives = drives, name_of = name_of }\nreturn F\n")
+text = text:gsub("\nreturn F%s*$", "\nF._t = { inv = inv, roster = roster, find = find, ent_of = ent_of, drive_step = drive_step, drives = drives, name_of = name_of }\nreturn F\n")
 local logs, saved = {}, {}
 TICK = 0
 local comps, pos = {}, {}
@@ -140,3 +140,15 @@ T.inv.adopt(W, r)
 print("restart while open: r.chest", r.chest, "open?", T.inv.open.N1 ~= nil)
 show("record after the restart", r)
 for _, l in ipairs(logs) do if l:find("inventory") then print(l) end end
+-- (0.15.289) he dies with the chest open: F.tick's death check closes it, saving first
+SESSION = 2
+T.inv.open_chest(W, 1, 500, r)
+for _ = 1, 120 do step() end
+c = T.inv.open.N1
+for _, sl in ipairs(chest_items(c.chest)) do if sl.id == 200 then sl.data.count = 2 end end  -- 3 potions taken out
+T.ent_of.N1 = 500
+comps[500].Health = { dataStorage = { 0, 0, 3680 } }
+for _ = 1, 20 do step() end
+print("he died: open?", T.inv.open.N1 ~= nil, "chest still there?", pos[c.chest] ~= nil)
+show("record after his death", r)
+for _, l in ipairs(logs) do if l:find("died") or l:find("he died") then print(l) end end
