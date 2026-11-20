@@ -1302,6 +1302,18 @@ next restart (no yes for a restart yet).
      healing design above is agreed (not built). Howl: never searched; his moves start by sequence id (FNV-1a of the
      sequence GUID) through `fkprobe.bite <entity> <hex>`; the hound's other sequences would come from the game data
      (claude_scratch/tpl has kfc.py and the template lists). Asked the owner whether to search.
+     **Owner 20:39:** "yes" (search). **Found (device scripts $HOME/hs/seqs*.py on the kfc.py reader; all 2157 action
+     sequences = resource type 0x9fd4a561; id = FNV-1a 32 of the GUID's 16 bytes as stored (bytes_le)):** the hound's
+     bite/lunge are the WOLF's: 0x63FE3237 Enemy_Wildlife_Wolf_Attack_Bite, 0xC34733A8 ..._Lunge; jump 0xE80706FC
+     Enemy_Jump_Move. Other wolf/dog sequences: 0x89A1BC53 Wolf_Shout, 0x0BA28FDE Wolf_Ability_LickWounds,
+     0xEE2A75E2 Wolf_Heavy_Opportunity_Howl, 0x60BD6595 Wolf_Heavy_Attack_Bite, 0xE5DAC59D Wolf_Heavy_Attack_Dash,
+     0x538A6913 Wolf_Heavy_Attack_Stomp, 0x04F7403E Wolf_Sleep, 0x405E2057 Wolf_Spawn, 0x59DF6580
+     Wolf_Reaction_Stun_Long, 0x45A6AA69 Enemy_Skeleton_Hound_Death, Pet_Dog_*: 0x194F5236 greeting_bark, 0xD76BB71B
+     Idle_01_bark, 0xF59B6263 Sit, 0xACD28521 Idle_02_sniff, 0x88F25807 Sleep, 0x4DA2D783 Idle_Sad, 0x66D08E3F eating,
+     0x0D240B10 being_petted_01; Interaction_Pet_DogCat_Buff 0xB1EB4A70. The full list: $HOME/hs/seqnames.tsv (device
+     scratch, not kept). **Played on N1 (254966) 20:40:28-20:41:16, 8 s apart** (fkprobe.bite via commands.txt): 1
+     Shout, 2 LickWounds, 3 Heavy howl, 4 dog greeting bark, 5 dog idle bark, 6 dog sit, 7 wolf sleep; all written
+     into his trigger; what played: asked the owner.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
