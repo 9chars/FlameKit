@@ -1289,7 +1289,12 @@ next restart (no yes for a restart yet).
      "health", n) (the game's attribute code, stops at max). **Owner 19:25, verbatim:** "yeah write it up, as for how
      much mana and how much heals... im not sure. I only have 483 mana at level 50, but im not spec'd as a mage. I would
      give him 800 mana and see how that works? how would a heal animation work with him? nothing for him I would
-     imagine?" -> written: `local_server/HEAL_PLAN.md` (proposal, nothing built; open questions at its end).
+     imagine?" -> Claude's take (was written as local_server/HEAL_PLAN.md; **owner 20:27:** "yeah delete that, I don't
+     actually need a write up, I just meant give what you think" -> deleted, in git history): his mana is ours (the
+     game gives him none), 800, refills 10/s; in Healing mode he heals the player below 60 % for 25 % of max health
+     (200 mana, 4 s apart, within 20 m), then himself the same way; otherwise as Passive; no heal animation known (only
+     bite and lunge): he turns to the player, a notice, the health bar rises. Open: the numbers; healing himself
+     outside Healing mode too; a notice per heal or not. Nothing built.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
