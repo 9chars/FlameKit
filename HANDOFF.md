@@ -1740,6 +1740,10 @@ next restart (no yes for a restart yet).
    player's jumps for pets too (13:48:37-41: 4 copies, down 0.6-0.8 m from the crumb). **Owner 13:56 "I saw one"**:
    likely the flat-ground copies are low hops (5.9 m/s up) with no jump animation on an animal (it is lifted by speed;
    the hound plays Enemy_Jump_Move). Open: look for a dog jump-like move in the game data if wanted.
+   **Owner 13:57 "yeah do the E menu next"** (pets' E). 0.15.326: spawn_body spawns a pet (core/pets guid) with
+   {IsTame = {}} (fallback: wild); inv.prompt skips pets; F.setup's InteractionAcceptedEvent handler: host = one of
+   ours without monster AI -> on_talk(world, guest, host) (his wheel). Untested: whether the game shows "E Pet" on a
+   tame spawn and fires the event.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

@@ -1,3 +1,6 @@
+0.15.326 Nov 20, 2026
+- Companions (test, local server only): pets are spawned tame, so the game gives them its own "E Pet" prompt; pressing it opens the companion wheel (as E on a companion). Server only: no game change.
+
 0.15.325 Nov 20, 2026
 - Companions (test, local server only): fix: pets no longer shoot 10-30 m in a moment while catching up to you (animals cannot sprint: pets run at most). Needs the server probe from this version (next server start). Server only: no game change.
 

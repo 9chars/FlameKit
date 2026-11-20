@@ -1310,7 +1310,16 @@ local function spawn_body(world, r, x, y, z, player)
     if not busy then break end
     x = x + 1.2
   end
-  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
+  -- (owner 13:57 "yeah do the E menu next") a pet is spawned tame (the game's IsTame tag): the game then gives it its
+  -- own "E Pet" prompt (EMF will not put ours on an animal: it has the game's), and pressing it opens his wheel
+  -- (InteractionAcceptedEvent, F.setup)
+  local pet = false
+  for _, m in ipairs(require("core.pets")) do if m[3] == r.guid then pet = true end end
+  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, pet and { IsTame = {} } or nil)
+  if pet and not (ok and id and id ~= 0) then
+    log(string.format("roster: %s: the tame spawn was refused (%s): spawned wild", r.name, tostring(id)))
+    ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
+  end
   if not (ok and id and id ~= 0) then
     log(string.format("roster: %s could not be spawned (%s)", r.name, tostring(id)))
     return nil
@@ -1590,6 +1599,8 @@ inv.CLOSE_VERB = 0x3959A87F
 -- comes off now, the new one is made from the next steps on until EMF takes it (inv.want, F.tick)
 inv.want = {}  -- entity -> { verb, at, tries }
 function inv.prompt(world, id, open)
+  -- (13:57) a pet (an animal) keeps the game's own E (EMF refuses ours there): its press opens his wheel (F.setup)
+  if not world:get("DynamicEnemy01BehaviorState", id) and world:get("DynamicWildlife", id) then return end
   pcall(emf.offer_remove, world, id)
   inv.want[id] = { verb = open and inv.CLOSE_VERB or "Talk", at = world:tick() + 2, tries = 0 }
 end
@@ -2896,6 +2907,13 @@ function F.setup(k)
     log(okl and line or ("HIT: " .. tostring(line)))
   end)
   pcall(emf.on_event, "InteractionAcceptedEvent", function(world, e)  -- (09:21) only the owner opens his chest
+    -- (13:57) the game's own E on a pet of ours (an animal): his wheel, as E on a companion
+    local host, guest = rawget(e, "hostEntityId"), rawget(e, "guestEntityId")
+    if host and guest and name_of[host] and not world:get("DynamicEnemy01BehaviorState", host) then
+      log(string.format("pet %s (%s): the game's E pressed by player %s: his wheel", tostring(name_of[host]), tostring(host), tostring(guest)))
+      local okt, errt = pcall(on_talk, world, guest, host)
+      if not okt then log("pet E: " .. tostring(errt)) end
+    end
     if not next(inv.open) then return end
     local oka, erra = pcall(inv.on_accept, world, e)
     if not oka then log("inventory: open check failed: " .. tostring(erra)) end
