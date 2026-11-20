@@ -453,12 +453,12 @@ void pet_offers(int where) {
         if (where != 3) {
             const bool ours = o->overrideSequence.value == kTouchSeq && o->overrideVerbLocaId.value == kTalkVerb &&
                               o->defaultSequence.value == kTouchSeq && o->defaultVerbId.value == kTalkVerb &&
-                              o->isOffered && !o->isDisabled;
+                              o->isOffered && !o->isDisabled && o->offerId != 0;
             if (!ours && where == 2 && now >= g_reset_log_at.load()) {
                 g_reset_log_at.store(now + 10000);
                 EMF_LOG(kMod, "pet offer %u before interaction_attempt: the game's again (seq %08x/%08x verb %08x/%08x "
-                        "offered %d disabled %d): set back", id, o->defaultSequence.value, o->overrideSequence.value,
-                        o->defaultVerbId.value, o->overrideVerbLocaId.value, (int)o->isOffered, (int)o->isDisabled);
+                        "offered %d disabled %d offerId %u): set back", id, o->defaultSequence.value, o->overrideSequence.value,
+                        o->defaultVerbId.value, o->overrideVerbLocaId.value, (int)o->isOffered, (int)o->isDisabled, o->offerId);
             }
             // (14:37: before the press check the override was 0 again: a reset program clears the override, so with
             // the default at 0 the press had no sequence to play) the default is ours too
@@ -468,6 +468,8 @@ void pet_offers(int where) {
             o->overrideVerbLocaId.value = kTalkVerb;
             o->isOffered = true;
             o->isDisabled = false;
+            // (14:43 petlog: the wild offer has offerId 0; the tame one, whose E worked at 14:07, had 1)
+            if (o->offerId == 0) o->offerId = 1;
             continue;
         }
         auto* c = w.get<emf::gen::ecs::ClientInteractionOffer>(id);

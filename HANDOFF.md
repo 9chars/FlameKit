@@ -1784,6 +1784,8 @@ next restart (no yes for a restart yet).
    DLL 11c28b80 (old .old_1440); restart 14:39 (owner "yes"). **Owner 14:42 "still nothing"**: default now stays ours
    (log: seq 3e5189bf/0 before the press check), still no InteractionAcceptedEvent. 0.15.333: petlog logs the animal's
    InteractionLock / InteractionKnowledgeLock / InteractionOffer / ClientInteractionOffer / InteractionPause.
+   petlog 14:43 (N2 22667): no locks, no InteractionOffer component, runtime ours but **offerId 0** (the tame one at
+   14:11 had offerId 1, and its E worked). 0.15.334: the probe also sets offerId 1 when it is 0.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

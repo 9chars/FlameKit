@@ -1,3 +1,6 @@
+0.15.334 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt gets an offer number like the game's own prompts (it had none, so the E press was not taken). Needs a server restart. Server only: no game change.
+
 0.15.333 Nov 20, 2026
 - Companions (test, local server only): the pet log also shows what can refuse an E press on the animal (its locks). Server only: no game change.
 
