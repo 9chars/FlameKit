@@ -1430,7 +1430,7 @@ end
 -- storage chest; before: Prop_Decoration_T5_Storage_40_Chest 0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec (40 slots)
 inv.CHEST = "bc834cbd-58f1-494a-97fb-0dc0248eb738"  -- Prop_Decoration_T6_Storage_72_Magic (72 slots)
 inv.PUT_WAIT, inv.RETRIES, inv.SAVE_EVERY = 30, 3, 60
-inv.SPOT = 2.5  -- m from him, on his far side from the player
+inv.SPOT = 1  -- m from him, on his far side from the player (owner 09:29 "1m should be fine"; was 2.5)
 
 -- (owner 2026-11-20 08:19 "we'll have to test the unlocked parts") every gear piece in the chest: its level, rarity,
 -- perks (PerkContainerNew: available/unlocked), durability-broken and gem, logged when the chest is filled and when it
