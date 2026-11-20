@@ -1,0 +1,8 @@
+vukah faction tries 3 81 0
+vukah components 111
+0x52487b01 (18196, 2520, 416)
+0x1f9efdb6 None
+0xa1f30f21 (20916, 1, 512)
+0x87f8093b None
+first entries [('0x9e8b34', (1328, 3832)), ('0x5c3c6dd8', (5148, 456)), ('0x6739e352', (5592, 104)), ('0xe4853b43', (5684, 2)), ('0xb4c3563e', (5676, 44)), ('0xe0c0261e', (5708, 40))]
+rows 12269 enemy_ai 538
