@@ -1314,6 +1314,13 @@ next restart (no yes for a restart yet).
      scratch, not kept). **Played on N1 (254966) 20:40:28-20:41:16, 8 s apart** (fkprobe.bite via commands.txt): 1
      Shout, 2 LickWounds, 3 Heavy howl, 4 dog greeting bark, 5 dog idle bark, 6 dog sit, 7 wolf sleep; all written
      into his trigger; what played: asked the owner.
+     **Owner 20:48:** "I missed them all I had no idea you did it... can you output the text as you do them for each
+     one" -> played again 20:48:48-20:49:49, a SendUserMessage right as each starts (do it that way for any visual
+     test). **Owner 20:51:** "I wanna see 1 2 and 3 again" (played 20:51:11/22/34). **Owner 20:55:** "I didnt see any
+     heals go out I like 1 and 2 not sure which one yet" (he was at full health since a 20:37 respawn, so the move's own
+     heal, if any, could not show). Claude suggested Lick Wounds for healing himself, Shout for healing the player.
+     **Owner 20:58, verbatim:** "Lick Wounds lets go with" -> the heal move: Lick Wounds 0x0BA28FDE (asked: for every
+     heal, his and the player's?).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
