@@ -179,3 +179,39 @@ T.roster_cmd(W, { "roster", "away", "N1" })
 print("away: chest open?", T.inv.open.N1 ~= nil, "items kept", T.find("N1") and #T.find("N1").inv)
 T.roster_cmd(W, { "roster", "delete", "N1" })
 print(replies[#replies], "still listed?", T.find("N1") ~= nil)
+-- (10:00) the Companion Roster window: rename, kind, give/share, main, away/back, delete through roster.ui_do
+local sent = {}
+emf.net.send_to = function(w, pid, ch, text) sent[#sent + 1] = text return true end
+emf.json.decode = function(d) return d end
+local enc = emf.json.encode
+emf.json.encode = function(t) return t.op == "result" and ("result: " .. tostring(t.text)) or "state" end
+env.require = function(n)
+  if n == "core.bag" then return bag end
+  if n == "core.monsters" then return { { "Undead", "Hound", "18eefd30-da1d-49f5-a6d8-7da8f2d01f43", false },
+    { "Vukah", "Melee", "d5d05217-52dc-467a-9192-26b4f661d8d9", false }, { "Vukah", "Brawler boss", "9c8e2008", true } } end
+  return setmetatable({}, { __index = function() return function() return {} end end })
+end
+local R = T.roster
+local from = { player = 1, account = "acc" }
+local function act(what, name, arg)
+  R.ui_do(W, from, { op = "do", what = what, name = name, arg = arg })
+  local last
+  for i = #sent, 1, -1 do if tostring(sent[i]):find("^result") then last = sent[i] break end end
+  print(what, name, tostring(arg), "->", last)
+end
+r.guid = "18eefd30-da1d-49f5-a6d8-7da8f2d01f43"
+act("rename", "N1", "Rex")
+print("renamed: find Rex?", T.find("Rex") ~= nil, "N1 gone?", T.find("N1") == nil)
+act("rename", "Rex", "Bad/name")
+act("rename", "Rex", "")
+act("kind", "Rex", "9c8e2008")
+act("kind", "Rex", "d5d05217-52dc-467a-9192-26b4f661d8d9")
+print("kind now", T.find("Rex").guid)
+act("give", "Rex", "0x00000000000000aa")
+print("owner", T.find("Rex").owner)
+act("share", "Rex", "0x00000000000000bb")
+act("main", "Rex", nil)
+act("delete", "Rex", nil)
+act("nope", "Rex", nil)
+act("rename", "Nobody", "X")
+emf.json.encode = enc

@@ -1101,7 +1101,7 @@ end
 local function roster_save()
   if not roster.loaded then return false end
   pcall(inv.write_names)
-  local out = { next_n = roster.next_n, main = roster.main, npcs = {} }
+  local out = { next_n = roster.next_n, main = roster.main, known = roster.known, npcs = {} }
   for _, r in ipairs(roster.list) do
     out.npcs[#out.npcs + 1] = { name = r.name, guid = r.guid, x = r.x, y = r.y, z = r.z, mode = r.mode, fight = r.fight, sus_base = r.sus_base, inv = r.inv, chest = r.chest,
       owner = r.owner, controllers = r.controllers, names = r.names, out = r.out, ent = ent_of[r.name] }
@@ -1252,6 +1252,7 @@ local function roster_loaded(world, text)
   if saved then
     roster.next_n = saved.next_n or 1
     roster.main = type(saved.main) == "table" and saved.main or {}
+    roster.known = type(saved.known) == "table" and saved.known or {}  -- (roster window) account -> name
     for _, r in ipairs(saved.npcs or {}) do
       -- a record without a controller list: its owner is the only controller
       if not r.controllers then r.controllers = r.owner and { r.owner } or {} end
@@ -2753,6 +2754,7 @@ function F.setup(k)
   end, "server")
   pcall(emf.on_player_joined, function(world, p)
     log(string.format("join: player %s (account %s)", tostring(p.player), tostring(p.account)))
+    pcall(roster.ui_known, world)  -- (roster window) his name kept for when he is offline
     local okr, errr = pcall(roster_joined, world, p)
     if not okr then log("roster: join failed: " .. tostring(errr)) end
   end)
@@ -2763,6 +2765,14 @@ function F.setup(k)
     end,
     on_player = function() end })
   log("wheel channel: " .. tostring(okc))
+  -- (owner 2026-11-20 10:00) the Companion Roster window in the players' games: their asks and actions come here
+  local okr = emf.net.channel(roster.RCH, { version = 1, to = "both", max = 16384, per_10s = 60,
+    on_server = function(world, from, data)
+      local oku, erru = pcall(roster.ui_do, world, from, data)
+      if not oku then log("roster window: " .. tostring(erru)) end
+    end,
+    on_player = function() end })
+  log("roster window channel: " .. tostring(okr))
   -- the roster lives in the world's data. (loot_filter registers an empty one only to ask for the data; this one,
   -- registered later, does that too.) TODO for the release: one owner of the world data in FlameKit's core.
   pcall(emf.on_world_data, function(world, text)
@@ -3067,6 +3077,7 @@ local companions_core = require("core.companions")  -- the minimap's companion d
 function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()
+  if t % 60 == 13 and next(roster.subs) then pcall(roster.ui_tick, world) end  -- (roster window) changes to its viewers
   if #heal_fx_shown > 0 then  -- (healfx preview) effects go after 10 s
     local keep = {}
     for _, f in ipairs(heal_fx_shown) do
@@ -3226,6 +3237,176 @@ function F.tick(world)
       end
     end
   end
+end
+
+-- ===== The Companion Roster window (owner 2026-11-20 10:00) =============================================================
+-- "Companion Roster needs to be its own complete window" (opened by a button next to "Call my companion"): every
+-- companion with its owner, kind, mode, items and chest; rename, change the kind (any non-boss monster template),
+-- give / share / unshare, set main, put away / bring back, delete. No admin checks for now (owner: "another task for
+-- another day"). The players' games ask on the channel flamekit/roster ({op = "get"}) and act ({op = "do", what, name,
+-- arg}); a player who asked gets every change for 10 minutes ({op = "roster", list, players}) and the result of each
+-- of his actions ({op = "result", text, ok}). Everything is kept in the roster table (the file is at Lua's 200
+-- top-level locals). The existing console actions are reused (roster_cmd), their replies become the result line.
+roster.RCH = "roster"
+roster.subs = {}                   -- player entity -> tick of his last ask
+roster.known = roster.known or {}  -- account -> the name last seen (players picked by name, also when offline)
+roster.NAME_MAX = 20
+
+function roster.ui_known(world)
+  local ok, ids = pcall(players.ids, world)
+  for _, pid in ipairs(ok and ids or {}) do
+    local acc = world:account(pid)
+    local n = acc and players.name(world, pid, nil)
+    if n and roster.known[acc] ~= n then
+      roster.known[acc] = n
+      roster.known_changed = true
+    end
+  end
+end
+
+function roster.ui_state(world)
+  local online = {}
+  local ok, ids = pcall(players.ids, world)
+  for _, pid in ipairs(ok and ids or {}) do local a = world:account(pid) if a then online[a] = true end end
+  local list, seen, pl = {}, {}, {}
+  local function person(acc, fallback)
+    if not acc or seen[acc] then return end
+    seen[acc] = true
+    pl[#pl + 1] = { a = acc, n = roster.known[acc] or fallback or acc, on = online[acc] or false }
+  end
+  for acc, n in pairs(roster.known) do person(acc, n) end
+  for _, r in ipairs(roster.list) do
+    for _, a in ipairs(r.controllers or {}) do person(a, (r.names or {})[a]) end
+    list[#list + 1] = { n = r.name, k = r.guid, o = r.owner or "", m = r.mode or "follow", f = r.fight or "Passive",
+      out = r.out and true or false, it = inv.count(r.inv), ch = inv.open[r.name] and true or false,
+      main = (r.owner and roster.main[r.owner] == r.name) and true or false, c = r.controllers or {} }
+  end
+  table.sort(pl, function(a, b) return tostring(a.n):lower() < tostring(b.n):lower() end)
+  return emf.json.encode({ op = "roster", list = list, players = pl })
+end
+
+function roster.ui_send(world, pid, text)
+  local ok, res = pcall(emf.net.send_to, world, pid, roster.RCH, text)
+  if not (ok and res) then log("roster window: not sent to " .. tostring(pid) .. " (" .. tostring(res) .. ")") end
+end
+
+function roster.ui_push(world, force)
+  local text = roster.ui_state(world)
+  if not force and text == roster.ui_last then return end
+  roster.ui_last = text
+  local t = world:tick()
+  for pid, at in pairs(roster.subs) do
+    if t - at > 36000 or not world:position(pid) then roster.subs[pid] = nil else roster.ui_send(world, pid, text) end
+  end
+end
+
+function roster.ui_tick(world)
+  roster.ui_known(world)
+  if roster.known_changed then
+    roster.known_changed = false
+    roster_save()
+  end
+  roster.ui_push(world, false)
+end
+
+-- a new name: 1 to NAME_MAX letters, digits, spaces, - _ ' . (the chest label shows it); not another companion's
+function roster.ui_rename(world, r, new)
+  new = tostring(new or ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
+  if new == "" or #new > roster.NAME_MAX then return "A name needs 1 to " .. roster.NAME_MAX .. " characters.", false end
+  if new:find("[^%w %-_'%.]") then return "Names can only have letters, digits, spaces and - _ ' .", false end
+  for _, o in ipairs(roster.list) do
+    if o ~= r and o.name:lower() == new:lower() then return "Another companion is already called " .. o.name .. ".", false end
+  end
+  if inv.open[r.name] then return r.name .. ": close his chest first.", false end
+  local old = r.name
+  if old == new then return "That is already his name.", true end
+  for _, t in ipairs({ ent_of, returning, mana_of, waiting }) do
+    if t[old] ~= nil then t[new], t[old] = t[old], nil end
+  end
+  for id, n in pairs(name_of) do if n == old then name_of[id] = new end end
+  for a, n in pairs(roster.main) do if n == old then roster.main[a] = new end end
+  r.name = new
+  roster_save()
+  log(string.format("roster window: %s renamed to %s", old, new))
+  return old .. " is now called " .. new .. ".", true
+end
+
+-- another kind: any non-boss monster template (core/monsters.lua); a body that is out is replaced at its spot
+function roster.ui_kind(world, r, guid, pid)
+  local kind
+  for _, m in ipairs(require("core.monsters")) do if m[3] == guid then kind = m end end
+  if not kind then return "Unknown kind.", false end
+  if kind[4] then return "Bosses cannot be companions.", false end
+  if inv.open[r.name] then return r.name .. ": close his chest first.", false end
+  if r.guid == guid then return r.name .. " already is a " .. kind[2] .. ".", true end
+  local was = r.guid
+  r.guid, r.sus_base = guid, nil  -- (armor) the new body's own values are read again
+  local ent = ent_of[r.name]
+  if ent and world:position(ent) then
+    local x, y, z = world:position(ent)
+    local h = drives[ent]
+    drives[ent], name_of[ent], ent_of[r.name] = nil, nil, nil
+    pcall(emf.destroy, world, ent)
+    spawn_body(world, r, x, y + 0.3, z, r.mode == "follow" and (h and h.player or player_of(world, r.owner)) or nil)
+  end
+  roster_save()
+  log(string.format("roster window: %s is now %s / %s (%s, was %s)", r.name, kind[1], kind[2], guid, tostring(was)))
+  return r.name .. " is now a " .. kind[2] .. " (" .. kind[1] .. ").", true
+end
+
+function roster.ui_do(world, from, data)
+  local okd, m = pcall(emf.json.decode, data)
+  if not (okd and type(m) == "table") then return end
+  local pid = from.player
+  if not pid then return end
+  roster.subs[pid] = world:tick()
+  if m.op == "get" then
+    roster.ui_known(world)
+    roster.ui_send(world, pid, roster.ui_state(world))
+    return
+  end
+  if m.op ~= "do" then return end
+  local what, arg = tostring(m.what or ""), m.arg
+  local r = find(tostring(m.name or ""))
+  local said, good
+  if not r then
+    said, good = "No companion called " .. tostring(m.name) .. ".", false
+  elseif what == "rename" then
+    said, good = roster.ui_rename(world, r, arg)
+  elseif what == "kind" then
+    said, good = roster.ui_kind(world, r, tostring(arg or ""), pid)
+  else
+    local args
+    if what == "away" or what == "delete" then args = { "roster", what, r.name }
+    elseif what == "back" then args = { "roster", "back", r.name, tostring(player_of(world, r.owner) or pid) }
+    elseif what == "give" or what == "share" or what == "unshare" then args = { "roster", what, r.name, tostring(arg or "") }
+    elseif what == "main" then args = r.owner and { "roster", "main", r.name, r.owner } end
+    if not args then
+      said, good = what == "main" and (r.name .. " has no owner.") or "Unknown action.", false
+    else
+      local real = emf.reply
+      emf.reply = function(t) said = t end
+      local okc, errc = pcall(roster_cmd, world, args)
+      emf.reply = real
+      if not okc then said = "Failed: " .. tostring(errc) end
+      said = tostring(said or "Done."):gsub("^roster: ", "")
+      good = okc and not said:find("refused") and not said:find("^no ") and not said:find("already")
+      if good then  -- the window's words for what was done
+        local who = arg and (roster.known[tostring(arg)] or tostring(arg))
+        local owner = r.owner and (roster.known[r.owner] or r.owner)
+        local nice = { give = r.name .. " now belongs to " .. tostring(who) .. ".",
+          share = tostring(who) .. " can now command " .. r.name .. ".",
+          unshare = tostring(who) .. " can no longer command " .. r.name .. ".",
+          main = r.name .. " is now " .. tostring(owner) .. "'s main companion.",
+          away = r.name .. " is put away.", back = r.name .. " is back.", delete = r.name .. " is deleted." }
+        said = nice[what] or said
+      end
+    end
+  end
+  log(string.format("roster window: player %s (%s): %s %s %s -> %s", tostring(pid), tostring(from.account), what,
+    tostring(m.name), tostring(arg), tostring(said)))
+  roster.ui_send(world, pid, emf.json.encode({ op = "result", text = said, ok = good and true or false }))
+  roster.ui_push(world, true)
 end
 
 return F
