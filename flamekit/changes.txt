@@ -1,3 +1,6 @@
+0.15.347 Nov 20, 2026
+- Companions (test, local server only): a companion or pet more than 80 m from you (for example after you log in somewhere else) comes back beside you at once, without the "Companion can't get up there!" notice. Server only: no game change.
+
 0.15.346 Nov 20, 2026
 - Companions (test, local server only): while a pet's chest is open, its E prompt says "Close" (it said "Talk"). Needs a server restart. Server only: no game change.
 
