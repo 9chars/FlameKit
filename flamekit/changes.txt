@@ -1,3 +1,6 @@
+0.15.322 Nov 20, 2026
+- Companions (test, local server only): console "flamekit.npc petlog <entity> [seconds]" logs what an animal's own AI does (for making pets follow). Server only: no game change.
+
 0.15.321 Nov 20, 2026
 - Companions (test, local server only): fix: after fast travel or a glide every companion that followed you comes back (only your main one came, twice). Server only: no game change.
 

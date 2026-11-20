@@ -3090,6 +3090,11 @@ function F.setup(k)
         local c = { chest = ch, fix = { { item = item, unlocked = math.floor(n) } } }
         inv.apply_unlocked(world, "command", c)
         emf.reply("npc: unlock done (see the log)")
+      elseif what == "petlog" then  -- petlog <entity> [seconds]: (pets, 12:48) what an animal's own AI does, twice a second
+        local id, sec = tonumber(args[2]), tonumber(args[3]) or 30
+        if not id then emf.reply("npc: petlog <entity> [seconds]") return end
+        roster.petlog = { id = id, untill = world:tick() + math.floor(sec * 60) }
+        emf.reply("npc: petlog " .. id .. " for " .. sec .. " s")
       elseif what == "names" then  -- names [copy <from> <to> | set <entity> <id>]: the game's own floating names
         -- (CustomPlayerString.stringId, the key of a name players gave a chest or altar; owner 08:41 "research the
         -- first point and see what it looks like?") lists every entity with one, or copies one onto another
@@ -3207,6 +3212,7 @@ function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()
   if t % 60 == 13 and next(roster.subs) then pcall(roster.ui_tick, world) end  -- (roster window) changes to its viewers
+  if roster.petlog and t % 30 == 0 then pcall(roster.petlog_tick, world) end  -- (pets) the animal AI watched
   if #heal_fx_shown > 0 then  -- (healfx preview) effects go after 10 s
     local keep = {}
     for _, f in ipairs(heal_fx_shown) do
@@ -3525,6 +3531,26 @@ function roster.ui_back(world, r, pid)
   roster_save()
   if not id then return r.name .. " could not be spawned.", false end
   return r.name .. " is back next to you" .. (r.mode == "stay" and " (staying there)." or ", following you."), true
+end
+
+-- (pets, owner 12:43/12:48 "n2 is a dog now") petlog: the wildlife AI of an animal body (program "wildlife": it writes
+-- ActorInput, DynamicLocomotion, DynamicPathWalker, DynamicWildlife)
+function roster.petlog_tick(world)
+  local pl = roster.petlog
+  local id = pl.id
+  if world:tick() > pl.untill or not world:position(id) then roster.petlog = nil log("petlog " .. id .. ": done") return end
+  local function rd(f) local ok, v = pcall(f) if ok then return v end return "err" end
+  local x, y, z = world:position(id)
+  local wl = rd(function() local w = world:get("DynamicWildlife", id) return string.format("state %s (last %s), target %.1f %.1f %.1f, keep until %s, flee %s",
+    tostring(w.state), tostring(w.lastState), w.currentTargetPosition.x, w.currentTargetPosition.y, w.currentTargetPosition.z,
+    tostring(w.keepRoamingTargetUntilTime), tostring(w.lastFleeTime)) end)
+  local ai = rd(function() local a = world:get("ActorInput", id) return string.format("move %.2f %.2f speed %s",
+    a.desiredWorldMoveInput.x, a.desiredWorldMoveInput.z, tostring(a.locomotionSpeed)) end)
+  local pw = rd(function() local p = world:get("DynamicPathWalker", id) return string.format("walker %s, to %.1f %.1f %.1f",
+    tostring(p.state), p.targetPosition.x, p.targetPosition.y, p.targetPosition.z) end)
+  local an = rd(function() local a = world:get("DynamicAnimal", id) return "animal state " .. tostring(a.state) end)
+  log(string.format("petlog %d at %.1f %.1f %.1f: %s | %s | %s | %s | time %s", id, x, y, z, tostring(wl), tostring(ai), tostring(pw),
+    tostring(an), tostring(rd(function() return world:get("SpawnTime", id).time end))))
 end
 
 function roster.ui_do(world, from, data)
