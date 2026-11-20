@@ -1931,6 +1931,8 @@ drive_heal = function(s)
   pcall(function() a.combatData.selectedAttackIndex = 2 end)  -- Wolf Shout
   mana_of[name] = m - HEAL_COST
   h.heal_t = t
+  -- (owner 2026-11-19 21:29 "can you add a notice message that says Companion heals you for <number>!")
+  if who == h.player and okh and res then say(world, h.player, string.format("Companion heals you for %d!", amount)) end
   log(string.format("heal %s: heals %s +%d (%d/%d before; %s mode); mana %d -> %d of %d; Wolf Shout%s", name, whom, amount, whp, wmax,
     mode, math.floor(m), math.floor(m - HEAL_COST), MANA_MAX, (okh and res) and "" or " (could not add health: " .. tostring(res) .. ")"))
 end
