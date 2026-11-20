@@ -3,7 +3,7 @@
 -- texlua invtest.lua ../../features/npc_probe.lua ../../../flamekit/core/bag.lua
 local file, bagfile = arg[1], arg[2]
 local f = assert(io.open(file)) local text = f:read("a") f:close()
-text = text:gsub("\nreturn F%s*$", "\nF._t = { inv = inv, roster = roster, find = find, ent_of = ent_of, drive_step = drive_step, drives = drives, name_of = name_of }\nreturn F\n")
+text = text:gsub("\nreturn F%s*$", "\nF._t = { inv = inv, roster = roster, find = find, ent_of = ent_of, drive_step = drive_step, drives = drives, name_of = name_of, roster_cmd = roster_cmd }\nreturn F\n")
 local logs, saved = {}, {}
 TICK = 0
 local comps, pos = {}, {}
@@ -168,3 +168,14 @@ T.inv.on_accept(W, { hostEntityId = c.chest, guestEntityId = 7 })
 print("someone else opened it: still open?", T.inv.open.N1 ~= nil, "chest still there?", pos[c.chest] ~= nil)
 show("record after someone else opened it", r)
 W.account = real_account
+-- (09:35) roster delete refuses while he carries items or his chest is open; away closes an open chest first
+local replies = {}
+emf.reply = function(t) replies[#replies + 1] = t end
+T.inv.open_chest(W, 1, 500, r)
+for _ = 1, 120 do step() end
+T.roster_cmd(W, { "roster", "delete", "N1" })
+print(replies[#replies], "still listed?", T.find("N1") ~= nil)
+T.roster_cmd(W, { "roster", "away", "N1" })
+print("away: chest open?", T.inv.open.N1 ~= nil, "items kept", T.find("N1") and #T.find("N1").inv)
+T.roster_cmd(W, { "roster", "delete", "N1" })
+print(replies[#replies], "still listed?", T.find("N1") ~= nil)

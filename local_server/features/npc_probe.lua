@@ -1329,6 +1329,18 @@ local function roster_cmd(world, args)
   elseif what == "away" or what == "delete" then  -- away <name>: body gone, kept on the list; delete: gone for good
     local r, i = find(args[3] or "")
     if not r then emf.reply("roster: no " .. tostring(args[3])) return end
+    -- (owner 2026-11-20 09:35 "yes delete should refuse it") his items would go with him, an open chest would stay
+    -- behind with no owner: delete refuses while his chest is open or he carries anything
+    if what == "delete" and (inv.open[r.name] or inv.count(r.inv) > 0) then
+      local why = inv.open[r.name] and "his chest is open: close it first" or
+        string.format("he carries %d item(s): take them out of his chest first", inv.count(r.inv))
+      log(string.format("roster: delete %s refused (%s)", r.name, why))
+      emf.reply("roster: delete " .. r.name .. " refused: " .. why)
+      return
+    end
+    -- (09:35) away with his chest open: without his body nothing could close it (E is on him, P is blocked): closed
+    -- first, his items saved
+    if inv.open[r.name] then inv.close(world, r, "put away") end
     local ent = ent_of[r.name]
     if ent then
       local x, y, z = world:position(ent)

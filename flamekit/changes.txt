@@ -1,3 +1,6 @@
+0.15.308 Nov 20, 2026
+- Companions (test, local server only): "roster delete" now refuses while the companion's chest is open or he still carries items (they would be lost); "roster away" closes his open chest first, his items kept. Server only: no game change.
+
 0.15.307 Nov 20, 2026
 - Companions (test, local server only): the companion's chest now appears 1.5 m to his left. Server only: no game change.
 

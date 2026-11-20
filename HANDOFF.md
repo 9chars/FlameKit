@@ -1583,6 +1583,12 @@ next restart (no yes for a restart yet).
      Owner 09:29 "2.5 away from him seems a bit too far don't you think? 1m should be fine": 0.15.306 inv.SPOT = 1.
      Owner 09:31 "make the chest just spawn to the left of him by 1.5 m, sorry its a process to test it out right":
      0.15.307 1.5 m to his left by his facing (the far-side-from-the-player rule removed).
+     Owner 09:31 "left of the way he is facing.. so if he is facing forward, its on his left side" (= what was built; the
+     left/right sign is UNPROVEN in game: if it lands on his right, flip it). Owner 09:33/09:34: frozen = follow,
+     attack, heal off (confirmed from drive_step: the frozen branch returns before all of it); items belong to the
+     world's data file, not the character. **Owner 09:35 "yes delete should refuse it"** (after I found: roster delete
+     dropped r.inv, and an open chest stayed behind ownerless): 0.15.308 delete refuses while inv.open[name] or
+     inv.count(r.inv) > 0; `away` closes an open chest first (without his body nothing could close it). invtest covers it.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
