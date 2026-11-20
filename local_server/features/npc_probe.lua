@@ -135,6 +135,8 @@ local GLIDE_STATE, GLIDE_WAIT, GLIDE_FAR, LAND_TICKS, TP_AFTER, FAR_JUMP = 4, 24
 local WATER_NEAR = 2  -- metres above the swimming player's water surface that still count as "at the water"
 local DIVE_PLAYER = 1.8  -- the player's depth from which he dives with him (at the surface the player reads about 1.3)
 local SWIM_ENTER, SWIM_DEPTH = 0.5, 0.9  -- he swims while his own depth is over 0.5 m, and is held at about 0.9 m
+F.SWIM_ENTER_SMALL, F.SWIM_DEPTH_SMALL = 0.25, 0.3  -- (owner 17:24) the same for a small pet (cats, bunnies, birds; in F:
+-- the file is at Lua's 200 top-level locals)
 local SWIM_MAX, SWIM_GAIN = 6, 1.2  -- swimming speed: 1 m/s past the stop distance, +1.2 m/s per metre, at most 6
 local HOP_TICKS, HOP_HOLD, HOP_EVERY, HOP_MARGIN, HOP_FORWARD = 90, 40, 120, 0.7, 3  -- the climb-out hop, see drive_water
 -- ===== Following: the drive ============================================================================================
@@ -349,8 +351,12 @@ local function drive_read(world, id, h)
   local pwet = pwater > 0.5
   local okh, hw = pcall(function() return tonumber(world:get("DynamicLocomotion", id).currentWaterState) end)
   hw = okh and hw or 0
-  local swim = hw > SWIM_ENTER
-  return { world = world, id = id, h = h, a = a, t = t, px = px, py = py, pz = pz, nx = nx, ny = ny, nz = nz,
+  -- (owner 17:24 "go ahead and make the adjustment") 17:21:47: the black cat stood in 0.40 m of water, below SWIM_ENTER,
+  -- so to the drive he walked; no progress toward the swimming player: put away. A small pet (F.SMALL_PETS) swims
+  -- from F.SWIM_ENTER_SMALL and is held F.SWIM_DEPTH_SMALL below the surface (s.small, drive_water)
+  local small = pet and F.is_small and F.is_small(id) or false
+  local swim = hw > (small and F.SWIM_ENTER_SMALL or SWIM_ENTER)
+  return { small = small, world = world, id = id, h = h, a = a, t = t, px = px, py = py, pz = pz, nx = nx, ny = ny, nz = nz,
            pwater = pwater, pwet = pwet, hw = hw, swim = swim, pet = pet }
 end
 
@@ -457,7 +463,7 @@ local function drive_water(s)
       h.diving = diving
       log(string.format("drive %s: %s (player depth %.2f)", tostring(id), diving and "dives with the player" or "back to the surface", pwater))
     end
-    local want = diving and (py + FLOAT_LIFT - ny) or (hw - SWIM_DEPTH)
+    local want = diving and (py + FLOAT_LIFT - ny) or (hw - (s.small and F.SWIM_DEPTH_SMALL or SWIM_DEPTH))
     local fix = math.max(-0.08, math.min(0.08, want * 0.25))  -- at most 0.08 m a tick
     -- (owner 15:35 "the pet dog swims but doesn't really follow me all the way down into the water"; 15:36 "only valid
     -- for pets") 15:34: diving, the dog stayed ~2.3 m deep while the player was 4-5.5 m: the game lifts an animal more
@@ -1293,8 +1299,24 @@ local function roster_save()
   return oks and res
 end
 
+-- (owner 17:24) the small pets (core/pets.lua guids): they swim in shallower water (drive_read)
+F.SMALL_PETS = {
+  ["1ce5ac27-d8b1-4fa8-92db-f568994d080f"] = true,  -- Cat (black)
+  ["60065215-15ca-424c-9bc3-5665685fed60"] = true,  -- Cat (striped)
+  ["8d2e50d2-ed98-4231-9846-ca1b7fb69041"] = true,  -- Cat (bright)
+  ["7e389a60-f74b-4133-a5aa-68e91623985c"] = true,  -- Bunny
+  ["1b8afedd-e02c-4746-88ff-c4367b53fa8e"] = true,  -- Bunny (Cold Heights)
+  ["5b609722-0dae-444b-b96c-283054a05495"] = true,  -- Turkey
+  ["4757dca8-d76b-4d1c-8215-cb1e7ee533a2"] = true,  -- Desert bird
+  ["0eaf60f1-7ab9-4936-9cd0-17233fb339ea"] = true,  -- Bird (flying)
+}
 local function find(name)
   for i, r in ipairs(roster.list) do if r.name == name then return r, i end end
+end
+function F.is_small(id)
+  local n = name_of[id]
+  local r = n and find(n)
+  return r and F.SMALL_PETS[r.guid] or false
 end
 
 local function player_of(world, account)

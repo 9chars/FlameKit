@@ -1,3 +1,6 @@
+0.15.355 Nov 20, 2026
+- Companions (test, local server only): small pets (cats, bunnies, birds, the turkey) start swimming in shallower water (0.25 m, was 0.5 m) and swim nearer the surface; the cat got stuck at the water's edge. Server only: no game change.
+
 0.15.354 Nov 20, 2026
 - Companions (test, local server only): pet speed boost, test B: found why the server froze (the boost was applied about 20 times per game step, so the pet's speed grew to infinity); now once per step and at most 10 m/s. Needs a server restart. Server only: no game change.
 

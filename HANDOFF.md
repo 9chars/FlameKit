@@ -1934,6 +1934,15 @@ next restart (no yes for a restart yet).
    Build fix ((std::min) against windows.h' min); DLL 305065ab (test A's kept as .bad_1706); restart 17:12 (owner
    "yes"), up 17:13:47. **Owner 17:15 "not crashing so thats good"**: log 17:15:24-39 "pet boost: 17 -> 488 boosts ...
    8.0-9.5 m from the player, 8.2-9.5 -> 10.0 m/s" (at the cap), no can't-follow. Whether they keep up: asked.
+   Owner 17:17 "I dont think I see the cat anyplace": N3 (Cat (black)) was the inf-speed pet put away at 17:05:07
+   just before the freeze, saved as away (17:13 "roster: loaded" listed N1 N2 N4 N5). **Owner 17:22 "they're keeping
+   up fine, is the black cat swimming with me? I cant see it"** (boost = option 1 done; option 2 not needed): 17:21:47
+   N3 29397 at depth 0.40 (< SWIM_ENTER 0.5) = walking: "can't follow (to the water): no progress toward the swimming
+   player" -> put away; back once the player stands on the ground. **Owner 17:24 "go ahead and make the adjustment,
+   but why didnt the cat just spawn to me then instead of being put away?"**. 0.15.355: F.SMALL_PETS (3 cats, 2
+   bunnies, turkey, desert bird, flying bird), F.is_small(id); drive_read: a small pet swims over F.SWIM_ENTER_SMALL
+   0.25 m; drive_water holds it F.SWIM_DEPTH_SMALL 0.3 m below the surface (was 0.9). npc_probe.lua is AT the 200
+   top-level locals: new values go into F or tables.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
