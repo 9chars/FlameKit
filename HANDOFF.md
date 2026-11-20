@@ -1502,6 +1502,16 @@ next restart (no yes for a restart yet).
      later): a crash in that window would have made it common. 0.15.293: after the filling c.ready_t = t + SAVE_EVERY;
      the first snapshot and the "filled" gear log wait for it; a close before it keeps the record from before the
      opening. The "Close" prompt (0.15.292) not seen yet: the chest was closed before that install.
+     **0.15.294 (owner 08:32 "the companion doesn't have an E button at all now"):** inv.prompt took the old offer off
+     and made the new one in the same step; EMF refuses that ("an earlier offer is still being taken off it: try again
+     in a moment"), so he had no prompt at all. Now the new offer is made 2 ticks later and retried every 6 ticks (up
+     to 50) until EMF takes it (inv.want / inv.want_tick from F.tick; log "prompt: E on <id> offered ... after N
+     try(s)"). Seen 08:35:18 after the reload: offered at the 1st try (Close verb on 182193, Talk on 13020).
+     **Idea (owner 08:33): "the chest that spawns, can it be "named" with the companions name?"** Not built. What we
+     know: the game has its own floating name labels (component CustomPlayerString, 8 bytes, saved with the world;
+     client programs ui_custom_name / ui_custom_name_visibility draw it with a line-of-sight check, from the
+     CustomPlayerStringsSystem); never touched by us, how a string gets into that system is unknown (research). The
+     chest's own E prompt words would need a content mod (a game update, not server only).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
