@@ -1686,7 +1686,10 @@ next restart (no yes for a restart yet).
    else the lowest within feet-3..feet+1, else (no answer in 1 s / none) his left at his height; inv.open_at spawns.
    Logged "chest place N of 4 (...)" and "chest ground: ..." (C++).
    **Owner 12:14: "would it be easiler for all companions of a player should just share one inventory? I dont think
-   each companion needs to have its own chest?" / "not sure"** - open, my opinion given (see the reply).
+   each companion needs to have its own chest?" / "not sure"**: my opinion (one inventory per player: items belong
+   to the player, fits one main, no stranded items, pets a smaller chest) -> **owner 12:16 "hold off on #2 for now"**
+   (kept on the list, not built). Owner 12:16 "yeah it was standing on the chest" (the cause). Server probe DLL
+   35370f20 copied in 12:15 (27d76044 renamed .old_1215): loads at the next server start (asked, not answered yet).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
