@@ -1655,6 +1655,9 @@ next restart (no yes for a restart yet).
    -> roster_cmd new <asking player>: a hound of his, next to him, following); fix: label rows need {label = true,
    text = ...} (they were blank). Pets as mains: proposed a type per roster entry (companion/pet), Kind list by type,
    New companion / New pet, main stays one per player; ASKED: one main total or one main companion + one main pet.
+   **Owner 11:16: "no just one main one, but it can be a pet or a companion, but pets will still have limited
+   capabilities"** = one main per player, a companion OR a pet; pets keep their limited set (no death, no fighting,
+   maybe heals, small inventory).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
