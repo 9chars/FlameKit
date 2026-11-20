@@ -16,8 +16,8 @@
 
 local F = { id = "npc_probe", title = "NPC Probe" }
 local function log(s) emf.log("npc probe: " .. s) end
-local function say(world, player, text)
-  pcall(function() require("features.chat").notice_to(world, player, text, "#8cd2ff", 5) end)
+local function say(world, player, text, colour)
+  pcall(function() require("features.chat").notice_to(world, player, text, colour or "#8cd2ff", 5) end)
 end
 
 -- a notice in the player's Notices window that stays until it is taken back (clear = true): the stuck and death
@@ -1932,7 +1932,7 @@ drive_heal = function(s)
   mana_of[name] = m - HEAL_COST
   h.heal_t = t
   -- (owner 2026-11-19 21:29 "can you add a notice message that says Companion heals you for <number>!")
-  if who == h.player and okh and res then say(world, h.player, string.format("Companion heals you for %d!", amount)) end
+  if who == h.player and okh and res then say(world, h.player, string.format("Companion heals you for %d!", amount), "#5ad25a") end  -- green (owner 21:31)
   log(string.format("heal %s: heals %s +%d (%d/%d before; %s mode); mana %d -> %d of %d; Wolf Shout%s", name, whom, amount, whp, wmax,
     mode, math.floor(m), math.floor(m - HEAL_COST), MANA_MAX, (okh and res) and "" or " (could not add health: " .. tostring(res) .. ")"))
 end
