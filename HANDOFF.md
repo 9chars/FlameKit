@@ -1658,6 +1658,9 @@ next restart (no yes for a restart yet).
    **Owner 11:16: "no just one main one, but it can be a pet or a companion, but pets will still have limited
    capabilities"** = one main per player, a companion OR a pet; pets keep their limited set (no death, no fighting,
    maybe heals, small inventory).
+   **Owner 11:20: "could the pets just have their own "Pets" section in the drop-down list with the other companions
+   to keep the UI cleaner?"** -> yes: no separate type field or New pet button; the Kind drop-down gets a "Pets" group
+   (the peaceful animals); picking one makes him a pet (his type follows from his kind). Built with the pets.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
