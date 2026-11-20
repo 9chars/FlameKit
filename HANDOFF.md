@@ -1831,6 +1831,8 @@ next restart (no yes for a restart yet).
    for pets"**. 0.15.339: in drive_water, for s.pet only: fix = half the difference, at most PET_DIVE_STEP 0.4 m a tick;
    log "dive <id> (pet): ..." every second while diving. Monsters unchanged (0.25, at most 0.08).
    **Owner 15:38: "yep looks good"** (pets dive with the player).
+   **Owner 15:38 "so here comes the last part" / 15:39: "in the wheel menu, id like a new section called "Companions"
+   this option would apply to both Pets and the Monster Companions"** (what it holds: being asked).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
