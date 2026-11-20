@@ -1311,7 +1311,7 @@ local function spawn_body(world, r, x, y, z, player)
     x = x + 1.2
   end
   -- (owner 14:20 "the 'pick up' option is still there") a pet is spawned wild again: the game's pick-up comes with its
-  -- IsTame tag (0.15.326-0.15.328 spawned them tame), not with the offer; his E comes from roster.pet_offer instead.
+  -- IsTame tag (0.15.326-0.15.328 spawned them tame), not with the offer; his E comes from the server probe instead.
   local ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
   if not (ok and id and id ~= 0) then
     log(string.format("roster: %s could not be spawned (%s)", r.name, tostring(id)))
@@ -3637,35 +3637,14 @@ function roster.pets_quiet(world)
       if wl.state ~= 3 then wl.state = 3 end
       local pw = world:get("DynamicPathWalker", id)
       if pw and pw.isWalkingActive ~= false then pw.isWalkingActive = false end
-      pcall(roster.pet_offer, world, id)
     end
   end
 end
 
--- (owner 14:09 "yeah we need to remove the pick up and pet option, the pet option could be put in the wheel") a tame
--- pet's game offer is verb Pet (0x6D5B6297) with the game's pet sequence (0xB1EB4A70; petlog 14:11:55), which also lets
--- a player pick him up (14:07:42: the body was gone). It is replaced by the plain touch sequence (no screen, EMF's
--- EMF_SEQUENCE_TOUCH) and the word Talk, so E only fires InteractionAcceptedEvent (his wheel, in F.setup).
-roster.TOUCH_SEQ, roster.TALK_VERB = 0x3E5189BF, 0xD9861C4B
-roster.offer_fixes = {}
-function roster.pet_offer(world, id)
-  local o = world:get("InteractionOfferRuntime", id)
-  if not o then return end
-  if o.overrideSequence == roster.TOUCH_SEQ and o.overrideVerbLocaId == roster.TALK_VERB and o.isOffered == true
-    and o.isDisabled == false then return end
-  local before = string.format("seq %s verb %s, offered %s, disabled %s", tostring(o.overrideSequence),
-    tostring(o.overrideVerbLocaId), tostring(o.isOffered), tostring(o.isDisabled))
-  o.overrideSequence = roster.TOUCH_SEQ
-  o.overrideVerbLocaId = roster.TALK_VERB
-  -- (14:20, wild pets) the game's taming offer on a wild animal shows no E (owner 12:54): it is switched on here
-  if o.isOffered ~= true then o.isOffered = true end
-  if o.isDisabled ~= false then o.isDisabled = false end
-  local n = (roster.offer_fixes[id] or 0) + 1
-  roster.offer_fixes[id] = n
-  if n == 1 or n % 100 == 0 then
-    log(string.format("pet %s (%d): the game's offer (%s) set to touch / Talk (time %d)", tostring(name_of[id]), id, before, n))
-  end
-end
+-- (owner 14:09 "yeah we need to remove the pick up and pet option, the pet option could be put in the wheel"; 14:22
+-- "pick up is gone, but so is the E menu") a pet is spawned wild (spawn_body); its E offer is set by the server probe
+-- (C++, pet_offers: right before the game's interaction_offer program each step; a Lua write after the step lost to
+-- the game's own offer every step, 0.15.328-0.15.329). E then fires InteractionAcceptedEvent: his wheel (F.setup).
 
 function roster.ui_do(world, from, data)
   local okd, m = pcall(emf.json.decode, data)

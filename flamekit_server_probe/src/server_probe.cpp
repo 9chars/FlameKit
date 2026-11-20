@@ -422,6 +422,48 @@ void read_pets() {
     g_pets.swap(got);
 }
 
+// ---- (2026-11-20, owner 14:09 "yeah we need to remove the pick up and pet option, the pet option could be put in the
+// wheel"; 14:22 "pick up is gone, but so is the E menu") a pet is a wild animal (a tame one has the game's Pick up,
+// which comes with IsTame). The game's taming offer on a wild animal is off (runtime: sequences 0, isOffered false) and
+// the game writes it again every step, so a write from the Lua after the step never reaches the client. Here, right
+// before program interaction_offer copies the runtime offer into ClientInteractionOffer (what the client shows), each
+// pet's runtime offer is set to EMF's touch sequence (no screen) with the word Talk; E then only fires
+// InteractionAcceptedEvent, which the Lua turns into his wheel. After it: the client copy is checked (and logged).
+constexpr uint32_t kTouchSeq = 0x3E5189BFu;   // EMF_SEQUENCE_TOUCH
+constexpr uint32_t kTalkVerb = 0xD9861C4Bu;   // EMF_VERB_TALK
+std::atomic<uint64_t> g_offer_log_at{0};
+void pet_offers(bool post) {
+    emf::World w = emf::server_world();
+    if (!w) return;
+    std::vector<uint32_t> ids;
+    {
+        std::lock_guard<std::mutex> lk(g_pet_mx);
+        for (auto& kv : g_pets) ids.push_back(kv.first);
+    }
+    const uint64_t now = GetTickCount64();
+    const bool say = post && now >= g_offer_log_at.load();
+    if (say) g_offer_log_at.store(now + 10000);
+    for (uint32_t id : ids) {
+        auto* o = w.get<emf::gen::ecs::InteractionOfferRuntime>(id);
+        if (!o) continue;
+        if (!post) {
+            o->overrideSequence.value = kTouchSeq;
+            o->overrideVerbLocaId.value = kTalkVerb;
+            o->isOffered = true;
+            o->isDisabled = false;
+            continue;
+        }
+        auto* c = w.get<emf::gen::ecs::ClientInteractionOffer>(id);
+        if (say)
+            EMF_LOG(kMod, "pet offer %u after interaction_offer: runtime seq %08x/%08x verb %08x/%08x offered %d disabled %d; "
+                    "client %s verb %08x offered %d", id, o->defaultSequence.value, o->overrideSequence.value,
+                    o->defaultVerbId.value, o->overrideVerbLocaId.value, (int)o->isOffered, (int)o->isDisabled,
+                    c ? "yes" : "NONE", c ? c->verbId.value : 0u, c ? (int)c->isOffered : -1);
+    }
+}
+void pet_offers_pre(void*, void*) { pet_offers(false); }
+void pet_offers_post(void*, void*) { pet_offers(true); }
+
 void drive_post(void* ctx, void*) {
     emf::World w = emf::server_world();
     if (!w) return;
@@ -805,6 +847,9 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     // option 2: the hook after the steering step, and the driven list refreshed after each server step
     const bool hooked = emf::api()->hook_program && emf::api()->hook_program("steering_locomotion", nullptr, drive_post, nullptr);
     EMF_LOG(kMod, "drive: hook after steering_locomotion %s", hooked ? "installed" : "NOT installed");
+    // (2026-11-20 14:22) pets' E: their offer set right before interaction_offer, checked after it (pet_offers)
+    const bool offers = emf::api()->hook_program("interaction_offer", pet_offers_pre, pet_offers_post, nullptr);
+    EMF_LOG(kMod, "pets: hook on interaction_offer %s", offers ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) { drive_scan(w); });
     emf::on_tick([](emf::World w) { if (w.is_server()) names_tick(w); });  // (2026-11-20) companion chest names
     emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {

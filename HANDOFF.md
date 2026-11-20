@@ -1765,6 +1765,11 @@ next restart (no yes for a restart yet).
    **Owner 14:20: "the 'pick up' option is still there"** = the pick-up is not in the offer (it needs IsTame: likely
    the player program animal_upgrade_interaction). 0.15.329: pets spawned wild again (the IsTame spawn removed);
    roster.pet_offer also forces isOffered true / isDisabled false on the wild animal's taming offer. Untested.
+   Log 14:21: wild offer every step seq 0 verb 0 offered false (game rewrites). **Owner 14:22: "pick up is gone, but
+   so is the E menu"**. 0.15.330: Lua pet_offer removed; server probe hooks program interaction_offer (it copies the
+   runtime offer into ClientInteractionOffer): pre = each g_pets id's runtime offer set to touch seq 0x3E5189BF + verb
+   Talk 0xD9861C4B, isOffered 1, isDisabled 0; post = logs runtime + client copy every 10 s ("pet offer ..."). Needs the
+   probe DLL (server restart).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

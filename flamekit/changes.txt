@@ -1,3 +1,6 @@
+0.15.330 Nov 20, 2026
+- Companions (test, local server only): a pet's E prompt ("Talk", opens the companion wheel) is now set by the server probe right before the game shows prompts, since the game turned the mod's prompt off again every step. Needs a server restart. Server only: no game change.
+
 0.15.329 Nov 20, 2026
 - Companions (test, local server only): pets are spawned wild again (the game's pick-up comes with tame animals); their E prompt is switched on by the mod and opens the companion wheel. Server only: no game change.
 
