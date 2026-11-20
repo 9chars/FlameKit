@@ -1,3 +1,6 @@
+0.15.286 Nov 20, 2026
+- Companions (test, local server only): a fall safety net: when the companion falls more than 7.5 m below where it left the ground (a jump of yours it could not make), it is brought back beside you before it lands, so a missed jump no longer kills it. Server only: no game change.
+
 0.15.285 Nov 20, 2026
 - Companions (test, local server only): following rebuilt around your trail: the companion walks the way you walked, jumps where you jumped and steps up where you stepped up. When it can't follow, it is put back beside you at once and "Companion can't follow you!" shows for 5 seconds.
 - Companions (test): it keeps your pace: it walks, runs or sprints the way you did at each spot, and sprints whenever it is more than 6 m behind.

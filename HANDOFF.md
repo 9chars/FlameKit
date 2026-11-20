@@ -1422,6 +1422,7 @@ next restart (no yes for a restart yet).
      drive_harness: identical on 9 seeds apart from the new field (seed 7: the net fired at 7.7 m down, correct). Not
      built (offered, not chosen): the glider rule (a jump where the player opened the glider = a break), level/armour set
      on the spawn tick.
+     -> **0.15.286 (server only):** flamekit/mod.json + changes.txt line for the fall safety net.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
