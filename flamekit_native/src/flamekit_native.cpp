@@ -2284,6 +2284,7 @@ struct Layer {
     virtual void mouse_left() {}
     virtual void wheel(int delta, int x, int y) {}      // the mouse wheel over the layer (delta: WHEEL_DELTA a notch)
     virtual void key(WPARAM vk) {}
+    virtual void chr(WPARAM ch) {}                      // (0.15.309) a typed character (WM_CHAR), for text boxes
     virtual void lost_front() {}                        // another window took the front while the layer had the keys
 
     bool visible = false;
@@ -5344,6 +5345,11 @@ struct WindowLayer : Layer {
 // "r" lines as in ui_tabs.dat (kinds h heading, t text, s separator, b button, l label, d drop-down), then "end". A click
 // goes back through FlameKit's window's ui_actions.txt as "exp <generation>/<button number>". Clicks need the pointer
 // key held, as on every pinned window. The drop-down's list opens in the window, which grows while it is open.
+// (0.15.309, owner 2026-11-20 10:00: "Companion Roster needs to be its own complete window") the same window serves the
+// Companion Roster too (second constructor): rows in ui_roster.dat, clicks as "ros ...", shown and hidden when
+// ui_roster_toggle.request appears (its button in the Experimental tab), hidden at first. Row kind e (both): a text
+// box; a click puts the keyboard there (the overlay takes the front), typing edits it, Enter sends
+// "<verb> <generation>/<number>/<the text as hex UTF-8>", Esc or a click elsewhere drops it.
 struct ExperimentalLayer : PinnedLayer {
     struct Opt {
         int number = 0;
@@ -5370,6 +5376,12 @@ struct ExperimentalLayer : PinnedLayer {
         int value;
     };
     WindowLayer* window = nullptr;  // its act() writes the click for the Lua part
+    std::wstring file_name = L"ui_exp.dat";  // (0.15.309) its rows
+    std::string verb = "exp";                 // its clicks' word in ui_actions.txt
+    std::wstring toggle_request;              // shown and hidden when this file appears (empty: its key, exp_window_key)
+    uint64_t next_ask = 0;
+    int edit_row = -1;                        // the text box being typed in (-1: none)
+    std::wstring edit_text;
     std::vector<Row> rows;
     uint64_t gen = 0, stamp = 0, next_read = 0;
     std::vector<Placed> placed;
@@ -5380,7 +5392,7 @@ struct ExperimentalLayer : PinnedLayer {
     int hover_x = -1, hover_y = -1;
     static constexpr int kLine = 26, kListMax = 12, kBtnH = 28;
 
-    uint32_t hotkey() const override { return settings().exp_vk; }
+    uint32_t hotkey() const override { return toggle_request.empty() ? settings().exp_vk : 0; }
     // right side, left of the PvP Leaderboard's place (12 px + its 300 + 12 px from the right edge)
     ExperimentalLayer() : PinnedLayer("experimental", L"Experimental", 256) {  // right, 121 px from the edge
         def_right_px = 121;
@@ -5389,6 +5401,61 @@ struct ExperimentalLayer : PinnedLayer {
         hide_in_menus = true;
         max_w = 760;
     }
+    // (0.15.309) the Companion Roster: in the middle, hidden until its button shows it
+    ExperimentalLayer(std::string i, std::wstring t, std::wstring file, std::string v, std::wstring request)
+        : PinnedLayer(std::move(i), std::move(t), 560) {
+        file_name = std::move(file);
+        verb = std::move(v);
+        toggle_request = std::move(request);
+        def_center = true;
+        def_y_pt = 1200;
+        default_h = 760;
+        hide_in_menus = true;
+        default_hidden = true;
+        max_w = 1000;
+    }
+
+    bool wants_keys() const override { return visible && edit_row >= 0; }
+    void stop_edit(const char* how) {
+        if (edit_row < 0) return;
+        edit_row = -1;
+        edit_text.clear();
+        dirty = true;
+        FK_LOG(fklog::kDebug, "%s: text box closed (%s)", id.c_str(), how);
+    }
+    void key(WPARAM vk) override {
+        if (edit_row < 0) return;
+        if (vk == VK_ESCAPE) {
+            stop_edit("Esc");
+        } else if (vk == VK_BACK) {
+            if (!edit_text.empty()) edit_text.pop_back();
+            dirty = true;
+        } else if (vk == VK_RETURN) {
+            const int number = edit_row < static_cast<int>(rows.size()) ? rows[static_cast<size_t>(edit_row)].number : 0;
+            if (number > 0 && window) {
+                std::string utf8;
+                const int n = WideCharToMultiByte(CP_UTF8, 0, edit_text.c_str(), static_cast<int>(edit_text.size()), nullptr, 0, nullptr, nullptr);
+                if (n > 0) {
+                    utf8.resize(static_cast<size_t>(n));
+                    WideCharToMultiByte(CP_UTF8, 0, edit_text.c_str(), static_cast<int>(edit_text.size()), utf8.data(), n, nullptr, nullptr);
+                }
+                static const char* hex = "0123456789abcdef";
+                std::string h;
+                for (unsigned char c : utf8) {
+                    h.push_back(hex[c >> 4]);
+                    h.push_back(hex[c & 15]);
+                }
+                window->act(verb, std::to_string(gen) + "/" + std::to_string(number) + (h.empty() ? "" : "/" + h));
+            }
+            stop_edit("Enter");
+        }
+    }
+    void chr(WPARAM ch) override {
+        if (edit_row < 0 || ch < 0x20 || ch == 0x7f) return;  // Backspace, Enter and Esc come as keys
+        if (edit_text.size() < 40) edit_text.push_back(static_cast<wchar_t>(ch));
+        dirty = true;
+    }
+    void lost_front() override { stop_edit("another window took the front"); }
 
     static std::wstring unescape(const std::string& s) {
         std::wstring w = widen(s);
@@ -5411,7 +5478,7 @@ struct ExperimentalLayer : PinnedLayer {
     }
 
     bool read_file() {
-        const std::wstring file = g_flamekit_dir + L"ui_exp.dat";
+        const std::wstring file = g_flamekit_dir + file_name;
         const uint64_t st = file_stamp(file);
         if (st == stamp) return false;
         FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
@@ -5477,22 +5544,33 @@ struct ExperimentalLayer : PinnedLayer {
         stamp = st;
         gen = g;
         if (list_open >= static_cast<int>(got.size()) || (list_open >= 0 && got[static_cast<size_t>(list_open)].kind != 'd')) list_open = -1;
+        if (edit_row >= static_cast<int>(got.size()) || (edit_row >= 0 && got[static_cast<size_t>(edit_row)].kind != 'e')) stop_edit("the rows changed");
         rows = std::move(got);
         laid_w = -1;
-        FK_LOG(fklog::kDebug, "experimental window: ui_exp.dat read: %d row(s), generation %llu", static_cast<int>(rows.size()),
+        FK_LOG(fklog::kDebug, "%s: rows read: %d row(s), generation %llu", id.c_str(), static_cast<int>(rows.size()),
                static_cast<unsigned long long>(gen));
         return true;
     }
 
     bool refresh(const Frame& f) override {
         bool again = false;
-        if (g_exp_toggle.exchange(false) && f.in_world) {
+        bool asked = false;  // (0.15.309) the Companion Roster's button
+        if (!toggle_request.empty() && f.now >= next_ask) {
+            next_ask = f.now + 100;
+            const std::wstring req = g_flamekit_dir + toggle_request;
+            if (GetFileAttributesW(req.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                DeleteFileW(req.c_str());
+                asked = true;
+            }
+        }
+        if (((toggle_request.empty() && g_exp_toggle.exchange(false)) || asked) && f.in_world) {
             LayoutEntry& e = lay();
             e.hidden = !e.hidden;
             g_layout.save();
-            FK_LOG(fklog::kInfo, "experimental window: %s (its key)", e.hidden ? "hidden" : "shown");
+            FK_LOG(fklog::kInfo, "%s: %s (%s)", id.c_str(), e.hidden ? "hidden" : "shown", asked ? "its button" : "its key");
             again = true;
         }
+        if (edit_row >= 0 && lay().hidden) stop_edit("the window was hidden");
         if (f.now >= next_read) {
             next_read = f.now + 200;
             if (read_file()) again = true;
@@ -5525,10 +5603,11 @@ struct ExperimentalLayer : PinnedLayer {
         };
         for (size_t i = 0; i < rows.size(); ++i) {
             const Row& r = rows[i];
-            if (r.kind == 'b' || r.kind == 'l' || r.kind == 'd') {
+            if (r.kind == 'b' || r.kind == 'l' || r.kind == 'd' || r.kind == 'e') {
                 int w = std::max(30, text.width(r.text) + 18);
                 if (r.kind == 'l') w = text.width(r.text) + 6;
                 if (r.kind == 'd') w = list_width(r, width);
+                if (r.kind == 'e') w = std::min(width - 16, 240);
                 if (!(r.same && x > left && x + w <= right)) newline();
                 placed.push_back({i, {x, y, x + w, y + kBtnH}, {}});
                 x += w + 5;
@@ -5593,6 +5672,24 @@ struct ExperimentalLayer : PinnedLayer {
                 float cr = 220, cg = 220, cb = 225;
                 if (r.has_colour) cr = r.r, cg = r.g, cb = r.b;
                 text.draw(canvas, b.left, b.top + 4, r.text, cr, cg, cb);
+            } else if (r.kind == 'e') {  // (0.15.309) a text box; the one being typed in shows the typed text and a caret
+                const bool typing = edit_row == static_cast<int>(p.row);
+                const bool over = g_pointer_mode && in(p.box, hover_x, hover_y);
+                box(b.left, b.top, b.right, b.bottom, typing ? 30.0f : 24.0f, typing ? 34.0f : 26.0f, typing ? 46.0f : 32.0f, 1.0f);
+                const float er = typing ? 120.0f : over ? 150.0f : 90.0f, eg = typing ? 160.0f : over ? 150.0f : 90.0f,
+                            eb = typing ? 220.0f : over ? 165.0f : 104.0f;
+                box(b.left, b.top, b.right, b.top + 1, er, eg, eb, 1.0f);
+                box(b.left, b.bottom - 1, b.right, b.bottom, er, eg, eb, 1.0f);
+                box(b.left, b.top, b.left + 1, b.bottom, er, eg, eb, 1.0f);
+                box(b.right - 1, b.top, b.right, b.bottom, er, eg, eb, 1.0f);
+                std::wstring t = typing ? edit_text : r.text;
+                while (t.size() > 1 && text.width(t) > (b.right - b.left) - 20) t.erase(0, 1);  // the end stays in view
+                text.draw(canvas, b.left + 6, b.top + 4, t, 240, 240, 240);
+                if (typing) {
+                    const int cx = b.left + 7 + text.width(t);
+                    box(cx, b.top + 5, cx + 2, b.bottom - 5, 200, 220, 255, 1.0f);
+                }
+                hits.push_back({p.box, 4, static_cast<int>(p.row)});
             } else if (r.kind == 'd') {
                 // (0.15.120) a disabled drop-down (the test monsters in PvP): greyed out, never opens
                 if (r.disabled && list_open == static_cast<int>(p.row)) list_open = -1;
@@ -5672,7 +5769,7 @@ struct ExperimentalLayer : PinnedLayer {
         if (list_open < 0 && g_pointer_mode && hover_x >= 0) {
             for (const Placed& p : placed) {
                 const Row& r = rows[p.row];
-                if (r.tip.empty() || !(r.kind == 'b' || r.kind == 'd' || r.kind == 'l') || !in(p.box, hover_x, hover_y)) continue;
+                if (r.tip.empty() || !(r.kind == 'b' || r.kind == 'd' || r.kind == 'l' || r.kind == 'e') || !in(p.box, hover_x, hover_y)) continue;
                 const std::vector<std::wstring> tl = wrap_words(little, r.tip, width - 16 - 16);
                 const int lh = 17, h = static_cast<int>(tl.size()) * lh + 10;
                 int y0 = static_cast<int>(p.box.bottom) + top + 4;
@@ -5706,8 +5803,17 @@ struct ExperimentalLayer : PinnedLayer {
         dirty = true;
         for (auto it = hits.rbegin(); it != hits.rend(); ++it) {  // the last drawn is on top (the list)
             if (!in(it->r, x, y)) continue;
+            if (it->kind == 4) {  // (0.15.309) a text box: typed in from now on (its text to start with)
+                if (edit_row != it->value) {
+                    edit_row = it->value;
+                    edit_text = rows[static_cast<size_t>(it->value)].text;
+                    FK_LOG(fklog::kDebug, "%s: text box %d opened", id.c_str(), edit_row);
+                }
+                return;
+            }
+            stop_edit("a click elsewhere");
             if (it->kind == 0 && it->value > 0 && window) {
-                window->act("exp", std::to_string(gen) + "/" + std::to_string(it->value));
+                window->act(verb, std::to_string(gen) + "/" + std::to_string(it->value));
             } else if (it->kind == 1) {
                 if (was != it->value) {
                     list_open = it->value;
@@ -5717,12 +5823,13 @@ struct ExperimentalLayer : PinnedLayer {
                         if (l[k].selected) list_scroll = std::max(0, static_cast<int>(k) - 3);
                 }
             } else if (it->kind == 2 && it->value > 0 && window) {
-                window->act("exp", std::to_string(gen) + "/" + std::to_string(it->value));
+                window->act(verb, std::to_string(gen) + "/" + std::to_string(it->value));
             } else if (it->kind == 3) {
                 list_open = was;  // a heading or the bar: the list stays open
             }
             return;
         }
+        stop_edit("a click elsewhere");
     }
 
     void wheel(int delta, int x, int y) override {
@@ -6576,6 +6683,9 @@ LRESULT CALLBACK overlay_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_SYSCOMMAND:
         if ((wp & 0xFFF0) == SC_KEYMENU) return 0;
         break;
+    case WM_CHAR:  // (0.15.309) typed text, for the Companion Roster's name box
+        if (Layer* l = g_compositor.keys_layer()) l->chr(wp);
+        return 0;
     case WM_KEYDOWN:
         if (Layer* l = g_compositor.keys_layer()) {
             FK_LOG(fklog::kDebug, "overlay: key %llu to %s", static_cast<unsigned long long>(wp), l->name());
@@ -6740,11 +6850,13 @@ void ui_thread_body() {
     NoticeLayer notices;
     ExperimentalLayer experimental;
     experimental.window = &window;
+    ExperimentalLayer roster("companion_roster", L"Companion Roster", L"ui_roster.dat", "ros", L"ui_roster_toggle.request");
+    roster.window = &window;
     BoardLayer board;
     UpdateDialog update_dialog;
     ChangeLogDialog change_log;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &change_log, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &roster, &change_log, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;

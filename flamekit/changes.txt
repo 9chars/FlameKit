@@ -1,3 +1,6 @@
+0.15.309 Nov 20, 2026
+- Companions (test): a "Companion Roster" button next to "Call my companion" (Experimental tab) opens the new Companion Roster window: every companion on the server with his owner, kind, mode, items and chest. Rename him (type the new name in his name box, Enter), change his kind to any monster that is not a boss, give him to a player or share him (also offline players), set him as main, put him away or bring him back, delete him (two clicks).
+
 0.15.308 Nov 20, 2026
 - Companions (test, local server only): "roster delete" now refuses while the companion's chest is open or he still carries items (they would be lost); "roster away" closes his open chest first, his items kept. Server only: no game change.
 
