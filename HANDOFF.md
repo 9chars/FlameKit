@@ -1844,6 +1844,14 @@ next restart (no yes for a restart yet).
    but drive_step returns after drive_water, so drive_put_away's TP_AFTER rule never ran in the water (old, every
    companion). 0.15.341: the same rule after drive_water (h.go_away = "can't follow"; log "can't follow: <id> in the
    water: put away").
+   **Owner 15:52 "I noticed the give to list box is grayed out, is that because theres no players on the server"**: yes
+   (roster.known has only Midevil; Give lists known players minus the owner).
+   **Owner 15:55: "I'm noticing with multiple companions open they're seem to all be fighting to get to me and I'm
+   getting lots of "Companion can't follow you!" messages"**: 15:54-15:55 N3 (follower 3 of 3, place 4) stood 0.4 m
+   from his place, 2.8 m from the player: drive_stuck saw no progress toward the crumb at the player's feet -> can't
+   follow -> respawn, every 8 s (18 times since 15:40; likely also the 14:11-14:19 loop). 0.15.342: drive_steer keeps
+   h.slot_at {x, z, t}; drive_stuck counts a follower within SLOT_AT 1.5 m of his place (slot set in the last 30
+   ticks) as progress.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

@@ -938,6 +938,7 @@ end
 -- (owner 2026-11-19 21:54 yes) the heal's Wolf Shout holds him in place while it plays: for SHOUT_HOLD after a heal the
 -- stuck timer starts over (21:33 and 21:38: two shouts 4 s apart made "can't follow: blocked" 0.5 m from his crumb)
 local SHOUT_HOLD = 120
+local SLOT_AT = 1.5  -- (15:55) metres from his place around the player that count as "there" (see drive_stuck)
 local function drive_stuck(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local nx, ny, nz = s.nx, s.ny, s.nz
@@ -955,7 +956,13 @@ local function drive_stuck(s)
   pcall(function() alive = world:get("Health", id).dataStorage[1] > 0 end)
   if c and alive then
     local dc = math.sqrt((c.x - nx) ^ 2 + (c.z - nz) ^ 2)
-    if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD then
+    -- (owner 15:55 "with multiple companions open they're seem to all be fighting to get to me and I'm getting lots of
+    -- "Companion can't follow you!" messages") 15:54-15:55: N3, follower 3 of 3, stood at his place (0.4 m from it,
+    -- 2.8 m from the player) and made no progress toward the crumb at the player's feet: "can't follow", respawned,
+    -- again every 8 s. A follower standing within SLOT_AT of his place (set by drive_steer this half second) has arrived.
+    local sa = h.slot_at
+    local at_slot = sa and t - sa.t < 30 and (sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SLOT_AT * SLOT_AT
+    if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD or at_slot then
       h.prog = { c = c, d = dc, t = t }
     elseif t - h.prog.t > STUCK_TICKS then
       h.prog = nil
@@ -1026,6 +1033,7 @@ local function drive_steer(s)
         pick = pick or ((k - 1) % #SLOTS + 1)
         h.slot_i, o = pick, SLOTS[pick]
         tx, tz = point(pick)
+        h.slot_at = { x = tx, z = tz, t = t }  -- (15:55) drive_stuck: standing at his place is not "stuck"
         -- (12:24: they still stood together) the C++ stops him within 2 m of homeZonePosition (the player): for a slot
         -- that point is put 1.5 m past his place, on his way there, so he stops about 0.5 m from his place
         local ux, uz = tx - nx, tz - nz
