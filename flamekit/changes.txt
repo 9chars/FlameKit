@@ -1,3 +1,6 @@
+0.15.292 Nov 20, 2026
+- Companions (test, local server only): while the companion's chest is open, E on the companion closes the chest at once (no wheel), and its prompt shows the game's door "Close" word (test: if it shows only "E", the word's id is wrong). Server only: no game change.
+
 0.15.291 Nov 20, 2026
 - Companions (test, local server only): while its chest is open the companion can no longer be pushed: it stays exactly where it stood when the chest opened. Server only: no game change.
 

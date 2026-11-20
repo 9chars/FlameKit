@@ -1181,7 +1181,7 @@ local function bring_to_life(world, r, id, player)
   end
   pcall(function() world:get("Faction", id).faction = COMPANION_FACTION end)
   pcall(calm, world, id)
-  pcall(emf.offer, world, id, { verb = "Talk" }, function(w, p, npc) on_talk(w, p, npc) end)
+  inv.prompt(world, id, inv.open[r.name] ~= nil)
   local oka, erra = pcall(match_armor, world, id, r)
   if not oka then log("armor: " .. tostring(erra)) end
   local okm, errm = pcall(match_level, world, id, r, player)
@@ -1447,6 +1447,18 @@ function inv.pin(world, id)
   end
 end
 
+-- (owner 2026-11-20 08:22 "I wanted the "E" button to just say "Close" chest. it doesn't have to bring up the whole wheel
+-- when the chest is open") his E prompt: "Talk" (the wheel), or while his chest is open the game's door "Close" text
+-- and E closes the chest at once (on_talk). EMF's verbs have no "Close": inv.CLOSE_VERB is FNV-1a of the onToOffVerb
+-- GUID of Base_Door's InteractionToggle (da5990c2-f8f0-413c-bb4d-fe057f4b4ca1), UNPROVEN: the same hash of its
+-- offToOnVerb is not EMF's Open id, so the prompt may show "E" with no word (then the id is wrong).
+inv.CLOSE_VERB = 0x3959A87F
+function inv.prompt(world, id, open)
+  pcall(emf.offer_remove, world, id)
+  local ok, res = pcall(emf.offer, world, id, { verb = open and inv.CLOSE_VERB or "Talk" }, function(w, p, npc) on_talk(w, p, npc) end)
+  if open then log(string.format("inventory: E on %s now closes the chest (verb %s: %s)", tostring(id), string.format("0x%08X", inv.CLOSE_VERB), tostring(ok and res))) end
+end
+
 -- his chest is open: he is frozen (drive_step)
 function inv.frozen(id) local n = name_of[id] return n ~= nil and inv.open[n] ~= nil end
 
@@ -1515,6 +1527,7 @@ inv.open_chest = function(world, player, npc, rr)
     rule = okr and rule or nil }
   rr.chest = { id = chest, session = emf.session(), state = "filling" }
   roster_save()
+  inv.prompt(world, npc, true)
   log(string.format("inventory %s: chest %s opened at %.1f %.1f %.1f with %d stack(s), %d item(s) to put in", rr.name, tostring(chest),
     cx, y, cz, #queue, inv.count(rr.inv)))
   say(world, player, rr.name .. ": Inventory open.")
@@ -1537,6 +1550,7 @@ function inv.close(world, r, why)
   inv.open[r.name] = nil
   r.chest = nil
   roster_save()
+  if ent_of[r.name] then inv.prompt(world, ent_of[r.name], false) end
   log(string.format("inventory %s: chest %s closed (%s): %d stack(s), %d item(s) kept", r.name, tostring(c.chest), why,
     #(r.inv or {}), inv.count(r.inv)))
   local p = c.player
@@ -1693,6 +1707,10 @@ on_talk = function(world, player, npc)
   if rr and not may_command(rr, account) then
     log(string.format("E: %s refused for %s (controllers %s)", rr.name, tostring(account), table.concat(rr.controllers or {}, ",")))
     refuse(world, player, rr)
+    return
+  end
+  if rr and inv.open[rr.name] then  -- (owner 08:22) E closes his open chest at once, no wheel
+    inv.close(world, rr, "the player")
     return
   end
   local okp, ver = pcall(emf.net.peer, world, player, WHEEL)

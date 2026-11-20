@@ -1487,6 +1487,14 @@ next restart (no yes for a restart yet).
      stop that?" -> 0.15.291: inv.pin (drive_step's frozen branch): the CurrentTransform position when frozen (c.pin, per
      body) is written back every tick he is moved, his Velocity zeroed; log "pushed while the chest is open: put back"
      once. Harness: a 2 m push undone the next tick.
+     **Owner 08:22, verbatim:** "also I wanted the "E" button to just say "Close" chest. it doesn't have to bring up the
+     whole wheel when the chest is open..." -> 0.15.292: on_talk while inv.open: inv.close at once (no wheel); his offer
+     (inv.prompt, used by bring_to_life too) while open: verb inv.CLOSE_VERB 0x3959A87F, back to "Talk" on close. EMF's
+     verb list (emf_api.h EMF_VERB_*) has no Close; own words need an EML content mod (a data patch on every game). The id
+     = FNV-1a of Base_Door's InteractionToggle.onToOffVerb GUID da5990c2-f8f0-413c-bb4d-fe057f4b4ca1 (tplcomp.py, comp
+     ad7e2be5); UNPROVEN: FNV-1a of its offToOnVerb (0af70198-...) = 0x4E82E309, not EMF_VERB_OPEN 0x0C2E4515, so the
+     door's words may be other entries or the hash another; TEST: the prompt shows "E Close" or just "E". Language data:
+     not in enshrouded.kfc's 60 biggest resources (the .dat files hold the rest).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
