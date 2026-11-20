@@ -1283,6 +1283,13 @@ next restart (no yes for a restart yet).
      Live 19:19; at once he attacked 171973 (the real monster). **Owner 19:20, verbatim:** "put it on the list, but it
      probably won't come up again" -> **LATER LIST:** a target's speed for the bat wait measured from how far it really
      moved (~0.25 s) instead of its Velocity (only matters if a real monster reports a wrong speed; not seen since #1).
+     **Owner 19:21:** "does that dog have any mana? can he do heals?" Logging 19:21 (live): the hound has NO Mana,
+     ManaRegeneration, HealthRecharge or HealingMod (only Health 3680 and Stamina 335; he never heals himself); the
+     player: Mana 483, ManaRegeneration, HealthRecharge, HealingMod x1.15. FlameKit can heal: emf.attribute_add(...,
+     "health", n) (the game's attribute code, stops at max). **Owner 19:25, verbatim:** "yeah write it up, as for how
+     much mana and how much heals... im not sure. I only have 483 mana at level 50, but im not spec'd as a mage. I would
+     give him 800 mana and see how that works? how would a heal animation work with him? nothing for him I would
+     imagine?" -> written: `local_server/HEAL_PLAN.md` (proposal, nothing built; open questions at its end).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
