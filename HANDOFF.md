@@ -1596,6 +1596,13 @@ next restart (no yes for a restart yet).
      [chat] admins in the server's emf\emf_core.ini (the local server has none); "nah its probably best no one can use
      the commands like that"**: no emf_core.ini, commands only through emf\commands.txt (me) / the server log.
 2. Companions in the party list.
+9. **Companion roster tab (owner 2026-11-20 09:43-09:45):** "the companion roster management probably best done with a new
+   window on the client side mod right?" / "why can't I just make it part of the FlameKit ui like all the other windows?"
+   / "yeah because were not using EMF ui to draw anything..." (rule 12: I wrongly mentioned EMF windows). Plan: a
+   "Companions" tab in FlameKit's window (F6), built like the Server tab (server sends the list on a channel, rows and
+   buttons, clicks go back and the server checks may_command/admin): every companion with owner (name), mode, out/away,
+   items, chest open; give/share/unshare/main/away/back/delete; players picked by name (names remembered per account at
+   join, for offline players). A game-side change: Development build. Not started.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
