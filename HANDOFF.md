@@ -1295,6 +1295,13 @@ next restart (no yes for a restart yet).
      (200 mana, 4 s apart, within 20 m), then himself the same way; otherwise as Passive; no heal animation known (only
      bite and lunge): he turns to the player, a notice, the health bar rises. Open: the numbers; healing himself
      outside Healing mode too; a notice per heal or not. Nothing built.
+     **Owner 20:27:** "will he be able to heal himself in defense and attack modes too?" Claude's take: one mana pool and
+     one heal for every mode; Defensive/Aggressive: he heals only himself, at ~40 % (mana lasts the fight), no
+     animation so it never stops an attack; Healing: the player first, then himself; Passive: a slow recovery between
+     fights. **Owner 20:35, verbatim:** "yes that would be good, did you find a howl animation he could do" -> the
+     healing design above is agreed (not built). Howl: never searched; his moves start by sequence id (FNV-1a of the
+     sequence GUID) through `fkprobe.bite <entity> <hex>`; the hound's other sequences would come from the game data
+     (claude_scratch/tpl has kfc.py and the template lists). Asked the owner whether to search.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
