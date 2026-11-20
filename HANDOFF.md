@@ -1435,12 +1435,21 @@ next restart (no yes for a restart yet).
      re_villages.md; core/loot_chest.lua): a hidden chest as storage loses everything on a server restart -> the
      companion's items must live in FlameKit's own file (the roster). (2) emf.put/take/move = take + put: plain stacks
      exact; GEAR has a per-item data entity (pide: level, perks, durability, gem) that a take destroys: put back = same
-     item, level and rarity (passable), perks re-rolled, the socketed gem gone (EMF guide.md/cookbook.md). The engine's
+     item, level and rarity (passable), [WRONG, see the owner 07:59 correction below:] perks re-rolled, the socketed gem
+     gone (EMF guide.md/cookbook.md). The engine's
      moveStack (op 4, 0x14040da50) keeps the pide between two containers (re_take_items.md 4b) but EMF does not offer it
      and both containers must exist (no saved one to move into). (3) core/bag.lua reads every stack: item, count, gear,
      rarity, level, gem id (not the perks). (4) The chest: core/loot_chest.lua's Prop_Decoration_T5_Storage_40_Chest
      (40 slots), PUT_WAIT 0.5 s before the first put, a hit rule so it takes no damage. Questions asked: gear handling,
      the auto-close time, where the chest appears.
+     **Owner 07:59, verbatim:** ""game destroys a gear piece's hidden data when it's taken out." I think you're wrong on
+     this and you just forget we tested that. why do you say thats a problem?" -> right: tested 2026-11-15 (core/
+     ground_loot.lua): a sword re-made with rarity 4 and level 10 came out legendary level 10, the same item (rarity =
+     the number of the item's perks unlocked, so level + rarity give the same piece). EMF's "perks re-rolled" warning
+     does not apply. The ONE thing that does not carry over: a gem socketed into a weapon (loot_drop keeps such pieces in
+     the body). **Rule for Claude: check HANDOFF and the code comments for our own tests before quoting EMF docs.**
+     Asked: a weapon with a socketed gem (store the gem as a separate item / refuse the piece), auto-close 10 min?,
+     the chest beside the companion?
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
