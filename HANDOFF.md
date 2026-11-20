@@ -1773,6 +1773,10 @@ next restart (no yes for a restart yet).
    Probe DLL 0dd8a1f0 installed (old 781c4e64 kept as .old_1425); restart 14:25 (owner "yes"); "pets: hook on
    interaction_offer installed". Log 14:28: N2 22654 runtime override 3e5189bf/d9861c4b offered 1, client verb
    d9861c4b offered 1. **Owner 14:28: "I see just the 'Talk' option"** (no Pet, no Pick up). E -> wheel: not yet pressed.
+   **Owner 14:32: "no wheel, do I need to respawn him?"**: no InteractionAcceptedEvent in the log at all (14:30-14:32)
+   = the press is checked (interaction_attempt) after the game put its own offer back. 0.15.331: the same set also
+   after interaction_taming and before interaction_attempt; "pet offer ... before interaction_attempt: the game's
+   again" logged (every 10 s at most) when it had been reset. Needs the probe DLL (restart). Respawn not needed.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

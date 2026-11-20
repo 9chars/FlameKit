@@ -1,3 +1,6 @@
+0.15.331 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt is also kept in place when the game checks the E press, so pressing it opens the companion wheel. Needs a server restart. Server only: no game change.
+
 0.15.330 Nov 20, 2026
 - Companions (test, local server only): a pet's E prompt ("Talk", opens the companion wheel) is now set by the server probe right before the game shows prompts, since the game turned the mod's prompt off again every step. Needs a server restart. Server only: no game change.
 

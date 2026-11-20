@@ -432,7 +432,11 @@ void read_pets() {
 constexpr uint32_t kTouchSeq = 0x3E5189BFu;   // EMF_SEQUENCE_TOUCH
 constexpr uint32_t kTalkVerb = 0xD9861C4Bu;   // EMF_VERB_TALK
 std::atomic<uint64_t> g_offer_log_at{0};
-void pet_offers(bool post) {
+std::atomic<uint64_t> g_reset_log_at{0};
+// where: 0 = before interaction_offer, 1 = after interaction_taming, 2 = before interaction_attempt (14:32: E on the
+// Talk prompt fired no InteractionAcceptedEvent: the game's own offer was back by the time the press was checked),
+// 3 = after interaction_offer (only checks and logs the client copy)
+void pet_offers(int where) {
     emf::World w = emf::server_world();
     if (!w) return;
     std::vector<uint32_t> ids;
@@ -441,12 +445,20 @@ void pet_offers(bool post) {
         for (auto& kv : g_pets) ids.push_back(kv.first);
     }
     const uint64_t now = GetTickCount64();
-    const bool say = post && now >= g_offer_log_at.load();
+    const bool say = where == 3 && now >= g_offer_log_at.load();
     if (say) g_offer_log_at.store(now + 10000);
     for (uint32_t id : ids) {
         auto* o = w.get<emf::gen::ecs::InteractionOfferRuntime>(id);
         if (!o) continue;
-        if (!post) {
+        if (where != 3) {
+            const bool ours = o->overrideSequence.value == kTouchSeq && o->overrideVerbLocaId.value == kTalkVerb &&
+                              o->isOffered && !o->isDisabled;
+            if (!ours && where == 2 && now >= g_reset_log_at.load()) {
+                g_reset_log_at.store(now + 10000);
+                EMF_LOG(kMod, "pet offer %u before interaction_attempt: the game's again (seq %08x verb %08x offered %d "
+                        "disabled %d): set back", id, o->overrideSequence.value, o->overrideVerbLocaId.value,
+                        (int)o->isOffered, (int)o->isDisabled);
+            }
             o->overrideSequence.value = kTouchSeq;
             o->overrideVerbLocaId.value = kTalkVerb;
             o->isOffered = true;
@@ -461,8 +473,10 @@ void pet_offers(bool post) {
                     c ? "yes" : "NONE", c ? c->verbId.value : 0u, c ? (int)c->isOffered : -1);
     }
 }
-void pet_offers_pre(void*, void*) { pet_offers(false); }
-void pet_offers_post(void*, void*) { pet_offers(true); }
+void pet_offers_pre(void*, void*) { pet_offers(0); }
+void pet_offers_post(void*, void*) { pet_offers(3); }
+void pet_offers_taming(void*, void*) { pet_offers(1); }
+void pet_offers_attempt(void*, void*) { pet_offers(2); }
 
 void drive_post(void* ctx, void*) {
     emf::World w = emf::server_world();
@@ -850,6 +864,11 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     // (2026-11-20 14:22) pets' E: their offer set right before interaction_offer, checked after it (pet_offers)
     const bool offers = emf::api()->hook_program("interaction_offer", pet_offers_pre, pet_offers_post, nullptr);
     EMF_LOG(kMod, "pets: hook on interaction_offer %s", offers ? "installed" : "NOT installed");
+    // (14:32) and wherever the game may put its own back before a press is checked
+    const bool taming = emf::api()->hook_program("interaction_taming", nullptr, pet_offers_taming, nullptr);
+    const bool attempt = emf::api()->hook_program("interaction_attempt", pet_offers_attempt, nullptr, nullptr);
+    EMF_LOG(kMod, "pets: hook after interaction_taming %s, before interaction_attempt %s", taming ? "installed" : "NOT installed",
+            attempt ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) { drive_scan(w); });
     emf::on_tick([](emf::World w) { if (w.is_server()) names_tick(w); });  // (2026-11-20) companion chest names
     emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {
