@@ -1736,6 +1736,10 @@ next restart (no yes for a restart yet).
    Restart 13:07 (owner "yes"); **owner 13:22 "it still glitches out a bit"**: petlog 13:23:25-60 (wildlife state 13):
    10-33 m in 0.5 s whenever the drive gave speed 4 (sprint), normal at 2/3; jumplog "takes off ... lands 33.6 m
    forward". Animal locomotion has no sprint. 0.15.325: C++ caps pets at speed 3 (run).
+   Restart 13:26 (owner "yep"). **Owner 13:48 "he seems good, does he jump"**: yes, drive_jump_follow copies the
+   player's jumps for pets too (13:48:37-41: 4 copies, down 0.6-0.8 m from the crumb). **Owner 13:56 "I saw one"**:
+   likely the flat-ground copies are low hops (5.9 m/s up) with no jump animation on an animal (it is lifted by speed;
+   the hound plays Enemy_Jump_Move). Open: look for a dog jump-like move in the game data if wanted.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
