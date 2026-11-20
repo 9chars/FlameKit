@@ -78,6 +78,9 @@ end
 
 function F.roster_rows(world)
   local rows = {}
+  -- (0.15.310, owner 10:47 "how do I add a new entry?") a new companion: a hound of yours, next to you, following you
+  rows[#rows + 1] = { button = "ros:new:", text = "New companion",
+    tooltip = "Makes a new companion (a hound) next to you that follows you; rename it, change its kind or give it away below." }
   if ros.result then rows[#rows + 1] = { text = ros.result, color = ros.ok and "#7fd67f" or "#ff9050" } end
   if not ros.list then
     rows[#rows + 1] = { text = "Asking the server for the roster... (a server without the companion code does not answer)", dim = true }
@@ -96,7 +99,7 @@ function F.roster_rows(world)
     if c.ch then facts[#facts + 1] = "Chest open" end
     if c.main then facts[#facts + 1] = "Main companion" end
     rows[#rows + 1] = { text = table.concat(facts, "  \u{00B7}  ") .. (#shared > 0 and ("\nShared with: " .. table.concat(shared, ", ")) or ""), dim = true }
-    rows[#rows + 1] = { label = "Name" }
+    rows[#rows + 1] = { label = true, text = "Name" }
     rows[#rows + 1] = { edit = "ros:rename:" .. c.n, text = c.n, same_line = true,
       tooltip = "Click, type a new name (up to 20 letters, digits, spaces, - _ ' .) and press Enter. Esc cancels." }
     -- the kinds: every monster that is not a boss, by group
@@ -110,7 +113,7 @@ function F.roster_rows(world)
         kinds[#kinds + 1] = { text = m[2], key = "ros:kind:" .. c.n .. ":" .. m[3], selected = m[3] == c.k }
       end
     end
-    rows[#rows + 1] = { label = "Kind", same_line = true }
+    rows[#rows + 1] = { label = true, text = "Kind", same_line = true }
     rows[#rows + 1] = { options = kinds, text = k and k[2] or "unknown", same_line = true,
       tooltip = "What he is: any monster that is not a boss. A body that is out is replaced at once." }
     local give, share, unshare = {}, {}, {}
