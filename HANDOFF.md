@@ -1575,6 +1575,11 @@ next restart (no yes for a restart yet).
      Prop_Decoration_T6_Storage_72_Magic bc834cbd-58f1-494a-97fb-0dc0248eb738 (72 slots, the biggest storage template;
      others: T4_Storage_56 fae7a62e..., T3_Storage_40 bdebd6a9...). Not seen in game yet. A bigger LOOK would be
      ScaleComponent in emf.spawn's components (untested on a prop).
+     Owner 09:27 "I meant bigger slots so you got it right". **Owner 09:28 "can you make the chest not spawn right on the
+     player? it spawned it right where I was standing which was super werid"** (09:27:21 chest 31493; the 72-slot chest
+     is bigger, 1.5 m to his right reached the player). 0.15.305: inv.SPOT 2.5 m from him on the far side from the player
+     (his right only when the player stands on him); the opened log gives the distance from the player. NOTE: no "opened
+     by its owner" line at 09:27 (he closed it via E at 09:27:34; maybe never opened it): the event is still unproven.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

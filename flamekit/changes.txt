@@ -1,3 +1,6 @@
+0.15.305 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 2.5 m from him on the side away from you, no longer on top of you. Server only: no game change.
+
 0.15.304 Nov 20, 2026
 - Companions (test, local server only): the companion's chest is now the game's biggest storage chest (72 slots) instead of the 40-slot one. Server only: no game change.
 
