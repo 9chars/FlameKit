@@ -1,3 +1,6 @@
+0.15.351 Nov 20, 2026
+- Companions (test, local server only): a pet more than 8 m behind you moves 1.6 times as fast until it catches up (animals have no sprint). Needs a server restart. Server only: no game change.
+
 0.15.350 Nov 20, 2026
 - Companions (test, local server only): fixed: since 0.15.349 companions and pets stopped following (an error in the new "near the player" check). Server only: no game change.
 

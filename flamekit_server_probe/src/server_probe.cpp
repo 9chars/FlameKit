@@ -487,6 +487,41 @@ void pet_offers(int where) {
                     c ? "yes" : "NONE", c ? c->verbId.value : 0u, c ? (int)c->isOffered : -1);
     }
 }
+// ---- (owner 2026-11-20 16:31 "no way to make the pets move faster eh" / 16:33 "for the pets, try 1 first then 2,
+// because they just lag behind too much") an animal has no sprint (ClientLocomotion.sprintSpeed 0; the dog runs at
+// 4.3 m/s, the hound 5.8) and asking for one made 10-33 m jumps (13:23). Its speed comes from the game's locomotion
+// (program locomotion_execution writes Velocity). Here, right after that program: a driven pet more than kBoostFrom
+// from the player's spot gets its horizontal velocity times kBoost (the run animation stays: the feet may slide).
+constexpr double kBoostFrom = 8.0;
+constexpr float kBoost = 1.6f;
+std::atomic<uint64_t> g_boost_log_at{0};
+void pet_boost(void*, void*) {
+    emf::World w = emf::server_world();
+    if (!w) return;
+    std::vector<std::pair<uint32_t, PetIn>> pets;
+    {
+        std::lock_guard<std::mutex> lk(g_pet_mx);
+        for (auto& kv : g_pets) pets.push_back(kv);
+    }
+    const uint64_t now = GetTickCount64();
+    for (auto& [id, p] : pets) {
+        if (p.code < 1.5f) continue;  // not driven this step
+        auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, id));
+        auto* v = w.get<emf::gen::ecs::Velocity>(id);
+        if (!tr || !v) continue;
+        const double x = (double)tr->px / 4294967296.0, z = (double)tr->pz / 4294967296.0;
+        const double d = std::sqrt((p.hx - x) * (p.hx - x) + (p.hz - z) * (p.hz - z));
+        const float hs = std::sqrt(v->velocity.x * v->velocity.x + v->velocity.z * v->velocity.z);
+        if (d <= kBoostFrom || hs < 1.0f) continue;
+        v->velocity.x *= kBoost;
+        v->velocity.z *= kBoost;
+        if (now >= g_boost_log_at.load()) {
+            g_boost_log_at.store(now + 5000);
+            EMF_LOG(kMod, "pet boost %u: %.1f m from the player: %.1f -> %.1f m/s", id, d, hs, hs * kBoost);
+        }
+    }
+}
+
 void pet_offers_pre(void*, void*) { pet_offers(0); }
 void pet_offers_post(void*, void*) { pet_offers(3); }
 void pet_offers_taming(void*, void*) { pet_offers(1); }
@@ -899,6 +934,9 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     const bool attempt = emf::api()->hook_program("interaction_attempt", pet_offers_attempt, nullptr, nullptr);
     EMF_LOG(kMod, "pets: hook after interaction_taming %s, before interaction_attempt %s", taming ? "installed" : "NOT installed",
             attempt ? "installed" : "NOT installed");
+    // (16:33) pets faster when far behind: after the game's locomotion (pet_boost)
+    const bool boost = emf::api()->hook_program("locomotion_execution", nullptr, pet_boost, nullptr);
+    EMF_LOG(kMod, "pets: hook after locomotion_execution %s", boost ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) { drive_scan(w); });
     emf::on_tick([](emf::World w) { if (w.is_server()) names_tick(w); });  // (2026-11-20) companion chest names
     emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {

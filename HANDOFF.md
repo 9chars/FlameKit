@@ -1902,6 +1902,17 @@ next restart (no yes for a restart yet).
    me....?"**: 16:26:42 "drive <id>: npc_probe.lua:980: attempt to compare number with nil" = drive_stuck read
    SLOT_NEAR, declared further down (a global nil). 0.15.350: SLOT_NEAR / SLOT_GAP declared above drive_stuck. Check
    from now on: texluac -l -p <file> | grep '_ENV "' must list only real globals.
+   16:29 reload: all 5 back (2 put away from 70-80 m, the rest caught up). Owner 16:30 "drop the baby bunny one": asked
+   whether to delete N5 or just drop it from the list: not answered (nothing done).
+   **Owner 16:31 "no way to make the pets move faster eh" / 16:33 "for the pets, try 1 first then 2, because they just
+   lag behind too much. the monster companions work differently right?"** = pets only: 1) find the animal's own run
+   speed and raise it; then 2) a catch-up put-away/bring-back when a pet falls too far behind. Monsters: walk/run/
+   sprint (the C++ sprints past 6 m), pets capped at run (sprint = 10-33 m jumps, 13:23).
+   Found (fullrec 16:34, dog 32527 / hound 26319): ClientLocomotion.runSpeed dog 4.3 / hound 5.8, sprintSpeed 0 for
+   both; no speed field in Locomotion; buff type names are not on the dedicated server (buffs.list needs a hosted
+   world). 0.15.351 (option 1): the probe hooks after locomotion_execution (writes Velocity): a driven pet (g_pets code
+   >= 1.5) more than kBoostFrom 8 m from the player's spot, moving over 1 m/s: horizontal velocity x kBoost 1.6 (log
+   "pet boost <id>: ..." every 5 s at most). Needs the probe DLL (restart). Option 2 (catch-up) after the test.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
