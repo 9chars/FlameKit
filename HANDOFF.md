@@ -1821,6 +1821,10 @@ next restart (no yes for a restart yet).
    for HEAL_COST 100 mana, HEAL_GAP 4 s, sparkle HEAL_FX 1 on both, green notice); for pets no fight_init wait, no
    Wolf Shout (selectedAttackIndex untouched), no self heal, own health not required. Log "heal N2: ... (Healing
    mode, pet)".
+   **Owner 15:27 "looks like it works"** (15:27:08 heal N2: the player +635, mana 333 -> 233). Owner 15:27 asked about
+   following / stuck / respawns: same drive and safety nets; pets: run at most (fall behind on long sprints), water
+   untested for animals, no "can't follow" since 15:02 (the 14:11-14:19 loop was with the tame spawn). **Owner 15:33
+   "seems good"** (log: jump follow copies, step-ups 3.5 m, no can't-follow).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
