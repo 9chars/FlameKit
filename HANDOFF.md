@@ -1550,7 +1550,14 @@ next restart (no yes for a restart yet).
      **Server restart 09:05 (owner 09:05 "yeah bounce it"):** probe DLL 27d76044 loaded; 09:05:40 'N1'/'N2' registered
      BEFORE the world loaded (table count 1, 2) and they survived the load: 09:11:57 chest 28184 kept key
      0x09207B07B5B5A6A0 (not zeroed); 09:11:58 "upgrades put back on item 3412482507 (level 47): unlocked 0 -> 1",
-     gear log 4/1; the owner took the weapon out at 09:12:03. In-game look not confirmed by the owner yet.
+     gear log 4/1; the owner took the weapon out at 09:12:03. **Owner 09:14 "seems to all work".**
+     **Owner 09:14: "I've decided to take the despawn time limit off the chest completely since the companion can't move
+     so it should be safe just to leave it there."** 0.15.300: inv.OPEN_MAX and the auto-close removed (rule 0n);
+     invtest checks it is still open after 5 minutes. Safety (his question "items will be safe on a server restart or
+     crash right?"): his record is written to emf\config\flamekit\<slot>.txt within 1 s of any change (the world data
+     file, written at once), the chest itself is never saved by the game, a new run starts with the record; the gap:
+     the PLAYER's inventory is only saved with the world (every 30 s), so a crash right after moving items can lose (took
+     out) or double (put in) what moved since the last world save; a restart through the helper saves first.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

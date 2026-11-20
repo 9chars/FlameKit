@@ -1416,8 +1416,8 @@ end
 -- ===== E: the wheel ====================================================================================================
 -- ===== Inventory (owner 2026-11-20 07:54/08:02) ===========================================================================
 -- "Inventory" on his wheel spawns a large chest next to him with everything he carries; while it is open he is frozen
--- and his wheel offers only "Close Chest", which saves what is in it and removes the chest. A chest left open closes
--- itself after inv.OPEN_MAX the same way. Spawned entities are not saved by the game (a server restart loses them), so his
+-- and his wheel offers only "Close Chest", which saves what is in it and removes the chest. It stays open until closed
+-- (owner 2026-11-20 09:14: the 5-minute limit is gone, "the companion can't move so it should be safe"). Spawned entities are not saved by the game (a server restart loses them), so his
 -- items live in his roster record (r.inv: {item, count, level, rarity}, in the world's data): the chest is only a view.
 -- Filling: the items are put into the new chest one after another (inv.PUT_WAIT after the spawn, inv.RETRIES tries on a
 -- fresh chest); r.inv is not touched until every put has answered. Open: every inv.SAVE_EVERY his record becomes the
@@ -1427,7 +1427,6 @@ end
 -- r.chest = {id, session, state} survives a script reload: the same server run takes the chest up again (an "open" one)
 -- or removes it ("filling": r.inv still holds everything); a new server run has lost it (r.inv is the last save).
 inv.CHEST = "0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec"  -- Prop_Decoration_T5_Storage_40_Chest (40 slots, core/loot_chest.lua)
-inv.OPEN_MAX = 5 * 60 * 60   -- ticks: closes itself after 5 minutes (owner 08:02 "maybe go with 5 minutes for now?")
 inv.PUT_WAIT, inv.RETRIES, inv.SAVE_EVERY = 30, 3, 60
 
 -- (owner 2026-11-20 08:19 "we'll have to test the unlocked parts") every gear piece in the chest: its level, rarity,
@@ -1642,7 +1641,7 @@ inv.open_chest = function(world, player, npc, rr)
   say(world, player, rr.name .. ": Inventory open.")
 end
 
--- why: "the player" or "after 5 minutes"
+-- why: "the player" or "he died"
 function inv.close(world, r, why)
   local c = inv.open[r.name]
   if not c then return end
@@ -1727,9 +1726,7 @@ function inv.tick(world)
         end
       end
     else
-      if t - c.t0 >= inv.OPEN_MAX then
-        inv.close(world, r, "after 5 minutes")
-      elseif c.ready_t and t >= c.ready_t and not c.gear_logged then
+      if c.ready_t and t >= c.ready_t and not c.gear_logged then
         c.gear_logged = true
         if c.fix then pcall(inv.apply_unlocked, world, name, c) end
         pcall(inv.log_gear, world, name, c.chest, "filled")

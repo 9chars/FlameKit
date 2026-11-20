@@ -113,10 +113,11 @@ for _, sl in ipairs(chest_items(c.chest)) do local st = comps[sl.data.pide] and 
   parts[#parts + 1] = sl.id .. "x" .. sl.data.count .. (st and ("@L" .. tostring(st.itemLevelUi) .. "/R" .. tostring(st.itemRarityUi)) or "") end
 print("chest on the second open: " .. table.concat(parts, " "))
 -- frozen: his drive does nothing while it is open
--- forgotten: closes itself after 5 minutes
+-- (owner 09:14) no time limit: still open after 5 minutes, then closed by the player
 for _ = 1, 5 * 3600 + 5 do step() end
 print("after 5 minutes: open?", T.inv.open.N1 ~= nil)
-show("record after the auto-close", r)
+T.inv.close(W, r, "the player")
+show("record after the close", r)
 -- a chest that vanished: closing keeps the last save
 T.inv.open_chest(W, 1, 500, r)
 for _ = 1, 120 do step() end
