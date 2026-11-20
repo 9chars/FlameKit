@@ -1,3 +1,6 @@
+0.15.339 Nov 20, 2026
+- Companions (test, local server only): a pet dives all the way down with you (it was held about 3 m above you). Pets only. Server only: no game change.
+
 0.15.338 Nov 20, 2026
 - Companions (test, local server only): pets heal you like a companion in Healing mode, always: the same mana, heals, sparkle and notice (no shout, and they never heal themselves since they take no damage). Server only: no game change.
 

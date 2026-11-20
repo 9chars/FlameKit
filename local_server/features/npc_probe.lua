@@ -106,6 +106,7 @@ end
 -- ===== The drive's numbers =============================================================================================
 -- Swimming: his body is held FLOAT_LIFT above the player's height while diving, tilted nose up FLOAT_PITCH degrees.
 local FLOAT_LIFT = 0.45  -- metres
+local PET_DIVE_STEP = 0.4  -- (owner 15:36, pets only) metres a tick a pet may be moved up or down while swimming
 local FLOAT_PITCH = 28  -- degrees, nose up
 local SWIM_OUT_STOP = 0.8  -- in the water with the player on land, he only stops this close (he has not arrived while he swims)
 -- Jumps (drive_copy, drive_jump_follow): he jumps where the player jumped (the next crumb is a landing) and up every
@@ -448,6 +449,15 @@ local function drive_water(s)
     end
     local want = diving and (py + FLOAT_LIFT - ny) or (hw - SWIM_DEPTH)
     local fix = math.max(-0.08, math.min(0.08, want * 0.25))  -- at most 0.08 m a tick
+    -- (owner 15:35 "the pet dog swims but doesn't really follow me all the way down into the water"; 15:36 "only valid
+    -- for pets") 15:34: diving, the dog stayed ~2.3 m deep while the player was 4-5.5 m: the game lifts an animal more
+    -- than 0.08 m a tick. A pet: half the difference each tick, at most PET_DIVE_STEP.
+    if s.pet then
+      fix = math.max(-PET_DIVE_STEP, math.min(PET_DIVE_STEP, want * 0.5))
+      if diving and t % 60 == 0 then
+        log(string.format("dive %s (pet): the player at %.2f, he at %.2f (wants %.2f m, step %.2f)", tostring(id), py, ny, want, fix))
+      end
+    end
     if hopping then fix = 0 end
     if fix < 0 then
       local okg, grounded = pcall(function() return world:get("MovementCollider", id).results.m_value.hasGroundCollision end)
