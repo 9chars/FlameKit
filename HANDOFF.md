@@ -1626,6 +1626,13 @@ next restart (no yes for a restart yet).
    another task for another day". So: its own window (opened by a button next to "Call my companion" in the
    Experimental tab), the list + actions as sketched 09:52, change a player's main companion's template to any non-boss
    monster template, per-template behaviour tweaks (water position etc.), NO admin checks for now.
+   **Owner 10:01: "I should be able to name the companion as well".** Plan asked 10:0x (window, rows, Rename text box,
+   Kind drop-down of non-boss monsters, Give/Share/Unshare by player name, Set main, Put away/Bring back, Delete,
+   per-kind profiles; Development build + server restart): **owner: "sounds good, not sure what "(2) one row per
+   companion: name, owner, kind (template)," is actually going to look like on the screen...but go ahead and make it"**.
+   Untuned kinds: **"I would go with #2.. once the roster system is done we'll test and develop some "tuned" behaviors
+   that work with the humanoid templates and see how it goes...."** = an untuned kind plays its own attack moves looked
+   up in the game data (its first melee attack), may look wrong until tuned.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
