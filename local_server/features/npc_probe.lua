@@ -2888,7 +2888,21 @@ function F.setup(k)
         end
       elseif what == "unlock" then  -- unlock <chest> <item> <n>: (08:57) puts the upgrades back on a piece in a chest
         local ch, item, n = tonumber(args[2]), tonumber(args[3]), tonumber(args[4])
-        if not (ch and item and n) then emf.reply("npc: unlock <chest> <item> <n>") return end
+        local rr = not ch and args[2] and find(args[2])
+        if rr and item and n then  -- unlock <companion> <item> <n>: in his record (put back at the next opening)
+          for _, e in ipairs(rr.inv or {}) do
+            if e.item == item and e.level then
+              e.unlocked = math.floor(n)
+              roster_save()
+              log(string.format("unlock: %s's record: item %s level %s now %d unlocked", rr.name, tostring(item), tostring(e.level), e.unlocked))
+              emf.reply("npc: unlock set in the record")
+              return
+            end
+          end
+          emf.reply("npc: unlock: no such gear in his record")
+          return
+        end
+        if not (ch and item and n) then emf.reply("npc: unlock <chest>|<companion> <item> <n>") return end
         local c = { chest = ch, fix = { { item = item, unlocked = math.floor(n) } } }
         inv.apply_unlocked(world, "command", c)
         emf.reply("npc: unlock done (see the log)")
