@@ -1758,6 +1758,10 @@ next restart (no yes for a restart yet).
    offerId 1, offered. 0.15.328: roster.pet_offer (from pets_quiet, every tick) writes override seq EMF_SEQUENCE_TOUCH
    0x3E5189BF + verb EMF_VERB_TALK 0xD9861C4B; logs the first fix and every 100th (shows whether the game rewrites it).
    Untested: whether the pick-up goes with the sequence. Next (owner's idea): "Pet" in his wheel.
+   Log 14:13: the game writes its Pet offer back every tick (our fix counted 60 a second). **Owner 14:19: "the 'E' pet
+   option just opens the wheel"** (the word still reads Pet; our touch sequence wins at E). Pick-up: not checked yet.
+   **Found 14:11-14:19 (not from 0.15.328):** standing still, N2 (tame) stops 2.0 m from the player and his crumb;
+   "can't follow: blocked: no progress toward his crumb (2.0 m away)" puts him away and back every 10-20 s.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
