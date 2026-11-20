@@ -233,3 +233,15 @@ print("back: spot", nr.x, nr.y, nr.z, "out", nr.out)
 act("back", nr.name, nil)
 -- (0.15.313) a pet kind
 act("kind", nr.name, "5d9c1829-69fc-4339-8bcc-5e62e63e9a31")
+-- (0.15.315) the chest's place from the probe's ground answers: his left is 1 m up (another chest), his right fits
+local okc = pcall(T.inv.close, W, T.find(nr.name) or r, "test")
+local rr2 = T.roster.list[1]
+T.ent_of[rr2.name] = 500
+pos[500] = { 0, 0, 0 }
+T.inv.open[rr2.name] = nil
+T.inv.open_chest(W, 1, 500, rr2)
+local fa = io.open("/tmp\\chest_ground.answer", "w")
+local key = rr2.name:gsub("%s", "_")
+fa:write(key .. "#1 1.000\n" .. key .. "#2 0.100\n" .. key .. "#3 none\n" .. key .. "#4 0.000\n") fa:close()
+for _ = 1, 3 do step() end
+for i = #logs - 3, #logs do if logs[i]:find("place") or logs[i]:find("opened at") then print(logs[i]) end end

@@ -1624,20 +1624,76 @@ function inv.snapshot(world, r, c)
   return true
 end
 
+-- (owner 2026-11-20 12:12 "N1's chest spawned in the air... can you make that stay on the ground..?" / "it spawned too
+-- close to the other chest I guess": at 12:11 N1 stood about 1 m above N2, likely on another chest, and his chest was
+-- spawned at his height) the server probe (C++) looks for the ground under four places around him (his left first, as
+-- the owner asked 09:31, then his right, behind, in front; inv.SPOT m): chest_ground.request / .answer (the game's ray
+-- straight down). The first place whose ground is near his feet (GROUND_BELOW under to GROUND_ABOVE over: not on top
+-- of another chest, not down a drop) gets the chest, on that ground; else the lowest ground found near him; without
+-- an answer within GROUND_WAIT (no probe) his left at his height, as before.
+inv.ground = {}  -- name -> { player, npc, rr, cands, feet, at }
+inv.GROUND_BELOW, inv.GROUND_ABOVE, inv.GROUND_WAIT = 1.2, 0.4, 60
 inv.open_chest = function(world, player, npc, rr)
   if not rr then say(world, player, "Not on the list: no inventory.") return end
-  if inv.open[rr.name] then return end
+  if inv.open[rr.name] or inv.ground[rr.name] then return end
   local x, y, z = world:position(npc)
   if not x then return end
-  -- (owner 09:31 "make the chest just spawn to the left of him by 1.5 m"; 09:28 the 72-slot chest 1.5 m to his RIGHT
-  -- was on the player) inv.SPOT m to his left
-  local px, _, pz = world:position(player)
   local yaw = 0
   pcall(function()
     local q = world:get("CurrentTransform", npc).transform.orientation
     yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
   end)
-  local cx, cz = x - math.cos(yaw) * inv.SPOT, z + math.sin(yaw) * inv.SPOT
+  local c, sn = math.cos(yaw), math.sin(yaw)
+  local d = inv.SPOT
+  -- forward = (sin yaw, cos yaw); his left = (-cos yaw, sin yaw)
+  local cands = { { x - c * d, z + sn * d }, { x + c * d, z - sn * d }, { x - sn * d, z - c * d }, { x + sn * d, z + c * d } }
+  local lines = {}
+  for i, p in ipairs(cands) do lines[#lines + 1] = string.format("%s#%d %.3f %.3f %.3f", rr.name:gsub("%s", "_"), i, p[1], y, p[2]) end
+  local f = emf.dir and io.open(emf.dir .. "\\chest_ground.request", "a")
+  if f then f:write(table.concat(lines, "\n") .. "\n") f:close() end
+  pcall(os.remove, emf.dir and (emf.dir .. "\\chest_ground.answer") or "")
+  inv.ground[rr.name] = { player = player, npc = npc, rr = rr, cands = cands, feet = y, at = world:tick() + inv.GROUND_WAIT,
+    key = rr.name:gsub("%s", "_") }
+end
+
+function inv.ground_tick(world)
+  local text
+  local f = emf.dir and io.open(emf.dir .. "\\chest_ground.answer", "r")
+  if f then text = f:read("a") f:close() end
+  local t = world:tick()
+  for name, g in pairs(inv.ground) do
+    local hits, all = {}, true
+    for i = 1, #g.cands do
+      local v = text and text:match(g.key:gsub("%p", "%%%0") .. "#" .. i .. " (%S+)")
+      if v == nil then all = false else hits[i] = tonumber(v) end
+    end
+    if all or t >= g.at then
+      inv.ground[name] = nil
+      local pick, py, how
+      for i = 1, #g.cands do
+        local h = hits[i]
+        if h and h >= g.feet - inv.GROUND_BELOW and h <= g.feet + inv.GROUND_ABOVE then pick, py, how = i, h, "ground" break end
+      end
+      if not pick then
+        for i = 1, #g.cands do
+          local h = hits[i]
+          if h and h >= g.feet - 3 and h <= g.feet + 1 and (not py or h < py) then pick, py, how = i, h, "lowest ground" end
+        end
+      end
+      if not pick then pick, py, how = 1, g.feet, all and "no ground found: his height" or "no answer: his height" end
+      if text then pcall(os.remove, emf.dir .. "\\chest_ground.answer") end
+      log(string.format("inventory %s: chest place %d of 4 (%s): ground answers %s, his feet %.2f", name, pick, how,
+        (function() local o = {} for i = 1, #g.cands do o[i] = tostring(hits[i] and string.format("%.2f", hits[i]) or "-") end return table.concat(o, "/") end)(),
+        g.feet))
+      if g.rr and find(g.rr.name) and not inv.open[g.rr.name] then
+        inv.open_at(world, g.player, g.npc, g.rr, g.cands[pick][1], py, g.cands[pick][2])
+      end
+    end
+  end
+end
+
+function inv.open_at(world, player, npc, rr, cx, y, cz)
+  local px, _, pz = world:position(player)
   local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz, { CustomPlayerString = { stringId = inv.name_key(rr.name) } })
   if not (oks and chest and chest ~= 0) then  -- (names) without the label rather than no chest
     log(string.format("inventory %s: the chest with his name label was refused (%s): spawned without it", rr.name, tostring(chest)))
@@ -3088,6 +3144,10 @@ function F.tick(world)
     heal_fx_shown = keep
   end
   if next(inv.want) then pcall(inv.want_tick, world) end  -- (his E prompt) made once EMF takes it
+  if next(inv.ground) then  -- (12:12) his chest's place on the ground, once the probe answered
+    local okg, errg = pcall(inv.ground_tick, world)
+    if not okg then log("inventory: ground: " .. tostring(errg)) inv.ground = {} end
+  end
   if next(inv.open) then  -- (inventory) fill new chests, keep open ones saved, close forgotten ones
     local oki, erri = pcall(inv.tick, world)
     if not oki then log("inventory: tick failed: " .. tostring(erri)) end

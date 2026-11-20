@@ -621,7 +621,9 @@ int set_string_guarded(SetStringFn fn, void* sys, const char* p, uint64_t n, uin
     }
 }
 
-std::wstring names_file() {
+std::wstring flamekit_file(const wchar_t* name);
+std::wstring names_file() { return flamekit_file(L"custom_names.txt"); }
+std::wstring flamekit_file(const wchar_t* name) {
     HMODULE me = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        reinterpret_cast<LPCWSTR>(&fnv1a64), &me);
@@ -630,7 +632,7 @@ std::wstring names_file() {
     std::wstring s(path);
     s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods\fk_server_probe
     s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods
-    return s + L"\\flamekit\\custom_names.txt";
+    return s + L"\\flamekit\\" + name;
 }
 
 void names_tick(emf::World w) {
@@ -678,6 +680,55 @@ void names_tick(emf::World w) {
                 r > 0 ? "registered" : (r < 0 ? "FAULTED (caught)" : "refused"), (unsigned long long)key,
                 (unsigned long long)want, before ? "there" : "new", name_known(sys, want) > 0 ? "there" : "MISSING",
                 *(uint32_t*)(static_cast<uint8_t*>(sys) + 0x1e4));
+    }
+}
+// ---- (owner 2026-11-20 12:12 "N1's chest spawned in the air... can you make that stay on the ground..?") ----
+// FlameKit (Lua) asks for the ground under the places its companion chest could go: chest_ground.request, a line
+// "<key> <x> <y> <z>" each (metres); from the step's program (the ray needs its context) each is one ray straight down
+// from y + 1.5 to y - 8 (do_ground's settings: mask 0x9, flags 0x100, byte 1, as fkprobe.ground and the walk test) and
+// the answer goes to chest_ground.answer: "<key> <hit y>" or "<key> none". The request file is removed once answered.
+void do_chest_ground(emf::World w, void* ctx) {
+    if (w.tick() % 3 != 0) return;
+    static const std::wstring req = flamekit_file(L"chest_ground.request");
+    static const std::wstring ans = flamekit_file(L"chest_ground.answer");
+    FILE* f = _wfopen(req.c_str(), L"rb");
+    if (!f) return;
+    struct Ask { std::string key; double x, y, z; };
+    std::vector<Ask> asks;
+    char line[256];
+    while (std::fgets(line, sizeof line, f)) {
+        char key[64] = {};
+        double x, y, z;
+        if (std::sscanf(line, "%63s %lf %lf %lf", key, &x, &y, &z) == 4) asks.push_back({key, x, y, z});
+    }
+    std::fclose(f);
+    DeleteFileW(req.c_str());
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kRayCastRva;
+    void* col = w.singleton("ecs::ColliderSystem");
+    void* vox = w.singleton("ecs::VoxelGrid");
+    const bool can = std::memcmp(fnp, kRayCastStart, sizeof(kRayCastStart)) == 0 && col && vox;
+    std::string out;
+    for (const Ask& a : asks) {
+        float hit[3] = {0, 0, 0};
+        int r = -2;
+        if (can) {
+            const float from[3] = {(float)a.x, (float)(a.y + 1.5), (float)a.z};
+            const float to[3] = {(float)a.x, (float)(a.y - 8.0), (float)a.z};
+            r = ray_cast_guarded(reinterpret_cast<RayCastFn>(fnp), ctx, col, vox, from, to, hit, 0x9u, 0x100, 1);
+        }
+        char buf[128];
+        if (r > 0) std::snprintf(buf, sizeof buf, "%s %.3f\n", a.key.c_str(), hit[1]);
+        else std::snprintf(buf, sizeof buf, "%s none\n", a.key.c_str());
+        out += buf;
+        EMF_LOG(kMod, "chest ground: %s at %.1f %.1f %.1f: %s", a.key.c_str(), a.x, a.y, a.z,
+                r > 0 ? (std::string("ground at ") + std::to_string(hit[1])).c_str() : r == -2 ? "no ray cast in this build" : r < 0 ? "ray FAULTED" : "no ground");
+    }
+    const std::wstring tmp = ans + L".tmp";
+    if (FILE* o = _wfopen(tmp.c_str(), L"wb")) {
+        std::fwrite(out.data(), 1, out.size(), o);
+        std::fclose(o);
+        MoveFileExW(tmp.c_str(), ans.c_str(), MOVEFILE_REPLACE_EXISTING);
     }
 }
 }  // namespace
@@ -740,6 +791,7 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                         w.singleton("ecs::ColliderSystem"), emf::program_singleton(ctx, "ecs::VoxelGrid"), w.singleton("ecs::VoxelGrid"));
             }
             if (pg) do_walk(w, ctx, pg);
+            do_chest_ground(w, ctx);  // (2026-11-20 12:12) the companion chest on the ground
         });
     EMF_LOG(kMod, "ground program %s", prog ? "registered" : "NOT registered");
     emf::add_command("fkprobe.ahead", "on|off: log the ground 1, 2, 3 m ahead of each driven companion (measuring)",

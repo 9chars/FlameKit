@@ -1677,6 +1677,16 @@ next restart (no yes for a restart yet).
    0.15.314 adds Animal_Wildlife_Flying_Bird 0eaf60f1-... as "Bird (flying)" (the only flying one). Fish still out.
    Cats/dogs are labelled by the colour in their template names (Dog bright/dotted/dark/black/white, Cat
    black/striped/bright).
+   **Owner 12:12: "N1's chest spawned in the air... can you make that stay on the ground..?" / "it spawned too close
+   to the other chest I guess"** (12:11 chest 65256 at y 1019.6 = N1's height; N2 at 1018.6, so N1 likely stood on
+   another chest). Also seen: 12:11:22 "chest 65256 opened by its owner": the InteractionAcceptedEvent check works.
+   0.15.315 (server only): inv.open_chest writes chest_ground.request ("<name>#<i> x y z", 4 places: left, right,
+   behind, front at inv.SPOT), the server probe's ground program (do_chest_ground, the game ray from y+1.5 to y-8,
+   mask 0x9) answers chest_ground.answer; inv.ground_tick picks the first place with ground in feet-1.2..feet+0.4,
+   else the lowest within feet-3..feet+1, else (no answer in 1 s / none) his left at his height; inv.open_at spawns.
+   Logged "chest place N of 4 (...)" and "chest ground: ..." (C++).
+   **Owner 12:14: "would it be easiler for all companions of a player should just share one inventory? I dont think
+   each companion needs to have its own chest?" / "not sure"** - open, my opinion given (see the reply).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
