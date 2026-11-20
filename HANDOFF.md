@@ -1375,6 +1375,12 @@ next restart (no yes for a restart yet).
      **Owner 22:21:** "seems good, we may have to adjust some numbers" (healing accepted; the numbers stay open: MANA_MAX
      800, MANA_REFILL 10/s, HEAL_PART 25 %, HEAL_COST 200, HEAL_GAP 4 s, HEAL_BELOW 60 % (himself in Healing),
      HEAL_BELOW_FIGHT 40 %, HEAL_FULL 99 %, RECOVER_AFTER 10 s, RECOVER_PART 2 %/s).
+     **Owner 22:21:** "is there still a 2 second delay before he teleports when he has to spawn and respawn?" (yes:
+     STUCK_TICKS 3 s -> the notice, TP_AFTER 2 s -> put away, back 1 s after the player stands, LAND_TICKS). **Owner
+     22:22, verbatim:** "get rid of the 2 seconds, show the error, but teleport him immediately" -> built (live): TP_AFTER
+     0 (put away the tick he cannot follow; drive_harness seed 1003: tick 632 instead of 753); put_away_for shows the
+     same words (STUCK_TEXT[h.cant]) as a 5 s notice in #ff9050 (the stuck status is cleared at the put-away, so it would
+     have shown for one tick). The 3 s of no progress before "can't follow" is unchanged.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

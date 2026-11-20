@@ -120,7 +120,9 @@ local DJ_LIFT = 40
 -- after GLIDE_WAIT ticks or GLIDE_FAR metres away, he is put away. The player moving more than FAR_JUMP in one tick
 -- (a fast travel) puts him away too, and so does TP_AFTER ticks of not being able to follow. He comes back beside the
 -- player once the player has stood on the ground LAND_TICKS (and his game has loaded).
-local GLIDE_STATE, GLIDE_WAIT, GLIDE_FAR, LAND_TICKS, TP_AFTER, FAR_JUMP = 4, 240, 30, 60, 120, 50
+-- (owner 2026-11-19 22:22 "get rid of the 2 seconds, show the error, but teleport him immediately") TP_AFTER 0: put
+-- away the moment he cannot follow; the notice then shows 5 s on its own (put_away_for)
+local GLIDE_STATE, GLIDE_WAIT, GLIDE_FAR, LAND_TICKS, TP_AFTER, FAR_JUMP = 4, 240, 30, 60, 0, 50
 local WATER_NEAR = 2  -- metres above the swimming player's water surface that still count as "at the water"
 local DIVE_PLAYER = 1.8  -- the player's depth from which he dives with him (at the surface the player reads about 1.3)
 local SWIM_ENTER, SWIM_DEPTH = 0.5, 0.9  -- he swims while his own depth is over 0.5 m, and is held at about 0.9 m
@@ -625,7 +627,7 @@ local function drive_put_away(s)
   h.last_px, h.last_pz = px, pz
   if h.cant then
     h.cant_since = h.cant_since or t
-    if t - h.cant_since > TP_AFTER then
+    if t - h.cant_since >= TP_AFTER then
       h.go_away = "can't follow"
       return true
     end
@@ -2505,6 +2507,9 @@ local function put_away_for(world, id, h)
   pcall(emf.destroy, world, id)
   if r then ent_of[r.name], r.out = nil, false roster_save() end
   status(world, h.player, "companion_stuck", nil)
+  if h.go_away == "can't follow" then  -- (owner 22:22 "show the error") the same words for 5 s, as he is respawned at once
+    say(world, h.player, STUCK_TEXT[h.cant] or STUCK_TEXT.blocked, "#ff9050")
+  end
   if h.go_away == "glide" then
     status(world, h.player, "companion_away", "Companion put away, waiting for your landing.", "#8cd2ff")
   end
