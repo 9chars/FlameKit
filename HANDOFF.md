@@ -1724,6 +1724,15 @@ next restart (no yes for a restart yet).
    wildlife state 3, its roaming target at the pet, the path walker off; pets skip drive_fight / drive_heal; an
    emf.hit_rule cancel makes pet bodies take no damage. C++ drive_scan takes faction-11 DynamicWildlife bodies with
    runAwayDistance >= 1.5; drive_post reads those carriers (same steering, edge stop, pace; no fight_step). Untested.
+   Restart 12:54 (owner "sure"); **owner 13:02 "the dog jerks around a lot but does follow me" / 13:05 "its very
+   erratic"**: petlog 13:04:45-49: 20 m jumps every half second (1767 -> 1779 -> 1757 -> 1774) = the game moves the
+   animal by AnimalSaved/DynamicWildlife spawn positions (my carriers). Also: the wildlife program keeps state 6 and
+   zeroes currentTargetPosition whatever we write. 0.15.324: carriers gone; Lua writes pet_drive.txt beside the mod
+   ("<id> <target xyz> <player xyz> <code>", only when it changes, tmp + rename); the probe's read_pets reloads it on a
+   new write time; drive_scan/drive_post take pets from it. pets_quiet only: wildlife state 3 + path walker off.
+   **E prompt on pets (owner 12:54 "I noticed this pet doesn't have an 'E' button, will that change?"):** emf.offer is
+   refused ("it has its own offer from the game"); ideas: spawn the pet tame so the game's "E Pet" shows and open our
+   wheel on its InteractionAcceptedEvent. Not built.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

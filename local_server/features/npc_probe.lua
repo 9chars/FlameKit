@@ -3343,6 +3343,7 @@ function F.tick(world)
     if not okd and not h.err_said then h.err_said = true log("drive " .. tostring(id) .. ": " .. tostring(errd)) end
     if h.shim then pcall(roster.pet_flush, world, id, h) end  -- (pets) the drive's answer to the server probe
   end
+  pcall(roster.pet_write)  -- (pets) the drive's inputs for the server probe
   pcall(roster.pets_quiet, world)  -- (pets) their own AI kept idle
   for id, h in pairs(drives) do
     if h.go_away then
@@ -3574,18 +3575,34 @@ function roster.petlog_tick(world)
     tostring(an), tostring(rd(function() return world:get("SpawnTime", id).time end))))
 end
 
--- (pets) the drive's inputs for the server probe (its drive_post reads them; see there) and the animal's own AI kept
--- idle (wildlife state 3, as the petlog showed between its walks; 6 = walking to a roaming target)
+-- (pets) the drive's inputs for the server probe, in pet_drive.txt beside the mod: a line per pet "<entity> <target x y
+-- z> <player spot x y z> <code>" (code: pace 2 walk / 3 run / 4 sprint, + 10 edge stop off, + 20 drops allowed; 0 = not
+-- driven), written each tick it changes; its drive_post reads it. (13:04: the first try kept them in the animal's own
+-- AnimalSaved / DynamicWildlife spawn positions: the game moved the dog by them, 20 m jumps every half second.)
+roster.pet_lines = {}
 function roster.pet_flush(world, id, h)
   local a = h.shim
-  local wl, as = world:get("DynamicWildlife", id), world:get("AnimalSaved", id)
-  if not (wl and as) then return end
-  as.spawnPosition.x, as.spawnPosition.y, as.spawnPosition.z = a.movementTarget.x, a.movementTarget.y, a.movementTarget.z
-  wl.spawnPosition.x, wl.spawnPosition.y, wl.spawnPosition.z = a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z
   local cd = a.combatData
-  wl.runAwayDistance = a.movementTargetIsValid and ((tonumber(cd.prowlAngle) or 2) + (cd.targetOfMyTarget and 10 or 0)
+  local code = a.movementTargetIsValid and ((tonumber(cd.prowlAngle) or 2) + (cd.targetOfMyTarget and 10 or 0)
     + (cd.isTargetInsideLeash and 20 or 0)) or 0
+  roster.pet_lines[id] = string.format("%d %.3f %.3f %.3f %.3f %.3f %.3f %g", id, a.movementTarget.x, a.movementTarget.y,
+    a.movementTarget.z, a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z, code)
   cd.targetOfMyTarget = false  -- set again each tick where the edge stop is off (edge_off)
+end
+function roster.pet_write()
+  local list = {}
+  for id, line in pairs(roster.pet_lines) do if drives[id] then list[#list + 1] = line end end
+  roster.pet_lines = {}
+  table.sort(list)
+  local text = table.concat(list, "\n") .. "\n"
+  if text == roster.pet_text or not emf.dir then return end
+  local f = io.open(emf.dir .. "\\pet_drive.tmp", "w")
+  if not f then return end
+  f:write(text)
+  f:close()
+  os.remove(emf.dir .. "\\pet_drive.txt")
+  os.rename(emf.dir .. "\\pet_drive.tmp", emf.dir .. "\\pet_drive.txt")
+  roster.pet_text = text
 end
 
 function roster.pets_quiet(world)
@@ -3593,8 +3610,6 @@ function roster.pets_quiet(world)
     local wl = world:get("DynamicWildlife", id)
     if wl and not world:get("DynamicEnemy01BehaviorState", id) then
       if wl.state ~= 3 then wl.state = 3 end
-      wl.currentTargetPosition.x, wl.currentTargetPosition.y, wl.currentTargetPosition.z = world:position(id)
-      if not drives[id] and wl.runAwayDistance ~= 0 then wl.runAwayDistance = 0 end
       local pw = world:get("DynamicPathWalker", id)
       if pw and pw.isWalkingActive ~= false then pw.isWalkingActive = false end
     end

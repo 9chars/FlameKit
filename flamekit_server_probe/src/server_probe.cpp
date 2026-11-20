@@ -393,12 +393,42 @@ void track_jump(emf::World w, uint32_t id, const WorldTransform* tr) {
 // are gone: steps up come from the player's trail now (npc_probe.lua drive_copy launches him). Under ceilings and
 // overhangs the ray had read the overhang as a step.
 
+// ---- (2026-11-20 13:05) pets: the drive's inputs from the Lua, in pet_drive.txt beside FlameKit: a line per pet
+// "<entity> <target x y z> <player spot x y z> <code>" (code: pace 2/3/4, + 10 edge stop off, + 20 drops allowed; under
+// 1.5 not driven). Read again whenever the file changes. (The first try kept them in the animal's own AnimalSaved /
+// DynamicWildlife spawn positions: the game moved the dog by them, 20 m jumps.)
+struct PetIn { double tx, ty, tz, hx, hy, hz; float code; };
+std::mutex g_pet_mx;
+std::map<uint32_t, PetIn> g_pets;
+std::wstring flamekit_file(const wchar_t* name);
+void read_pets() {
+    static const std::wstring file = flamekit_file(L"pet_drive.txt");
+    static FILETIME seen{};
+    WIN32_FILE_ATTRIBUTE_DATA fa{};
+    if (!GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &fa)) return;
+    if (CompareFileTime(&fa.ftLastWriteTime, &seen) == 0) return;
+    FILE* f = _wfopen(file.c_str(), L"rb");
+    if (!f) return;
+    std::map<uint32_t, PetIn> got;
+    char line[256];
+    while (std::fgets(line, sizeof line, f)) {
+        unsigned id = 0;
+        PetIn p{};
+        if (std::sscanf(line, "%u %lf %lf %lf %lf %lf %lf %f", &id, &p.tx, &p.ty, &p.tz, &p.hx, &p.hy, &p.hz, &p.code) == 8) got[id] = p;
+    }
+    std::fclose(f);
+    seen = fa.ftLastWriteTime;
+    std::lock_guard<std::mutex> lk(g_pet_mx);
+    g_pets.swap(got);
+}
+
 void drive_post(void* ctx, void*) {
     emf::World w = emf::server_world();
     if (!w) return;
     write_bites(w);
     write_jumps(w);
     if (ctx) do_ground(w, ctx);
+    read_pets();
 
     std::vector<uint32_t> ids;
     {
@@ -411,10 +441,7 @@ void drive_post(void* ctx, void*) {
         auto* tr = static_cast<const WorldTransform*>(w.get_raw(0x027ac564u, id));
         if (!ai || !tr) continue;
         // (2026-11-20 12:49, owner: pets "should just use what we made already") the same drive for a pet (an animal: no
-        // monster AI). The Lua writes its inputs into fields the animal's own AI leaves alone while it is kept idle:
-        // AnimalSaved.spawnPosition = the target, DynamicWildlife.spawnPosition = the player's spot, and
-        // DynamicWildlife.runAwayDistance = pace (2 walk, 3 run, 4 sprint) + 10 (edge stop off) + 20 (drops allowed);
-        // under 1.5: not driven now.
+        // monster AI); its inputs come from pet_drive.txt (read_pets above).
         double tx, tz, hx, hy, hz;
         float pace;
         bool edge_off, drop_ok;
@@ -426,17 +453,22 @@ void drive_post(void* ctx, void*) {
             edge_off = st->combatData.targetOfMyTarget;
             drop_ok = st->combatData.isTargetInsideLeash;
         } else {
-            auto* wl = w.get<emf::gen::ecs::DynamicWildlife>(id);
-            auto* as = w.get<emf::gen::ecs::AnimalSaved>(id);
-            if (!wl || !as || wl->runAwayDistance < 1.5f) continue;
-            float code = wl->runAwayDistance;
+            PetIn p{};
+            {
+                std::lock_guard<std::mutex> lk(g_pet_mx);
+                auto it = g_pets.find(id);
+                if (it == g_pets.end()) continue;
+                p = it->second;
+            }
+            if (p.code < 1.5f) continue;
+            float code = p.code;
             drop_ok = code >= 20.0f;
             if (drop_ok) code -= 20.0f;
             edge_off = code >= 10.0f;
             if (edge_off) code -= 10.0f;
             pace = code;
-            tx = as->spawnPosition.x, tz = as->spawnPosition.z;
-            hx = wl->spawnPosition.x, hy = wl->spawnPosition.y, hz = wl->spawnPosition.z;
+            tx = p.tx, tz = p.tz;
+            hx = p.hx, hy = p.hy, hz = p.hz;
         }
         track_jump(w, id, tr);
         // (the companion's fight) the attack asked for and the ray to his target, once per step (fight_step); combatData
@@ -568,9 +600,11 @@ void drive_scan(emf::World w) {
     w.for_each_entity([&](uint32_t id) {
         auto* f = static_cast<const uint8_t*>(w.get_raw(0xa1f30f21u, id));
         auto* st = w.get<emf::gen::ecs::DynamicEnemy01BehaviorState>(id);
-        if (!st) {  // (2026-11-20) a pet: an animal of ours that the Lua drives (see drive_post)
-            auto* wl = w.get<emf::gen::ecs::DynamicWildlife>(id);
-            if (wl && f && *f == 11 && wl->runAwayDistance >= 1.5f) found.push_back(id);
+        if (!st) {  // (2026-11-20) a pet: an animal of ours that the Lua drives (pet_drive.txt, see drive_post)
+            if (!f || *f != 11 || !w.get<emf::gen::ecs::DynamicWildlife>(id)) return;
+            std::lock_guard<std::mutex> lk(g_pet_mx);
+            auto it = g_pets.find(id);
+            if (it != g_pets.end() && it->second.code >= 1.5f) found.push_back(id);
             return;
         }
         if (st->enabled || !st->movementTargetIsValid) return;
