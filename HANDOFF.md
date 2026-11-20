@@ -1859,6 +1859,17 @@ next restart (no yes for a restart yet).
    2.5 m and closer to the player (log "gap <id>: waits for ..." / "goes on"); drive_stuck counts that wait as progress.
    16:02:22-23: "waits" / "goes on" several times a second at the border. 0.15.344: a waiting one goes on past
    TRAIL_GAP_GO 3.5 m.
+   **Owner 16:03 "yep looks good, I noticed I set a baby bunny and I dont see it"**: N5 = Baby bunny (91110) has no
+   DynamicWildlife (petlog: tame true from its template, the game's Pet offer, animal state 4), so not a pet to the
+   drive: left at 6298 948 5199 by the 16:02:40 fast travel. Babies: tame from birth (pick-up), no wildlife AI, grow up.
+   **Owner 16:08: "yeah that the babies out... also the spacing changes made it hard for me to go up to one of the
+   pets, the run around a lot when I try to move, making it hard for me to get to them. maybe theres a small radius we
+   can add so as long as they're in that radius around me, they don't move around so much?"** 0.15.345: core/pets.lua
+   without the 9 babies (kept as comments; client list too: Development release); ui_kind's "Pets do not follow yet"
+   text removed; drive_steer: settle (SETTLE_R 6, SETTLE_ARRIVE 2.7): once arrived (the first within 2.7 m of the
+   player, the others within SLOT_AT of their place) h.settled: hold_at where he stands while the player is within
+   6 m ("settle <id>: arrived ..." / "follows again"); drive_stuck counts h.settle_t as progress. Applies to every
+   companion (owner 16:00 "pets and companion monsters too" for the spacing). N5 needs another kind (roster window).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

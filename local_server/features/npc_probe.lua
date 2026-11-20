@@ -962,7 +962,8 @@ local function drive_stuck(s)
     -- again every 8 s. A follower standing within SLOT_AT of his place (set by drive_steer this half second) has arrived.
     local sa = h.slot_at
     local at_slot = sa and t - sa.t < 30 and (sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SLOT_AT * SLOT_AT
-    local gap_wait = t - (h.gap_t or -1e9) < 30  -- (16:00) waiting for the follower ahead (drive_steer, TRAIL_GAP)
+    local gap_wait = t - (h.gap_t or -1e9) < 30 or t - (h.settle_t or -1e9) < 30  -- (16:00) waiting for the follower
+    -- ahead (drive_steer, TRAIL_GAP); (16:08) settled near the player
     if h.prog == nil or h.prog.c ~= c or dc < h.prog.d - 0.3 or t - (h.heal_t or -1e9) < SHOUT_HOLD or at_slot or gap_wait then
       h.prog = { c = c, d = dc, t = t }
     elseif t - h.prog.t > STUCK_TICKS then
@@ -990,6 +991,11 @@ end
 local SLOTS = { { -2.4, -1.2 }, { 2.4, -1.2 }, { 0, -3.3 }, { -3.6, -3.3 }, { 3.6, -3.3 } }  -- (12:22) followers 2..6
 local SLOT_NEAR, SLOT_GAP = 6, 2.5
 local TRAIL_GAP_GO = 3.5  -- (16:02) a waiting follower goes on once the one ahead is this far
+-- (owner 16:08 "the spacing changes made it hard for me to go up to one of the pets, the run around a lot when I try
+-- to move ... maybe theres a small radius we can add so as long as they're in that radius around me, they don't move
+-- around so much?") once a follower has arrived (the first within SETTLE_ARRIVE of the player, the others at their
+-- place), he stays where he stands while the player is within SETTLE_R of him; past it he follows again
+local SETTLE_R, SETTLE_ARRIVE = 6, 2.7
 local TRAIL_GAP = 2.5  -- (16:00) on the trail a follower stands while another of the player's is closer to the player
                        -- and within this of him (a queue instead of a bunch); drive_stuck counts that as no stuck
 local function drive_steer(s)
@@ -1058,6 +1064,24 @@ local function drive_steer(s)
           o and string.format(", place %d: %.1f %.1f (%.1f m from him now)", h.slot_i, tx, tz, math.sqrt((tx - nx) ^ 2 + (tz - nz) ^ 2)) or ", next to him"))
       end
     end
+  end
+  -- (owner 16:08) settled: he stands while the player is within SETTLE_R; he settles once he has arrived
+  if h.settled and dp and dp > SETTLE_R then
+    h.settled = nil
+    log(string.format("settle %s: the player is %.1f m away: follows again", tostring(id), dp))
+  end
+  if not h.settled and dp and dp <= SETTLE_R then
+    local sa = h.slot_at
+    local at_place = (sa and sa.t == t) and ((sa.x - nx) ^ 2 + (sa.z - nz) ^ 2 <= SLOT_AT * SLOT_AT) or (not (sa and sa.t == t) and dp <= SETTLE_ARRIVE)
+    if at_place then
+      h.settled = true
+      log(string.format("settle %s: arrived (%.1f m from the player): stays while the player is within %.1f m", tostring(id), dp, SETTLE_R))
+    end
+  end
+  if h.settled then
+    h.settle_t = t
+    hold_at(a, nx, s.ny, nz)
+    return
   end
   -- (owner 15:59 / 16:00) on the trail, further than SLOT_NEAR: he waits while another follower of the same player is
   -- within TRAIL_GAP of him and closer to the player
@@ -3616,7 +3640,7 @@ end
 function roster.ui_kind(world, r, guid, pid)
   local kind
   for _, m in ipairs(require("core.monsters")) do if m[3] == guid then kind = m end end
-  -- (0.15.313, owner 11:40) the Pets section: the game's peaceful animals (core/pets.lua); not driven yet (pets come next)
+  -- (0.15.313, owner 11:40) the Pets section: the game's peaceful animals (core/pets.lua; no babies since 0.15.345)
   for _, m in ipairs(require("core.pets")) do if m[3] == guid then kind = m end end
   if not kind then return "Unknown kind.", false end
   if kind[4] then return "Bosses cannot be companions.", false end
@@ -3634,7 +3658,7 @@ function roster.ui_kind(world, r, guid, pid)
   end
   roster_save()
   log(string.format("roster window: %s is now %s / %s (%s, was %s)", r.name, kind[1], kind[2], guid, tostring(was)))
-  if kind[1] == "Pets" then return r.name .. " is now a pet: " .. kind[2] .. ". Pets do not follow yet (they come next).", true end
+  if kind[1] == "Pets" then return r.name .. " is now a pet: " .. kind[2] .. ".", true end  -- (16:08: the "do not follow yet" text was old)
   return r.name .. " is now a " .. kind[2] .. " (" .. kind[1] .. ").", true
 end
 
