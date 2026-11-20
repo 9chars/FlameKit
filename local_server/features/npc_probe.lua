@@ -996,6 +996,11 @@ local function drive_steer(s)
           a.homeZonePosition.x, a.homeZonePosition.z = tx + 1.5, tz
         end
       end
+      if (o and k or 0) ~= h.slot_said then  -- (12:27) logged when his place changes
+        h.slot_said = o and k or 0
+        log(string.format("slot %s: follower %d of %d for player %s%s", tostring(id), k + 1, #mine, tostring(h.player),
+          o and string.format(", his place %.1f %.1f (%.1f m from him now)", tx, tz, math.sqrt((tx - nx) ^ 2 + (tz - nz) ^ 2)) or ", next to him"))
+      end
     end
   end
   local on_trail = c ~= nil
