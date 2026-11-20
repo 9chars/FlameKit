@@ -1522,6 +1522,12 @@ next restart (no yes for a restart yet).
      cannot be copied exactly). 2112, 11 m from the player, is a chest (Inventory, ToggleAnimation, UiOffsets) with key
      0x2E2B803BEE877B55 (copyable). Next test: copy 2112's key onto the companion's open chest and see if 2112's name
      floats over it; then making our own text needs a new entry in the server's string pool (C++).
+     08:47: the companion's spawned chest (186765) has NO CustomPlayerString (player-placed chests do);
+     emf.add_component (Lua 1.12) only takes ScaleComponent/InteractionPause, but emf.spawn's `components` takes any:
+     0.15.296 `names spawn <from>` spawns a test chest (60 s) with {CustomPlayerString = {stringId = key}}. 08:48:49
+     test chest 187029 with 2112's key: **owner 08:49 "it says "Private Stash" so the label test worked"**: the game's
+     floating name shows on a chest the mod spawns, by key alone. Left: our own text ("N1") needs an entry in the
+     server's CustomPlayerStringsSystem (layout only known on the client; it is saved with the world).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
