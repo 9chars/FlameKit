@@ -1833,6 +1833,12 @@ next restart (no yes for a restart yet).
    **Owner 15:38: "yep looks good"** (pets dive with the player).
    **Owner 15:38 "so here comes the last part" / 15:39: "in the wheel menu, id like a new section called "Companions"
    this option would apply to both Pets and the Monster Companions"** (what it holds: being asked).
+   **Owner 15:39: "this wheel should should all the assigned pets and companions to that user and let them spawn them
+   to them"**; restated (every companion/pet he controls, name + kind; a pick spawns it beside him following; one out
+   is put away first; main unchanged), **owner "yup"**. 0.15.340: "Companions" last in WHEEL_LABELS and PET_WHEEL;
+   roster.wheel_list sends a second wheel (title Companions, labels "N1 (Hound) - out"), roster.cw[player] maps
+   labels to names (an hour); on_pick checks it first -> roster.wheel_summon (controls() check, roster away if out,
+   mode follow, roster.ui_back, green notice, roster window pushed).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

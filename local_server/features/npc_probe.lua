@@ -1979,11 +1979,11 @@ end
 -- Healing. The mode is kept in the roster (r.fight; a companion without one is Passive) until the player changes it.
 -- The game side sends back the label it showed, so a pick is matched by its label.
 local WHEEL = "npcwheel"
-local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Inventory", "Put away" }
+local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Inventory", "Put away", "Companions" }  -- Companions: owner 15:39
 inv.WHEEL = { "Close Chest" }  -- (owner 08:02) while his chest is open the wheel offers only this
 -- (owner 14:49 "the wheel for pets would need to be different than the wheel for the monster companions"; 14:59 "lets
 -- try it") a pet's wheel: no Attack (pets do not fight), and Pet (roster.do_pet: his next E is the game's petting)
-local PET_WHEEL = { "Follow me", "Stay here", "Pet", "Inventory", "Put away" }
+local PET_WHEEL = { "Follow me", "Stay here", "Pet", "Inventory", "Put away", "Companions" }
 local FIGHT_MODES = { "Passive", "Defensive", "Aggressive", "Healing" }
 
 local function refuse(world, player, rr)
@@ -2125,9 +2125,18 @@ local function on_pick(world, from, data)
   if not (npc and world:position(npc)) then return end
   if rr and not may_command(rr, from.account) then refuse(world, player, rr) return end
   local label = type(m.label) == "string" and m.label or ""
+  -- (owner 15:39) a pick in the Companions wheel (roster.wheel_list): that companion comes to the player
+  local cw = roster.cw and roster.cw[player]
+  if cw and cw.map[label] and world:tick() - cw.at < 3600 then
+    roster.cw[player] = nil
+    local okb, errb = pcall(roster.wheel_summon, world, player, cw.map[label])
+    if not okb then log("wheel: Companions failed: " .. tostring(errb)) say(world, player, "Cannot do that (see the server's log).") end
+    return
+  end
   local act = ({ ["Follow me"] = do_follow, ["Stay here"] = do_stay, ["Attack"] = do_attack_menu, ["Put away"] = do_away,
     ["Inventory"] = inv.open_chest, ["Close Chest"] = inv.close_chest,
-    ["Pet"] = function(w, pl, n, r) roster.do_pet(w, pl, n, r) end })[label]
+    ["Pet"] = function(w, pl, n, r) roster.do_pet(w, pl, n, r) end,
+    ["Companions"] = function(w, pl, n, r) roster.wheel_list(w, pl, n, r) end })[label]
   if rr and inv.open[rr.name] and label ~= "Close Chest" then act = nil end  -- an old wheel: only "Close Chest" now
   for _, mode in ipairs(FIGHT_MODES) do
     if label == mode then act = function(w, pl, n, r) set_fight(w, pl, n, r, mode) end end
@@ -3666,6 +3675,49 @@ function roster.pet_mode_tick(world)
       roster.pet_mode[npc] = nil
     end
   end
+end
+
+-- (owner 15:39 "in the wheel menu, id like a new section called "Companions" this option would apply to both Pets and
+-- the Monster Companions" / "this wheel should should all the assigned pets and companions to that user and let them
+-- spawn them to them"; confirmed "yup": every companion and pet he controls, by name and kind; a pick spawns it beside
+-- him, following him, as the roster window's Bring back; one already out is put away first; the main is unchanged)
+roster.cw = {}   -- player -> { map = label -> companion name, at = tick } of the Companions wheel sent to him
+function roster.wheel_list(world, player, npc, rr)
+  local account = world:account(player)
+  local names = {}
+  for _, r in ipairs(roster.list) do if account and controls(r, account) then names[#names + 1] = r end end
+  table.sort(names, function(a, b) return tostring(a.name):lower() < tostring(b.name):lower() end)
+  if #names == 0 then say(world, player, "You have no companions.") return end
+  local kinds = {}
+  for _, m in ipairs(require("core.monsters")) do kinds[m[3]] = m[2] end
+  for _, m in ipairs(require("core.pets")) do kinds[m[3]] = m[2] end
+  local labels, map = {}, {}
+  for _, r in ipairs(names) do
+    local label = r.name .. " (" .. tostring(kinds[r.guid] or "?") .. ")" .. (r.out and still_ours(world, ent_of[r.name]) and " - out" or "")
+    labels[#labels + 1] = label
+    map[label] = r.name
+  end
+  roster.cw[player] = { map = map, at = world:tick() }
+  local oks, sent = pcall(emf.net.send_to, world, player, WHEEL, emf.json.encode({ op = "wheel", npc = npc, title = "Companions", labels = labels }))
+  log(string.format("wheel: Companions for player %s: %s (sent %s)", tostring(player), table.concat(labels, ", "), tostring(oks and sent)))
+end
+function roster.wheel_summon(world, player, name)
+  local r = find(name)
+  if not r then say(world, player, tostring(name) .. " is no longer on the roster.") return end
+  local account = world:account(player)
+  if not (account and controls(r, account)) then refuse(world, player, r) return end
+  if r.out and still_ours(world, ent_of[r.name]) then
+    local real = emf.reply
+    emf.reply = function() end
+    local okc, errc = pcall(roster_cmd, world, { "roster", "away", r.name })
+    emf.reply = real
+    if not okc then log("wheel: Companions: away " .. r.name .. " failed: " .. tostring(errc)) end
+  end
+  r.mode = "follow"
+  local said, good = roster.ui_back(world, r, player)
+  log(string.format("wheel: Companions: player %s called %s: %s", tostring(player), r.name, tostring(said)))
+  say(world, player, said, good and "#5ad25a" or nil)
+  roster.ui_push(world, true)
 end
 
 roster.pet_lines = {}
