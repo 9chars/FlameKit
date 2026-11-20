@@ -1372,6 +1372,9 @@ next restart (no yes for a restart yet).
      when the dog heals himself he can do the effect, when he heals the player he can do the effect on himself and me to
      highly the heal" -> built (live): after a heal HEAL_FX[1] VFX_Resource_Increase_Health on him, and on the player too
      when it was the player's heal; removed after 10 s (heal_fx_shown).
+     **Owner 22:21:** "seems good, we may have to adjust some numbers" (healing accepted; the numbers stay open: MANA_MAX
+     800, MANA_REFILL 10/s, HEAL_PART 25 %, HEAL_COST 200, HEAL_GAP 4 s, HEAL_BELOW 60 % (himself in Healing),
+     HEAL_BELOW_FIGHT 40 %, HEAL_FULL 99 %, RECOVER_AFTER 10 s, RECOVER_PART 2 %/s).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
