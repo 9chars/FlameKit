@@ -1482,6 +1482,11 @@ next restart (no yes for a restart yet).
      yet" -> **TO TEST** (owner): a perked weapon through his chest (close, reopen, compare). 0.15.290 logging (live):
      inv.log_gear at "filled" and "closing": "inventory <name> gear (<when>): item, level, rarity, perks a/u unlocked,
      gem, base damage, item state" per gear piece.
+     08:20:52 in game: a reload took his OPEN chest up again (inv.adopt) and it kept saving: reload safety confirmed live.
+     **Owner 08:20, verbatim:** "I noticed the companion can still be pushed around while the chest is open, anyway to
+     stop that?" -> 0.15.291: inv.pin (drive_step's frozen branch): the CurrentTransform position when frozen (c.pin, per
+     body) is written back every tick he is moved, his Velocity zeroed; log "pushed while the chest is open: put back"
+     once. Harness: a 2 m push undone the next tick.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

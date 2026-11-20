@@ -1000,6 +1000,7 @@ local function drive_step(world, id, h)
   set_pace(s.a, PACE_WALK)  -- drive_steer sets the trail's pace; the C++ sprints past 6 m from where he is headed
   -- (owner 2026-11-20 08:02 "make it so the companion can't move or do anything until the chest is closed")
   if inv.frozen and inv.frozen(id) then  -- (name_of is declared further down: the inventory part answers)
+    pcall(inv.pin, world, id)
     hold_at(s.a, s.nx, s.ny, s.nz)
     h.atk = nil
     pcall(function() s.a.combatData.lastTargetId = 0 s.a.combatData.selectedAttackIndex = 255 end)
@@ -1429,6 +1430,21 @@ function inv.log_gear(world, name, chest, when)
     end
   end
   if n == 0 then log(string.format("inventory %s gear (%s): none", name, when)) end
+end
+
+-- (owner 2026-11-20 08:20 "the companion can still be pushed around while the chest is open, anyway to stop that?")
+-- pinned: the spot he stood on when the chest opened (or was taken up after a reload) is kept; anything that moves him
+-- (a push) is undone the same tick, and his speed is set to nothing
+function inv.pin(world, id)
+  local c = inv.open[name_of[id] or ""]
+  if not c then return end
+  local p = world:get("CurrentTransform", id).transform.position
+  if not c.pin or c.pin_id ~= id then c.pin, c.pin_id = { p.x, p.y, p.z }, id return end
+  if p.x ~= c.pin[1] or p.y ~= c.pin[2] or p.z ~= c.pin[3] then
+    p.x, p.y, p.z = c.pin[1], c.pin[2], c.pin[3]
+    pcall(function() local v = world:get("Velocity", id).velocity v.x, v.y, v.z = 0, 0, 0 end)
+    if not c.pushed then c.pushed = true log(string.format("inventory %s: pushed while the chest is open: put back", name_of[id])) end
+  end
 end
 
 -- his chest is open: he is frozen (drive_step)

@@ -1,3 +1,6 @@
+0.15.291 Nov 20, 2026
+- Companions (test, local server only): while its chest is open the companion can no longer be pushed: it stays exactly where it stood when the chest opened. Server only: no game change.
+
 0.15.290 Nov 20, 2026
 - Companions (test, local server only): the server's log lists every gear piece in the companion's chest (level, quality, perks, gem, damage) when the chest is filled and when it closes, to check that gear comes back unchanged. Server only: no game change.
 
