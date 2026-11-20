@@ -1790,6 +1790,12 @@ next restart (no yes for a restart yet).
    14:46:28 / 14:46:38: E on N2 22666 -> wheel sent). Pets: only "Talk", no Pet, no Pick up; E opens his wheel.
    Open: "Pet" as a wheel entry (owner's 14:09 idea); the 10 s probe log lines can be thinned later.
    **Owner 14:47: "looks like everything seems to be working like it was"** (the rest of the pet still works).
+   **Owner 14:49: "yes and the wheel for pets would need to be different than the wheel for the monster companions I
+   think. I also noticed it wasn't labeling the inventory chest with the pets name on it"** = yes to "Pet" in the wheel;
+   pets get their own wheel (wording being confirmed). Chest label: log 14:47:04 N2's chest key 0x0 (his name
+   0x09207E07B5B5ABB9 registered 14:44:57 "now there"); N1's chest at 14:47:11 had its key. Not pet-specific so far.
+   The game offers no call to play its petting animation; idea: wheel "Pet" switches his E to the game's pet sequence
+   0xB1EB4A70 / verb Pet for a few seconds (that E plays the animation), then back to Talk.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
