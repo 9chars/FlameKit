@@ -1865,14 +1865,19 @@ end
 -- number (owner 19:25 "I would give him 800 mana and see how that works?"), refilling in every mode. A heal goes through
 -- the game's attribute code (emf.attribute_add "health": stops at the maximum, not a hit) and plays Wolf Shout
 -- (combatData.selectedAttackIndex 2 -> the C++ starts 0x89A1BC53; owner 20:59 "I want Wolf Shout", 21:01 "every heal
--- would be a good queue that its happening"). Who and when (owner 20:35 "yes that would be good"):
---   Healing: the player below HEAL_BELOW (within FIGHT_RANGE) first, else himself below HEAL_BELOW;
---   Defensive / Aggressive: only himself, below HEAL_BELOW_FIGHT (the mana lasts the fight);
+-- would be a good queue that its happening"). Who and when (owner 20:35 "yes that would be good"; 22:04 "when he's in
+-- heal mode, he should just always heal me to full, when he's in attack or defense I meant more like when all the
+-- attack sequences are all done, he should do full heals on himself and me, but can wait until all attack sequences
+-- are done"):
+--   Healing: the player (within FIGHT_RANGE) up to full, always; else himself below HEAL_BELOW;
+--   Defensive / Aggressive: in an attack sequence only himself, below HEAL_BELOW_FIGHT (the mana lasts the fight); with
+--   no attack sequence going on, the player and then himself up to full;
 --   Passive: no heals; a slow recovery once he has not been hit for RECOVER_AFTER (no mana, no shout).
 -- Not while one of his attacks plays (the shout would cut it). Logs "heal <name>: ...".
 local MANA_MAX, MANA_REFILL = 800, 10                     -- refill: a second
 local HEAL_PART, HEAL_COST, HEAL_GAP = 0.25, 200, 240     -- 25 % of the target's maximum, 200 mana, 4 s apart
 local HEAL_BELOW, HEAL_BELOW_FIGHT = 0.6, 0.4
+local HEAL_FULL = 0.99                                    -- "full": a heal only when 1 % or more is missing
 local RECOVER_AFTER, RECOVER_PART = 600, 0.02             -- Passive: 10 s without a hit, then 2 % of his maximum a second
 local mana_of = {}                                        -- companion name -> mana
 local SHOUT_TICKS = 90                                    -- the shout plays this long before his next attack
@@ -1905,17 +1910,24 @@ drive_heal = function(s)
   if t - (h.heal_t or -1e9) < HEAL_GAP then return end
   if not h.fight_init then return end  -- the fight's first step clears any move asked for: the shout would be lost
   local who, whp, wmax, whom
+  local php, pmax = tonumber(emf.attribute(world, h.player, "health")), tonumber(emf.attribute(world, h.player, "max_health"))
+  local px, py, pz = world:position(h.player)
+  local near = px and (px - s.nx) ^ 2 + (py - s.ny) ^ 2 + (pz - s.nz) ^ 2 <= FIGHT_RANGE ^ 2
+  local player_hurt = php and pmax and php > 0 and php < pmax * HEAL_FULL and near
   if mode == "Healing" then
-    local php, pmax = tonumber(emf.attribute(world, h.player, "health")), tonumber(emf.attribute(world, h.player, "max_health"))
-    local px, py, pz = world:position(h.player)
-    local near = px and (px - s.nx) ^ 2 + (py - s.ny) ^ 2 + (pz - s.nz) ^ 2 <= FIGHT_RANGE ^ 2
-    if php and pmax and php > 0 and php < pmax * HEAL_BELOW and near then
+    if player_hurt then
       who, whp, wmax, whom = h.player, php, pmax, "the player"
     elseif hp < hmax * HEAL_BELOW then
       who, whp, wmax, whom = id, hp, hmax, "himself"
     end
   elseif mode == "Defensive" or mode == "Aggressive" then
-    if hp < hmax * HEAL_BELOW_FIGHT then who, whp, wmax, whom = id, hp, hmax, "himself" end
+    if h.atk then
+      if hp < hmax * HEAL_BELOW_FIGHT then who, whp, wmax, whom = id, hp, hmax, "himself" end
+    elseif player_hurt then
+      who, whp, wmax, whom = h.player, php, pmax, "the player"
+    elseif hp < hmax * HEAL_FULL then
+      who, whp, wmax, whom = id, hp, hmax, "himself"
+    end
   end
   if not who then return end
   if m < HEAL_COST then

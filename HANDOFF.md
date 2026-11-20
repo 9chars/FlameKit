@@ -1350,6 +1350,14 @@ next restart (no yes for a restart yet).
      0.5-0.6 m from his crumb on flat ground (21:33:30, 21:38:46) -> respawn: the Wolf Shout holds him in place, two
      4 s apart = the stuck rule. Other respawns: 3 glide, 1 fast travel, 3 can't follow (steps, long jumps). **Owner
      21:54:** "yes" -> built (live): drive_stuck restarts its progress timer for SHOUT_HOLD 2 s after a heal (h.heal_t).
+     **Owner 22:00:** "when were not in combat, or combat finishes, he should heal me up full regardless of my %".
+     Claude asked (Healing only? the reading). **Owner 22:04, verbatim:** "when he's in heal mode, he should just always
+     heal me to full, when he's in attack or defense I meant more like when all the attack sequences are all done, he
+     should do full heals on himself and me, but can wait until all attack sequences are done". **Built 22:0x (live):**
+     Healing: the player within 20 m up to full, always (HEAL_FULL 0.99: a heal when 1 % or more is missing), else
+     himself below 60 %; Defensive/Aggressive: during an attack sequence (h.atk) only himself below 40 %; with none
+     going on, the player and then himself up to full. Passive unchanged. The heal itself unchanged (25 %, 200 mana,
+     4 s apart, Wolf Shout, the green notice for the player).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
