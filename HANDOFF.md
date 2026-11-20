@@ -1323,6 +1323,8 @@ next restart (no yes for a restart yet).
      heal, his and the player's?).
      **Owner 20:59, verbatim:** "I changed my mind, I want Wolf Shout" -> the heal move is **Wolf Shout 0x89A1BC53**
      (replaces Lick Wounds; asked again: for every heal?).
+     **Owner 21:01, verbatim:** "every heal would be a good queue that its happening" -> Wolf Shout plays on EVERY heal
+     (his own and the player's), as the cue that a heal happens.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
