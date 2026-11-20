@@ -435,6 +435,7 @@ constexpr uint32_t kTalkVerb = 0xD9861C4Bu;   // EMF_VERB_TALK
 // a tame animal has it (petlog 14:11:55)
 constexpr uint32_t kPetSeq = 0xB1EB4A70u;
 constexpr uint32_t kPetVerb = 0x6D5B6297u;    // EMF_VERB_PET
+constexpr uint32_t kCloseVerb = 0x3959A87Fu;  // (16:10) "Close", FlameKit's inv.CLOSE_VERB (the chest's onToOffVerb)
 std::atomic<uint64_t> g_offer_log_at{0};
 std::atomic<uint64_t> g_reset_log_at{0};
 // where: 0 = before interaction_offer, 1 = after interaction_taming, 2 = before interaction_attempt (14:32: E on the
@@ -454,7 +455,8 @@ void pet_offers(int where) {
     for (auto [id, mode] : ids) {
         auto* o = w.get<emf::gen::ecs::InteractionOfferRuntime>(id);
         if (!o) continue;
-        const uint32_t seq = mode == 1 ? kPetSeq : kTouchSeq, verb = mode == 1 ? kPetVerb : kTalkVerb;
+        // mode 2 (owner 16:10): his chest is open: "Close" (FlameKit's inv.CLOSE_VERB, the touch sequence)
+        const uint32_t seq = mode == 1 ? kPetSeq : kTouchSeq, verb = mode == 1 ? kPetVerb : (mode == 2 ? kCloseVerb : kTalkVerb);
         if (where != 3) {
             const bool ours = o->overrideSequence.value == seq && o->overrideVerbLocaId.value == verb &&
                               o->defaultSequence.value == seq && o->defaultVerbId.value == verb &&

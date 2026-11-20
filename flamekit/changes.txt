@@ -1,3 +1,6 @@
+0.15.346 Nov 20, 2026
+- Companions (test, local server only): while a pet's chest is open, its E prompt says "Close" (it said "Talk"). Needs a server restart. Server only: no game change.
+
 0.15.345 Nov 20, 2026
 - Companion Roster: the baby animals are no longer in the Pets list (the game makes them tame, so they could be picked up, and they did not follow).
 - Companions (test, local server only): once a companion or pet has reached you, it stays where it stands while you are within 6 m of it, so you can walk up to it; further away it follows again. Changing a kind to a pet no longer says pets do not follow.

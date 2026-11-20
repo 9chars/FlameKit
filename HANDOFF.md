@@ -1870,6 +1870,10 @@ next restart (no yes for a restart yet).
    player, the others within SLOT_AT of their place) h.settled: hold_at where he stands while the player is within
    6 m ("settle <id>: arrived ..." / "follows again"); drive_stuck counts h.settle_t as progress. Applies to every
    companion (owner 16:00 "pets and companion monsters too" for the spacing). N5 needs another kind (roster window).
+   0.15.345 server part installed 16:09:54 (settle lines logged at once). **Owner 16:10: "I also noticed, when their
+   inventory crate is open, the pet still says "E" Talk instead of "E" Close"**. 0.15.346: pet_drive.txt 9th field
+   2 while his chest is open; the probe's pet_offers: mode 2 = touch sequence + verb 0x3959A87F (inv.CLOSE_VERB).
+   Needs the probe DLL (restart). Client Development release for core/pets.lua (no babies in the Kind list).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

@@ -3806,7 +3806,10 @@ function roster.pet_flush(world, id, h)
   local code = a.movementTargetIsValid and ((tonumber(cd.prowlAngle) or 2) + (cd.targetOfMyTarget and 10 or 0)
     + (cd.isTargetInsideLeash and 20 or 0)) or 0
   roster.pet_lines[id] = string.format("%d %.3f %.3f %.3f %.3f %.3f %.3f %g %d", id, a.movementTarget.x, a.movementTarget.y,
-    a.movementTarget.z, a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z, code, roster.pet_mode[id] and 1 or 0)
+    a.movementTarget.z, a.homeZonePosition.x, a.homeZonePosition.y, a.homeZonePosition.z, code,
+    -- the offer (the probe's pet_offers): 1 = the game's pet action (Pet in his wheel), 2 = "Close" while his chest is
+    -- open (owner 16:10 "when their inventory crate is open, the pet still says "E" Talk instead of "E" Close"), 0 = Talk
+    roster.pet_mode[id] and 1 or ((name_of[id] and inv.open[name_of[id]]) and 2 or 0))
   cd.targetOfMyTarget = false  -- set again each tick where the edge stop is off (edge_off)
 end
 function roster.pet_write()
