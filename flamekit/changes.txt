@@ -1,3 +1,6 @@
+0.15.336 Nov 20, 2026
+- Companions (test, local server only): Pet in a pet's wheel now says "Press E to pet <name>"; that E plays the game's petting, then his E is Talk again (the server can't start the petting by itself). Server only: no game change.
+
 0.15.335 Nov 20, 2026
 - Companions (test, local server only): pets get their own wheel (Follow me, Stay here, Pet, Inventory, Put away; no Attack). Pet is a try: the server starts the game's own petting for you. The chest name is watched in the log. Needs a server restart. Server only: no game change.
 

@@ -1972,7 +1972,7 @@ local WHEEL = "npcwheel"
 local WHEEL_LABELS = { "Follow me", "Stay here", "Attack", "Inventory", "Put away" }
 inv.WHEEL = { "Close Chest" }  -- (owner 08:02) while his chest is open the wheel offers only this
 -- (owner 14:49 "the wheel for pets would need to be different than the wheel for the monster companions"; 14:59 "lets
--- try it") a pet's wheel: no Attack (pets do not fight), and Pet (roster.do_pet: the game's petting, started by the server)
+-- try it") a pet's wheel: no Attack (pets do not fight), and Pet (roster.do_pet: his next E is the game's petting)
 local PET_WHEEL = { "Follow me", "Stay here", "Pet", "Inventory", "Put away" }
 local FIGHT_MODES = { "Passive", "Defensive", "Aggressive", "Healing" }
 
@@ -2911,16 +2911,13 @@ function F.setup(k)
     end)
     log(okl and line or ("HIT: " .. tostring(line)))
   end)
-  -- (14:59) "Pet" in a pet's wheel: the server accepts the game's pet offer in the player's name (roster.do_pet)
-  local oke, saide = pcall(emf.emits, { "AcceptOfferedInteractionEvent" }, "server")
-  log("pets: AcceptOfferedInteractionEvent to send: " .. tostring(oke and saide) .. (oke and "" or (" " .. tostring(saide))))
   pcall(emf.on_event, "InteractionAcceptedEvent", function(world, e)  -- (09:21) only the owner opens his chest
     -- (13:57) the game's own E on a pet of ours (an animal): his wheel, as E on a companion
     local host, guest = rawget(e, "hostEntityId"), rawget(e, "guestEntityId")
-    if host and guest and roster.pet_mode[host] then  -- (14:59) the accept the server sent for "Pet": no wheel
+    if host and guest and roster.pet_mode[host] then  -- (15:06) E after "Pet" in his wheel: the game's petting, no wheel
       log(string.format("pet %s (%s): petting accepted (player %s, offer %s)", tostring(name_of[host]), tostring(host),
         tostring(guest), tostring(rawget(e, "offerId"))))
-      roster.pet_mode[host].accepted = true
+      roster.pet_mode[host].accepted = roster.pet_mode[host].accepted or world:tick()
     elseif host and guest and name_of[host] and not world:get("DynamicEnemy01BehaviorState", host) then
       log(string.format("pet %s (%s): the game's E pressed by player %s: his wheel", tostring(name_of[host]), tostring(host), tostring(guest)))
       local okt, errt = pcall(on_talk, world, guest, host)
@@ -3628,15 +3625,17 @@ end
 -- z> <player spot x y z> <code>" (code: pace 2 walk / 3 run / 4 sprint, + 10 edge stop off, + 20 drops allowed; 0 = not
 -- driven), written each tick it changes; its drive_post reads it. (13:04: the first try kept them in the animal's own
 -- AnimalSaved / DynamicWildlife spawn positions: the game moved the dog by them, 20 m jumps every half second.)
--- (owner 14:49 / 14:59 "lets try it") "Pet" in a pet's wheel. The game offers no call that plays its petting; the try:
--- the pet's offer is switched to the game's pet action (the server probe, 9th field of pet_drive.txt = 1; sequence
--- 0xB1EB4A70, verb Pet), then the server sends AcceptOfferedInteractionEvent {player, pet, offer 1} as if he pressed E,
--- and after PET_HOLD ticks the offer is Talk again. The accept is logged ("petting accepted"), not turned into his
--- wheel. Unknown: whether the game then plays the petting on the player (his own game may start it before the event).
-roster.pet_mode = {}   -- pet entity -> { player, at = tick set, sent = bool, accepted = bool }
-roster.PET_SEND, roster.PET_HOLD = 6, 240
+-- (owner 14:49 / 14:59) "Pet" in a pet's wheel. The game offers no call that plays its petting, and the server sending
+-- AcceptOfferedInteractionEvent in the player's name did nothing (0.15.335, 15:05: never accepted; the player's own game
+-- starts the petting). So (owner 15:06 "it lets me press E again for the pet") Pet switches the pet's offer to the
+-- game's pet action (the server probe, 9th field of pet_drive.txt = 1; sequence 0xB1EB4A70, verb Pet) and tells the
+-- player to press E; that E plays the game's petting. Back to Talk PET_AFTER ticks after that press is accepted
+-- (InteractionAcceptedEvent, "petting accepted", no wheel), or after PET_HOLD ticks without one.
+roster.pet_mode = {}   -- pet entity -> { player, at = tick set, accepted = tick or nil }
+roster.PET_HOLD, roster.PET_AFTER = 600, 30
 function roster.do_pet(world, player, npc, rr)
   roster.pet_mode[npc] = { player = player, at = world:tick() }
+  say(world, player, "Press E to pet " .. tostring(rr and rr.name or "your pet") .. ".")
   log(string.format("pet %s (%s): Pet picked by player %s: his offer goes to the game's pet action", tostring(rr and rr.name), tostring(npc), tostring(player)))
 end
 function roster.pet_mode_tick(world)
@@ -3644,13 +3643,8 @@ function roster.pet_mode_tick(world)
   for npc, m in pairs(roster.pet_mode) do
     if not world:position(npc) then
       roster.pet_mode[npc] = nil
-    elseif not m.sent and t - m.at >= roster.PET_SEND then
-      m.sent = true
-      local ok, err = pcall(emf.emit, "server", "AcceptOfferedInteractionEvent",
-        { guestEntityId = m.player, hostEntityId = npc, offerId = 1 })
-      log(string.format("pet %s: accept sent for player %s: %s", tostring(npc), tostring(m.player), tostring(ok and (err == nil or err)) .. (ok and "" or (" " .. tostring(err)))))
-    elseif t - m.at >= roster.PET_HOLD then
-      log(string.format("pet %s: back to Talk (accepted %s)", tostring(npc), tostring(m.accepted or false)))
+    elseif (m.accepted and t - m.accepted >= roster.PET_AFTER) or t - m.at >= roster.PET_HOLD then
+      log(string.format("pet %s: back to Talk (%s)", tostring(npc), m.accepted and "petted" or "not petted"))
       roster.pet_mode[npc] = nil
     end
   end

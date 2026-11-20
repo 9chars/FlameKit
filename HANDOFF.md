@@ -1804,6 +1804,10 @@ next restart (no yes for a restart yet).
    InteractionAcceptedEvent while pet_mode: logged "petting accepted", no wheel; after PET_HOLD 240 ticks back to Talk.
    Chest name: Lua logs the key right after the chest spawn; the probe logs when a registered name leaves the
    server's table ("names: 'N2' ... is NO LONGER in the server's table").
+   DLL 010b78f7 (old .old_1503); restart 15:02 (owner "yes"). Log 15:05-15:06: the server-sent accept was never
+   accepted (the 2 accepted ones, offer 4 and 7, came ~2 s later = his own E). **Owner 15:06: "when I press the 'Pet'
+   option from the wheel, it lets me press E again for the pet"**. 0.15.336 (the press-E plan): the emit removed;
+   Pet says "Press E to pet <name>"; back to Talk PET_AFTER 30 ticks after that accept, or PET_HOLD 600 without it.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
