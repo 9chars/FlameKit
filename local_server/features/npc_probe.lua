@@ -1430,7 +1430,7 @@ end
 -- storage chest; before: Prop_Decoration_T5_Storage_40_Chest 0c667e7e-0fbd-4cb9-b58d-c3a20df7eaec (40 slots)
 inv.CHEST = "bc834cbd-58f1-494a-97fb-0dc0248eb738"  -- Prop_Decoration_T6_Storage_72_Magic (72 slots)
 inv.PUT_WAIT, inv.RETRIES, inv.SAVE_EVERY = 30, 3, 60
-inv.SPOT = 1  -- m from him, on his far side from the player (owner 09:29 "1m should be fine"; was 2.5)
+inv.SPOT = 1.5  -- m to his left (owner 09:31)
 
 -- (owner 2026-11-20 08:19 "we'll have to test the unlocked parts") every gear piece in the chest: its level, rarity,
 -- perks (PerkContainerNew: available/unlocked), durability-broken and gem, logged when the chest is filled and when it
@@ -1614,21 +1614,15 @@ inv.open_chest = function(world, player, npc, rr)
   if inv.open[rr.name] then return end
   local x, y, z = world:position(npc)
   if not x then return end
-  -- (owner 09:28 "can you make the chest not spawn right on the player? it spawned it right where I was standing"; the
-  -- 72-slot chest is far bigger than the 40-slot one, 1.5 m to his right reached the player) on his far side from the
-  -- player, inv.SPOT m from him; a player standing on him: his right, as before
+  -- (owner 09:31 "make the chest just spawn to the left of him by 1.5 m"; 09:28 the 72-slot chest 1.5 m to his RIGHT
+  -- was on the player) inv.SPOT m to his left
   local px, _, pz = world:position(player)
-  local dx, dz = px and (x - px) or 0, pz and (z - pz) or 0
-  local d = math.sqrt(dx * dx + dz * dz)
-  if d < 0.3 then
-    local yaw = 0
-    pcall(function()
-      local q = world:get("CurrentTransform", npc).transform.orientation
-      yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
-    end)
-    dx, dz, d = math.cos(yaw), -math.sin(yaw), 1
-  end
-  local cx, cz = x + dx / d * inv.SPOT, z + dz / d * inv.SPOT
+  local yaw = 0
+  pcall(function()
+    local q = world:get("CurrentTransform", npc).transform.orientation
+    yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
+  end)
+  local cx, cz = x - math.cos(yaw) * inv.SPOT, z + math.sin(yaw) * inv.SPOT
   local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz, { CustomPlayerString = { stringId = inv.name_key(rr.name) } })
   if not (oks and chest and chest ~= 0) then  -- (names) without the label rather than no chest
     log(string.format("inventory %s: the chest with his name label was refused (%s): spawned without it", rr.name, tostring(chest)))

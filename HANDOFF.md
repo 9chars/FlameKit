@@ -1581,6 +1581,8 @@ next restart (no yes for a restart yet).
      (his right only when the player stands on him); the opened log gives the distance from the player. NOTE: no "opened
      by its owner" line at 09:27 (he closed it via E at 09:27:34; maybe never opened it): the event is still unproven.
      Owner 09:29 "2.5 away from him seems a bit too far don't you think? 1m should be fine": 0.15.306 inv.SPOT = 1.
+     Owner 09:31 "make the chest just spawn to the left of him by 1.5 m, sorry its a process to test it out right":
+     0.15.307 1.5 m to his left by his facing (the far-side-from-the-player rule removed).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
