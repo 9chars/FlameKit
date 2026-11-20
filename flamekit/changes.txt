@@ -1,3 +1,6 @@
+0.15.301 Nov 20, 2026
+- Companions (test, local server only): fix: after logging off and back on with the companion's chest open, the "Inventory closed" notice goes to you again. Server only: no game change.
+
 0.15.300 Nov 20, 2026
 - Companions (test, local server only): the companion's chest no longer closes itself after 5 minutes; it stays open until you close it (he stays frozen next to it). Server only: no game change.
 

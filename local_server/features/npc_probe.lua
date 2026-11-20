@@ -1642,7 +1642,7 @@ inv.open_chest = function(world, player, npc, rr)
 end
 
 -- why: "the player" or "he died"
-function inv.close(world, r, why)
+function inv.close(world, r, why, by)  -- by: the player who closed it (the notice goes to him)
   local c = inv.open[r.name]
   if not c then return end
   local gone = not world:position(c.chest)  -- removed by something else: his record keeps the last save
@@ -1664,13 +1664,13 @@ function inv.close(world, r, why)
   if ent_of[r.name] then inv.prompt(world, ent_of[r.name], false) end
   log(string.format("inventory %s: chest %s closed (%s): %d stack(s), %d item(s) kept", r.name, tostring(c.chest), why,
     #(r.inv or {}), inv.count(r.inv)))
-  local p = c.player
+  local p = by or c.player  -- (09:17) after a log off and back on c.player is an old entity id
   if p and world:position(p) then say(world, p, r.name .. ": Inventory closed" .. (why == "the player" and "." or " (" .. why .. ").")) end
   return true
 end
 
 inv.close_chest = function(world, player, npc, rr)
-  if rr then inv.close(world, rr, "the player") end
+  if rr then inv.close(world, rr, "the player", player) end
 end
 
 -- every tick: fill new chests, keep open ones saved, close forgotten ones
@@ -1835,7 +1835,7 @@ on_talk = function(world, player, npc)
     return
   end
   if rr and inv.open[rr.name] then  -- (owner 08:22) E closes his open chest at once, no wheel
-    inv.close(world, rr, "the player")
+    inv.close(world, rr, "the player", player)
     return
   end
   local okp, ver = pcall(emf.net.peer, world, player, WHEEL)

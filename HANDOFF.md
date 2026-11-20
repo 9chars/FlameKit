@@ -1558,6 +1558,11 @@ next restart (no yes for a restart yet).
      file, written at once), the chest itself is never saved by the game, a new run starts with the record; the gap:
      the PLAYER's inventory is only saved with the world (every 30 s), so a crash right after moving items can lose (took
      out) or double (put in) what moved since the last world save; a restart through the helper saves first.
+     **Owner 09:17 "if I open my companions chest and log off and come back. is everything in the same spot.. orrrr
+     now does that work?"** From the code: the server keeps the chest (only a server restart loses it); his drive stops
+     when the player is gone (drive_read: player position nil), the game AI stays off so he stands; roster_joined drives
+     him again and inv.frozen pins him back to c.pin; E still closes it. 0.15.301: inv.close(world, r, why, by): the
+     closed notice goes to the player who pressed E (c.player is an old entity id after a rejoin). Not tested in game.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
