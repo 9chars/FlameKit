@@ -1959,6 +1959,13 @@ next restart (no yes for a restart yet).
    (N1 stayed: in the save); 17:31:30 N4's chest key 0. Same as the 14:47 miss (WATCH solved). 0.15.358: names_tick
    registers a name again when it is no longer there (log "names: '<n>' registered again"; the file read once more).
    Needs the probe DLL (restart).
+   Restart 17:34 (owner "yes"): 17:34:53 N1-N5 registered; no drop after the join this time.
+   **Owner 17:39: "lets get everything folded into one DLL, do some clean up on the code and evaluate what outstanding
+   stuff needs to get addressed before we push a big update"**: plan given (1 one DLL: fk_server_probe into
+   flamekit_native, side both; 2 cleanup: one companion feature, test tools out, server folder, HANDOFF; 3 open list:
+   second-player tests, today's untested fixes, line check, admin, per-kind tuning, shared inventory, versions).
+   **Owner 17:42: "E close on chests worked, small pets swim. I think the Companion Roster needs to be protected by
+   admin rights"** (wording being confirmed).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
