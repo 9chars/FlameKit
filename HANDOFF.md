@@ -1180,7 +1180,8 @@ next restart (no yes for a restart yet).
      no hit on it and no 0.3 m closer for NO_HIT 2 s -> a reposition step (hop / 2 m left / 2 m right), 1 s, then he
      tries again from there; after the three -> gives up on it (20 s) and picks again; a hit on it starts the steps
      over. Logs "can't deliver attacks on X (why; d m away): hops/moves", "tries X again from here", "gives up on X:
-     why after the hop, left and right". Not done (to propose): the edge stop off in fights.
+     why after the hop, left and right". ~~Not done (to propose): the edge stop off in fights.~~ -> **WATCH, not a
+     to-do** (2026-11-20, see below).
      **Owner 11:11, verbatim:** "the radius change definitely kept him more focused at least the last 2 fights. he still
      struggles to face the targets however. he attacks, lunges and then takes too long to turn around. now there are 2
      monsters attacking me and he took like 10 seconds to even respond to that, still better than before". Data
@@ -1398,6 +1399,13 @@ next restart (no yes for a restart yet).
      helper .py; README), `flamekit_native/notes/map_marker_registry.json`. Left out on purpose: the work folder's
      old `notes/probes/npc_probe.lua` / `npc_wheel_probe.lua` (2026-11-17 copies, superseded; their history is in git)
      and `npc_fields.lua` (identical to local_server's).
+     **Owner 06:32-06:37:** "what was the edge check in fights about?", "so he runs off cliffs without my trail to
+     follow?" (no: off the trail the C++ edge stop holds him at no ground within 12 m, more than 7.5 m down, or steeper
+     than 30 deg unless the player took it), "there was data to back this change up?" -> No: ONE case (2026-11-19 10:38,
+     a 0.88 m step), which Claude put on the list as "to propose" by itself, against the one-off rule; since the 21:14
+     restart 6 edge stops, all in fights, each ONE tick ("goes on" right after), none left him stuck. **Owner 06:37:**
+     "keep it as a watch item, how did it get on the list?" -> **WATCH: the edge stop in fights** (look again only if it
+     actually keeps him from a monster again).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
