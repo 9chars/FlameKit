@@ -1,3 +1,84 @@
+0.15.309 Nov 20, 2026
+- Companions (test): a "Companion Roster" button next to "Call my companion" (Experimental tab) opens the new Companion Roster window: every companion on the server with his owner, kind, mode, items and chest. Rename him (type the new name in his name box, Enter), change his kind to any monster that is not a boss, give him to a player or share him (also offline players), set him as main, put him away or bring him back, delete him (two clicks).
+
+0.15.308 Nov 20, 2026
+- Companions (test, local server only): "roster delete" now refuses while the companion's chest is open or he still carries items (they would be lost); "roster away" closes his open chest first, his items kept. Server only: no game change.
+
+0.15.307 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 1.5 m to his left. Server only: no game change.
+
+0.15.306 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 1 m from him (was 2.5 m), still on the side away from you. Server only: no game change.
+
+0.15.305 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 2.5 m from him on the side away from you, no longer on top of you. Server only: no game change.
+
+0.15.304 Nov 20, 2026
+- Companions (test, local server only): the companion's chest is now the game's biggest storage chest (72 slots) instead of the 40-slot one. Server only: no game change.
+
+0.15.303 Nov 20, 2026
+- Companions (test, local server only): the server log notes when the owner opens the companion's chest (checks that the owner-only rule sees it). Server only: no game change.
+
+0.15.302 Nov 20, 2026
+- Companions (test, local server only): while his chest is open the companion is held in place for everyone, also while his owner is offline. Only the companion's owner can open his chest: when anyone else opens it, it closes at once and everything stays safe with the companion. Server only: no game change.
+
+0.15.301 Nov 20, 2026
+- Companions (test, local server only): fix: after logging off and back on with the companion's chest open, the "Inventory closed" notice goes to you again. Server only: no game change.
+
+0.15.300 Nov 20, 2026
+- Companions (test, local server only): the companion's chest no longer closes itself after 5 minutes; it stays open until you close it (he stays frozen next to it). Server only: no game change.
+
+0.15.299 Nov 20, 2026
+- Companions (test, local server only): console "flamekit.npc unlock <companion> <item> <n>" sets a gear piece's upgrades in the companion's record by hand (to repair the piece that lost its upgrade before 0.15.298). Server only: no game change.
+
+0.15.298 Nov 20, 2026
+- Companions (test, local server only): fix: gear upgrades (unlocked perks) are no longer lost when gear goes through the companion's chest; they are kept in his record and put back on the piece when the chest opens. Server only: no game change.
+
+0.15.297 Nov 20, 2026
+- Companions (test, local server only): the companion's chest shows his name floating over it, the way the game shows a name you give your own chest. Needs the server probe from this version (loads at the next server start); before that the chest opens without the name. Server only: no game change.
+
+0.15.296 Nov 20, 2026
+- Companions (test, local server only): "flamekit.npc names spawn <entity>" puts a test chest (gone after 60 s) next to the player carrying that entity's name, to see the game's floating name on a chest the mod made. Server only: no game change.
+
+0.15.295 Nov 20, 2026
+- Companions (test, local server only): new console command "flamekit.npc names" lists the game's own floating names (the names players give chests and altars); "names copy <from> <to>" puts one entity's name on another, to see if the companion's chest can carry a name. Server only: no game change.
+
+0.15.294 Nov 20, 2026
+- Companions (test, local server only): fix: the companion had no E prompt after his chest opened or closed (the game refused the new prompt in the same moment the old one was taken off); the new prompt is now made a moment later and retried until it is taken. Server only: no game change.
+
+0.15.293 Nov 20, 2026
+- Companions (test, local server only): fix: the companion's chest no longer saves its contents in the first second after filling, when a fresh gear piece can still read as level 0 and common; a crash in that moment could have saved it that way. Server only: no game change.
+
+0.15.292 Nov 20, 2026
+- Companions (test, local server only): while the companion's chest is open, E on the companion closes the chest at once (no wheel), and its prompt shows the game's door "Close" word (test: if it shows only "E", the word's id is wrong). Server only: no game change.
+
+0.15.291 Nov 20, 2026
+- Companions (test, local server only): while its chest is open the companion can no longer be pushed: it stays exactly where it stood when the chest opened. Server only: no game change.
+
+0.15.290 Nov 20, 2026
+- Companions (test, local server only): the server's log lists every gear piece in the companion's chest (level, quality, perks, gem, damage) when the chest is filled and when it closes, to check that gear comes back unchanged. Server only: no game change.
+
+0.15.289 Nov 20, 2026
+- Companions (test, local server only): when the companion dies with its chest open, the chest closes at once, keeping everything that was in it. Server only: no game change.
+
+0.15.288 Nov 20, 2026
+- Companions (test, local server only): while the companion's chest is open, "Call my companion" (P) is refused with "Close the chest first." Server only: no game change.
+
+0.15.287 Nov 20, 2026
+- Companions (test, local server only): the companion carries items for you. "Inventory" on its E wheel puts a large chest next to it with everything it carries; take out and put in what you like, then "Close Chest" (the only choice on its wheel while the chest is open) stores it all and the chest goes away. A chest left open closes itself after 5 minutes, keeping everything. While the chest is open the companion stays where it is and does nothing. Gear keeps its level and quality; a gem socketed into a weapon comes back as a separate gem next to the weapon. Server only: no game change.
+
+0.15.286 Nov 20, 2026
+- Companions (test, local server only): a fall safety net: when the companion falls more than 7.5 m below where it left the ground (a jump of yours it could not make), it is brought back beside you before it lands, so a missed jump no longer kills it. Server only: no game change.
+
+0.15.285 Nov 20, 2026
+- Companions (test, local server only): following rebuilt around your trail: the companion walks the way you walked, jumps where you jumped and steps up where you stepped up. When it can't follow, it is put back beside you at once and "Companion can't follow you!" shows for 5 seconds.
+- Companions (test): it keeps your pace: it walks, runs or sprints the way you did at each spot, and sprints whenever it is more than 6 m behind.
+- Companions (test): the E menu has an Attack menu: Passive (never fights), Defensive (fights once something attacks you or it), Aggressive (fights every monster within 20 m of you) and Healing (never fights, keeps you healed).
+- Companions (test): in a fight it picks the nearest monster it has a clear line to, turns to face it, runs in to lunge range (4 m) and attacks with the wolf's bite and lunge until the monster is dead, then picks the next one. When something blocks it or its attacks don't land, it hops, steps left, then right, and otherwise moves on to the next monster. It stays within 20 m of you, keeps following you while it looks for a target, and goes back to following when no monster is left. Setting Passive ends a fight at once; in Defensive, once attacked it fights every monster around you.
+- Companions (test): fast monsters such as bats: it waits at lunge range until they slow down; floating monsters: it jumps into a lunge. Only real monsters (with health) are targets.
+- Companions (test): armour: it takes a third of the damage it used to.
+- Companions (test): healing: it has its own 800 mana, refilling 10 a second. In Healing mode it keeps you at full health, then heals itself. In Defensive and Aggressive it heals itself in a fight when below 40 %, and heals you and itself to full once the fight is over. In Passive it slowly recovers its own health between fights. Each heal restores 25 % of the target's health (200 mana, at most every 4 s) with a Wolf Shout and the game's healing sparkle, and "Companion heals you for <number>!" shows in green. Server only: no game change.
+
 0.15.284 Nov 18, 2026
 - Fast travel: FlameKit's UI now hides 2 seconds later (5.3 s after you pick the destination instead of 3.3 s), so it stays up through the travel animation, and it stays hidden for the whole loading screen even when loading takes long. Server only: no game change.
 
