@@ -1913,6 +1913,13 @@ next restart (no yes for a restart yet).
    world). 0.15.351 (option 1): the probe hooks after locomotion_execution (writes Velocity): a driven pet (g_pets code
    >= 1.5) more than kBoostFrom 8 m from the player's spot, moving over 1 m/s: horizontal velocity x kBoost 1.6 (log
    "pet boost <id>: ..." every 5 s at most). Needs the probe DLL (restart). Option 2 (catch-up) after the test.
+   DLL 29afa6fa installed (old e7000094 .old_1637). **Owner 16:41 "power went down"**; files intact, world saved
+   16:38:06; **owner 16:45 "start it all up"**: up 16:46:38 (hooks installed). **Owner 16:48 "mod crashed?"**:
+   emf_core.log ends 16:48:23.031 on the FIRST "pet boost 25645: 8.1 m from the player: 7.3 -> 11.6 m/s"; the game
+   server process still runs (its session log goes on, player connected) = the server's world step hung right after
+   the boost (cause not known: the hook after locomotion_execution, its Velocity write, or its log from a worker
+   thread). The DLL put back: e7000094 (29afa6fa kept as .bad_1650). 0.15.352: server_probe.cpp back to 0.15.346's
+   (8e22ed7a). Needs a restart. Option 1 needs another way (or option 2).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

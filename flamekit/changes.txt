@@ -1,3 +1,6 @@
+0.15.352 Nov 20, 2026
+- Companions (test, local server only): the pet speed boost (0.15.351) taken out again: the server's game step stopped at the first boost. Needs a server restart. Server only: no game change.
+
 0.15.351 Nov 20, 2026
 - Companions (test, local server only): a pet more than 8 m behind you moves 1.6 times as fast until it catches up (animals have no sprint). Needs a server restart. Server only: no game change.
 
