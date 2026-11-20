@@ -1,3 +1,6 @@
+0.15.313 Nov 20, 2026
+- Companions (test): the Companion Roster's Kind list has a "Pets" section first: the game's dogs, cats, goats, bunnies, cat-deer, turkeys, desert birds, yaks, capybaras and their babies. A companion made a pet is spawned as that animal; pets do not follow or act yet (that comes next).
+
 0.15.312 Nov 20, 2026
 - Companions (test): fix: after a game restart the Companion Roster window (still open from before) stayed at "Asking the server for the roster"; it now asks the server by itself.
 
