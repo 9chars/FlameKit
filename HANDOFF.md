@@ -1321,6 +1321,8 @@ next restart (no yes for a restart yet).
      heal, if any, could not show). Claude suggested Lick Wounds for healing himself, Shout for healing the player.
      **Owner 20:58, verbatim:** "Lick Wounds lets go with" -> the heal move: Lick Wounds 0x0BA28FDE (asked: for every
      heal, his and the player's?).
+     **Owner 20:59, verbatim:** "I changed my mind, I want Wolf Shout" -> the heal move is **Wolf Shout 0x89A1BC53**
+     (replaces Lick Wounds; asked again: for every heal?).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
