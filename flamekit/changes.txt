@@ -1,3 +1,6 @@
+0.15.337 Nov 20, 2026
+- Companions (test, local server only): a companion's heal costs 100 of his 800 mana (was 200): 8 heals from full, about one every 10 s over a long fight. Server only: no game change.
+
 0.15.336 Nov 20, 2026
 - Companions (test, local server only): Pet in a pet's wheel now says "Press E to pet <name>"; that E plays the game's petting, then his E is Talk again (the server can't start the petting by itself). Server only: no game change.
 

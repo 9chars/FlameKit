@@ -1813,6 +1813,9 @@ next restart (no yes for a restart yet).
    least the player can still do it"** = not built; Pet stays as in 0.15.336 (idea kept on the list).
    Chest name: 15:10:46 N2's chest had his key right after the spawn and at the filling; **owner 15:11 "that looks
    good"**. WATCH: the 14:47 miss (key 0) is unexplained; the probe's "NO LONGER in the server's table" log stays on.
+   **Owner 15:11 "do pets have there own mana?"**: no (drive_heal skipped for pets; the dog body has no Mana).
+   **Owner 15:16 "is 200 per heal normal ? that seems high honestly" / 15:17 "yeah I would"** (100): 0.15.337 HEAL_COST
+   100 (was 200; MANA_MAX 800, refill 10/s unchanged).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

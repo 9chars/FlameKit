@@ -2499,7 +2499,8 @@ end
 --   Passive: no heals; a slow recovery once he has not been hit for RECOVER_AFTER (no mana, no shout).
 -- Not while one of his attacks plays (the shout would cut it). Logs "heal <name>: ...".
 local MANA_MAX, MANA_REFILL = 800, 10                     -- refill: a second
-local HEAL_PART, HEAL_COST, HEAL_GAP = 0.25, 200, 240     -- 25 % of the target's maximum, 200 mana, 4 s apart
+local HEAL_PART, HEAL_COST, HEAL_GAP = 0.25, 100, 240     -- 25 % of the target's maximum, 100 mana (owner 2026-11-20
+                                                          -- 15:16 "that seems high", 15:17: 100, was 200), 4 s apart
 local HEAL_BELOW, HEAL_BELOW_FIGHT = 0.6, 0.4
 local HEAL_FULL = 0.99                                    -- "full": a heal only when 1 % or more is missing
 local RECOVER_AFTER, RECOVER_PART = 600, 0.02             -- Passive: 10 s without a hit, then 2 % of his maximum a second
