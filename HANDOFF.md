@@ -1280,6 +1280,9 @@ next restart (no yes for a restart yet).
      its Velocity. **Owner 19:18, verbatim:** "yeah #1 for sure for ahead". **Built 19:2x (Lua, live by reload):**
      is_monster needs NetworkHealth; monster_alive: no health = not alive. #2 not built: asked whether "go ahead"
      covered it.
+     Live 19:19; at once he attacked 171973 (the real monster). **Owner 19:20, verbatim:** "put it on the list, but it
+     probably won't come up again" -> **LATER LIST:** a target's speed for the bat wait measured from how far it really
+     moved (~0.25 s) instead of its Velocity (only matters if a real monster reports a wrong speed; not seen since #1).
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
