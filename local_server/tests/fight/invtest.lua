@@ -215,3 +215,9 @@ act("delete", "Rex", nil)
 act("nope", "Rex", nil)
 act("rename", "Nobody", "X")
 emf.json.encode = enc
+-- (0.15.310) New companion from the window
+pos[1] = { 5, 0, 5 }
+local before = #T.roster.list
+emf.json.encode = function(t) return t.op == "result" and ("result: " .. tostring(t.text)) or "state" end
+act("new", "", nil)
+print("new: list grew", #T.roster.list - before)

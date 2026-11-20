@@ -3369,7 +3369,14 @@ function roster.ui_do(world, from, data)
   local what, arg = tostring(m.what or ""), m.arg
   local r = find(tostring(m.name or ""))
   local said, good
-  if not r then
+  if what == "new" then  -- (0.15.310) a hound of the asking player, next to him, following him (roster new)
+    local real = emf.reply
+    emf.reply = function(t) said = t end
+    local okc, errc = pcall(roster_cmd, world, { "roster", "new", tostring(pid) })
+    emf.reply = real
+    local made = okc and tostring(said or ""):match("^roster: new (.+)$")
+    said, good = made and (made .. " is made: a hound next to you, following you.") or ("Not made: " .. tostring(okc and said or errc)), made and true
+  elseif not r then
     said, good = "No companion called " .. tostring(m.name) .. ".", false
   elseif what == "rename" then
     said, good = roster.ui_rename(world, r, arg)
