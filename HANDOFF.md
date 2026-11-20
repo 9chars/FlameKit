@@ -1528,6 +1528,25 @@ next restart (no yes for a restart yet).
      test chest 187029 with 2112's key: **owner 08:49 "it says "Private Stash" so the label test worked"**: the game's
      floating name shows on a chest the mod spawns, by key alone. Left: our own text ("N1") needs an entry in the
      server's CustomPlayerStringsSystem (layout only known on the client; it is saved with the world).
+     **Owner 08:51: "when the chest spawns and opens I just want it to have the companions name on it.. you're just
+     asking me too many questions for a simple task"** (fewer questions: build it). Static RE of enshrouded_server.exe
+     (sha256 f0d824be7fcd48eb; objdump + numpy xref scripts in the device's $HOME/re, not kept): the key IS FNV-1a 64 of
+     the text ("Private Stash" = 0x2E2B803BEE877B55, "N1" = 0x09207B07B5B5A6A0); setString 0x140915b80(out, sys, oldKey,
+     {p, n}) = the CustomPlayerStringClientMessage handler's call (0x1407bde90): refcounted entries (+0x138), takes a ref
+     on the new text, drops one on oldKey's; hash map sys+0x198 bits / +0x1a0 slots / +0x1b8 keys / +0x1d0 entries /
+     +0x1e4 count; lookup 0x140953040 ALSO adds a ref (custom_player_string_init calls it per entity and ZEROES a key
+     that is not in the map: the name must exist before the chest spawns). 0.15.297: Lua writes roster names to
+     mods\flamekit\custom_names.txt and spawns the chest with {CustomPlayerString = {stringId = FNV-1a 64(name)}}
+     (logs "name label key on the chest ..." at the filling: 0 = the server did not know the name); the server probe
+     (on_tick, server world, every 30 ticks when the file changes) calls setString(oldKey 0) once per name per run
+     (our ref, never dropped), logs "names: 'N1' registered ...". DLL md5 27d76044 copied in at 09:03 (03a0df63 renamed
+     .old_0903): loads at the next server start (not restarted yet).
+     **Upgrades (owner 08:57 "upgraded items don't appear to be preserved :( it definitely stripped the upgrades off
+     it...... if there anything you can do to put them back on it?"):** 08:56:41 out "perks 4/1", 08:56:47 back "4/0":
+     emf.put does not keep PerkContainerNew.unlockedPerks (the unlocked-perks question is answered: NOT kept).
+     0.15.298: inv.gear_list reads it, his record keeps `unlocked`, the put records a fix, inv.apply_unlocked writes it
+     on the new piece at ready_t (before the first snapshot). 0.15.299: `flamekit.npc unlock <companion> <item> <n>`;
+     09:02:16 N1's record item 3412482507 level 47 set to 1 unlocked (the owner's weapon). NOT yet seen in game.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
