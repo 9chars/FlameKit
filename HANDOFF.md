@@ -1946,6 +1946,12 @@ next restart (no yes for a restart yet).
    Asked: bring a can't-follow companion back beside a swimming player at once? **Owner 17:27 "yes"**. 0.15.356: the
    returning loop: after rt.why "can't follow" a swimming player (depth > 0.5) counts as ready (LAND_TICKS as before);
    glide / fast travel / falling still wait for the ground.
+   0.15.356 installed 17:27:57. **Owner 17:29 "it took the companion dog a bit to respond to that crab that just
+   attacked"**: 17:28:21-24 N1 (Aggressive): crab 29669 at 20.6 m, 4.8 m below, ray blocked x3 -> skipped 20 s; attacked
+   at 17:28:44 (3.9 m), dead 17:28:53. (17:28:31: the Companions wheel brought N3 back: works.) **Owner 17:31 "yeah make
+   that change, also 20 second skip might be too long a wait also? drop it down to like 10 seconds?"**. 0.15.357:
+   SKIP_TICKS 600 (10 s, was 1200); fight_candidates: a skipped monster within F.SKIP_NEAR 6 m of the player is a
+   candidate again ("... is no longer skipped: it is within 6 m of the player"); a hit already did that.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

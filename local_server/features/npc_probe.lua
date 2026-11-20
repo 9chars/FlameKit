@@ -2581,7 +2581,12 @@ local function turn_toward(world, id, fx, fz)
   if math.abs(diff) > 0.01 then face(world, id, yaw + step) end
   return math.deg(diff - step)
 end
-local SKIP_TICKS = 1200
+local SKIP_TICKS = 600  -- (owner 17:31 "drop it down to like 10 seconds?": 10 s, was 20)
+-- (owner 17:29 "it took the companion dog a bit to respond to that crab that just attacked"; 17:31 "yeah make that
+-- change") 17:28:21-24 the crab, 20.6 m off and 4.8 m below, was blocked 3 times and skipped for 20 s; it came up to
+-- the player meanwhile and was attacked only at 17:28:44. A skipped monster within F.SKIP_NEAR of the player is a
+-- candidate again at once (a hit on him or the player already did that)
+F.SKIP_NEAR = 6
 
 local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
   local list, seen = {}, {}
@@ -2589,7 +2594,11 @@ local function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
   local now = world:tick()
   for m, untill in pairs(skip) do
     local hit_t = threats[cid] and threats[cid][m]
+    local mx, _, mz = world:position(m)
     if now > untill then skip[m] = nil
+    elseif mx and (mx - px) ^ 2 + (mz - pz) ^ 2 <= F.SKIP_NEAR * F.SKIP_NEAR then
+      skip[m] = nil
+      log(string.format("fight %s: %s is no longer skipped: it is within %d m of the player", tostring(name_of[cid] or cid), tostring(m), F.SKIP_NEAR))
     elseif hit_t and hit_t > untill - SKIP_TICKS then
       -- (owner 11:17 yes) it hit him or the player again after he gave up on it: it is a candidate again at once
       skip[m] = nil
