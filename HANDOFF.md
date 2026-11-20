@@ -1260,6 +1260,18 @@ next restart (no yes for a restart yet).
      kCatchUp 6 m from where he is headed (the player; in a fight the monster), else the Lua pace; the old 6/12 m steps
      are gone. drive_harness: identical to the commit before on 9 seeds apart from the pace field. Lua live 16:40 (the
      old DLL ignores the pace until the restart).
+     Restart 17:22 (owner 17:21 "ready to restart"). **Owner 18:39:** "you should have a lot of data to analyze now".
+     **Data 17:22-18:39 (no errors):** 49 sequences, 252 attacks; ground bites at level monsters 26/31 hit or kill,
+     ground lunges 15/18; 67 waits, 66 slowed; 14 give-ups. Jump attacks (floating monsters 0.5-3.3 m above): he rises
+     2-3 m by 0.4 s; jump LUNGES 20/25 hit or kill, jump BITES 5/22. 30 of 47 sequence ends = everything left blocked:
+     97 of 129 blocked checks were monsters >= 1.5 m BELOW him (another floor; the ray hits his own floor's edge), 20
+     monsters; each such sequence held him still ~3 s, again every 20 s. Pace (at each change, player away median):
+     walk 2.5 m, run 3.1, sprint 5.1. Can't follow 18x -> 15 respawns (7 drops too high, 11 blocked/up), the same kinds
+     as before. Claude proposed (1) a target HIGH or more above him: lunge only; (2) he keeps following while he checks
+     the candidates. **Owner 18:47, verbatim:** "yes, overall he did well for a pet". **Built 18:5x (Lua, live by
+     reload):** (1) ix = bite only when within FIGHT_BITE AND less than HIGH above him, else lunge; (2) the pick phase
+     returns false (the following goes on) while it checks (lastTargetId set, RAY_WAIT, the ray read); he stops only
+     once a target is locked on.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

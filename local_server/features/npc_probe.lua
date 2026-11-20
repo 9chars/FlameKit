@@ -1730,7 +1730,8 @@ end
 -- Picking: the candidates, nearest to him first (Defensive: monsters that hit him or the player; Aggressive: those and
 -- every monster within FIGHT_RANGE of the player; alive, within FIGHT_RANGE of the player, not skipped). For each one
 -- the C++ shoots a ray from his shoulder to its middle (combatData.lastTargetId -> isTargetReachable, every step);
--- blocked (a fence, wall, tree or object) -> the next one; the first clear one is his target.
+-- blocked (a fence, wall, tree or object) -> the next one; the first clear one is his target. While he checks he keeps
+-- following the player (owner 2026-11-19 18:47 yes: monsters on another floor held him still 3 s every 20 s).
 -- Fighting: locked on until it is dead. The ray every step; he faces it (the C++ turns him to lastTargetId), runs at it
 -- (the native hook stops him 2 m off), lunges from FIGHT_LUNGE and bites from FIGHT_BITE as often as his moves allow
 -- (the next one when his move's animation is over, at most ATTACK_MAX). He can't deliver attacks (owner 10:43 yes):
@@ -1901,14 +1902,14 @@ drive_fight = function(s)
         A.list = fight_candidates(world, id, h, smode, px, py, pz, nx, ny, nz)
         log(string.format("fight %s: try %d: %d candidate(s)", name, A.tries, #A.list))
       end
-      return hold_still()
+      return false  -- (owner 18:47) he keeps following while he checks
     end
     if A.checking ~= c.id then
       A.checking, A.check_t = c.id, t
       pcall(function() cd.lastTargetId = c.id end)
-      return hold_still()
+      return false  -- (owner 18:47) he keeps following while he checks
     end
-    if t - A.check_t < RAY_WAIT then return hold_still() end
+    if t - A.check_t < RAY_WAIT then return false end  -- (owner 18:47) he keeps following while he checks
     local okr, reach = pcall(function() return cd.isTargetReachable end)
     local okd, rd = pcall(function() return tonumber(cd.distanceToTarget) end)
     if okr and reach then
@@ -1928,7 +1929,7 @@ drive_fight = function(s)
       A.blocked_ids = A.blocked_ids or {}
       A.blocked_ids[c.id] = true
       A.i, A.checking = A.i + 1, nil
-      return hold_still()
+      return false  -- (owner 18:47) he keeps following while he checks
     end
   end
   -- fighting
@@ -2091,7 +2092,9 @@ drive_fight = function(s)
     off = okt and o or 0
   end
   if not at and d <= FIGHT_LUNGE and math.abs(off) <= FACE_OK and not waiting then
-    local ix = d <= FIGHT_BITE and 0 or 1
+    -- (owner 2026-11-19 18:47 yes: jump bites at floating monsters hit 5 of 22, jump lunges 20 of 25) a target HIGH or more
+    -- above him gets the lunge only
+    local ix = (d <= FIGHT_BITE and my - ny < HIGH) and 0 or 1
     local ok = pcall(function() cd.selectedAttackIndex = ix end)
     A.atk = { ix = ix, t = t, x = nx, z = nz, d = d, mx = mx, mz = mz, y = ny }
     if my - ny >= HIGH then A.atk.jump = (launch_speeds(0, my - ny)) end
