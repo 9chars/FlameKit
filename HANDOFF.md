@@ -1272,6 +1272,14 @@ next restart (no yes for a restart yet).
      reload):** (1) ix = bite only when within FIGHT_BITE AND less than HIGH above him, else lunge; (2) the pick phase
      returns false (the following goes on) while it checks (lastTargetId set, RAY_WAIT, the ray read); he stops only
      once a target is locked on.
+     **Owner 19:17:** "any reason why he's not attacking the current monster?" Log: 19:16:09 locked on 171975 (faction 15,
+     DynamicLocomotion+DynamicPathWalker+MovementCollider, NO NetworkHealth: a part of a monster), its Velocity a
+     constant 20 m/s while it did not move (0.0 m in 0.4 s) -> the bat wait forever (waiting resets the no-hit rule);
+     171973 beside it (with health; one jump lunge hit it for 400) hit him 8 times, 3680 -> 2751. Claude proposed (1)
+     only entities with NetworkHealth are monsters; (2) a target's speed from how far it really moved (~0.25 s), not
+     its Velocity. **Owner 19:18, verbatim:** "yeah #1 for sure for ahead". **Built 19:2x (Lua, live by reload):**
+     is_monster needs NetworkHealth; monster_alive: no health = not alive. #2 not built: asked whether "go ahead"
+     covered it.
 2. Companions in the party list.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").

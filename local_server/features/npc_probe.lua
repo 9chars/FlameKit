@@ -1520,11 +1520,15 @@ local function fight_mode(cid)
   return r and r.fight or "Passive"
 end
 
--- a monster: the monster AI, not one of ours, and a monster faction (not 7 Player, 8, 11 PlayerAlly)
+-- a monster: the monster AI, not one of ours, a monster faction (not 7 Player, 8, 11 PlayerAlly), and health
+-- (NetworkHealth; owner 2026-11-19 19:18 "#1 for sure": 171975, a part of a monster with no health and a constant
+-- 20 m/s speed, held him for a minute while 171973 beside it hit him)
 local function is_monster(world, id)
   if name_of[id] then return false end
   local ok, st = pcall(world.get, world, "DynamicEnemy01BehaviorState", id)
   if not (ok and st) then return false end
+  local okh, nh = pcall(world.get, world, "NetworkHealth", id)
+  if not (okh and nh) then return false end
   local okf, f = pcall(world.get, world, "Faction", id)
   local fn = okf and f and tonumber(tostring(f.faction))
   return fn ~= nil and fn ~= 7 and fn ~= 8 and fn ~= 11
@@ -1559,7 +1563,7 @@ end
 local function monster_alive(world, id)
   if not world:position(id) then return false end
   local ok, hp = pcall(function() return world:get("NetworkHealth", id).health end)
-  return not (ok and hp and hp <= 0)
+  return ok and hp ~= nil and hp > 0  -- no health: not a monster (is_monster), so not alive either
 end
 
 -- (owner 21:20 "does the dog have any armor or defensive numbers, he seemed to die pretty quick", 21:21 "lets just do
