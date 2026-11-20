@@ -1781,6 +1781,9 @@ next restart (no yes for a restart yet).
    10 s "before interaction_attempt: the game's again (seq 0 verb 0 offered 1)" = the override is cleared between
    interaction_offer and the press check (likely program interaction_override_reset), and the wild default is 0.
    0.15.332: defaultSequence / defaultVerbId set to touch / Talk as well (all three hooks).
+   DLL 11c28b80 (old .old_1440); restart 14:39 (owner "yes"). **Owner 14:42 "still nothing"**: default now stays ours
+   (log: seq 3e5189bf/0 before the press check), still no InteractionAcceptedEvent. 0.15.333: petlog logs the animal's
+   InteractionLock / InteractionKnowledgeLock / InteractionOffer / ClientInteractionOffer / InteractionPause.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

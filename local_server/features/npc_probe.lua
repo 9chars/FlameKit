@@ -3596,6 +3596,10 @@ function roster.petlog_tick(world)
     return string.format("default seq %s verb %s, override seq %s verb %s, offerId %s, offered %s, disabled %s, last guest %s offer %s",
       sv(o.defaultSequence), sv(o.defaultVerbId), sv(o.overrideSequence), sv(o.overrideVerbLocaId), sv(o.offerId),
       sv(o.isOffered), sv(o.isDisabled), sv(rd(function() return o.lastAcceptData.guestId end)), sv(rd(function() return o.lastAcceptData.offerId end))) end)
+  -- (14:42 "still nothing": E on the Talk prompt fires no InteractionAcceptedEvent) what may refuse the press
+  local function comp(n) return rd(function() local c = world:get(n, id) if c == nil then return "none" end return sv(c) end) end
+  log(string.format("petlog %d locks: InteractionLock %s | InteractionKnowledgeLock %s | InteractionOffer %s | ClientInteractionOffer %s | InteractionPause %s",
+    id, comp("InteractionLock"), comp("InteractionKnowledgeLock"), comp("InteractionOffer"), comp("ClientInteractionOffer"), comp("InteractionPause")))
   log(string.format("petlog %d offer: %s | tame %s | emf offer %s", id, tostring(of),
     tostring(rd(function() return world:get("IsTame", id) ~= nil end)), tostring(rd(function() return emf.offered and emf.offered(world, id) end))))
 end
