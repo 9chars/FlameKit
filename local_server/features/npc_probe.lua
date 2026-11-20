@@ -1689,6 +1689,28 @@ local function fight_watch(world)
       log(string.format("fight %s: his Health.dataStorage %s%s (mode %s)", tostring(name_of[cid] or cid), table.concat(parts, " "),
         hurt_now and " (hurt)" or "", fight_mode(cid)))
     end
+    -- (owner 2026-11-19 19:21 "does that dog have any mana? can he do heals?") which mana / healing parts his body has,
+    -- once per body, and the player's for comparison
+    if not h.heal_dumped then
+      h.heal_dumped = true
+      local function has(e)
+        local out = {}
+        for _, c in ipairs({ "Mana", "ManaRegeneration", "HealthRecharge", "HealingMod", "RecoverHealthSetup", "Stamina" }) do
+          local ok, v = pcall(world.get, world, c, e)
+          if ok and v then
+            local extra = ""
+            pcall(function()
+              local d = v.dataStorage
+              if d then extra = string.format(" [%s/%s]", tostring(d[1]), tostring(d[3])) end
+            end)
+            out[#out + 1] = c .. extra
+          end
+        end
+        return #out > 0 and table.concat(out, ", ") or "none"
+      end
+      log(string.format("fight %s: mana/healing parts: his body: %s; the player's: %s", tostring(name_of[cid] or cid),
+        has(cid), h.player and has(h.player) or "?"))
+    end
     -- (21:21 logging) his defence data, once per body
     if not h.defence_dumped then
       h.defence_dumped = true
