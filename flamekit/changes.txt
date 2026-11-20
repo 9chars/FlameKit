@@ -1,3 +1,6 @@
+0.15.329 Nov 20, 2026
+- Companions (test, local server only): pets are spawned wild again (the game's pick-up comes with tame animals); their E prompt is switched on by the mod and opens the companion wheel. Server only: no game change.
+
 0.15.328 Nov 20, 2026
 - Companions (test, local server only): our pets no longer get the game's "Pet" prompt and pick-up: their E is a plain "Talk" that opens the companion wheel. Server only: no game change.
 

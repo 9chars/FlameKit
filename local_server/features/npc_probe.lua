@@ -1310,16 +1310,9 @@ local function spawn_body(world, r, x, y, z, player)
     if not busy then break end
     x = x + 1.2
   end
-  -- (owner 13:57 "yeah do the E menu next") a pet is spawned tame (the game's IsTame tag): the game then gives it its
-  -- own "E Pet" prompt (EMF will not put ours on an animal: it has the game's), and pressing it opens his wheel
-  -- (InteractionAcceptedEvent, F.setup)
-  local pet = false
-  for _, m in ipairs(require("core.pets")) do if m[3] == r.guid then pet = true end end
-  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, pet and { IsTame = {} } or nil)
-  if pet and not (ok and id and id ~= 0) then
-    log(string.format("roster: %s: the tame spawn was refused (%s): spawned wild", r.name, tostring(id)))
-    ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
-  end
+  -- (owner 14:20 "the 'pick up' option is still there") a pet is spawned wild again: the game's pick-up comes with its
+  -- IsTame tag (0.15.326-0.15.328 spawned them tame), not with the offer; his E comes from roster.pet_offer instead.
+  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
   if not (ok and id and id ~= 0) then
     log(string.format("roster: %s could not be spawned (%s)", r.name, tostring(id)))
     return nil
@@ -3658,10 +3651,15 @@ roster.offer_fixes = {}
 function roster.pet_offer(world, id)
   local o = world:get("InteractionOfferRuntime", id)
   if not o then return end
-  if o.overrideSequence == roster.TOUCH_SEQ and o.overrideVerbLocaId == roster.TALK_VERB then return end
-  local before = string.format("seq %s verb %s", tostring(o.overrideSequence), tostring(o.overrideVerbLocaId))
+  if o.overrideSequence == roster.TOUCH_SEQ and o.overrideVerbLocaId == roster.TALK_VERB and o.isOffered == true
+    and o.isDisabled == false then return end
+  local before = string.format("seq %s verb %s, offered %s, disabled %s", tostring(o.overrideSequence),
+    tostring(o.overrideVerbLocaId), tostring(o.isOffered), tostring(o.isDisabled))
   o.overrideSequence = roster.TOUCH_SEQ
   o.overrideVerbLocaId = roster.TALK_VERB
+  -- (14:20, wild pets) the game's taming offer on a wild animal shows no E (owner 12:54): it is switched on here
+  if o.isOffered ~= true then o.isOffered = true end
+  if o.isDisabled ~= false then o.isDisabled = false end
   local n = (roster.offer_fixes[id] or 0) + 1
   roster.offer_fixes[id] = n
   if n == 1 or n % 100 == 0 then
