@@ -1,3 +1,6 @@
+0.15.341 Nov 20, 2026
+- Companions (test, local server only): a companion or pet that can't follow you while swimming is now brought back beside you, as on land (it only showed the notice). Server only: no game change.
+
 0.15.340 Nov 20, 2026
 - Companions (test, local server only): a "Companions" entry in every companion's and pet's wheel opens a wheel of all your companions and pets (name and kind); picking one brings it next to you, following you (one already out is moved to you). Server only: no game change.
 

@@ -1088,7 +1088,19 @@ local function drive_step(world, id, h)
     return
   end
   drive_waterlog(s)
-  if drive_water(s) then return end
+  if drive_water(s) then
+    -- (owner 15:44 "I'm getting the Companion can't follow you error, but it hasn't respawned to me") 15:43:38 a pet
+    -- swimming at a bank 2 m below the player: "can't follow (water)", but drive_put_away is never reached from the
+    -- water, so nothing put him away. The same TP_AFTER rule here (every companion: it is the shared safety net).
+    if s.h.cant then
+      s.h.cant_since = s.h.cant_since or s.t
+      if s.t - s.h.cant_since >= TP_AFTER and not s.h.go_away then
+        s.h.go_away = "can't follow"
+        log(string.format("can't follow: %s in the water: put away", tostring(id)))
+      end
+    end
+    return
+  end
   drive_track_player(s)
   if drive_put_away(s) then return end
   drive_lay_crumb(s)

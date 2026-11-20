@@ -1839,6 +1839,11 @@ next restart (no yes for a restart yet).
    roster.wheel_list sends a second wheel (title Companions, labels "N1 (Hound) - out"), roster.cw[player] maps
    labels to names (an hour); on_pick checks it first -> roster.wheel_summon (controls() check, roster away if out,
    mode follow, roster.ui_back, green notice, roster window pushed).
+   **Owner 15:44: "I'm getting the Companion can't follow you error, but it hasn't respawned to me"**: 15:43:38 pet
+   82256 swimming at a bank (player 2 m higher, 12-15 m away; climb-out hops every 2 s fail): "can't follow (water)"
+   but drive_step returns after drive_water, so drive_put_away's TP_AFTER rule never ran in the water (old, every
+   companion). 0.15.341: the same rule after drive_water (h.go_away = "can't follow"; log "can't follow: <id> in the
+   water: put away").
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
