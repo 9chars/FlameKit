@@ -9,4 +9,6 @@ server). Then:
    upload.cmd yourself. It uploads what is in the outbox (C:\enshrouded mod shit\outbox) into the server's FlameKit
    folder, mod.json last, then fetches the server's logs into C:\enshrouded mod shit\production_stable_logs.
 
-It never deletes anything on the server and never touches any other folder there.
+Files in the outbox's _flamekit_native folder go into the server's FlameKit Native folder (emf\mods\flamekit_native,
+beside the FlameKit folder; since 2026-11-20, for the companion system). It never deletes anything on the server and
+never touches any other folder there.

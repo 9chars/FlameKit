@@ -2,7 +2,8 @@
 # server's log back into the outbox so Claude can check the reload. The owner runs it (upload.cmd), or (owner,
 # 2026-11-15) Claude through the restart helper's 'upload' request. The password stays encrypted for the owner's Windows
 # user (ftp_password.dat, DPAPI): it is never shown or logged, and Claude never opens that file. It only ever writes into the
-# server's FlameKit folder (ftp.txt mod_dir), mod.json last, and reads the log (log_path). It never deletes on the server.
+# server's FlameKit folder (ftp.txt mod_dir), mod.json last, and (2026-11-20) the FlameKit Native folder beside it (the
+# outbox's _flamekit_native), and reads the log (log_path). It never deletes on the server.
 param([switch]$List, [switch]$LogsOnly)  # -LogsOnly (nightly fetch): uploads nothing, only fetches the logs  # (2026-11-15) -List: also writes what is on the FTP (names, sizes, dates) to production_stable_logs\ftp_list.txt
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -28,18 +29,26 @@ $files = @()
 if (Test-Path $out) { $files = @(Get-ChildItem $out -Recurse -File | Where-Object { $_.FullName -notlike (Join-Path $out 'server_log\*') } |
     Sort-Object { $_.Name -ieq 'mod.json' -and $_.DirectoryName -ieq $out }) }
 if ($LogsOnly) { $files = @() } elseif (-not $files.Count) { Write-Host 'The outbox is empty: nothing to upload.' }
+# (owner, 2026-11-20 19:20 "yes": FlameKit Native goes to the server too, for the companion system) the outbox's
+# _flamekit_native\ folder goes into the FlameKit Native folder beside the FlameKit folder (mod_dir's
+# ..\flamekit_native); it is uploaded first. Nothing else outside mod_dir is ever written.
+$nativeDir = ($s.mod_dir.TrimEnd('/') -replace '/[^/]*$', '') + '/flamekit_native'
+$files = @($files | Sort-Object { -not ($_.FullName -like (Join-Path $out '_flamekit_native\*')) }, { $_.Name -ieq 'mod.json' -and $_.DirectoryName -ieq $out })
 foreach ($f in $files) {
     $rel = $f.FullName.Substring($out.Length).TrimStart('\') -replace '\\', '/'
+    $base = $s.mod_dir.TrimEnd('/')
+    if ($rel -like '_flamekit_native/*') { $base = $nativeDir; $rel = $rel.Substring('_flamekit_native/'.Length) }
     $dir = ($rel -replace '/[^/]*$', '')
+    if ($base -eq $nativeDir) { try { (Req $nativeDir ([System.Net.WebRequestMethods+Ftp]::MakeDirectory)).GetResponse().Close() } catch { } }
     if ($dir -ne $rel) {
-        $acc = $s.mod_dir.TrimEnd('/')
+        $acc = $base
         foreach ($part in $dir.Split('/')) { $acc = "$acc/$part"; try { (Req $acc ([System.Net.WebRequestMethods+Ftp]::MakeDirectory)).GetResponse().Close() } catch { } }
     }
-    $r = Req ($s.mod_dir.TrimEnd('/') + '/' + $rel) ([System.Net.WebRequestMethods+Ftp]::UploadFile)
+    $r = Req ($base + '/' + $rel) ([System.Net.WebRequestMethods+Ftp]::UploadFile)
     $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
     $r.ContentLength = $bytes.Length
     $st = $r.GetRequestStream(); $st.Write($bytes, 0, $bytes.Length); $st.Close(); $r.GetResponse().Close()
-    Write-Host "uploaded $rel ($($bytes.Length) bytes)"
+    Write-Host "uploaded $(if ($base -eq $nativeDir) { 'flamekit_native/' })$rel ($($bytes.Length) bytes)"
     Remove-Item $f.FullName -Force
 }
 if ($files.Count) { Write-Host "Done: $($files.Count) file(s) on the server. Waiting 15 s for EMF to reload FlameKit..."; Start-Sleep -Seconds 15 }

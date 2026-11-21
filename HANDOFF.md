@@ -13,8 +13,8 @@ Read this first when starting a new conversation about FlameKit. Updated 2026-11
    removed; not yet restarted into), 0.15.283 (14:42: the minimap's old TeleportCount rule removed entirely, Rule 0n), 0.15.282 (14:35: the minimap comes back with the rest
    of the UI after fast travel), 0.15.281 (14:18: fast travel hides all of FlameKit's
    UI; includes 0.15.280 Invincible air), earlier today **0.15.279** (2026-11-18: companion map dots with the companion's name (0.15.279), notices also go to
-   Messages, the companion test hooks: P key, wheel, panel button). **0.15.277 on Stable and G-Portal.** The local
-   server's main.lua keeps `features.npc_probe` instead of `features.npc_wheel_probe`; its npc_probe feeds
+   Messages, the companion test hooks: P key, wheel, panel button). **0.15.368 on Stable and G-Portal (2026-11-20 19:20-19:23)**,
+   with the companion system. (Before 0.15.368 the local server's main.lua listed `features.npc_probe` instead of `features.npc_wheel_probe`.) Its companions feed
    `core.companions.set_places` ({x, z, owner = character name}); minimap sends `c x z owner<TAB>companion name` lines, the DLL draws a
    small dot in the owner's player_style colour with the companion's name over it (owner 09:17: "named by the
    companion's name"; there was never a "no name" request), never merged with players.
@@ -626,6 +626,14 @@ travel/npcwheel/roster channels allowed, the companion parts copied into its dat
 fails). Local server 19:14:39: 16 features loaded, both ends' channels true, roster found again, no errors.
 Development 0.15.368 signed (sig good). G-Portal needs mods\flamekit_native too (the companion C++: drive, E offers,
 labels) and the FTP tool only writes into the FlameKit folder.
+**Owner 19:20 "yes"** (Stable 0.15.368 + G-Portal + the FTP tool also uploading FlameKit Native). Stable: dist =
+dist-test 0.15.368 (sig good), pushed. FTP tool upload.ps1 (repo tools/ftp_tool + the PC's release\FlameKit FTP tool,
+old copy claude_scratch\upload_ps1_old_368.ps1): the outbox's `_flamekit_native\` goes to mod_dir's sibling
+flamekit_native/ (uploaded first; root mod.json still last). G-Portal 19:23: 29 files (27 Lua changed since 0.15.277
++ flamekit_native.dll 21452746 + its mod.json); 19:22:58 reload: 16 features, companions' channels true, roster 0
+NPCs. **G-Portal needs a restart**: "restart the game to receive InteractionAcceptedEvent" (the pets' E) and the DLL
+loads only at a start. After it: fetch the logs (upload with an empty outbox) and look for "[flamekit_native] on a
+dedicated server: only the companion part runs (loaded)".
 
 ## How to build and publish a version
 
