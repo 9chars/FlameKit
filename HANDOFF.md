@@ -653,6 +653,17 @@ monsters a bit more?" (now SPOT_MIN 2 m hex grid; 3 m / 4 m offered, not picked 
 button option for 1000, so that can go away" (DUEL_COUNTS without 1000).
 20:13 "don't limit it": the server's cap MAX_DUELISTS stays 1000 (only the button goes).
 20:14 "bump it out to 3 m for 500" / 20:15 "put them all to 3 m I think": SPOT_MIN 3 for every quantity.
+**Owner 20:16 "yes #3 is good"**: 0.15.370 built: F.TEAMS {3,4,15,14}, Team row (dbg:team:0-4, msg.team, b.faction kept
+every body check), Spawn Monsters adds (no drop_bodies_of; the queue is cleared only by Remove), Spawn Dummy replaces
+only the dummy, SPOT_MIN 3, DUEL_COUNTS without 1000 (MAX_DUELISTS 1000). run.lua: Team test (factions, both stay,
+faction restored, Remove both). Local server 20:19:57, Development 0.15.370 signed. Not on Stable/G-Portal.
+**Owner 20:19: reward loot "legendary gems were only spawning two types" - check for missed legendary gear.** Found
+(item dumps of 2026-11-15 joined with item_details.dat, build 1287369): the game has only 6 legendary gems (T4
+FocusedLight, T5 ColdComposure, T6 Lycanthropy, T7 Armoring + HyperSpecialization) and 5 legendary rings (T1 ministory_05,
+T3 Light, T4 The_Ancients, T5 Frost, T6 Shock; none at T7); db.pick takes the monster's tier, so level 100 gives only
+the two T7 gems and always Ring of Shock. Not in item_db at all: every shield (45, 2 of them legendary lore shields),
+Armor_T5-TX_*_Loot (15), Weapon_T7-TX_2H_GreatSwordEpic_Vorgoth (legendary). Enemy weapons, _Craft, T0, NPC/WIP
+cosmetics are left out on purpose. Some dump queries were capped at 50 names: a fresh finer dump would confirm.
 
 ## How to build and publish a version
 
