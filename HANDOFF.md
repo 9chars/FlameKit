@@ -1983,6 +1983,11 @@ next restart (no yes for a restart yet).
    B every test tool stays (own file); C split npc_probe.lua into modules + rename probe -> companions; D delete only
    the 20 old probe DLL copies and 43 MB of fullrec dumps; E shorten HANDOFF keeping rules/decisions. **Owner 18:11 "go
    ahead"**. Standing rule from this: debug tools are never removed, only switched off.
+   D done 18:13: delete permission granted for the server's emf folder; 20 .old_/.bad_ probe DLLs and 81 fullrec_*.txt
+   removed (fk_server_probe.dll fdef5e67 kept). A, 0.15.361: npc_probe's log() skips F.DEBUG_ONLY patterns unless
+   F.debug (console "flamekit.npc debug on|off", store "companion_debug", file companion_debug.txt beside FlameKit);
+   the probe: DLOG() for jumps, edge, sequence writes, pet offer, boost, fight ray, drive count, names "is in"; reads
+   companion_debug.txt every 120 ticks ("companion debug log on/off"). drive_harness identical with F.debug true.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

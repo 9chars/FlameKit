@@ -21,6 +21,11 @@
 
 namespace {
 constexpr const char* kMod = "fk_server_probe";
+// (owner 2026-11-20 18:11: debug tools are never removed, only switched off) the companion debug log: the detailed
+// lines (jumps, edge stops, the pets' offers, the boost, the fight ray, the drive count, names that are there) only
+// while FlameKit's companion_debug.txt exists beside it (the console's "flamekit.npc debug on|off"; read every 2 s)
+std::atomic<bool> g_debug{false};
+#define DLOG(...) do { if (g_debug.load()) EMF_LOG(kMod, __VA_ARGS__); } while (0)
 
 #pragma pack(push, 1)
 struct WorldTransform {  // CurrentTransform (56 bytes): position in fixed point (1 m = 2^32), orientation, scale
@@ -112,7 +117,7 @@ void start_sequence(emf::World w, uint32_t id, emf::gen::ecs::ActorInput* ai, ui
     const uint16_t trig = 0x18;
     std::memcpy(tc + 24, &trig, 2);
     tc[26] = 0x38;
-    EMF_LOG(kMod, "%s: sequence %08x written into %u's trigger (call %u, time %lld)", why, seq, id, call, (long long)now);
+    DLOG( "%s: sequence %08x written into %u's trigger (call %u, time %lld)", why, seq, id, call, (long long)now);
 }
 
 // (owner 2026-11-19 09:03/09:17, the attack sequence) once per step per companion: the attack the Lua part asks for
@@ -353,10 +358,10 @@ bool edge_blocked(emf::World w, void* ctx, uint32_t id, const WorldTransform* tr
         }
         if (blocked && !was) {
             g_edge_stops.fetch_add(1);
-            EMF_LOG(kMod, "edge: %u stops at %.1f %.1f %.1f (ground 1.5 m ahead: %s, %.2f m down)", id, nx, ny, nz,
+            DLOG( "edge: %u stops at %.1f %.1f %.1f (ground 1.5 m ahead: %s, %.2f m down)", id, nx, ny, nz,
                     r != 1 ? "none within 12 m" : (d1 > 7.5 ? "more than 7.5 m lower" : "a drop the player did not take"), r == 1 ? d1 : -1.0);
         } else if (!blocked && was) {
-            EMF_LOG(kMod, "edge: %u goes on (ground ahead %+.2f m)", id, (double)hy - ny);
+            DLOG( "edge: %u goes on (ground ahead %+.2f m)", id, (double)hy - ny);
         }
     }
     return blocked;
@@ -380,11 +385,11 @@ void track_jump(emf::World w, uint32_t id, const WorldTransform* tr) {
     j.tick = t;
     if (st == 2 && j.state != 2) {
         j.x = x; j.y = y; j.z = z; j.top = y;
-        EMF_LOG(kMod, "jumplog: %u takes off at %.2f %.2f %.2f", id, x, y, z);
+        DLOG( "jumplog: %u takes off at %.2f %.2f %.2f", id, x, y, z);
     } else if (st == 2) {
         if (y > j.top) j.top = y;
     } else if (j.state == 2) {
-        EMF_LOG(kMod, "jumplog: %u lands at %.2f %.2f %.2f: %.2f m forward, highest %+.2f m, landed %+.2f m", id, x, y, z,
+        DLOG( "jumplog: %u lands at %.2f %.2f %.2f: %.2f m forward, highest %+.2f m, landed %+.2f m", id, x, y, z,
                 std::sqrt((x - j.x) * (x - j.x) + (z - j.z) * (z - j.z)), j.top - j.y, y - j.y);
     }
     j.state = st;
@@ -464,7 +469,7 @@ void pet_offers(int where) {
                               o->isOffered && !o->isDisabled && o->offerId != 0;
             if (!ours && where == 2 && now >= g_reset_log_at.load()) {
                 g_reset_log_at.store(now + 10000);
-                EMF_LOG(kMod, "pet offer %u before interaction_attempt: the game's again (seq %08x/%08x verb %08x/%08x "
+                DLOG( "pet offer %u before interaction_attempt: the game's again (seq %08x/%08x verb %08x/%08x "
                         "offered %d disabled %d offerId %u): set back", id, o->defaultSequence.value, o->overrideSequence.value,
                         o->defaultVerbId.value, o->overrideVerbLocaId.value, (int)o->isOffered, (int)o->isDisabled, o->offerId);
             }
@@ -482,7 +487,7 @@ void pet_offers(int where) {
         }
         auto* c = w.get<emf::gen::ecs::ClientInteractionOffer>(id);
         if (say)
-            EMF_LOG(kMod, "pet offer %u after interaction_offer: runtime seq %08x/%08x verb %08x/%08x offered %d disabled %d; "
+            DLOG( "pet offer %u after interaction_offer: runtime seq %08x/%08x verb %08x/%08x offered %d disabled %d; "
                     "client %s verb %08x offered %d", id, o->defaultSequence.value, o->overrideSequence.value,
                     o->defaultVerbId.value, o->overrideVerbLocaId.value, (int)o->isOffered, (int)o->isDisabled,
                     c ? "yes" : "NONE", c ? c->verbId.value : 0u, c ? (int)c->isOffered : -1);
@@ -550,7 +555,7 @@ void boost_report(emf::World w) {
     at = now + 5000;
     const uint64_t n = g_boost_n.load();
     if (n == seen) return;
-    EMF_LOG(kMod, "pet boost: %llu boosts so far (hook ran %llu times); last %u at %.1f m from the player, %.1f -> %.1f m/s",
+    DLOG( "pet boost: %llu boosts so far (hook ran %llu times); last %u at %.1f m from the player, %.1f -> %.1f m/s",
             (unsigned long long)n, (unsigned long long)g_boost_calls.load(), g_boost_last_id.load(), g_boost_last_d.load(),
             g_boost_last_v.load(), (std::min)(g_boost_last_v.load() * kBoost, kBoostMax));
     seen = n;
@@ -727,8 +732,8 @@ void fight_step(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::DynamicEnem
             e.target = target;
             e.clear = clear ? 1 : 0;
         }
-        if (r < 0) EMF_LOG(kMod, "fight ray: %u -> %u: the ray FAULTED (taken as clear)", id, target);
-        else EMF_LOG(kMod, "fight ray: %u -> %u: %s (%.1f m; hit at %.1f m, %.1f %.1f %.1f)", id, target, clear ? "clear" : "BLOCKED", total,
+        if (r < 0) DLOG( "fight ray: %u -> %u: the ray FAULTED (taken as clear)", id, target);
+        else DLOG( "fight ray: %u -> %u: %s (%.1f m; hit at %.1f m, %.1f %.1f %.1f)", id, target, clear ? "clear" : "BLOCKED", total,
                      hitd, r == 1 ? hit[0] : 0.0f, r == 1 ? hit[1] : 0.0f, r == 1 ? hit[2] : 0.0f);
     }
 }
@@ -760,7 +765,7 @@ void drive_scan(emf::World w) {
         g_driven = found;
     }
     if (found.size() != before)
-        EMF_LOG(kMod, "drive: %zu driven NPC(s) (movement input written %llu times so far)", found.size(),
+        DLOG( "drive: %zu driven NPC(s) (movement input written %llu times so far)", found.size(),
                 (unsigned long long)g_drive_writes.load());
 }
 // ---- (owner 2026-11-20 08:51 "when the chest spawns and opens I just want it to have the companions name on it")
@@ -854,7 +859,7 @@ void names_tick(emf::World w) {
             const int k = name_known(sysw, kv.second);
             auto it = last.find(kv.first);
             if (it == last.end() || it->second != k) {
-                EMF_LOG(kMod, "names: '%s' (0x%016llX) %s in the server's table (%u names)", kv.first.c_str(),
+                if (k <= 0 || g_debug.load()) EMF_LOG(kMod, "names: '%s' (0x%016llX) %s in the server's table (%u names)", kv.first.c_str(),
                         (unsigned long long)kv.second, k > 0 ? "is" : (k < 0 ? "?? (table unreadable)" : "is NO LONGER"),
                         *(uint32_t*)(static_cast<uint8_t*>(sysw) + 0x1e4));
                 last[kv.first] = k;
@@ -989,6 +994,12 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     emf::on_tick([](emf::World w) { drive_scan(w); });
     emf::on_tick([](emf::World w) { if (w.is_server()) names_tick(w); });  // (2026-11-20) companion chest names
     emf::on_tick([](emf::World w) { if (w.is_server()) boost_report(w); });  // (17:00) the pet boost's log, test A
+    emf::on_tick([](emf::World w) {  // (18:11) the companion debug log switch
+        if (!w.is_server() || w.tick() % 120 != 0) return;
+        static const std::wstring f = flamekit_file(L"companion_debug.txt");
+        const bool on = GetFileAttributesW(f.c_str()) != INVALID_FILE_ATTRIBUTES;
+        if (on != g_debug.load()) { g_debug.store(on); EMF_LOG(kMod, "companion debug log %s", on ? "on" : "off"); }
+    });
     emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {
         size_t n;
         { std::lock_guard<std::mutex> lk(g_drive_mx); n = g_driven.size(); }

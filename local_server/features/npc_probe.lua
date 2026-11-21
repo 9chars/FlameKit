@@ -15,7 +15,22 @@
 -- Logs "npc probe: ..." in emf\emf_core.log.
 
 local F = { id = "npc_probe", title = "NPC Probe" }
-local function log(s) emf.log("npc probe: " .. s) end
+-- (owner 2026-11-20 18:11 "I'm afraid some of the clean up will make it harder to debug and fix future errors ... I
+-- don't want to limit myself on that": debug tools are never removed, only switched off) the companion debug log: the
+-- detailed lines (F.DEBUG_ONLY) only while it is on (console "flamekit.npc debug on|off"; saved; companion_debug.txt
+-- beside FlameKit tells the server probe too). Off: errors, can't follow, put away / back, fights' start and end,
+-- kills, heals, the roster, joins.
+F.debug = false
+F.DEBUG_ONLY = { "^crumbs ", "^waterlog ", "^slide ", "^slot ", "^gap ", "^settle ", "^pace ", "^edge ", "^dive ", "^air ",
+  "^jump follow ", "^leap ", "^load: ", "^hop: ", "^HIT ", "^fight [^:]*: his ", "^fight [^:]*: bite ", "^fight [^:]*: lunge ",
+  "^fight [^:]*: waits", "^fight [^:]*: [0-9]+ slowed", "^fight [^:]*: try ", "^fight [^:]*: picks again", "^fight [^:]*: last 10 s",
+  "^fight scan:", "^fight [^:]*: mana/healing", "^drive [0-9]+: switch", "^names: '[^']*' %(0x[0-9A-F]+%) is in" }
+local function log(s)
+  if not F.debug then
+    for _, p in ipairs(F.DEBUG_ONLY) do if s:find(p) then return end end
+  end
+  emf.log("npc probe: " .. s)
+end
 local function say(world, player, text, colour)
   pcall(function() require("features.chat").notice_to(world, player, text, colour or "#8cd2ff", 5) end)
 end
@@ -24,6 +39,20 @@ end
 -- notices stay on the screen until the condition is over (client: npc_wheel_probe.lua)
 -- (owner 2026-11-20 16:20) the "can't follow" notices only for players who switched them on (the client's Experimental
 -- tab, Debug: "Companion follow notices", default off; it sends op "prefs" on npcwheel): account -> true
+function F.set_debug(on)
+  F.debug = on and true or false
+  pcall(function() require("core.store").save("companion_debug", { on = F.debug }) end)
+  local path = emf.dir and (emf.dir .. "\\companion_debug.txt")
+  if path then
+    if F.debug then
+      local f = io.open(path, "w")
+      if f then f:write("on\n") f:close() end
+    else
+      os.remove(path)
+    end
+  end
+  emf.log("npc probe: companion debug log " .. (F.debug and "on" or "off"))
+end
 F.notice_pref = {}
 function F.follow_notices(world, player)
   local ok, acc = pcall(world.account, world, player)
@@ -3122,7 +3151,8 @@ function F.setup(k)
     if not okl then log("roster: load failed: " .. tostring(errl)) end
   end)
   emf.log("[flamekit] npc probe: loaded (companion test: flamekit.npc)")
-  pcall(emf.command, "npc", "roster ... | drive <npc> <player>|stop | fullrec <entity> [s] | look <entity> | near <x> <y> <z> [r] | remove <entity>: companion test",
+  pcall(F.set_debug, (store.load("companion_debug", {}) or {}).on == true)  -- (18:11) the debug log as last switched
+  pcall(emf.command, "npc", "debug on|off | roster ... | drive <npc> <player>|stop | fullrec <entity> [s] | look <entity> | near <x> <y> <z> [r] | remove <entity>: companion test",
     function(world, args)
       local what = args[1]
       if what == "roster" then
@@ -3303,6 +3333,9 @@ function F.setup(k)
         local c = { chest = ch, fix = { { item = item, unlocked = math.floor(n) } } }
         inv.apply_unlocked(world, "command", c)
         emf.reply("npc: unlock done (see the log)")
+      elseif what == "debug" then  -- debug on|off: (owner 18:11) the companion debug log (F.debug, companion_debug.txt)
+        if args[2] == "on" or args[2] == "off" then F.set_debug(args[2] == "on") end
+        emf.reply("npc: companion debug log " .. (F.debug and "on" or "off"))
       elseif what == "petlog" then  -- petlog <entity> [seconds]: (pets, 12:48) what an animal's own AI does, twice a second
         local id, sec = tonumber(args[2]), tonumber(args[3]) or 30
         if not id then emf.reply("npc: petlog <entity> [seconds]") return end
