@@ -572,6 +572,11 @@ hot reload, companions in the party list, ...). Versions: Stable 0.15.277, Devel
 Owner 18:26 "once its folded into the DLL we can still make changes and update it correct?" (yes: Lua reloads; the
 DLL goes to the server by copy and to players by the updater; a server-only C++ fix: server copy only, Rule 0d) /
 **18:27 "k well everyone will be updating"** (the version gap between server and players' DLL is no concern).
+**Owner 18:28 "one last little feature request, anyway to float the companion/pets name above them? or add it into the
+"E" label some place?" / 18:29 "lets do #1 like how the chests show it"**: 0.15.363 spawn_body spawns the body with
+{CustomPlayerString = {stringId = inv.name_key(name)}} (inv.write_names first; refused -> plain spawn), logs "roster:
+<n>: name label key on his body ...". Untested whether creatures show it. (#2, the name in the E word, needs a content
+mod's text table.) New check: python3 local_server/tests/globals_check.py (names read but never set in the bundle).
 
 ## How to build and publish a version
 

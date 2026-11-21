@@ -234,7 +234,24 @@ function spawn_body(world, r, x, y, z, player)
   end
   -- (owner 14:20 "the 'pick up' option is still there") a pet is spawned wild again: the game's pick-up comes with its
   -- IsTame tag (0.15.326-0.15.328 spawned them tame), not with the offer; his E comes from the server probe instead.
-  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
+  -- (owner 18:28 "anyway to float the companion/pets name above them?" / 18:29 "lets do #1 like how the chests show
+  -- it") the body gets the game's player-name label, as his chest: CustomPlayerString.stringId = FNV-1a 64 of his name
+  -- (the server probe keeps the names of custom_names.txt in the server's name table). Whether the game shows it over
+  -- a creature: untested.
+  inv.write_names()
+  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, { CustomPlayerString = { stringId = inv.name_key(r.name) } })
+  if not (ok and id and id ~= 0) then  -- (as the chest) without the label rather than no body
+    log(string.format("roster: %s: the spawn with his name label was refused (%s): spawned without it", r.name, tostring(id)))
+    ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
+  else
+    pcall(function()
+      local k = world:get("CustomPlayerString", id)
+      k = k and k.stringId
+      if type(k) ~= "number" and k then k = k.value end
+      log(string.format("roster: %s: name label key on his body %s (his name's 0x%016X)", r.name,
+        k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.name_key(r.name)))
+    end)
+  end
   if not (ok and id and id ~= 0) then
     log(string.format("roster: %s could not be spawned (%s)", r.name, tostring(id)))
     return nil

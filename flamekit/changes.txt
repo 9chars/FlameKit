@@ -1,3 +1,6 @@
+0.15.363 Nov 20, 2026
+- Companions (test, local server only): a companion or pet gets its name as the game's name label when it spawns, the way its chest shows it (whether the game shows it over a creature is being tested). Server only: no game change.
+
 0.15.362 Nov 20, 2026
 - Companions (test, local server only): the companion code is split into 11 parts (features/companions/: follow, roster, inventory, wheel, fight, healing and attacks, console and test tools, ...) and renamed from "npc probe" to "companions" (its log lines now start with "companions:"). It works exactly as before (the same tests give the same results); nothing was removed. Server only: no game change.
 
