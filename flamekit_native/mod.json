@@ -1,7 +1,7 @@
 {
   "id": "flamekit_native",
   "name": "FlameKit Native",
-  "version": "0.15.404",
+  "version": "0.15.405",
   "description": "FlameKit's native part: its window, the minimap, the party window, item and buff icons, and updates in your game; on a server (or the game that hosts) the companion system's server part, so install it on a dedicated server too. It needs the FlameKit mod; its settings are in FlameKit's settings, group Minimap.",
   "authors": [
     "Ninechars"

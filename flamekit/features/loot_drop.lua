@@ -506,6 +506,16 @@ function F.setup(k)
   kit = k
   prefs.setup()
   require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer"))  -- (0.15.404) logging
+  -- (0.15.405, owner 16:16 "sure") the same in the player's own game (the server never heard of a refused take, 16:15),
+  -- and the game's "item could not be used" event there
+  require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer (client)"), "client")
+  require("core.game_events").on("UiItemTriggerFailedEvent", kit.guard(F, function(world, e)
+    if xfer.said >= XFER_MAX then return end
+    xfer.said = xfer.said + 1
+    local okp, pl = pcall(function() return e.playerEntityId end)
+    local oks, sl = pcall(function() return e.itemSlotId end)
+    emf.log(string.format("loot drop: item trigger failed: player %s slot %s", tostring(okp and pl or "?"), oks and slot_text(sl) or "?"))
+  end, "a failed item trigger"), "client")
   require("core.loot_news").setup()  -- (0.15.399) the DLL's new containers: core/loot_spots.lua answers from them
   local okh, hooked = pcall(emf.on_hit, kit.guard(F, on_hit, "a hit"))
   if not (okh and hooked ~= false) then emf.log("loot drop: emf.on_hit is not there: no killer is known, every monster keeps its loot (the game's own way)") end

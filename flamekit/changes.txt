@@ -1,3 +1,6 @@
+0.15.405 Nov 21, 2026
+- Logging (in the player's own game too): what the game reports when you move an item out of a chest.
+
 0.15.404 Nov 21, 2026
 - Logging: what the game reports when you move an item out of a chest (for taking items into a companion when your bag is full). Server only: no game change (needs a server restart).
 
