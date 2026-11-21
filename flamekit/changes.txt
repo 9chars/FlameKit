@@ -1,3 +1,6 @@
+0.15.409 Nov 21, 2026
+- Logging for a full bag: what the game does with chopped items when there is no room, and the chest logging in the player's own game on again.
+
 0.15.408 Nov 21, 2026
 - The chest logging on the server switched off (testing whether it made a chest look empty). Server only.
 

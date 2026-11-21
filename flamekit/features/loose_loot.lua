@@ -68,8 +68,25 @@ local function tick_of(world)
   return ok and tonumber(t) or 0
 end
 
+-- (0.15.409, owner 17:02 "the same problem happens when i'm chopping down a tree and my inv is full") logging first:
+-- every tool hit's place for HIT_TICKS, and new loose items near one that no break or kill claims (what a full bag
+-- may throw on the ground while chopping). Debug tool: kept, can be switched off.
+local HIT_LOG, HIT_TICKS, HIT_R = true, 60 * 3, 10
+local tool_hits = {}  -- { player, x, y, z, tick }
+local function note_tool_hit(world, hit)
+  if not (HIT_LOG and hit and is_tool(hit)) then return end
+  local player = route.player_of(world, hit.attacker)
+  if not player then return end
+  local x, y, z = world:position(player)
+  if not x then return end
+  local t = tick_of(world)
+  tool_hits[#tool_hits + 1] = { player = player, x = x, y = y, z = z, tick = t }
+  if #tool_hits > 64 then table.remove(tool_hits, 1) end
+end
+
 -- the breaking or killing hit: the target is noted (when its player auto loots)
 local function on_hit(world, hit)
+  pcall(note_tool_hit, world, hit)
   if not (hit and hit.killed) then return end
   local target = tonumber(hit.target) or 0
   if target == 0 or get(world, "PlayerState", target) then return end
@@ -95,8 +112,25 @@ local function on_hit(world, hit)
 end
 
 -- a new loose item (the DLL's news): the drop of the nearest target broken or killed lately within its reach
+local function hit_near(x, y, z, now)
+  for i = #tool_hits, 1, -1 do
+    local h = tool_hits[i]
+    if now - h.tick <= HIT_TICKS and (x - h.x) ^ 2 + (z - h.z) ^ 2 <= HIT_R * HIT_R then return h end
+  end
+  return nil
+end
+
 local function on_pickup(world, id, x, y, z, now)
-  if #broken == 0 or ground.is_own(id) then return end
+  if ground.is_own(id) then return end
+  if HIT_LOG and #broken == 0 then
+    local h = hit_near(x, y, z, now)
+    if h then
+      local p = get(world, "PickupItem", id)
+      note("a loose item %s (item %s x%s) near player %s's tool hit, no break: %.1f m from him", tostring(id),
+        p and tostring(p.itemId) or "?", p and tostring(p.pickupAmount) or "?", tostring(h.player), math.sqrt((x - h.x) ^ 2 + (z - h.z) ^ 2))
+    end
+  end
+  if #broken == 0 then return end
   local best, best_d
   local keep = {}
   for _, b in ipairs(broken) do
@@ -126,7 +160,8 @@ end
 function F.tick(world)
   steps = steps + 1
   if #broken > 0 and tick_of(world) - broken[#broken].tick > WINDOW_TICKS then broken = {} end
-  news.tick(world, #broken > 0)  -- (0.15.399) the DLL's news only while a drop is awaited
+  if #tool_hits > 0 and tick_of(world) - tool_hits[#tool_hits].tick > HIT_TICKS then tool_hits = {} end
+  news.tick(world, #broken > 0 or #tool_hits > 0)  -- (0.15.399) the DLL's news only while a drop is awaited (0.15.409: or a tool is in use)
   if steps % 3600 == 0 then
     said = 0
     ground.forget_old()
