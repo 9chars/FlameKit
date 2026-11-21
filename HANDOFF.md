@@ -873,6 +873,13 @@ Found: every item left on the ground near the kills was FlameKit's own (ground.i
 entries (Corrosive Blood, Torn Cloth, Golden Steel Arrow, Aerated Banshee Gel: Loot tab "> junk drop"); Critter Carapace
 was "picked up" by hand once (from a container); the tree at 13:23 gave 2 drops (chop loot works, both junk-dropped).
 Asked the owner whether junk-list "drop" items should still go to the ground under Auto Loot.
+**Owner 13:29 "you're wrong once again. I know what items are on my junk list. Critter carapace is not on my junk list.
+the item dropped, nothing picked it up"** (my junk-drop answer was wrong for the carapace: I answered before finding
+where it came from; question withdrawn). Found: he took the carapace by hand from loot spot 106943 at 13:29:07; it was
+body 100463's (killed 13:23:42): EntityDiedEvent came twice (.808, .976); the first run found the body gone at look 1
+and no loot spot yet ("no loot spot found", the spot came later); the second had no killer any more (kills[] used up)
+-> the game's own. 0.15.392 (server only, features/loot_drop.lua): a second death event of one body within 10 s is
+left out (dead[]); no spot found -> looked for again 1 s apart, 4 times (SPOT_TRIES).
 
 ## How to build and publish a version
 
