@@ -61,11 +61,18 @@ for _ = 1, 60 do feed.tick(W) end  -- (who has it on is looked at once a second)
 feed.hit(W, { attacker = 1, target = 500, amount = 120, crit = true })
 feed.hit(W, { attacker = 500, target = 600, amount = 33 })
 feed.hit(W, { attacker = 500, target = 501, amount = 33 })  -- monsters among themselves: nobody
+comps[700] = {}  -- (0.15.382) a tree: no faction
+pos[700] = { 1, 0, 1 }
+feed.hit(W, { attacker = 1, target = 700, amount = 1 })
+feed.hit(W, { attacker = 0, target = 1, amount = 9 })  -- no attacker
 flush()
 local a, b, c = lines(1, "battle"), lines(2, "battle"), lines(3, "battle")
 check(#a >= 2 and a[#a - 1]:find("Ann hit Vukah%(25%) for 120 damage %(crit%)") ~= nil, "Ann's own hit, with the monster's kind, level and crit: " .. tostring(a[#a - 1]))
 check(#b >= 1 and b[#b]:find("Vukah%(25%) hit Rex for 33 damage") ~= nil, "a hit on Bob's companion goes to Bob, the companion by name")
 check(#c == 0, "Cid (400 m away) sees neither")
+local objs = 0
+for _, l in ipairs(a) do if l:find("Creature") or l:find("something") then objs = objs + 1 end end
+check(objs == 0, "a hit on a tree (no faction) and damage with no attacker are left out")
 check(sent[4] == nil, "a game without the channel gets nothing")
 values["0xa2"].others_battle = false
 sent = {}

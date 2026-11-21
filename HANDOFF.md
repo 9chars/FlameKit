@@ -800,6 +800,9 @@ engine event once and fans out (loot_filter's PickupEvent moved there). The firs
 whole ("feed: pickup ...") to see what a container take sends (WATCH: if from = 0 there, the filter drops them).
 **Owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?" / 12:05 "you can just say Fogger(45) not "Fogger(lvl
 45)""**: 0.15.381 (server only): "<a> hit <b> for N damage (flags)", monsters "Kind(level)".
+**Owner 12:07 "what does "Midevil > Monster 1" mean" / 12:08 "only log damage to and from actual monsters or other players
+(PvP)"**: 0.15.382 (server only): feed.hit needs both sides creatures (a player, a companion, or a Faction other than 0);
+no attacker (0) is left out; an unnamed faction is "Creature".
 
 ## How to build and publish a version
 

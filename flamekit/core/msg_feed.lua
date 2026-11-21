@@ -63,7 +63,7 @@ name_of = function(world, id)
     if namer then local ok, n = pcall(namer, world, id) if ok and n then name = n end end
     if not name then
       local f = get(world, "Faction", id)
-      local kind = f and FACTION_NAME[tonumber(f.faction) or -1] or "Monster"
+      local kind = f and FACTION_NAME[tonumber(f.faction) or -1] or "Creature"  -- (0.15.382) a faction without a name
       local lv = get(world, "Level", id)
       local l = lv and lv.dataStorage and tonumber(lv.dataStorage[1])
       name = l and l > 0 and string.format("%s(%d)", kind, l) or kind  -- (0.15.381, owner 12:05 "just say Fogger(45)")
@@ -138,6 +138,17 @@ function feed.hit(world, hit)
   local a, t = tonumber(hit.attacker) or 0, tonumber(hit.target) or 0
   local pa, pt = route.player_of(world, a), route.player_of(world, t)
   if not pa and not pt then return end  -- monsters among themselves
+  -- (0.15.382, owner 2026-11-21 12:08 "only log damage to and from actual monsters or other players (PvP)") the other
+  -- side has to be a creature too: a player, a companion, or something with a faction other than Environment (0).
+  -- Hits on trees, rocks, crates and the like (no faction: "Midevil > Monster 1") are left out, and so is damage with
+  -- no attacker.
+  local function creature(id, p)
+    if p then return true end
+    if id == 0 then return false end
+    local f = get(world, "Faction", id)
+    return f ~= nil and (tonumber(f.faction) or 0) ~= 0
+  end
+  if not (creature(a, pa) and creature(t, pt)) then return end
   local owners = {}
   if pa then owners[pa] = true end
   if pt then owners[pt] = true end
