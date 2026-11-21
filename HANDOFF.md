@@ -927,6 +927,11 @@ healer = target (feed.hit and feed.heal: companions too); the self heal logging 
 updated (asked).
 **Owner 14:57 "it seems fine to me"** (taken as: the chop scan timing stays 1/3/6/10 s, no change; G-Portal stays on
 0.15.396 until he says so).
+**Owner 14:58 "I just want to optimize how things work... scanning for stuff over and over doesn't seem efficient"**:
+0.15.398 (server only, local): loose_loot and loot_spots log their walks' cost once a minute ("... last minute: N
+walk(s), entities, ms in steps"). Known: EMF has no search by component or place, only world:entities(); a full
+synchronous walk with 4 checks per entity (flamekit.lootnear) took ~50 ms on the local server. Options told: merge the
+two walks into one shared core walk; or a C++ spawn hook in the DLL (no scanning; game update + server restart).
 
 ## How to build and publish a version
 
