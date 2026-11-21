@@ -914,6 +914,8 @@ G-Portal: 28 Lua files changed since 0.15.374 + flamekit_native/mod.json (no DLL
 feature(s) loaded, no error (it reloaded every second while the files came in: loose_loot/msg_tabs missing in between).
 Old core/server_settings.lua and features/server_tab.lua are still on G-Portal (not loaded). The owner's game: "Update
 v0.15.396 is ready" 14:25. Not yet seen in a game: 0.15.390+ client part (owner's game had not restarted on it).
+**Owner 14:27 "looks like the update fixed his issue"**: SuperB's UI works again on 0.15.396 (the re-download of the
+files that differed repaired his install, as far as known).
 
 ## How to build and publish a version
 
