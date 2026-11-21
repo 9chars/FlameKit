@@ -960,6 +960,10 @@ containers, 166 file writes (in ~3 min). Monster piles/drops not yet seen since 
 **Owner 15:25 "when it says "into bag" it should say "into Poop Eater's bag"" / 15:26 "yes, it needs to say whos bag its
 going into"**: 0.15.401 (server only, local): feed.loot "> into <player>'s bag", "> into <companion>'s bag", "> on the
 ground" (a part: " (n)"); feed.pickup "> into <player>'s bag" (from 0: mined) and "> picked up into <player>'s bag".
+Owner 15:36 "seems fine" (monsters with the DLL news: 11 bodies/piles 15:27-15:34, stacks to Poop Eater; chop drops
+taken). **Owner 15:37 "no wait on doing any major updates... the biggest problem is text wrapping around in the
+message windows now making it harder to read with the longer lines..."**: decision: no release for now (local server
+0.15.401; players and G-Portal 0.15.396). Next: the Messages window's long lines (options asked).
 
 ## How to build and publish a version
 
