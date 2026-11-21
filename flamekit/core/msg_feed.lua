@@ -36,6 +36,7 @@ local namer = nil
 local out = {}             -- player entity -> { battle = {lines}, loot = {lines} }
 local steps = 0
 local name_cache = {}      -- entity -> { name, at }
+local monster_print = require("core.monster_print")
 
 local FACTION_NAME = { [1] = "Monster", [2] = "Fogger", [3] = "Vukah", [4] = "Scavenger", [5] = "Animal", [6] = "Beast",
   [9] = "Monster", [10] = "Skeleton", [12] = "Farm animal", [13] = "Cyclops", [14] = "Drak", [15] = "Ancient" }
@@ -63,7 +64,9 @@ name_of = function(world, id)
     if namer then local ok, n = pcall(namer, world, id) if ok and n then name = n end end
     if not name then
       local f = get(world, "Faction", id)
-      local kind = f and FACTION_NAME[tonumber(f.faction) or -1] or "Creature"  -- (0.15.382) a faction without a name
+      -- (0.15.384, owner 12:15 "it need to say the actual monster's name") the kind's name (core/monster_names.lua),
+      -- the faction's only for a monster that table does not know
+      local kind = monster_print.name(world, id) or (f and FACTION_NAME[tonumber(f.faction) or -1]) or "Creature"
       local lv = get(world, "Level", id)
       local l = lv and lv.dataStorage and tonumber(lv.dataStorage[1])
       name = l and l > 0 and string.format("%s(%d)", kind, l) or kind  -- (0.15.381, owner 12:05 "just say Fogger(45)")

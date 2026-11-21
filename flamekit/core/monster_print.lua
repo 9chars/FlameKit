@@ -5,62 +5,50 @@
 -- debug command flamekit.monprints on the local server: every kind of core/monsters.lua spawned out of sight, printed,
 -- removed) maps fingerprints to FlameKit's names of the kinds.
 --   print.of(world, id [, comps])   the fingerprint text, or nil when the entity has none of the components
---   print.COMPS                     the components that make it
+--   print.FIELDS                    the template fields that make it
+--   print.name(world, id)           (0.15.384) the monster's name, or nil
 
 local print_ = {}
 
--- the template halves looked at (server-side components; ModelResource is the client's only)
-print_.COMPS = { "DefaultInventory", "Enemy01BehaviorState", "AnimationGraphResourceComponent2", "CharacterSetup", "NpcSetup", "Wildlife" }
+-- the template fields looked at (EMF gives template halves as read-only component data, not tables: fields by name)
+print_.FIELDS = {
+  { "AnimationGraphResourceComponent2", "animationGraph" },
+  { "AnimationGraphResourceComponent2", "retargetData" },
+  { "EnemyArsenalReference", "arsenal" },
+  { "Destructible", "maxHealth" },
+}
 
--- FNV-1a 32 over a text
-local function fnv(s)
-  local h = 2166136261
-  for i = 1, #s do
-    h = h ~ s:byte(i)
-    h = (h * 16777619) % 4294967296
-  end
-  return string.format("%08x", h)
-end
-
--- a table's fields in a fixed order (nested tables too), as one text
-local function flat(v, depth, out)
-  local t = type(v)
-  if t == "table" then
-    if depth > 6 then out[#out + 1] = "~" return end
-    local keys = {}
-    for k in pairs(v) do keys[#keys + 1] = k end
-    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
-    out[#out + 1] = "{"
-    for _, k in ipairs(keys) do
-      out[#out + 1] = tostring(k) .. "="
-      flat(v[k], depth + 1, out)
-      out[#out + 1] = ","
-    end
-    out[#out + 1] = "}"
-  elseif t == "number" then
-    out[#out + 1] = string.format("%.6g", v)
-  else
-    out[#out + 1] = tostring(v)
-  end
-end
-
--- One component's template half as a short hash, or nil.
-function print_.part(world, id, comp)
-  local ok, v = pcall(world.template, world, comp, id)
+-- One template field as text, or nil.
+function print_.part(world, id, comp, field)
+  local ok, v = pcall(function() local t = world:template(comp, id) return t and t[field] end)
   if not ok or v == nil then return nil end
-  local out = {}
-  flat(v, 0, out)
-  return fnv(table.concat(out))
+  return tostring(v)
 end
 
-function print_.of(world, id, comps)
+-- The fingerprint: the fields joined with "|" ("-" for one the entity has not), nil when it has none of them.
+function print_.of(world, id)
   local parts, any = {}, false
-  for _, c in ipairs(comps or print_.COMPS) do
-    local h = print_.part(world, id, c)
-    parts[#parts + 1] = h or "-"
-    if h then any = true end
+  for _, f in ipairs(print_.FIELDS) do
+    local v = print_.part(world, id, f[1], f[2])
+    parts[#parts + 1] = v or "-"
+    if v then any = true end
   end
-  return any and table.concat(parts, ".") or nil
+  return any and table.concat(parts, "|") or nil
+end
+
+-- (0.15.384) A monster's name from core/monster_names.lua: its kind (the template's arsenal), else its species (the
+-- animation graph, for kinds core/monsters.lua does not have), else nil.
+local names
+function print_.name(world, id)
+  if names == nil then
+    local ok, t = pcall(require, "core.monster_names")
+    names = ok and type(t) == "table" and t or false
+  end
+  if not names then return nil end
+  local a = print_.part(world, id, "EnemyArsenalReference", "arsenal")
+  if a and names.arsenal[a] then return names.arsenal[a] end
+  local g = print_.part(world, id, "AnimationGraphResourceComponent2", "animationGraph")
+  return g and names.graph[g] or nil
 end
 
 return print_

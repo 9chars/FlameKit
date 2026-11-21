@@ -1,3 +1,6 @@
+0.15.384 Nov 21, 2026
+- Battle tab: monsters by their own names (e.g. "Scavenger Ranger Crossbow(45)", "Shroud Soldier(30)") instead of the faction (Fogger). A monster FlameKit does not know yet still shows its faction. Server only: no game change.
+
 0.15.383 Nov 21, 2026
 - A debug tool for the monster names in the Battle tab (the console's flamekit.monprints). Server only: no game change.
 

@@ -15,26 +15,42 @@ local kit
 -- 300 m below the player who typed it (the console: the local player), 5 a step, prints each one's template halves
 -- (core/monster_print.lua) the step after, removes it, and writes monster_prints.txt beside FlameKit:
 -- "<template guid>\t<group>\t<name>\t<boss>\t<one hash per component, - for none>".
-local mp = { queue = nil, out = nil, pending = {} }
+local mp = { queue = nil, out = nil, pending = {}, step = 0, raw = nil, names = nil }
 local function monprints_tick(world)
   if not mp.queue then return end
+  mp.step = mp.step + 1
+  local P = require("core.monster_print")
+  local still = {}
   for _, p in ipairs(mp.pending) do
-    local parts = {}
-    for _, c in ipairs(require("core.monster_print").COMPS) do parts[#parts + 1] = require("core.monster_print").part(world, p.id, c) or "-" end
-    mp.out[#mp.out + 1] = table.concat({ p.m[3], p.m[1], p.m[2], tostring(p.m[4]), table.concat(parts, " ") }, "\t")
-    pcall(emf.destroy, world, p.id)
+    if mp.step < p.due then still[#still + 1] = p
+    else -- (0.15.383) read 2 s after the spawn: the entity is set up by then
+      local parts = {}
+      for _, f in ipairs(P.FIELDS) do parts[#parts + 1] = P.part(world, p.id, f[1], f[2]) or "-" end
+      if mp.names then -- "discover": every component name of monprint_comps.txt that has a template half here
+        local has = {}
+        for _, n in ipairs(mp.names) do
+          local okt, v = pcall(world.template, world, n, p.id)
+          if okt and v ~= nil then has[#has + 1] = n end
+        end
+        mp.raw[#mp.raw + 1] = p.m[1] .. " " .. p.m[2] .. ": " .. table.concat(has, " ")
+      end
+      mp.out[#mp.out + 1] = table.concat({ p.m[3], p.m[1], p.m[2], tostring(p.m[4]), table.concat(parts, "|") }, "\t")
+      pcall(emf.destroy, world, p.id)
+    end
   end
-  mp.pending = {}
+  mp.pending = still
   for _ = 1, 5 do
     local m = table.remove(mp.queue, 1)
     if not m then break end
     local oks, id = pcall(emf.spawn, world, m[3], mp.x, mp.y, mp.z)
-    if oks and id and id ~= 0 then mp.pending[#mp.pending + 1] = { id = id, m = m }
+    if oks and id and id ~= 0 then mp.pending[#mp.pending + 1] = { id = id, m = m, due = mp.step + 120 }
     else mp.out[#mp.out + 1] = table.concat({ m[3], m[1], m[2], tostring(m[4]), "spawn refused" }, "\t") end
   end
   if #mp.queue == 0 and #mp.pending == 0 then
     local f = io.open(emf.dir .. "\\monster_prints.txt", "w")
     if f then f:write(table.concat(mp.out, "\n"), "\n") f:close() end
+    f = io.open(emf.dir .. "\\monster_prints_raw.txt", "w")
+    if f then f:write(table.concat(mp.raw, "\n"), "\n") f:close() end
     emf.log(string.format("monprints: %d kind(s) in monster_prints.txt", #mp.out))
     mp.queue = nil
   end
@@ -61,10 +77,27 @@ function F.setup(k)
       local who = emf.sender()
       local pid = (who and who.chat and who.entity and who.entity ~= 0) and who.entity or emf.local_player()
       local ok, x, y, z = pcall(world.position, world, pid)
-      if not (ok and x) then emf.reply("monprints: no position for player " .. tostring(pid)) return end
+      if not (ok and x) then -- the server console has no player of its own: the first player online
+        for _, id in ipairs(require("core.players").ids(world)) do
+          local okw = pcall(world.account, world, id)
+          if okw then ok, x, y, z = pcall(world.position, world, id) end
+          if ok and x then pid = id break end
+        end
+      end
+      if not (ok and x) then emf.reply("monprints: no player online to spawn under") return end
       mp.x, mp.y, mp.z = x, y - 300, z
-      mp.queue, mp.out, mp.pending = {}, {}, {}
-      for _, m in ipairs(require("core.monsters")) do mp.queue[#mp.queue + 1] = m end
+      mp.queue, mp.out, mp.pending, mp.raw = {}, {}, {}, {}
+      mp.names = nil
+      local all = require("core.monsters")
+      if args and args[1] == "discover" then -- a few kinds of different groups, every component name tried
+        mp.names = {}
+        local f = io.open(emf.dir .. "\\monprint_comps.txt", "r")
+        if f then for l in f:lines() do l = l:gsub("%s+$", "") if l ~= "" then mp.names[#mp.names + 1] = l end end f:close() end
+        local seen = {}
+        for _, m in ipairs(all) do if not seen[m[1]] then seen[m[1]] = true mp.queue[#mp.queue + 1] = m end end
+      else
+        for _, m in ipairs(all) do mp.queue[#mp.queue + 1] = m end
+      end
       emf.reply(string.format("monprints: %d kind(s), 5 a step, 300 m below player %s", #mp.queue, tostring(pid)))
     end, "the monprints command"))
   pcall(emf.on_player_left, kit.guard(F, function(world, p) if p and p.player then feed.forget(p.player) end end, "a player leaving"))
