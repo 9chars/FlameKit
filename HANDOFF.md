@@ -691,6 +691,10 @@ Stable (sig good, commit 79874ba) and G-Portal 20:41 (5 files changed since 0.15
 features/experimental.lua, mod.json, flamekit_native/mod.json; reload 20:41:16, 16 features, no "restart the game").
 WATCH (seen, not fixed): G-Portal pet Biggs (75332) "found again" then "drive 75332: gone, stopped" at every reload
 (also 20:00:39); player 3 (0x05891a85470cffe2, not an admin) gets "roster window: get refused" every 5 s.
+2026-11-21 07:42 Biggs explained (no bug): MisShady's pet (owner 0x3c7d90b3165e75f8); she fast travelled home (Biggs back
+beside her 19:59:53 at her base 6298 949 5188) and left 20:00:40.001; her position went 0.17 s earlier, so the drive
+stopped ("gone"). The body stayed there; the 20:41 reloads found it again and stopped again (owner away); the 04:11
+restart: "Biggs waits for its owner", spawned beside her when she joins (roster_joined / waiting).
 
 ## How to build and publish a version
 
