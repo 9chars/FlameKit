@@ -11,7 +11,8 @@
 -- Shared core code (HANDOFF rule 0b): the features that know the parts register them here; none of them calls another.
 --   route.set_junk(fn)        fn(world, account, item, gear) -> "drop" | "delete" | nil   (features/loot_filter)
 --   route.set_owner(fn)       fn(world, entity) -> the player entity whose companion this is, or nil   (features/companions)
---   route.set_companion(fn)   fn(world, player, account, item, count, level, rarity) -> how many it stored (companions)
+--   route.set_companion(fn)   fn(world, player, account, item, count, level, rarity) -> how many it stored, and the
+--                             name of the (first) companion that took them (features/companions)
 --   route.set_report(fn)      fn(world, report) after each item (the Loot tab, later)
 
 local ground = require("core.ground_loot")
@@ -66,7 +67,7 @@ function route.deliver(world, player, account, choice, item, count, level, rarit
   if count <= 0 then return end
   tally.items = tally.items + 1
   local r = { player = player, account = account, item = item, count = count, level = level, rarity = rarity,
-              from = from, bag = 0, companion = 0, ground = 0, junk = nil }
+              from = from, bag = 0, companion = 0, ground = 0, junk = nil, x = x, z = z }
   -- the Auto Junk List first
   if hooks.junk and account then
     local okj, act = pcall(hooks.junk, world, account, item, gear)
@@ -86,9 +87,9 @@ function route.deliver(world, player, account, choice, item, count, level, rarit
   local left = count
   local function companions()
     if left <= 0 or not hooks.companion then return end
-    local okc, n = pcall(hooks.companion, world, player, account, item, left, level, rarity)
+    local okc, n, who = pcall(hooks.companion, world, player, account, item, left, level, rarity)
     n = okc and math.floor(tonumber(n) or 0) or 0
-    if n > 0 then r.companion = r.companion + n left = left - n tally.companion = tally.companion + 1 end
+    if n > 0 then r.companion = r.companion + n left = left - n tally.companion = tally.companion + 1 r.companion_name = who end
   end
   local function finish(w)
     if left > 0 then

@@ -459,7 +459,7 @@ function inv.loot_into(world, player, account, item, count, level, rarity)
   local main = account and roster.main[account]
   table.sort(cands, function(a, b) return (a.name == main and 0 or 1) < (b.name == main and 0 or 1) end)
   local max = items.max_stack(item) or 1
-  local left, stored = count, 0
+  local left, stored, first = count, 0, nil
   for _, r in ipairs(cands) do
     if left <= 0 then break end
     if type(r.inv) ~= "table" then r.inv = {} end
@@ -478,11 +478,12 @@ function inv.loot_into(world, player, account, item, count, level, rarity)
     end
     if n0 > 0 then
       stored = stored + n0
+      first = first or r.name
       inv.loot_dirty = true
       log(string.format("auto loot: %s took %d of item %s (%d stack(s) now)", r.name, n0, tostring(item), #list))
     end
   end
-  return stored
+  return stored, first
 end
 
 -- The player whose companion or pet `entity` is: the one he follows, else his owner when online; nil when it is none.

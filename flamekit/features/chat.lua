@@ -30,7 +30,8 @@ local function show(msg)
   if msg.c == "n" then  -- (0.15.205) a notice only
     announce_n = announce_n + 1
     local c = type(msg.nc) == "string" and msg.nc:match("^#%x%x%x%x%x%x$") and msg.nc or JOIN_COLOUR
-    kit.notice("announce_" .. announce_n, msg.t:sub(1, 200), c, math.max(2, math.min(300, tonumber(msg.ns) or 10)))
+    kit.notice("announce_" .. announce_n, msg.t:sub(1, 200), c, math.max(2, math.min(300, tonumber(msg.ns) or 10)),
+      msg.q and { noted = true } or nil)  -- (0.15.377) quiet: no Messages line
     return
   end
   local colour = msg.c == "a" and ANNOUNCE_COLOUR or CHAT_COLOUR
@@ -65,8 +66,10 @@ end
 
 -- (0.15.209) A short notice in one player's Notices window only (kind "n", which games since 0.15.205 know). Server
 -- world. `colour` "#rrggbb" (default yellow), `seconds` how long it stays (default 5).
-function F.notice_to(world, player, text, colour, seconds)
-  local msg = { c = "n", t = text, nc = colour or JOIN_COLOUR, ns = seconds or 5 }
+-- (0.15.377) `opts.quiet`: only the notice, no line in the Messages window (a companion's heal: its line is in the
+-- Battle tab; a game before 0.15.377 still writes the line)
+function F.notice_to(world, player, text, colour, seconds, opts)
+  local msg = { c = "n", t = text, nc = colour or JOIN_COLOUR, ns = seconds or 5, q = type(opts) == "table" and opts.quiet and 1 or nil }
   if player == emf.local_player() and kit.is_host() then
     show(msg)
   else

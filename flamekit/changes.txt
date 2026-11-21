@@ -1,3 +1,8 @@
+0.15.377 Nov 21, 2026
+- The Messages window has tabs: Chat (everything it showed before), Battle and Loot. A tab you are not looking at shows how many new lines it has, e.g. "Battle (12)"; the window never switches tabs by itself.
+- Battle: every hit you and your companions land or take, with its damage (crit, backstab, weak spot, blocked, parried, killed), and the companions' heals, by name ("Rex heals you for 120!": the green notice stays, its line is in the Battle tab now). Off by default (Settings tab, new Messages section: Battle messages), so the server sends nothing until you turn it on. Other players' hits near you too, unless you turn "Show other players' battle messages" off.
+- Loot: what Auto Loot gave you (and other players near you, unless "Show other players' loot messages" is off): the item, how many, its quality and level, the monster, and where it went (bag, companion, ground, junk).
+
 0.15.376 Nov 21, 2026
 - Auto Loot (Settings tab, above Features): where the loot of a monster you kill goes, your own choice: 1. into your main bag, 2. into a companion's bag, 3. on the ground, 4. the game's own way (the default: the body keeps it, press E). A kill by your companion or pet counts as yours. When the chosen bag is full the loot goes to the other one (a companion counts only while it is out and following you; your main companion first, at most 72 stacks each), then to the ground. Your Auto Junk List comes first: junk is dropped or deleted as you set it there.
 - The Server tab is gone, with its "Monsters drop their loot on the ground" (each player chooses now).

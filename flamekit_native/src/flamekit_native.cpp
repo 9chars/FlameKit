@@ -2744,6 +2744,10 @@ struct PinnedLayer : Layer {
     virtual bool content_hover(int x, int y) { return false; }  // the pointer over the content (-1, -1: gone); true: draw again
     virtual uint32_t hotkey() const { return 0; }                // the key that shows and hides it, for its title (0: none)
     virtual bool press(int x, int y) { return false; }           // a headless window's own button under a press (true: taken)
+    // (0.15.377) something of its own in the title bar after the title (the Messages window's tabs), from x `left`;
+    // a press there (true: taken, not a drag)
+    virtual void draw_title_extra(int left, int width) {}
+    virtual bool title_click(int x, int y) { return false; }
 
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
@@ -2797,7 +2801,9 @@ struct PinnedLayer : Layer {
         }
         {  // the title, and the key that shows and hides the window: "Experimental [F6]" (0.15.81, owner)
             const std::wstring k = key_label(hotkey());
-            text.draw(canvas, 8, 5, k.empty() ? title : title + L" [" + k + L"]", 235, 225, 205);
+            const std::wstring t = k.empty() ? title : title + L" [" + k + L"]";
+            text.draw(canvas, 8, 5, t, 235, 225, 205);
+            draw_title_extra(8 + text.width(t) + 12, w - 56);  // (0.15.377) up to the collapse button
         }
         // the buttons at the right of the title bar: "-" collapse (or "+" open), "x" hide
         hide_r = {w - 26, 3, w - 4, kHead - 3};
@@ -2948,6 +2954,8 @@ struct PinnedLayer : Layer {
             dirty = true;
         } else if (headless && !e.collapsed && press(x, y)) {
             // (0.15.114) a headless window's own button (the Notices window's x): not a drag
+        } else if (!headless && y < kHead && title_click(x, y)) {
+            dirty = true;  // (0.15.377) the title bar's own button (the Messages window's tabs): not a drag
         } else if (y < kHead || headless) {
             drag = kMove;
             grab = {x, y};
@@ -3381,6 +3389,10 @@ struct PartyLayer : PinnedLayer {
 // then "end". In a world, hidden in the game's menus (0.15.107): the last 5 messages, the last 10 while the pointer is
 // out, or all of them once the player sized it (0.15.105). Hidden with its x button, it stays hidden (the FlameKit
 // Menu's Windows tab shows it again).
+// (0.15.377, owner 2026-11-21 09:35 "replace the existing text box behavior with a tabbed control ... 3 tabs: Chat,
+// Battle, Loot") three tabs in the title bar, each with its own file: Chat (ui_messages.dat, as before), Battle
+// (ui_battle.dat) and Loot (ui_loot.dat), both "m" lines from kit.note_tab. Owner 09:48: a tab that is not shown says
+// how many new lines it has ("Battle (12)"); the shown tab never changes by itself.
 struct MessagesLayer : PinnedLayer {
     struct Msg {
         int n = 0;
@@ -3388,13 +3400,22 @@ struct MessagesLayer : PinnedLayer {
         std::wstring text;
         uint64_t at = 0;  // GetTickCount64 when it came; 0: before this game start
     };
-    std::vector<Msg> all;
-    std::vector<size_t> shown;               // indices into all
+    struct Feed {
+        const wchar_t* file;
+        const wchar_t* label;
+        std::vector<Msg> all;
+        int newest = 0, seen = 0;  // seen: the newest number when the tab was last shown
+        bool first = true;
+        uint64_t stamp = 0;
+    };
+    Feed feeds[3] = {{L"ui_messages.dat", L"Chat"}, {L"ui_battle.dat", L"Battle"}, {L"ui_loot.dat", L"Loot"}};
+    int tab = 0;
+    RECT tab_r[3]{};
+    std::vector<size_t> shown;               // indices into the shown feed's all
+    int shown_tab = -1;
     std::vector<std::pair<size_t, std::wstring>> lines;  // the wrapped lines of the shown messages (message index, text)
-    int newest = 0;
-    bool first = true;
-    uint64_t stamp = 0, next_read = 0;
-    static constexpr int kLine = 18, kShowMs = 12000, kNew = 5, kAll = 10;
+    uint64_t next_read = 0;
+    static constexpr int kLine = 18, kNew = 5, kAll = 10;
 
     // (0.15.105, owner: it holds the chat now) sized freely in both directions at its lower right corner: once the
     // player gave it a height it keeps that height and shows every kept message, scrolled to the newest (the mouse wheel
@@ -3413,12 +3434,20 @@ struct MessagesLayer : PinnedLayer {
     // (0.15.107, owner) hidden in the game's menus like the other windows
     bool active(const Frame& f) override { return f.in_world && !f.in_menu; }
 
-    void read_file(uint64_t now) {
-        const std::wstring file = g_flamekit_dir + L"ui_messages.dat";
+    // new lines in a tab that is not shown (those that came in this game run)
+    int unread(const Feed& fd) const {
+        int n = 0;
+        for (const Msg& m : fd.all)
+            if (m.n > fd.seen && m.at != 0) ++n;
+        return n;
+    }
+
+    bool read_file(Feed& fd, uint64_t now, bool chat) {
+        const std::wstring file = g_flamekit_dir + fd.file;
         const uint64_t st = file_stamp(file);
-        if (st == stamp) return;
+        if (st == fd.stamp) return false;
         FILE* fp = _wfsopen(file.c_str(), L"rb", _SH_DENYNO);
-        if (!fp) return;
+        if (!fp) return false;
         std::vector<Msg> list;
         bool complete = false;
         char line[1024];
@@ -3435,37 +3464,91 @@ struct MessagesLayer : PinnedLayer {
                 m.r = static_cast<uint8_t>(rgb >> 16), m.g = static_cast<uint8_t>(rgb >> 8), m.b = static_cast<uint8_t>(rgb);
                 m.text = widen(line + used);
                 list.push_back(std::move(m));
-            } else if (sscanf_s(line, "p %d %n", &m.n, &used) == 1 && used > 0) {
+            } else if (chat && sscanf_s(line, "p %d %n", &m.n, &used) == 1 && used > 0) {
                 // (0.15.112) a player's chat line: "p <n> <name>\t<text>", in the player's colour (player_style, the one
                 // place the colour is worked out: the Party window's and the minimap's too)
                 const char* name = line + used;
-                const char* tab = std::strchr(name, '\t');
-                if (!tab) continue;
-                const PlayerStyle st = player_style(std::string(name, tab));
-                m.r = st.r, m.g = st.g, m.b = st.b;
-                m.text = widen(tab + 1);
+                const char* tab_c = std::strchr(name, '\t');
+                if (!tab_c) continue;
+                const PlayerStyle ps = player_style(std::string(name, tab_c));
+                m.r = ps.r, m.g = ps.g, m.b = ps.b;
+                m.text = widen(tab_c + 1);
                 list.push_back(std::move(m));
             }
         }
         fclose(fp);
-        if (!complete) return;
-        stamp = st;
+        if (!complete) return false;
+        fd.stamp = st;
         int top = 0;
         for (const Msg& m : list) top = std::max(top, m.n);
-        const bool reset = top < newest;  // the Lua part was loaded again: its numbers start again at 1
+        const bool reset = top < fd.newest;  // the Lua part was loaded again: its numbers start again at 1
+        if (reset) fd.seen = 0;
+        std::unordered_map<int, const Msg*> old;  // (0.15.377) by number: the Battle tab keeps up to 1000
+        old.reserve(fd.all.size());
+        for (const Msg& o : fd.all) old[o.n] = &o;
         for (Msg& m : list) {
-            bool known = false;
-            for (const Msg& old : all)
-                if (old.n == m.n && old.text == m.text) {
-                    m.at = old.at;
-                    known = true;
-                }
-            if (!known) m.at = first ? 0 : (reset || m.n > newest) ? now : 0;
+            const auto it = old.find(m.n);
+            if (it != old.end() && it->second->text == m.text) m.at = it->second->at;
+            else m.at = fd.first ? 0 : (reset || m.n > fd.newest) ? now : 0;
         }
-        first = false;
-        newest = top;
-        all = std::move(list);
-        FK_LOG(fklog::kDebug, "messages: %d in ui_messages.dat, newest %d", static_cast<int>(all.size()), newest);
+        if (fd.first) fd.seen = top;
+        fd.first = false;
+        fd.newest = top;
+        fd.all = std::move(list);
+        FK_LOG(fklog::kDebug, "messages: %d in %ls, newest %d", static_cast<int>(fd.all.size()), fd.file, fd.newest);
+        return true;
+    }
+
+    void draw_title_extra(int left, int width) override {
+        // the tabs: "Chat", "Battle (12)", "Loot" (0.15.377); the shown one lit
+        int x = left;
+        for (int i = 0; i < 3; ++i) {
+            const Feed& fd = feeds[i];
+            std::wstring label = fd.label;
+            const int u = i == tab ? 0 : unread(fd);
+            if (u > 0) label += L" (" + std::to_wstring(u) + L")";
+            const int tw = little.width(label) + 14;
+            if (x + tw > width) {
+                tab_r[i] = RECT{};
+                continue;
+            }
+            tab_r[i] = {x, 4, x + tw, kHead - 4};
+            const bool over = g_pointer_mode && mouse_x >= tab_r[i].left && mouse_y >= tab_r[i].top && mouse_x < tab_r[i].right && mouse_y < tab_r[i].bottom;
+            if (i == tab) box(x, 4, x + tw, kHead - 4, 70, 90, 130, 1.0f);
+            else box(x, 4, x + tw, kHead - 4, over ? 60.0f : 42.0f, over ? 64.0f : 46.0f, over ? 76.0f : 56.0f, 1.0f);
+            little.draw(canvas, x + 7, 7, label, i == tab ? 245 : u > 0 ? 255 : 200, i == tab ? 245 : u > 0 ? 210 : 200, i == tab ? 250 : u > 0 ? 120 : 210);
+            x += tw + 4;
+        }
+    }
+
+    bool title_click(int x, int y) override {
+        for (int i = 0; i < 3; ++i) {
+            const RECT& r = tab_r[i];
+            if (r.right > r.left && x >= r.left && y >= r.top && x < r.right && y < r.bottom) {
+                if (i != tab) {
+                    feeds[tab].seen = feeds[tab].newest;
+                    tab = i;
+                    stick = true;
+                    shown_tab = -1;  // shown again from the new tab
+                    FK_LOG(fklog::kInfo, "messages window: tab %ls", feeds[i].label);
+                }
+                feeds[i].seen = feeds[i].newest;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    int hover_tab = -1;
+    bool content_hover(int x, int y) override {  // the tabs light under the pointer (mouse_x, mouse_y: the window's)
+        int h = -1;
+        for (int i = 0; i < 3; ++i) {
+            const RECT& r = tab_r[i];
+            if (r.right > r.left && mouse_x >= r.left && mouse_y >= r.top && mouse_x < r.right && mouse_y < r.bottom) h = i;
+        }
+        if (h == hover_tab) return false;
+        hover_tab = h;
+        return true;
     }
 
     bool refresh(const Frame& f) override {
@@ -3477,38 +3560,52 @@ struct MessagesLayer : PinnedLayer {
             keyed = true;
             FK_LOG(fklog::kInfo, "messages window: %s (its key)", le.hidden ? "hidden" : "shown");
         }
+        bool counts = false;
         if (f.now >= next_read) {
             next_read = f.now + 250;
-            read_file(f.now);
+            for (int i = 0; i < 3; ++i)
+                if (read_file(feeds[i], f.now, i == 0) && i != tab) counts = true;  // another tab's count changed
         }
+        Feed& fd = feeds[tab];
+        fd.seen = fd.newest;  // the shown tab has nothing new
         std::vector<size_t> want;  // the last 5, or 10 while the pointer is out; all when it has a height (the player's or its default)
-        const size_t n = given_h() > 0 ? all.size() : g_pointer_mode ? kAll : kNew;
-        for (size_t i = all.size() > n ? all.size() - n : 0; i < all.size(); ++i) want.push_back(i);
-        if (want == shown) {
+        const size_t n = given_h() > 0 ? fd.all.size() : g_pointer_mode ? kAll : kNew;
+        for (size_t i = fd.all.size() > n ? fd.all.size() - n : 0; i < fd.all.size(); ++i) want.push_back(i);
+        if (want == shown && shown_tab == tab) {
             if (stick && lay().h > 0 && scroll < max_scroll) {  // sized just now: to the newest
                 scroll = max_scroll;
                 return true;
             }
-            return false;
+            return counts || keyed;
         }
         shown = std::move(want);
+        shown_tab = tab;
         if (stick) scroll = 1 << 28;  // to the newest (draw_all keeps it in range)
         return true;
     }
 
     int content_height(int width) override {
         lines.clear();
+        const Feed& fd = feeds[tab];
         for (size_t i : shown)  // each message wrapped to the width, words kept whole where they can be
-            for (std::wstring& l : wrap_words(little, all[i].text, width - 20)) lines.push_back({i, std::move(l)});
+            if (i < fd.all.size())
+                for (std::wstring& l : wrap_words(little, fd.all[i].text, width - 20)) lines.push_back({i, std::move(l)});
         return std::max<int>(1, static_cast<int>(lines.size())) * kLine + static_cast<int>(shown.size()) * 2 + 4;
     }
 
     void draw_content(int top, int width) override {
         int y = top;
-        if (lines.empty()) little.draw(canvas, 10, y, L"No messages yet", 140, 145, 155);
+        const Feed& fd = feeds[tab];
+        if (lines.empty())
+            little.draw(canvas, 10, y,
+                        tab == 0 ? L"No messages yet"
+                        : tab == 1 ? L"No battle lines yet (Settings tab, Messages: Battle messages)"
+                                   : L"No loot lines yet (Settings tab, Auto Loot)",
+                        140, 145, 155);
         size_t last = static_cast<size_t>(-1);
         for (const auto& [i, l] : lines) {
-            const Msg& m = all[i];
+            if (i >= fd.all.size()) continue;
+            const Msg& m = fd.all[i];
             if (i != last && last != static_cast<size_t>(-1)) y += 2;  // a little room between two messages
             last = i;
             little.draw(canvas, 10, y, l, m.r, m.g, m.b);

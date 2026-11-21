@@ -15,6 +15,7 @@ local bag = require("core.bag")
 local ground = require("core.ground_loot")
 local route = require("core.loot_route")     -- (0.15.376) where each item goes
 local prefs = require("core.player_prefs")   -- (0.15.376) the killer's Auto Loot choice
+local feed = require("core.msg_feed")        -- (0.15.377) the monster's name for the Loot tab
 local test_tag = require("core.test_tag")
 local spots = require("core.loot_spots")  -- (0.15.170) a creature's separate loot spot
 local players = require("core.players")   -- (0.15.179) the nearest player opens a body that fills only when opened
@@ -72,8 +73,9 @@ local function died(world, e)
   local t = spots.death_time(e)
   note("body %s died: queued (time %s)", tostring(id), tostring(t))
   -- (0.15.198) whether it is a creature is told here, at the death: a later look may come after the body lost its Faction
+  local okn, from = pcall(feed.name, world, id)  -- (0.15.377) read at the death (the body loses its Faction later)
   queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1, x = okp and x or nil, y = okp and y or nil,
-                        z = okp and z or nil, t = t, creature = get(world, "Faction", id) ~= nil }
+                        z = okp and z or nil, t = t, creature = get(world, "Faction", id) ~= nil, from = okn and from or nil }
 end
 
 local FX_CANDIDATES = {  -- (0.15.180) for flamekit.fx
@@ -121,7 +123,7 @@ local function killer_of(world, d)
     note("body %s: killed by player %s, Auto Loot %s: the game's own loot", tostring(d.id), tostring(k.player), tostring(choice))
     return nil
   end
-  d.ctx = { player = k.player, account = acc, choice = choice }
+  d.ctx = { player = k.player, account = acc, choice = choice, from = d.from }
   note("body %s: killed by player %s, Auto Loot %s", tostring(d.id), tostring(k.player), choice)
   return d.ctx
 end
@@ -129,7 +131,7 @@ end
 -- (0.15.376) one taken stack, by the killer's choice (core/loot_route.lua); `back(w, n)`: into `home` again
 local function deliver(world, ctx, st, taken, x, y, z, home)
   route.deliver(world, ctx.player, ctx.account, ctx.choice, st.item, taken, st.level or 0, st.rarity or 0, x, y, z, st.gear,
-    function(w, n) emf.put(w, home, st.item, n, nil, { level = st.level or 0, rarity = st.rarity or 0 }) end)
+    function(w, n) emf.put(w, home, st.item, n, nil, { level = st.level or 0, rarity = st.rarity or 0 }) end, ctx.from)
   tally.items = tally.items + 1
 end
 
@@ -385,7 +387,7 @@ function F.tick(world)
       elseif r == "empty" then
         if d.look < #LOOKS then
           waiting[#waiting + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1,
-                                    x = d.x, y = d.y, z = d.z, t = d.t, creature = d.creature, ctx = d.ctx }
+                                    x = d.x, y = d.y, z = d.z, t = d.t, creature = d.creature, ctx = d.ctx, from = d.from }
         elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
           -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
           d.poked = true

@@ -229,7 +229,10 @@ end
 
 -- (0.15.376) the choices the server needs (core/player_prefs.lua): sent when one changes and every 30 s
 function F.client_tick(world)
-  prefs.client_tick(world, { auto_loot = kit.setting("auto_loot", "game") }, kit.is_host())
+  prefs.client_tick(world, { auto_loot = kit.setting("auto_loot", "game"),
+    -- (0.15.377) the Messages section: the Battle and Loot tabs
+    battle_msgs = kit.setting("battle_msgs", false) == true, others_battle = kit.setting("others_battle", true) ~= false,
+    others_loot = kit.setting("others_loot", true) ~= false }, kit.is_host())
 end
 
 function F.setup(k)

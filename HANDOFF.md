@@ -767,6 +767,22 @@ to deliver (back into the body when even the ground refuses). Server tab + core/
 Test monsters keep their own reward loot (experimental.lua). Tests: run.lua host + joined (Settings section, the game's
 own leaves the body alone, ground choice as before), flamekit_native/notes/tests/loot_route_test.lua (order, junk),
 local_server/tests/fight/autoloot_test.lua (companions), drive harness identical to 0.15.375.
+**0.15.377, Part 2 Messages tabs built:** DLL MessagesLayer: tabs Chat/Battle/Loot in the title bar
+(PinnedLayer::draw_title_extra / title_click, new), each tab its own file (ui_messages.dat, ui_battle.dat, ui_loot.dat),
+unread counts on tabs not shown (lines that came this game run), the shown tab never changes by itself; known lines
+matched by number (unordered_map). Lua: kit.note_tab(tab, text, colour) (battle 1000 lines, loot 300, files written 4x a
+second); core/msg_feed.lua (channel flamekit/feed to=players 16384 B, 100/10 s; per player queues, a batch every 30
+steps of up to 4 messages of at most 15 KB, the rest waits: nothing dropped; recipients: own lines always (hits by/on
+him or his companions, his loot), others' with others_battle/others_loot (default on) within feed.RADIUS = 150 m
+(PENDING the owner's A/B answer: A everyone at any distance, B 150 m; there are no party groups in Enshrouded, the Party
+window lists everyone); Battle only for players with battle_msgs on (default off; nothing worked out while nobody has
+it); games without the channel get nothing; the host's own lines go straight in); features/msg_tabs.lua (emf.on_hit
+-> feed.hit, route report -> feed.loot, player left -> forget). Heals: "<companion> heals you for N!" notice stays
+(chat.notice_to opts.quiet: no Chat line), its line in Battle (feed.heal). Monster names: faction kind + level
+("Vukah (lvl 25)"); EMF has no template name per entity. Settings: Messages section (battle_msgs default false,
+others_battle, others_loot default true). Tests: msg_feed_test.lua (recipients, filters, 3000 hits all arrive, <= 15 KB,
+loot text), run.lua host + joined. DLL b09e1d4b (built 10:05). Open question: should Auto Junk's "Junk discarded..."
+lines move to the Loot tab too ("Messages from the auto loot system ... can be moved to this Loot tab").
 
 ## How to build and publish a version
 

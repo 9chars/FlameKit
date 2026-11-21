@@ -120,7 +120,12 @@ drive_heal = function(s)
     if who == h.player then sparkle(h.player) end
   end
   -- (owner 2026-11-19 21:29 "can you add a notice message that says Companion heals you for <number>!")
-  if who == h.player and okh and res then say(world, h.player, string.format("Companion heals you for %d!", amount), "#5ad25a") end  -- green (owner 21:31)
+  -- (0.15.377, owner 2026-11-21 09:35 "should say which companion is healing you by name"; 09:44 "notice messages should
+  -- stay for heals": the notice stays, its line goes to the Battle tab instead of the Messages window's Chat)
+  if who == h.player and okh and res then
+    pcall(function() require("features.chat").notice_to(world, h.player, string.format("%s heals you for %d!", name, amount), "#5ad25a", 5, { quiet = true }) end)
+  end
+  if okh and res then pcall(function() require("core.msg_feed").heal(world, id, who, amount) end) end
   log(string.format("heal %s: heals %s +%d (%d/%d before; %s mode%s); mana %d -> %d of %d%s%s", name, whom, amount, whp, wmax,
     mode, pet and ", pet" or "", math.floor(m), math.floor(m - HEAL_COST), MANA_MAX, pet and "" or "; Wolf Shout",
     (okh and res) and "" or " (could not add health: " .. tostring(res) .. ")"))

@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.376",
+  "version": "0.15.377",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -353,6 +353,33 @@
         }
       ],
       "help": "The monsters you kill (and those your companions kill) give their loot by this choice. Main bag: into your bag; when it is full, into a companion that is out and following you (your main companion first, 72 stacks each); then the ground. Companion bag: the other way round. Ground: beside the body. Original: the game's own (the body keeps it; press E). Your Auto Junk List comes first: junk is dropped or deleted as you set it there."
+    },
+    {
+      "key": "battle_msgs",
+      "type": "bool",
+      "default": false,
+      "label": "Battle messages",
+      "live": true,
+      "group": "Messages",
+      "help": "The Battle tab of the Messages window: every hit you and your companions land or take, with its damage (crit, blocked, backstab...), and the companions' heals. Off by default: the server sends nothing then (less traffic). Turn it on to look at the fight data."
+    },
+    {
+      "key": "others_battle",
+      "type": "bool",
+      "default": true,
+      "label": "Show other players' battle messages",
+      "live": true,
+      "group": "Messages",
+      "help": "With Battle messages on: the hits of other players near you (and their companions) too. Off: only your own."
+    },
+    {
+      "key": "others_loot",
+      "type": "bool",
+      "default": true,
+      "label": "Show other players' loot messages",
+      "live": true,
+      "group": "Messages",
+      "help": "The Loot tab of the Messages window: what Auto Loot gave other players near you too. Off: only your own loot."
     }
   ]
 }
