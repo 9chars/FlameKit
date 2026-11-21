@@ -44,6 +44,8 @@ local targets = {}
 local walk = nil     -- { list, i, found = { { id, x, y, z } }, set = { id = true }, started }
 local said = 0
 local tally = { objects = 0, monsters = 0, stacks = 0 }
+-- (0.15.398, owner 14:58 "scanning for stuff over and over doesn't seem efficient") what the walks cost, once a minute
+local cost = { walks = 0, entities = 0, ms = 0, steps = 0 }
 
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
@@ -175,6 +177,11 @@ function F.tick(world)
         tally.objects, tally.monsters, tally.stacks))
     end
     tally = { objects = 0, monsters = 0, stacks = 0 }
+    if cost.walks > 0 then
+      emf.log(string.format("loose loot: last minute: %d walk(s), %d entities looked at, %.1f ms in %d step(s) (%.2f ms a step)",
+        cost.walks, cost.entities, cost.ms, cost.steps, cost.ms / math.max(1, cost.steps)))
+    end
+    cost = { walks = 0, entities = 0, ms = 0, steps = 0 }
   end
   local need = false
   for tid, t in pairs(targets) do
@@ -186,9 +193,15 @@ function F.tick(world)
     end
   end
   if not walk then
-    if need then walk = { list = world:entities(), i = 1, found = {}, set = {}, started = steps } end
+    if need then
+      local t0 = os.clock()
+      walk = { list = world:entities(), i = 1, found = {}, set = {}, started = steps }
+      cost.walks, cost.entities = cost.walks + 1, cost.entities + #walk.list
+      cost.ms, cost.steps = cost.ms + (os.clock() - t0) * 1000, cost.steps + 1
+    end
     return
   end
+  local t0 = os.clock()
   local last = math.min(#walk.list, walk.i + PER_STEP - 1)
   for i = walk.i, last do
     local id = walk.list[i]
@@ -204,6 +217,7 @@ function F.tick(world)
     walk = nil
     after_walk(world, w)
   end
+  cost.ms, cost.steps = cost.ms + (os.clock() - t0) * 1000, cost.steps + 1
 end
 
 function F.setup(k)

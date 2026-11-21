@@ -1,3 +1,6 @@
+0.15.398 Nov 21, 2026
+- Logging: what FlameKit's scans of the world for loot cost, once a minute. Server only: no game change.
+
 0.15.397 Nov 21, 2026
 - Battle tab: someone healing themselves reads "Midevil heals themselves for 18" (was "Midevil heals Midevil"). Server only: no game change.
 

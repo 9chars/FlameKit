@@ -63,13 +63,32 @@ function M.find(id, x, z, t, fn)
   return true
 end
 
+-- (0.15.398, owner 14:58 "scanning for stuff over and over doesn't seem efficient") what the walks cost, once a minute
+local cost = { walks = 0, entities = 0, ms = 0, steps = 0, tick = 0 }
 function M.tick(world)
+  cost.tick = cost.tick + 1
+  if cost.tick % 3600 == 0 and cost.walks > 0 then
+    emf.log(string.format("loot spots: last minute: %d walk(s), %d entities looked at, %.1f ms in %d step(s) (%.2f ms a step at most %d entities)",
+      cost.walks, cost.entities, cost.ms, cost.steps, cost.ms / math.max(1, cost.steps), PER_STEP))
+    cost.walks, cost.entities, cost.ms, cost.steps = 0, 0, 0, 0
+  end
+  local t0 = os.clock()
+  M.walk_step(world)
+  if walk or cost.started then
+    cost.ms = cost.ms + (os.clock() - t0) * 1000
+    cost.steps = cost.steps + 1
+  end
+  cost.started = walk ~= nil
+end
+
+function M.walk_step(world)
   if not walk then
     if not next(wanted) then return end
     local ok, list = pcall(world.entities, world)
     if not ok or type(list) ~= "table" then return end
     walk = { list = list, i = 1, found = {}, asked = wanted }
     wanted = {}
+    cost.walks, cost.entities = cost.walks + 1, cost.entities + #list
   end
   local stop = math.min(#walk.list, walk.i + PER_STEP - 1)
   for k = walk.i, stop do
