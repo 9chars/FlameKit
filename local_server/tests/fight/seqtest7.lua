@@ -6,7 +6,7 @@ local emf = setmetatable({ log = function(s) logs[#logs+1] = "[" .. tostring(TIC
   json = { encode = function() return "" end, decode = function() return {} end }, dir = "/tmp" }, { __index = function() return function() end end })
 local env = setmetatable({ emf = emf, require = function(n) return setmetatable({}, { __index = function() return function() return {} end end }) end }, { __index = _G })
 local F = assert(load(text, "=" .. file, "t", env))()
-setmetatable(env, { __index = function(_, k) if k == "BLOCKED" or k == "BLOCK_FROM" then return rawget(_G, k) end local v = _G[k] if v == nil then error("undefined global " .. k, 2) end return v end, __newindex = function(_, k) error("global write " .. k, 2) end })
+-- (0.15.362) no strict globals check: the split companion code keeps shared values in its environment
 local T = F._t
 local S = 2^32
 local tick = 0

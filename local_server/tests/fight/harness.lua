@@ -43,11 +43,7 @@ local function load_version(file)
   end }, { __index = _G })
   local chunk = assert(load(text, "=" .. file, "t", env))
   local F = chunk()
-  setmetatable(env, { __index = function(_, k)
-    local v = _G[k]
-    if v == nil then error("undefined global read: " .. tostring(k), 2) end
-    return v
-  end, __newindex = function(_, k) error("global write: " .. tostring(k), 2) end })
+  -- (0.15.362) no strict globals check: the split companion code keeps shared values in its environment
   return F, rec
 end
 

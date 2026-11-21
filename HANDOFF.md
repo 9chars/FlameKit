@@ -1988,6 +1988,14 @@ next restart (no yes for a restart yet).
    F.debug (console "flamekit.npc debug on|off", store "companion_debug", file companion_debug.txt beside FlameKit);
    the probe: DLOG() for jumps, edge, sequence writes, pet offer, boost, fight ray, drive count, names "is in"; reads
    companion_debug.txt every 120 ticks ("companion debug log on/off"). drive_harness identical with F.debug true.
+   0.15.361 installed 18:15 (Lua live; probe DLL a9f92ac0, old fdef5e67 .old_1820: loads at the next restart).
+   C, 0.15.362: features/npc_probe.lua -> features/companions.lua (loader) + features/companions/01_base .. 11_roster_
+   window.lua (split at the section headers by a script: top-level locals became names in ONE shared environment, so
+   no 200-locals limit and no declared-too-late nils). F.id "companions", log prefix "companions: ". local_server/main.lua
+   loads features.companions. Tests: python3 local_server/tests/bundle.py makes /tmp/companions_bundle.lua (the parts in
+   order) for the harnesses; drive_harness (debug on) identical over 1500 ticks for 3 seeds; invtest, fighttest,
+   doortest, heal/seq/armor/watch tests identical; the fight tests' strict-globals checks removed (shared values are
+   environment names now). Still there: features/npc_fields.lua (the recorder's field list).
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was

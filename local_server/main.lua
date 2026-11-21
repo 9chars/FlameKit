@@ -23,6 +23,6 @@ kit.start({
   "features.leaderboard",     -- the PvP Leaderboard (kills and deaths between players)
   "features.loot_drop",       -- (0.15.142) monsters drop their loot on the ground (a Server tab setting)
   "features.travel_hide",     -- (0.15.281) FlameKit's UI hides during a fast travel (the server tells the game when)
-  "features.npc_probe",        -- TEMPORARY probe (local server only)
+  "features.companions",       -- the companion system, server side (0.15.362; was features.npc_probe). Local server only for now
   -- "features.my_next_feature",
 })

@@ -6,7 +6,7 @@ local emf = setmetatable({ log = function(s) logs[#logs+1] = s end, net = { send
   json = { encode = function() return "" end, decode = function() return {} end }, dir = "/tmp" }, { __index = function() return function() end end })
 local env = setmetatable({ emf = emf, require = function(n) return setmetatable({}, { __index = function() return function() return {} end end }) end }, { __index = _G })
 local F = assert(load(text, "=" .. file, "t", env))()
-setmetatable(env, { __index = function(_, k) local v = _G[k] if v == nil then error("undefined global " .. k, 2) end return v end, __newindex = function(_, k) error("global write " .. k, 2) end })
+-- (0.15.362) no strict globals check: the split companion code keeps shared values in its environment
 local T = F._t
 local pos = { [1] = {0,0,0}, [100] = {1,0,1}, [200] = {5,0,5}, [201] = {12,0,0}, [202] = {40,0,0} }
 local comps = { [100] = { Health = { dataStorage = { 900, 3680 } }, DynamicEnemy01BehaviorState = {} },

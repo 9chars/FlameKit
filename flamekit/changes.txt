@@ -1,3 +1,6 @@
+0.15.362 Nov 20, 2026
+- Companions (test, local server only): the companion code is split into 11 parts (features/companions/: follow, roster, inventory, wheel, fight, healing and attacks, console and test tools, ...) and renamed from "npc probe" to "companions" (its log lines now start with "companions:"). It works exactly as before (the same tests give the same results); nothing was removed. Server only: no game change.
+
 0.15.361 Nov 20, 2026
 - Companions (test, local server only): the detailed companion log lines (trail, slides, places, jumps, water, pets' prompts, the speed boost, fight details) only show with the companion debug log on (console: flamekit.npc debug on / off; off by default, remembered). Nothing was removed. The server probe follows the same switch (after a server restart). Server only: no game change.
 
