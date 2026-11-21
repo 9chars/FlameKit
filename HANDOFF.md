@@ -636,6 +636,15 @@ loads only at a start. After it: fetch the logs (upload with an empty outbox) an
 dedicated server: only the companion part runs (loaded)".
 G-Portal restarted by the owner 19:25: 19:25:13 "[flamekit_native] on a dedicated server: only the companion part runs
 (loaded)", all hooks installed, 16 features, no errors; world loaded 19:25:40; the owner joined 19:26:59.
+**Owner 19:37 "go ahead and to that fix quick on both local / dev and stable -- g-portal"**: 0.15.369 drive_put_away:
+the player's TeleportCount going up puts the companion away ("fast travel"), replacing the FAR_JUMP 50 m rule (Rule
+0n; G-Portal 19:32:45 a ~25 m travel was missed: back 15-19 s later via can't follow). drive_harness: the fake world
+raises TeleportCount on every >50 m move (identical to 0.15.368 in 22 seeds, ignoring tp_count/last_px); with a 25 m
+travel step the new rule puts away, the old did not. Local 19:47:06, Development + Stable (sig good), G-Portal 19:47:34
+(4 files), all 16 features. **Owner 19:47 "why am I being prompted for an update? you said it was server side only?"**:
+a Development/Stable publish always makes an update in every game (the release carries the companion Lua for hosted
+games); this one changes only Lua files (the DLL is the same). Say so up front next time a server-only fix is also
+asked for on dev/stable.
 
 ## How to build and publish a version
 
