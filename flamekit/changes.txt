@@ -1,3 +1,6 @@
+0.15.406 Nov 21, 2026
+- The chest logging in the player's own game switched off again (testing whether it made a chest look empty).
+
 0.15.405 Nov 21, 2026
 - Logging (in the player's own game too): what the game reports when you move an item out of a chest.
 

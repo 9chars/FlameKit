@@ -366,6 +366,7 @@ end
 -- TransferItemToInventoryEvent (a player moving an item between inventories), and a second later whether the item is
 -- still in the slot it came from (a full bag refused it). The first XFER_MAX of a run. Debug tool: kept, can be off.
 local XFER_LOG, XFER_MAX = true, 30
+local XFER_CLIENT = false  -- (0.15.406) the client-side listening: off (see F.setup)
 local xfer = { said = 0, later = {} }
 local function slot_text(v)
   if type(v) ~= "table" and type(v) ~= "userdata" then return tostring(v) end
@@ -507,7 +508,9 @@ function F.setup(k)
   prefs.setup()
   require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer"))  -- (0.15.404) logging
   -- (0.15.405, owner 16:16 "sure") the same in the player's own game (the server never heard of a refused take, 16:15),
-  -- and the game's "item could not be used" event there
+  -- and the game's "item could not be used" event there. (0.15.406, owner 16:44: a chest opened empty in his game
+  -- right after this came in, 16:19, while the server still had its items: switched off to test that; debug tool kept)
+  if XFER_CLIENT then
   require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer (client)"), "client")
   require("core.game_events").on("UiItemTriggerFailedEvent", kit.guard(F, function(world, e)
     if xfer.said >= XFER_MAX then return end
@@ -516,6 +519,7 @@ function F.setup(k)
     local oks, sl = pcall(function() return e.itemSlotId end)
     emf.log(string.format("loot drop: item trigger failed: player %s slot %s", tostring(okp and pl or "?"), oks and slot_text(sl) or "?"))
   end, "a failed item trigger"), "client")
+  end
   require("core.loot_news").setup()  -- (0.15.399) the DLL's new containers: core/loot_spots.lua answers from them
   local okh, hooked = pcall(emf.on_hit, kit.guard(F, on_hit, "a hit"))
   if not (okh and hooked ~= false) then emf.log("loot drop: emf.on_hit is not there: no killer is known, every monster keeps its loot (the game's own way)") end
