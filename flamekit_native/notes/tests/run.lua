@@ -234,7 +234,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" or name == "chat" or name == "board" or name == "travel" or name == "feed" then assert(def.to == "players") elseif name == "party_test" or name == "prefs" then assert(def.to == "server") elseif name == "ver" or name == "npcwheel" or name == "roster" then assert(def.to == "both"); assert(not channels[name], "a channel registered twice: " .. name) else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
+      if name == "map" or name == "party" or name == "chat" or name == "board" or name == "travel" or name == "feed" then assert(def.to == "players") elseif name == "party_test" or name == "prefs" or name == "overflow" then assert(def.to == "server") elseif name == "ver" or name == "npcwheel" or name == "roster" then assert(def.to == "both"); assert(not channels[name], "a channel registered twice: " .. name) else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true

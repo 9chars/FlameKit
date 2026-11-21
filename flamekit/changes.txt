@@ -1,3 +1,6 @@
+0.15.410 Nov 21, 2026
+- Chest Overflow: what you try to take out of a loot chest while your bag is full goes into your companions' bags instead (your main companion first), with a Loot tab line. What fits nowhere stays in the chest. Only loot chests and loot piles in the world, never storage chests; only with Auto Loot on "main bag" or "companion bag".
+
 0.15.409 Nov 21, 2026
 - Logging for a full bag: what the game does with chopped items when there is no room, and the chest logging in the player's own game on again.
 

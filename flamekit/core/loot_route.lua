@@ -63,14 +63,17 @@ end
 -- Hands `count` of `item` (level, rarity) taken out of a body at x, y, z to `player` (account) by `choice`. `back(world,
 -- n)` puts n back into the body when even the ground refused them (nothing is lost). `gear`: a piece with its own level
 -- and perks (the junk list keeps those unless the player shows all items). `from`: the monster's name (reports).
-function route.deliver(world, player, account, choice, item, count, level, rarity, x, y, z, gear, back, from)
+-- (0.15.410) `opts` (optional): { no_ground = true } what fits nowhere goes to `back` (never on the ground),
+-- { no_junk = true } the Auto Junk List is not asked (an item the player tried to take himself)
+function route.deliver(world, player, account, choice, item, count, level, rarity, x, y, z, gear, back, from, opts)
+  opts = opts or {}
   count = math.floor(tonumber(count) or 0)
   if count <= 0 then return end
   tally.items = tally.items + 1
   local r = { player = player, account = account, item = item, count = count, level = level, rarity = rarity,
               from = from, bag = 0, companion = 0, ground = 0, junk = nil, x = x, z = z }
   -- the Auto Junk List first
-  if hooks.junk and account then
+  if hooks.junk and account and not opts.no_junk then
     local okj, act = pcall(hooks.junk, world, account, item, gear)
     if okj and (act == "delete" or act == "drop") then
       r.junk = act
@@ -93,7 +96,10 @@ function route.deliver(world, player, account, choice, item, count, level, rarit
     if n > 0 then r.companion = r.companion + n left = left - n tally.companion = tally.companion + 1 r.companion_name = who end
   end
   local function finish(w)
-    if left > 0 then
+    if left > 0 and opts.no_ground then
+      if back then back(w, left) end
+      if r.bag + r.companion == 0 then return end  -- nothing went anywhere: no Loot tab line
+    elseif left > 0 then
       if to_ground(w, item, left, level, rarity, x, y, z) > 0 then
         r.ground = left
         tally.ground = tally.ground + 1

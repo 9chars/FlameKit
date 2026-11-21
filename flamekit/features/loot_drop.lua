@@ -366,7 +366,7 @@ end
 -- TransferItemToInventoryEvent (a player moving an item between inventories), and a second later whether the item is
 -- still in the slot it came from (a full bag refused it). The first XFER_MAX of a run. Debug tool: kept, can be off.
 local XFER_LOG, XFER_MAX = true, 30
-local XFER_CLIENT = true  -- (0.15.406) the client-side listening: off (see F.setup); (0.15.409) on again: the empty chest (16:19-17:01) was not it
+local XFER_CLIENT = false  -- (0.15.406) the client-side listening: off (see F.setup); (0.15.409) on again: the empty chest (16:19-17:01) was not it; (0.15.410) off: features/chest_overflow.lua listens
 local XFER_SERVER = false  -- (0.15.408) the server-side listening: off (see F.setup)
 local xfer = { said = 0, later = {} }
 local function slot_text(v)
