@@ -1,3 +1,6 @@
+0.15.389 Nov 21, 2026
+- Auto Loot: what falls out of a tree, rock or other object you break with an axe or pickaxe goes into your bag or your companions' bags too, by your Auto Loot setting ("ground" and "game": left where it falls). Items that were already lying on the ground are left alone. Server only: no game change.
+
 0.15.388 Nov 21, 2026
 - Loot tab: what goes straight into your bag (mining with a pickaxe, picking up loose items from the ground) is listed too ("> into bag"). Auto Loot's own lines are not doubled. Server only: no game change.
 

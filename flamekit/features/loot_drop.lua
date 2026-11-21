@@ -346,82 +346,9 @@ body_again = function(world, r)
   elseif okh and res == "gone" then pcall(from_spot, world, d) end
 end
 
--- (0.15.385, owner 12:44 "loot that drops from chopping things down should also be automatically handled based on loot
--- settings as well") logging first: what a player's hit on an object (a tree, a rock: no Faction) reports, and which
--- loose pickups (PickupItem) appear within CHOP_R m of an object that broke, 1 s and 3 s after. At most CHOP_MAX lines a
--- minute. Debug tool: kept, switched off by CHOP_LOG = false.
-local CHOP_LOG, CHOP_R, CHOP_MAX = true, 30, 40  -- (0.15.387) 30 m: a falling trunk drops along its length
-local chop = { said = 0, scans = {}, walk = nil, seen = {}, last = {} }
-local function chop_note(fmt, ...)
-  if chop.said < CHOP_MAX then chop.said = chop.said + 1 emf.log(string.format("loot drop: chop: " .. fmt, ...)) end
-end
-local function chop_hit(world, hit)
-  if not CHOP_LOG then return end
-  local target = tonumber(hit.target) or 0
-  if target == 0 or get(world, "Faction", target) or get(world, "PlayerState", target) then return end
-  local player = route.player_of(world, hit.attacker)
-  if not player then return end
-  local x, y, z = world:position(target)
-  -- (0.15.387) the breaking hit comes when the object is already gone (no position, 12:49:18): its last hit's place,
-  -- else the player's
-  if x then chop.last[target] = { x, y, z, steps } elseif chop.last[target] then x, y, z = table.unpack(chop.last[target], 1, 3)
-  else x, y, z = world:position(player) end
-  local d = get(world, "Destructible", target)
-  chop_note("hit by %s on %s: %s damage, killed %s, Destructible %s, Health %s, at %s", tostring(hit.attacker), tostring(target),
-    tostring(hit.amount), tostring(hit.killed), d and tostring(d.maxHealth) or "no", tostring(get(world, "Health", target) ~= nil),
-    x and string.format("%.1f %.1f %.1f", x, y, z) or "?")
-  if hit.killed and x then
-    chop.scans[#chop.scans + 1] = { x = x, y = y, z = z, at = steps + 60, target = target }
-    chop.scans[#chop.scans + 1] = { x = x, y = y, z = z, at = steps + 180, target = target }
-  end
-end
-local function chop_tick(world)
-  if steps % 3600 == 0 then
-    chop.said = 0
-    for id, l in pairs(chop.last) do if steps - l[4] > 3600 then chop.last[id] = nil end end
-  end
-  if not chop.walk then
-    local due = {}
-    local keep = {}
-    for _, c in ipairs(chop.scans) do if c.at <= steps then due[#due + 1] = c else keep[#keep + 1] = c end end
-    chop.scans = keep
-    if #due == 0 then return end
-    chop.walk = { list = world:entities(), i = 1, due = due, found = 0 }
-    return
-  end
-  local w = chop.walk
-  local last = math.min(#w.list, w.i + 2999)
-  for i = w.i, last do
-    local id = w.list[i]
-    local p = get(world, "PickupItem", id)
-    if p and not chop.seen[id] then
-      local x, y, z = world:position(id)
-      for _, c in ipairs(w.due) do
-        if x and (x - c.x) ^ 2 + (z - c.z) ^ 2 <= CHOP_R * CHOP_R then
-          chop.seen[id] = true
-          w.found = w.found + 1
-          local okf, desc = pcall(function()
-            return string.format("item %s x%s lvl %s rar %s", tostring(p.itemId), tostring(p.pickupAmount), tostring(p.level), tostring(p.rarity))
-          end)
-          chop_note("pickup %s near %s (%.1f m, %.1f up): %s", tostring(id), tostring(c.target),
-            math.sqrt((x - c.x) ^ 2 + (z - c.z) ^ 2), y - c.y, okf and desc or ("fields? " .. tostring(desc)))
-          break
-        end
-      end
-    end
-  end
-  w.i = last + 1
-  if w.i > #w.list then
-    if w.found == 0 then chop_note("no new pickups within %d m of %d broken object(s)", CHOP_R, #w.due) end
-    chop.walk = nil
-  end
-end
-
 function F.tick(world)
   steps = steps + 1
   pcall(spots.tick, world)
-  local okc, why = pcall(chop_tick, world)  -- (0.15.385) the chop logging
-  if not okc then emf.log("loot drop: chop: " .. tostring(why)) chop.walk = nil end
   pcall(pull_tick, world)  -- (0.15.178) bodies and spots opened into a receiving chest
   if #fx_shown > 0 then  -- (0.15.180) preview effects go after 10 s
     local keep = {}
@@ -501,7 +428,6 @@ end
 
 -- (0.15.376) a killing blow: who gets the loot (the player, or the owner of the companion or pet that landed it)
 local function on_hit(world, hit)
-  if hit then pcall(chop_hit, world, hit) end
   if not (hit and hit.killed) then return end
   local target = tonumber(hit.target)
   if not target or target == 0 then return end
