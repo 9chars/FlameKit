@@ -829,6 +829,12 @@ feed.pickup read e.itemLevel, and EMF's strict event table made that an error, s
 Loot) come with from 0 (12:33:46-55), so the from = 0 filter stays (no double lines). 0.15.386 (server only): no
 level/quality on pickup lines; the logging keeps 20 lines with a from and 20 without; msg_feed_test uses a strict
 event. 12:48:04 a pickup with from 3380087472 went through without error.
+**Owner 12:50 "lots of different items fall depending on what tree I chop down.. you'll never catch every item by just
+watching me take a few trees down..?"**: answered: the plan does not list items; it takes whatever loose pickup appears
+where the object broke, so one tree that falls shows the mechanism. Learned 12:49: hits on trees come (targets ~3.38e9,
+Health, no Destructible); the breaking hit (killed true) has no position any more; while chopping, pickups of one item
+(1853942795 x1) came with from 0 every ~5 s (ground pickups by hand? FlameKit's bag puts are from 0 too). 0.15.387
+(server only): the scan uses the object's last hit place (else the player's), 30 m.
 
 ## How to build and publish a version
 
