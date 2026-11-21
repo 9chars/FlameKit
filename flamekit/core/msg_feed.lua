@@ -137,6 +137,7 @@ end
 -- a line: "<colour hex> <text>"
 local OUT, IN, HEAL = "ffb060", "ff6a5a", "5ad25a"
 
+local SELF_LOG, self_logged = 10, 0  -- (0.15.395) self heals logged whole
 function feed.hit(world, hit)
   if not (hit and battle_wanted(world)) then return end
   local a, t = tonumber(hit.attacker) or 0, tonumber(hit.target) or 0
@@ -165,6 +166,20 @@ function feed.hit(world, hit)
   if hit.parried then flags[#flags + 1] = "parried" end
   if hit.killed then flags[#flags + 1] = "KILLED" end
   local text
+  -- (0.15.395, owner 13:53 "Midevil heals Midevil for 18?") a player's heal on himself, every second or so: what the game
+  -- says about it, the first SELF_LOG of a run (Logging is live)
+  if (hit.healing or amount < 0) and a == t and self_logged < SELF_LOG then
+    self_logged = self_logged + 1
+    local f = {}
+    for _, k in ipairs({ "amount", "attack", "kind", "weapon_item", "weapon_category", "program", "impact", "reaction", "source",
+                         "part", "from_mod", "instant", "health_before", "health_after" }) do
+      local okv, v = pcall(function() return hit[k] end)
+      f[#f + 1] = k .. "=" .. tostring(okv and v or "?")
+    end
+    local okt, types = pcall(function() return hit.types end)
+    if okt and type(types) == "table" then f[#f + 1] = "types=" .. table.concat(types, ",") end
+    emf.log("feed: self heal " .. table.concat(f, " "))
+  end
   if hit.healing or amount < 0 then
     text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), name_of(world, t), math.abs(amount))
   else
