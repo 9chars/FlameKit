@@ -998,6 +998,12 @@ as flamekit_native.dll.hooks_400): 16:57 "nothing" (still empty) -> the DLL hook
 XFER_SERVER = false (the server's TransferItemToInventoryEvent listening off), hooks DLL back (137dec07), restart 16:58:
 17:01 "empty still" -> none of today's additions is the cause. Owner 16:59 "just find a different chest or?": next a
 different chest. The full-bag-to-companion idea: the server never sees a refused take; both listenings stay off.
+Owner 17:01 "server must have some internal check denying me the loot for whatever reason" (agreed: a game quirk of
+RandomLoot chests, WATCH). **17:02 "ok can we go back to the original objective and I'll find a different chest? the
+same problem happens when i'm chopping down a tree and my inv is full"**: 0.15.409: XFER_CLIENT = true again (cleared);
+loose_loot logs new loose items within 10 m of a player's tool hit in the last 3 s that no break claims ("a loose item
+... near player N's tool hit, no break"); his game restarted 17:04 (2 relay programs). Waiting: a full-bag chest take
+(another chest) and chopping with a full bag.
 
 ## How to build and publish a version
 
