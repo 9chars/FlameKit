@@ -16,12 +16,12 @@ DJ_MARGIN, DJ_TICKS = 0.7, 150
 DJ_SETTLE = 45
 DJ_LIFT = 40
 -- Put away and back (drive_put_away, F.tick): the glider is the player's locomotion state GLIDE_STATE; still gliding
--- after GLIDE_WAIT ticks or GLIDE_FAR metres away, he is put away. The player moving more than FAR_JUMP in one tick
--- (a fast travel) puts him away too, and so does TP_AFTER ticks of not being able to follow. He comes back beside the
+-- after GLIDE_WAIT ticks or GLIDE_FAR metres away, he is put away. A fast travel of the player (his TeleportCount goes
+-- up, 0.15.369) puts him away too, and so does TP_AFTER ticks of not being able to follow. He comes back beside the
 -- player once the player has stood on the ground LAND_TICKS (and his game has loaded).
 -- (owner 2026-11-19 22:22 "get rid of the 2 seconds, show the error, but teleport him immediately") TP_AFTER 0: put
 -- away the moment he cannot follow; the notice then shows 5 s on its own (put_away_for)
-GLIDE_STATE, GLIDE_WAIT, GLIDE_FAR, LAND_TICKS, TP_AFTER, FAR_JUMP = 4, 240, 30, 60, 0, 50
+GLIDE_STATE, GLIDE_WAIT, GLIDE_FAR, LAND_TICKS, TP_AFTER = 4, 240, 30, 60, 0
 WATER_NEAR = 2  -- metres above the swimming player's water surface that still count as "at the water"
 DIVE_PLAYER = 1.8  -- the player's depth from which he dives with him (at the surface the player reads about 1.3)
 SWIM_ENTER, SWIM_DEPTH = 0.5, 0.9  -- he swims while his own depth is over 0.5 m, and is held at about 0.9 m
@@ -539,7 +539,7 @@ function drive_track_player(s)
 end
 
 -- Put away (h.go_away; F.tick removes the body and brings him back beside the player once he stands on the ground):
--- a glide still going after GLIDE_WAIT or GLIDE_FAR away, a fast travel (FAR_JUMP in one tick), or TP_AFTER after he
+-- a glide still going after GLIDE_WAIT or GLIDE_FAR away, a fast travel (his TeleportCount went up), or TP_AFTER after he
 -- could not follow (h.cant).
 -- (owner 2026-11-20 06:53 "I think safety net is a good idea") the fall safety net: in the air (locomotion state 2) he
 -- remembers the height he left the ground at; more than FALL_SAFE below it, he is put away before he lands and comes back
@@ -568,11 +568,19 @@ function drive_put_away(s)
     h.go_away = "glide"
     return true
   end
-  if h.last_px and (px - h.last_px) ^ 2 + (pz - h.last_pz) ^ 2 > FAR_JUMP ^ 2 then
-    h.go_away = "fast travel"
-    return true
+  -- (0.15.369, owner 2026-11-20 19:37 "go ahead and to that fix") every fast travel of the player, however short: his
+  -- TeleportCount goes up (the game's fast travel, a respawn, emf.teleport). It replaces the old rule (the player more
+  -- than FAR_JUMP = 50 m away in one tick, Rule 0n): G-Portal 19:32:45, a travel of about 25 m was not seen, so both
+  -- tried to walk to the old trail and came back 15-19 s later through "can't follow".
+  local okc, cnt = pcall(function() return tonumber(s.world:get("TeleportCount", h.player).counter) end)
+  if okc and cnt then
+    if h.tp_count and cnt ~= h.tp_count then
+      h.tp_count = cnt
+      h.go_away = "fast travel"
+      return true
+    end
+    h.tp_count = cnt
   end
-  h.last_px, h.last_pz = px, pz
   if h.cant then
     h.cant_since = h.cant_since or t
     if t - h.cant_since >= TP_AFTER then

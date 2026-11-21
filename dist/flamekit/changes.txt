@@ -1,3 +1,6 @@
+0.15.369 Nov 20, 2026
+- Companions and pets: every fast travel now puts them away and brings them back beside you once you have landed, also a short one (before, only a jump of more than 50 m counted, so after a short fast travel they tried to walk to you and came back only 15-20 s later). Server only: no game change.
+
 0.15.368 Nov 20, 2026
 - Companions and pets are now part of FlameKit (they were on the local test server only): the wheel (E on your companion or pet), Call Companion (P), the Companions list in the wheel, the companion's chest, healing, name labels, and the admins' Companion Roster window. A dedicated server needs both FlameKit and FlameKit Native installed (the native part loads at the server's next restart). In a game you host, you are an admin; on a server, its EMF admins are too.
 - FlameKit Native no longer asks EMF to compare its version when a player joins (no "Missing mods for this server" note over a version difference).
