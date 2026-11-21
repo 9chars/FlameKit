@@ -131,4 +131,12 @@ values["0xa2"].others_battle = true
 feed.heal(W, 600, 2, 40)
 flush()
 check(lines(2, "battle")[1]:find("Rex heals Bob for 40"), "a heal names the companion")
+-- (0.15.397) a character healing itself: "themselves"
+sent = {}
+feed.hit(W, { attacker = 2, target = 2, amount = -18, healing = true })
+feed.heal(W, 600, 600, 920)
+flush()
+local b = lines(2, "battle")
+check(b[1] and b[1]:find("Bob heals themselves for 18"), "a self heal: " .. tostring(b[1]))
+check(b[2] and b[2]:find("Rex heals themselves for 920"), "a companion's self heal: " .. tostring(b[2]))
 print("ALL PASSED (msg_feed)")

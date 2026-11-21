@@ -137,7 +137,13 @@ end
 -- a line: "<colour hex> <text>"
 local OUT, IN, HEAL = "ffb060", "ff6a5a", "5ad25a"
 
-local SELF_LOG, self_logged = 10, 0  -- (0.15.395) self heals logged whole
+local SELF_LOG, self_logged = 0, 0  -- (0.15.395) self heals logged whole; (0.15.397) off: the owner says they are valid
+-- (0.15.397, owner 14:44 "the self heal is valid.. can you just make the log say "Midevil heals themselves for 18"
+-- whenever you see a character healing themselves?") who is healed: "themselves" when it is the healer
+local function heal_target(world, healer, target)
+  if (tonumber(healer) or 0) ~= 0 and tonumber(healer) == tonumber(target) then return "themselves" end
+  return name_of(world, target)
+end
 function feed.hit(world, hit)
   if not (hit and battle_wanted(world)) then return end
   local a, t = tonumber(hit.attacker) or 0, tonumber(hit.target) or 0
@@ -181,7 +187,7 @@ function feed.hit(world, hit)
     emf.log("feed: self heal " .. table.concat(f, " "))
   end
   if hit.healing or amount < 0 then
-    text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), name_of(world, t), math.abs(amount))
+    text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), heal_target(world, a, t), math.abs(amount))
   else
     -- (0.15.381, owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?") spelled out
     text = string.format("%s %s hit %s for %d damage%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
@@ -199,7 +205,7 @@ function feed.heal(world, healer, target, amount)
   if owner then owners[owner] = true end
   if pt then owners[pt] = true end
   if not next(owners) then return end
-  local text = string.format("%s %s heals %s for %d", HEAL, name_of(world, healer), name_of(world, target), math.floor((tonumber(amount) or 0) + 0.5))
+  local text = string.format("%s %s heals %s for %d", HEAL, name_of(world, healer), heal_target(world, healer, target), math.floor((tonumber(amount) or 0) + 0.5))
   local okp, x, _, z = pcall(world.position, world, target)
   for _, pid in ipairs(recipients(world, "battle", owners, okp and x or nil, okp and z or nil)) do queue(pid, "battle", text) end
 end

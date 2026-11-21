@@ -1,3 +1,6 @@
+0.15.397 Nov 21, 2026
+- Battle tab: someone healing themselves reads "Midevil heals themselves for 18" (was "Midevil heals Midevil"). Server only: no game change.
+
 0.15.396 Nov 21, 2026
 - Release (Development and Stable): everything since 0.15.374 (the lines below), including Auto Loot, the Messages window's Battle and Loot tabs and a repair of damaged FlameKit installs (every file that differs from the release is downloaded again).
 
