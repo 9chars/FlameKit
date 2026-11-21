@@ -748,7 +748,12 @@ attack and I would still want to record that data.. I'm not sure what the sweet 
 window is always on the screen -- you mean if the user has the window hidden? #9 -- on by default."
 So: default = game's own (4) for players and for kills without a player; others (no FlameKit) = 4; main companion first;
 Battle: every hit, no truncation (net channel max 16384 bytes, compact batches); heal notice stays; filters on by default.
-Open (asked 09:45): Battle on/off switch, the radius (#6), what a new line does to an unselected tab (#8).
+Asked 09:45: Battle on/off switch, the radius (#6), what a new line does to an unselected tab (#8).
+**Owner 09:48:** "#5 battle messages can be turned off by default to mitigate server load, users who want to analyze this
+data can turn it on -- #6 ok I agree with you. #8 I like the new message count, go ahead and add it, but don't mess with
+changing the current tab focus when a new message comes in." So: "Battle messages" switch, OFF by default (the server
+sends nothing then); radius = your own and your companions' at any distance, party members at any distance, everyone
+else within 100 m (Battle and Loot); unselected tabs show a new-line count, the selected tab never changes by itself.
 
 ## How to build and publish a version
 
