@@ -822,6 +822,13 @@ faction's, then "(level)". **Owner 12:39 "its good enough for now. not worth the
 as well"**: 0.15.385 (server only) logging first (features/loot_drop.lua chop_hit/chop_tick, CHOP_LOG): a player's hit
 on an object (no Faction) is logged ("loot drop: chop: hit by ..."), and 1 s and 3 s after one breaks every new
 PickupItem within 20 m ("loot drop: chop: pickup ..."). Waiting: the owner's yes on the restated scope, and a chop.
+**Owner 12:46 "loot you take from chests should also show up in the loot log...."**: cause found: the game's PickupEvent
+has only hideInUi, itemCount, itemId, pickedUpByEntityId, pickedUpFromEntityId, position, targetSlotId, timeStamp;
+feed.pickup read e.itemLevel, and EMF's strict event table made that an error, so the first pickup with a "from"
+(12:40:06, 12:47:29) stopped msg_tabs (Battle and Loot tabs dead until a reload). FlameKit's own puts into a bag (Auto
+Loot) come with from 0 (12:33:46-55), so the from = 0 filter stays (no double lines). 0.15.386 (server only): no
+level/quality on pickup lines; the logging keeps 20 lines with a from and 20 without; msg_feed_test uses a strict
+event. 12:48:04 a pickup with from 3380087472 went through without error.
 
 ## How to build and publish a version
 
