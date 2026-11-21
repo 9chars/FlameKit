@@ -1,6 +1,9 @@
-// fk_server_probe (2026-11-17): FlameKit's companion drive, a TEST server mod on the owner's local server only (never
-// published). Rebuilt at 17:09 (owner: everything old that did not work is gone: the player-body experiments, the
-// template writes, the read-only dumps). What is left: the hook that moves a driven companion (see below).
+// companions_server.cpp: the companion system's C++ (server) part, inside flamekit_native.dll since 0.15.364 (owner
+// 2026-11-20 17:39 "lets get everything folded into one DLL"; until then the separate test mod fk_server_probe, begun
+// 2026-11-17). It works on the server world wherever one runs: a dedicated server, or a player's game that hosts.
+// flamekit_native's emf_mod_load calls fk_companions_load() (bottom). What it does: moves driven companions and pets
+// (after steering_locomotion), the pets' E offer, the pet speed boost, chest and body name labels, the ground ray for
+// chests, the companion debug log; plus the test tools (console fkcomp.*). The Lua side: features/companions/.
 #include <windows.h>
 
 #include <cstdint>
@@ -20,7 +23,7 @@
 #include "emf/query.hpp"
 
 namespace {
-constexpr const char* kMod = "fk_server_probe";
+constexpr const char* kMod = "flamekit companions";
 // (owner 2026-11-20 18:11: debug tools are never removed, only switched off) the companion debug log: the detailed
 // lines (jumps, edge stops, the pets' offers, the boost, the fight ray, the drive count, names that are there) only
 // while FlameKit's companion_debug.txt exists beside it (the console's "flamekit.npc debug on|off"; read every 2 s)
@@ -66,7 +69,7 @@ struct FaceTarget { uint32_t target; int64_t until_ns; };
 std::mutex g_face_mx;
 std::map<uint32_t, FaceTarget> g_face;
 
-// (owner 23:32 "lets try to finish the jump") two ways a jump may start, tried by fkprobe.jump <id> <mode> [type]:
+// (owner 23:32 "lets try to finish the jump") two ways a jump may start, tried by fkcomp.jump <id> <mode> [type]:
 //  mode 1: ActorInput.externalTriggerJumpType = type (JumpType: 1 Default, 5 Sprint), externalTriggerJumpTime = now
 //  mode 2: the hound's jump sequence 0xe80706fc (PathWalker.jumpSequence) with triggerContext.jumpType = type,
 //          strength 1 and directionOverride = his facing, else like the bite
@@ -156,7 +159,7 @@ void write_bites(emf::World w) {
 //   Query (0x34 bytes, as check_line_above_sensor builds it): +0 byte = programContext->world->byte 0xbb,
 //   +8 / +0x10 = the program's two system pointers (sys-read ecs::ColliderSystem, ecs::VoxelGrid; here from
 //   emf singleton(), NOT CONFIRMED the same pointers), +0x18 0, +0x20 mask bits 0 and 3, +0x24 u16 0x100,
-//   +0x28/+0x2c entity ids to ignore (0), +0x30 0, +0x33 byte 1. Test only: fkprobe.ground.
+//   +0x28/+0x2c entity ids to ignore (0), +0x30 0, +0x33 byte 1. Test only: fkcomp.ground.
 constexpr uintptr_t kRayCastRva = 0x9300b0;
 const uint8_t kRayCastStart[] = {0x48, 0x8B, 0xC4, 0x48, 0x89, 0x58, 0x08, 0x4C, 0x89, 0x40, 0x18, 0x48, 0x89, 0x50, 0x10};
 using RayCastFn = void (*)(void* out, const float* from, const float* to, const void* query);
@@ -212,7 +215,7 @@ void do_ground(emf::World w, void* ctx) {
 // Server 0x140175a20 (found from the teleport program 0x1400916a0, call at 0x140091a3a):
 //   search(out, const float3* pos, bool isPlayer, PathGridSystem* pg, u8 worldFlag)   worldFlag = world byte 0xbb
 //   out: +0 byte status (0 found; 1-3 not ready, ask again next tick; else nothing), +8 float3 the walkable spot.
-// EMF re_teleport.md 1.4: snaps to the nearest walkable cell, about +-10 m vertically. Test only: fkprobe.walk.
+// EMF re_teleport.md 1.4: snaps to the nearest walkable cell, about +-10 m vertically. Test only: fkcomp.walk.
 constexpr uintptr_t kWalkSearchRva = 0x175a20;
 const uint8_t kWalkSearchStart[] = {0x48, 0x89, 0x5C, 0x24, 0x08, 0x55, 0x48, 0x8B, 0xEC, 0x48, 0x83, 0xEC, 0x70, 0x33, 0xC0};
 using WalkSearchFn = void* (*)(void* out, const float* pos, bool isPlayer, void* pg, uint8_t flag);
@@ -259,7 +262,7 @@ void do_walk(emf::World w, void* ctx, void* pg_in = nullptr) {
 
 // (owner 22:28 "lets try it") ground check ahead of a driven companion, measuring only: every 15 steps, rays straight
 // down 1, 2 and 3 m ahead along his movement (or facing) direction, from his height + 2 m to - 12 m, mask 7 (terrain
-// and objects, not characters), ignoring himself. Logged; nothing about his movement changes. fkprobe.ahead on|off.
+// and objects, not characters), ignoring himself. Logged; nothing about his movement changes. fkcomp.ahead on|off.
 std::atomic<bool> g_ahead{false};
 uint32_t g_ahead_tick = 0;
 void log_ahead(emf::World w, void* ctx, uint32_t id, const emf::gen::ecs::ActorInput* ai, const WorldTransform* tr) {
@@ -841,7 +844,7 @@ std::wstring flamekit_file(const wchar_t* name) {
     wchar_t path[MAX_PATH] = {};
     GetModuleFileNameW(me, path, MAX_PATH);
     std::wstring s(path);
-    s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods\fk_server_probe
+    s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods\flamekit_native
     s = s.substr(0, s.find_last_of(L"\\/"));  // ...\mods
     return s + L"\\flamekit\\" + name;
 }
@@ -927,7 +930,7 @@ void names_tick(emf::World w) {
 // ---- (owner 2026-11-20 12:12 "N1's chest spawned in the air... can you make that stay on the ground..?") ----
 // FlameKit (Lua) asks for the ground under the places its companion chest could go: chest_ground.request, a line
 // "<key> <x> <y> <z>" each (metres); from the step's program (the ray needs its context) each is one ray straight down
-// from y + 1.5 to y - 8 (do_ground's settings: mask 0x9, flags 0x100, byte 1, as fkprobe.ground and the walk test) and
+// from y + 1.5 to y - 8 (do_ground's settings: mask 0x9, flags 0x100, byte 1, as fkcomp.ground and the walk test) and
 // the answer goes to chest_ground.answer: "<key> <hit y>" or "<key> none". The request file is removed once answered.
 void do_chest_ground(emf::World w, void* ctx) {
     if (w.tick() % 3 != 0) return;
@@ -975,8 +978,8 @@ void do_chest_ground(emf::World w, void* ctx) {
 }
 }  // namespace
 
-extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
-    if (!emf::init(api)) return false;
+// (0.15.364) called by flamekit_native's emf_mod_load once EMF is set up (emf::init), in every process
+bool fk_companions_load() {
     // option 2: the hook after the steering step, and the driven list refreshed after each server step
     const bool hooked = emf::api()->hook_program && emf::api()->hook_program("steering_locomotion", nullptr, drive_post, nullptr);
     EMF_LOG(kMod, "drive: hook after steering_locomotion %s", hooked ? "installed" : "NOT installed");
@@ -1000,23 +1003,23 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
         const bool on = GetFileAttributesW(f.c_str()) != INVALID_FILE_ATTRIBUTES;
         if (on != g_debug.load()) { g_debug.store(on); EMF_LOG(kMod, "companion debug log %s", on ? "on" : "off"); }
     });
-    emf::add_command("fkprobe.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {
+    emf::add_command("fkcomp.drive", ": option 2 drive status", [](emf::World w, const std::vector<std::string>&) {
         size_t n;
         { std::lock_guard<std::mutex> lk(g_drive_mx); n = g_driven.size(); }
         EMF_LOG(kMod, "drive: %zu driven, %llu writes", n, (unsigned long long)g_drive_writes.load());
         EMF_REPLY("drive: %zu driven, %llu writes", n, (unsigned long long)g_drive_writes.load());
     });
-    emf::add_command("fkprobe.bite", "<entity> [sequence id hex, default 63fe3237]: start one attack sequence (test)",
+    emf::add_command("fkcomp.bite", "<entity> [sequence id hex, default 63fe3237]: start one attack sequence (test)",
                      [](emf::World w, const std::vector<std::string>& args) {
-                         if (args.size() < 2) { EMF_REPLY("usage: fkprobe.bite <entity> [sequence hex]"); return; }
+                         if (args.size() < 2) { EMF_REPLY("usage: fkcomp.bite <entity> [sequence hex]"); return; }
                          const uint32_t id = (uint32_t)std::strtoul(args[1].c_str(), nullptr, 0);
                          const uint32_t seq = args.size() > 2 ? (uint32_t)std::strtoul(args[2].c_str(), nullptr, 16) : 0x63FE3237u;
                          { std::lock_guard<std::mutex> lk(g_bite_mx); g_bites.emplace_back(id, seq); }
                          EMF_REPLY("bite %u: %08x queued", id, seq);
                      });
-    emf::add_command("fkprobe.face", "<entity> <target> [seconds, default 5]: the entity looks at the target (attack test)",
+    emf::add_command("fkcomp.face", "<entity> <target> [seconds, default 5]: the entity looks at the target (attack test)",
                      [](emf::World w, const std::vector<std::string>& args) {
-                         if (args.size() < 3) { EMF_REPLY("usage: fkprobe.face <entity> <target> [seconds]"); return; }
+                         if (args.size() < 3) { EMF_REPLY("usage: fkcomp.face <entity> <target> [seconds]"); return; }
                          const uint32_t id = (uint32_t)std::strtoul(args[1].c_str(), nullptr, 0);
                          const uint32_t tg = (uint32_t)std::strtoul(args[2].c_str(), nullptr, 0);
                          const double sec = args.size() > 3 ? std::strtod(args[3].c_str(), nullptr) : 5.0;
@@ -1025,9 +1028,9 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                          EMF_LOG(kMod, "face: %u looks at %u for %.1f s", id, tg, sec);
                          EMF_REPLY("face %u -> %u for %.1f s", id, tg, sec);
                      });
-    emf::add_command("fkprobe.ground", "<x> <z> <y top> <y bottom> [mask hex] [flags hex] [byte33]: one ray cast straight down, logs the ground hit (test)",
+    emf::add_command("fkcomp.ground", "<x> <z> <y top> <y bottom> [mask hex] [flags hex] [byte33]: one ray cast straight down, logs the ground hit (test)",
                      [](emf::World, const std::vector<std::string>& args) {
-                         if (args.size() < 5) { EMF_REPLY("usage: fkprobe.ground <x> <z> <y top> <y bottom>"); return; }
+                         if (args.size() < 5) { EMF_REPLY("usage: fkcomp.ground <x> <z> <y top> <y bottom>"); return; }
                          GroundAsk a{std::strtod(args[1].c_str(), nullptr), std::strtod(args[2].c_str(), nullptr),
                                      std::strtod(args[3].c_str(), nullptr), std::strtod(args[4].c_str(), nullptr),
                                      args.size() > 5 ? (uint32_t)std::strtoul(args[5].c_str(), nullptr, 16) : 0x9u,
@@ -1038,7 +1041,7 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                      });
     // (21:57) our own step in the game loop, registered with the walkable-ground map (and the collision and terrain
     // grids): the walkable search answered "not ready" forever when called from the steering hook.
-    const bool prog = emf::add_program("fk_ground_probe", EMF_WORLD_SERVER, {}, {},
+    const bool prog = emf::add_program("fk_companion_ground", EMF_WORLD_SERVER, {}, {},
         {"ecs::PathGridSystem", "ecs::ColliderSystem", "ecs::VoxelGrid"}, {}, [](void* ctx) {
             emf::World w = emf::server_world();
             if (!w) return;
@@ -1054,22 +1057,22 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
             do_chest_ground(w, ctx);  // (2026-11-20 12:12) the companion chest on the ground
         });
     EMF_LOG(kMod, "ground program %s", prog ? "registered" : "NOT registered");
-    emf::add_command("fkprobe.ahead", "on|off: log the ground 1, 2, 3 m ahead of each driven companion (measuring)",
+    emf::add_command("fkcomp.ahead", "on|off: log the ground 1, 2, 3 m ahead of each driven companion (measuring)",
                      [](emf::World, const std::vector<std::string>& args) {
                          g_ahead = args.size() > 1 && args[1] == "on";
                          EMF_REPLY("ahead %s", g_ahead.load() ? "on" : "off");
                      });
-    emf::add_command("fkprobe.jump", "<entity> <mode 1 external | 2 sequence> [jump type, default 1]: jump test",
+    emf::add_command("fkcomp.jump", "<entity> <mode 1 external | 2 sequence> [jump type, default 1]: jump test",
                      [](emf::World, const std::vector<std::string>& args) {
-                         if (args.size() < 3) { EMF_REPLY("usage: fkprobe.jump <entity> <1|2> [type]"); return; }
+                         if (args.size() < 3) { EMF_REPLY("usage: fkcomp.jump <entity> <1|2> [type]"); return; }
                          JumpAsk j{(uint32_t)std::strtoul(args[1].c_str(), nullptr, 0), (int)std::strtol(args[2].c_str(), nullptr, 10),
                                    (uint8_t)(args.size() > 3 ? std::strtoul(args[3].c_str(), nullptr, 10) : 1)};
                          { std::lock_guard<std::mutex> lk(g_jump_mx); g_jumps.push_back(j); }
                          EMF_REPLY("jump %u mode %d type %u queued", j.id, j.mode, j.type);
                      });
-    emf::add_command("fkprobe.walk", "<x> <y> <z> [layer, -1 = the world's] [player 0/1]: the game's walkable-ground search near that point (test)",
+    emf::add_command("fkcomp.walk", "<x> <y> <z> [layer, -1 = the world's] [player 0/1]: the game's walkable-ground search near that point (test)",
                      [](emf::World, const std::vector<std::string>& args) {
-                         if (args.size() < 4) { EMF_REPLY("usage: fkprobe.walk <x> <y> <z>"); return; }
+                         if (args.size() < 4) { EMF_REPLY("usage: fkcomp.walk <x> <y> <z>"); return; }
                          WalkAsk a{{(float)std::strtod(args[1].c_str(), nullptr), (float)std::strtod(args[2].c_str(), nullptr),
                                     (float)std::strtod(args[3].c_str(), nullptr)}, 0,
                                    args.size() > 4 ? (int)std::strtol(args[4].c_str(), nullptr, 10) : -1,
@@ -1077,6 +1080,6 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
                          { std::lock_guard<std::mutex> lk(g_walk_mx); g_walk.push_back(a); }
                          EMF_REPLY("walk %.1f %.1f %.1f queued", a.p[0], a.p[1], a.p[2]);
                      });
-    EMF_LOG(kMod, "loaded (drive, bite, facing, ground ray and walkable search tests, chest names; commands: fkprobe.drive, fkprobe.bite, fkprobe.face, fkprobe.ground, fkprobe.walk)");
+    EMF_LOG(kMod, "loaded (the drive, pets' offers, the pet boost, name labels, the ground ray; test commands: fkcomp.drive, fkcomp.bite, fkcomp.face, fkcomp.ground, fkcomp.ahead, fkcomp.jump, fkcomp.walk)");
     return true;
 }

@@ -1,3 +1,6 @@
+0.15.364 Nov 20, 2026
+- FlameKit Native: the companion system's C++ part (until now the separate test mod fk_server_probe) is inside flamekit_native.dll, which now also runs on a server. On a dedicated server only that part runs (no window, no updater). Its console test commands are now fkcomp.* (were fkprobe.*).
+
 0.15.363 Nov 20, 2026
 - Companions (test, local server only): a companion or pet gets its name as the game's name label when it spawns, the way its chest shows it (whether the game shows it over a creature is being tested). Server only: no game change.
 

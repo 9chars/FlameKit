@@ -7244,10 +7244,30 @@ void updater_body() {
 void updater_thread() { fklog::guarded("updater", updater_body); }
 }  // namespace
 
+bool fk_companions_load();  // companions_server.cpp (0.15.364): the companion system's server part
+
+// (0.15.364, owner 2026-11-20 17:39 "lets get everything folded into one DLL") this DLL now also runs on a dedicated
+// server (mod.json side "both"). There only the companion part runs: no window, no updater (a server's FlameKit is
+// put there by its admin; the updater would replace the server's files with a player's version), no settings.
+bool dedicated_server_process() {
+    wchar_t exe[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    std::wstring name(exe, n);
+    name = name.substr(name.find_last_of(L"\\/") + 1);
+    return _wcsicmp(name.c_str(), L"enshrouded_server.exe") == 0;
+}
+
 extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     g_game_dir = game_dir_of_process();
     g_flamekit_dir = g_game_dir + L"emf\\mods\\flamekit\\";
     fklog::open(g_flamekit_dir);  // FlameKit's own log (fk_log.hpp): first, so everything after is in it
+    if (dedicated_server_process()) {
+        if (!emf::init(api)) return false;
+        const bool ok = fk_companions_load();
+        FK_LOG(ok ? fklog::kInfo : fklog::kWarn, "start: on a dedicated server: only the companion part runs (%s)", ok ? "loaded" : "NOT loaded");
+        EMF_LOG(kMod, "on a dedicated server: only the companion part runs (%s)", ok ? "loaded" : "NOT loaded");
+        return true;
+    }
     // a new version's Lua part, held since the last session: in place now, so the Lua part and this DLL switch together
     const bool installed = web_update::install_pending(g_game_dir + L"emf\\mods\\", [](const char* text) {
         FK_LOG(std::strstr(text, "failed") || std::strstr(text, "does not match") ? fklog::kWarn : fklog::kInfo, "%s", text);
@@ -7310,6 +7330,9 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     if (!events) FK_LOG(fklog::kWarn, "events: the events program was refused: no pings on the minimap");
     std::thread(ui_thread).detach();
     std::thread(monitor_thread).detach();
+    // (0.15.364) the companion system's server part: it acts only on a world this game hosts
+    const bool companions = fk_companions_load();
+    FK_LOG(companions ? fklog::kInfo : fklog::kWarn, "start: the companion part %s", companions ? "loaded" : "NOT loaded");
     FK_LOG(fklog::kInfo, "start: loaded (the native part of FlameKit)");
     return true;
 }

@@ -578,6 +578,13 @@ DLL goes to the server by copy and to players by the updater; a server-only C++ 
 <n>: name label key on his body ...". Untested whether creatures show it. (#2, the name in the E word, needs a content
 mod's text table.) New check: python3 local_server/tests/globals_check.py (names read but never set in the bundle).
 **Owner 18:32 "yup it works perfect"** (the name label shows over companions and pets).
+**Owner 18:33 "yes" (fold the probe into the main DLL).** 0.15.364: flamekit_native/src/companions_server.cpp = the
+probe's code (anonymous namespace; kMod "flamekit companions"; commands fkcomp.*; program fk_companion_ground);
+flamekit_native's emf_mod_load: dedicated_server_process() (exe enshrouded_server.exe) -> emf::init +
+fk_companions_load() only (no updater: it would replace the server's files with a player's version; no window, no
+settings, no install_pending); in a player's game fk_companions_load() after the rest (acts only on a hosted world).
+mod.json side "both". flamekit_server_probe removed from the repo (git history keeps it); on the server
+mods\fk_server_probe moved to emf\_to_delete\fk_server_probe_1836 and mods\flamekit_native added.
 
 ## How to build and publish a version
 
