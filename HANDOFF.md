@@ -1016,6 +1016,12 @@ Inventory, not a player) within 8 m, Auto Loot bag/companion, a single take with
 opts { no_ground, no_junk }, no Loot line when nothing went anywhere. loot_drop's client listening off again
 (chest_overflow listens). Test flamekit_native/notes/tests/chest_overflow_test.lua; run.lua knows channel overflow.
 Restart 17:28 (18 features). A hosting game's own takes are not handled.
+17:35 first test failed: both companions were "put away" after the 17:28 restart (loot_into needs out + follow;
+bodies too: companions 0); the chest kept its 2 stacks on the server while his game showed it empty/locked (the same
+as the earlier chest: both right after a take his full bag refused; a guess, not checked). 17:41 owner "i got the
+backup full error, but looks like loot went to the companions bag": take all from 3379825911 -> 7 Gold Coins to his
+bag, 2 stacks (rare Tribal Hammer, epic Amber Bow) to Poop Eater, Loot lines "(chest)". The game's own "backpack
+full" message stays (his game refuses before the server hears). Single take: not tested yet (owner looking for a chest).
 
 ## How to build and publish a version
 
