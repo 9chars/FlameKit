@@ -791,6 +791,13 @@ them to teleport to me, fix it" / 11:55 "yes"**: joined 11:51:51, both "follow a
 (he had not moved) until 11:53:50. 0.15.379 (server only, local server): roster_joined marks the drive joined=true;
 drive_put_away at its first step with both positions: farther than JOIN_FAR = 20 m (3D) -> go_away "joined" (back
 beside him once on the ground, like a fast travel). Test local_server/tests/fight/joinfar_test.lua; drive harness same.
+**Owner 11:58-12:00 "I just took a bunch of loot and none of it showed up in my loot tab?" / "I took the loot from the loot
+container after I turned the option on" / "#2... come on, if I pick up loot, it needs to be logged into the loot window
+according to my settings."** (Facts: 3 kills 11:57:02-23 judged with "game" before he set bag at 11:57:29; no kill after.)
+0.15.380 (server only): feed.pickup on the game's PickupEvent (pickedUpByEntityId a player, pickedUpFromEntityId not 0:
+crafting is 0), a Loot line "<name>: <item> xN > picked up" by the same recipients; core/game_events.lua registers each
+engine event once and fans out (loot_filter's PickupEvent moved there). The first 20 PickupEvents of a run are logged
+whole ("feed: pickup ...") to see what a container take sends (WATCH: if from = 0 there, the filter drops them).
 
 ## How to build and publish a version
 

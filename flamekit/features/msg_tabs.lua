@@ -23,6 +23,9 @@ function F.setup(k)
   route.set_report(function(world, r) feed.loot(world, r) end)
   local okh, hooked = pcall(emf.on_hit, kit.guard(F, function(world, hit) feed.hit(world, hit) end, "a hit"))
   if not (okh and hooked ~= false) then emf.log("message tabs: emf.on_hit is not there: no Battle lines") end
+  -- (0.15.380) loot taken by hand (a body, a chest, the ground)
+  local okp = require("core.game_events").on("PickupEvent", kit.guard(F, function(world, e) feed.pickup(world, e) end, "a pickup"))
+  if not okp then emf.log("message tabs: PickupEvent refused: hand pickups are not in the Loot tab") end
   pcall(emf.on_player_left, kit.guard(F, function(world, p) if p and p.player then feed.forget(p.player) end end, "a player leaving"))
 end
 

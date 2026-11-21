@@ -420,7 +420,7 @@ function S.setup(k, F)
     if removable(st, { item = item, gear = gear and true or false }) then return st.opts.action end
     return nil
   end)
-  emf.on_event("PickupEvent", kit.guard(F, S.on_pickup, "PickupEvent"), "server")
+  require("core.game_events").on("PickupEvent", kit.guard(F, S.on_pickup, "PickupEvent"))  -- (0.15.380) shared with the Loot tab
   emf.on_world_data(function() end)  -- asks EMF for this world's saved data: the players' lists are kept beside it
   emf.on_player_left(kit.guard(F, function(world, p)
     players[p.account] = nil  -- the list stays saved with the world; what was running for them stops

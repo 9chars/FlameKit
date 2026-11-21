@@ -15,6 +15,7 @@
 --   feed.hit(world, hit)                  the server: one emf.on_hit hit
 --   feed.heal(world, healer, target, amount)   the server: a companion's heal
 --   feed.loot(world, report)              the server: core/loot_route.lua's report of one item
+--   feed.pickup(world, event)             the server: the game's PickupEvent (loot taken by hand)
 --   feed.tick(world)                      the server, every step: sends the batches
 
 local players = require("core.players")
@@ -188,6 +189,28 @@ function feed.loot(world, r)
     ((r.from or ""):gsub("|", "/")))
   local x, z = r.x, r.z
   for _, pid in ipairs(recipients(world, "loot", { [r.player] = true }, x, z)) do queue(pid, "loot", line) end
+end
+
+-- (0.15.380, owner 2026-11-21 12:00 "if I pick up loot, it needs to be logged into the loot window according to my
+-- settings") a pickup by hand: the game's PickupEvent (from a body, a chest, the ground; anything with a source
+-- entity: crafting and FlameKit's own puts come from entity 0 and are left out). The event has the item and how many.
+local pickups_logged = 0
+function feed.pickup(world, e)
+  if type(e) ~= "table" then return end
+  local by, from, item, count = tonumber(e.pickedUpByEntityId) or 0, tonumber(e.pickedUpFromEntityId) or 0,
+    tonumber(e.itemId) or 0, tonumber(e.itemCount) or 0
+  if pickups_logged < 20 then  -- the first ones of a run, to see what the game sends (Logging is live)
+    pickups_logged = pickups_logged + 1
+    local f = {}
+    for k, v in pairs(e) do f[#f + 1] = tostring(k) .. "=" .. tostring(v) end
+    table.sort(f)
+    emf.log("feed: pickup " .. table.concat(f, " "))
+  end
+  if count <= 0 or from == 0 or item == 0 or not is_player(world, by) then return end
+  local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
+    tonumber(e.itemLevel) or 0, tonumber(e.rarity) or 0, "picked up")
+  local okp, x, _, z = pcall(world.position, world, by)
+  for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end
 
 local RARITY = { [0] = "", [1] = "uncommon ", [2] = "rare ", [3] = "epic ", [4] = "legendary " }

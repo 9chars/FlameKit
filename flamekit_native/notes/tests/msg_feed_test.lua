@@ -94,6 +94,15 @@ sent = {}
 feed.loot(W, { player = 1, item = 77, count = 1, junk = "delete", x = 0, z = 0 })
 flush()
 check(#lines(2, "loot") == 0 and lines(1, "loot")[1]:find("junk delete"), "Bob with other players' loot off; a junk line says so")
+-- (0.15.380) a pickup by hand: logged for its player (and players near); crafting (from entity 0) is not
+sent = {}
+values["0xa2"].others_loot = true
+feed.pickup(W, { pickedUpByEntityId = 1, pickedUpFromEntityId = 777, itemId = 77, itemCount = 3 })
+feed.pickup(W, { pickedUpByEntityId = 1, pickedUpFromEntityId = 0, itemId = 78, itemCount = 1 })
+flush()
+check(#lines(1, "loot") == 1 and #lines(2, "loot") == 1 and #lines(3, "loot") == 0, "a pickup: Ann and Bob near her, not Cid; crafting left out")
+channel.on_player(W, {}, sent[1][1])
+check(notes[#notes][2] == "Ann: Iron Sword x3 > picked up", "a pickup line: " .. tostring(notes[#notes][2]))
 -- a companion's heal
 sent = {}
 values["0xa2"].others_battle = true
