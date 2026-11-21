@@ -880,6 +880,15 @@ body 100463's (killed 13:23:42): EntityDiedEvent came twice (.808, .976); the fi
 and no loot spot yet ("no loot spot found", the spot came later); the second had no killer any more (kills[] used up)
 -> the game's own. 0.15.392 (server only, features/loot_drop.lua): a second death event of one body within 10 s is
 left out (dead[]); no spot found -> looked for again 1 s apart, 4 times (SPOT_TRIES).
+**Owner 13:42 "sure the AI is so sure its right, when it's not.. super annoying"** (lesson: say what the log shows and
+what is my reading; no claim of a cause or a fix before it is seen working). **13:43 "auto loot collects the drops from
+items I chop down with an axe, but it doesn't log it in the loot window"**: ui_loot.dat has "Pink Mushroom Meat from
+chopped > bag" (13:41-42) and the DLL read it (newest 346); the 13:33 tree's 6 drops (Mycelium x5 = junk, Metal Scraps)
+have no line found: asked which chop (open). **13:45 "dropped a ton of Critter Carapace and nothing picked it up"**:
+0.15.393 debug command `flamekit.lootnear [player] [m]` (features/loot_drop.lua): the critters' piles near him were
+Inventory InventorySetup DefaultInventory DestroyOnLoot Faction SpawnTime StaticCollider (no DoNotSave, empty until
+opened); core/loot_spots.lua wanted DoNotSave. 0.15.394 (server only): DoNotSave or Faction (a world chest or urn, e.g.
+80693, has no Faction). Not yet seen working.
 
 ## How to build and publish a version
 
