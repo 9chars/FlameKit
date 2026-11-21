@@ -1,3 +1,6 @@
+0.15.374 Nov 20, 2026
+- Test monsters' Reward loot: more gear can be the legendary item: the Fog Nest and Hollow Hall dungeon weapons and Vorgoth's greatsword (level 43 and up), the multi-class Fog Powered and Skeleton armour sets, the tier 5 loot set and the Wards (tiers 1-7). Server only: no game change.
+
 0.15.373 Nov 20, 2026
 - Test monsters' Reward loot: the cosmetic can now be any of the game's 199 cosmetics (NPC outfits, event and Twitch drop sets included; before 105). Server only: no game change.
 

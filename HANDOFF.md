@@ -682,7 +682,10 @@ flamekit.itemnames (experimental.lua, 0.15.372; cosmetics 0.15.373): item_ids.tx
 = all 199 Vanity items (was 105: the old item lists were capped at 50 names a query, so my 20:19 "9 left out" was wrong:
 94 were missing). Still not in item_db, found with the full list: TX dungeon weapons (FogNest, HollowHall: 19, many
 legendary), Vorgoth's greatsword, MultiClass armour (FogPowered T2, SkeletonArmor T4/T6: 15), Armor_T5-TX loot set (15),
-Wards T1-T7 (+_Loot, 14), Craft_ copies of the Lore weapons/shields (left out: crafted). Offered, not answered.
+Wards T1-T7 (+_Loot, 14), Craft_ copies of the Lore weapons/shields (left out: crafted).
+**Owner 20:36 "yes, add them"**: 0.15.374 (server only): weapon T7 + the 19 Weapon_TX_ (FogNest, HollowHall; levels 1-55)
+and Weapon_T7-TX_2H_GreatSwordEpic_Vorgoth; armour: MultiClass T2/T4/T6, Armor_T5-TX_*_Loot in T5, Ward_T1..T7 (+_Loot)
+in their tiers (64 names, all checked against the full list, no duplicates).
 
 ## How to build and publish a version
 
