@@ -658,7 +658,7 @@ every body check), Spawn Monsters adds (no drop_bodies_of; the queue is cleared 
 only the dummy, SPOT_MIN 3, DUEL_COUNTS without 1000 (MAX_DUELISTS 1000). run.lua: Team test (factions, both stay,
 faction restored, Remove both). Local server 20:19:57, Development 0.15.370 signed. Not on Stable/G-Portal.
 **Owner 20:19: reward loot "legendary gems were only spawning two types" - check for missed legendary gear.** Found
-(item dumps of 2026-11-15 joined with item_details.dat, build 1287369): the game has only 6 legendary gems (T4
+(item dumps of 2026-11-15 joined with item_details.dat, build 1287369): the game has only 5 legendary gems (T4
 FocusedLight, T5 ColdComposure, T6 Lycanthropy, T7 Armoring + HyperSpecialization) and 5 legendary rings (T1 ministory_05,
 T3 Light, T4 The_Ancients, T5 Frost, T6 Shock; none at T7); db.pick takes the monster's tier, so level 100 gives only
 the two T7 gems and always Ring of Shock. Not in item_db at all: every shield (45, 2 of them legendary lore shields),
@@ -669,6 +669,13 @@ cosmetics are left out on purpose. Some dump queries were capped at 50 names: a 
 only seen two gem types ... look at it closer or explain how we can get those to drop". Explained: TIER_MAX_LEVEL puts
 level 50/75/100 in T7 (Armoring, HyperSpecialization), 1 and 25 give T4 FocusedLight; T5 ColdComposure (levels 30-36)
 and T6 Lycanthropy (37-42) are not reachable with the level buttons. Unfinished outfits = Vanity_TX_PartyHat_02/04_Tint_WIP.
+**Owner 20:28 "yes, make those changes, and also make sure the way its randomizing, picking, and dropping the loots is
+also doing it right"**: 0.15.372 (server only): db.pick for rings/gems = every legendary one of tier <= the monster's
+(uniform), else the nearest above. Checked: Lua 5.4.9 (math.random seeds itself); the logged single kills
+(production 2026-11-16..20: armor 13, cosmetic 16, gem 17, ring 13, weapon 20) are even across the five kinds; no
+"came out rarity ... not legendary" line in any log; the gem picks matched the tier rule exactly (no bug, the rule
+itself). Note: legendary rings have fixed levels (5, 15, 20, 30, 40), so a lower-tier ring from a level 100 kill is
+low level; gems are level 1-105.
 
 ## How to build and publish a version
 

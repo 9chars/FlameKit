@@ -1137,8 +1137,8 @@ function db.tier_for_level(level)
   return 7
 end
 
--- A random debug name of `kind` ("weapon", "armor", "ring", "gem") for a monster of `level`: from its tier, else the
--- nearest tier below, else above. `random(n)` gives 1..n (math.random by default).
+-- A random debug name of `kind` ("weapon", "armor", "ring", "gem") for a monster of `level`: weapons and armour from
+-- its tier, else the nearest tier below, else above; rings and gems: see below. `random(n)` gives 1..n (math.random by default).
 -- (0.15.168, owner: "it also dropped uncommon gems and rings") rings and gems keep the rarity of their item type,
 -- whatever rarity they are given (no item entity of their own); weapons and armour take the one given. These are the
 -- rings and gems that are legendary by type (the game's item details, item_details.dat, joined with the item list,
@@ -1150,11 +1150,27 @@ db.LEGENDARY_BY_TYPE = {
           [7] = { "T7_Gem_GemOfArmoring", "T7_Gem_GemOfHyperSpecialization" } },
 }
 
+-- (0.15.372, owner 2026-11-20 20:28 "yes, make those changes ... we've killed thousands of level 100 and only 2 gem
+-- types drop") the game has few legendary rings and gems (5 gems: T4, T5, T6 and two at T7; 5 rings: T1, T3, T4, T5,
+-- T6) and level 43 and up is T7, so the monster's own tier gave a level 100 kill only the two T7 gems and always Ring of
+-- Shock. Now a ring or gem is any legendary one of the monster's tier or below (every one equally likely), else the
+-- nearest tier above. Weapons and armour still come from the monster's tier.
 function db.pick(kind, level, random)
   random = random or math.random
-  local by_tier = db.LEGENDARY_BY_TYPE[kind] or db.GEAR[kind]
-  if not by_tier then return nil end
   local t = db.tier_for_level(level)
+  local legendary = db.LEGENDARY_BY_TYPE[kind]
+  if legendary then
+    local pool = {}
+    for tt = 1, t do for _, n in ipairs(legendary[tt] or {}) do pool[#pool + 1] = n end end
+    if #pool > 0 then return pool[random(#pool)] end
+    for tt = t + 1, 7 do
+      local list = legendary[tt]
+      if list and #list > 0 then return list[random(#list)] end
+    end
+    return nil
+  end
+  local by_tier = db.GEAR[kind]
+  if not by_tier then return nil end
   for d = 0, 6 do
     for _, tt in ipairs({ t - d, t + d }) do
       local list = by_tier[tt]
