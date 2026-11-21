@@ -816,7 +816,8 @@ AnimationGraphResourceComponent2.animationGraph (77: the species); core/monster_
 `python3 tools/gamedata/make_monster_names.py tools/gamedata/monster_prints.txt flamekit/core/monster_names.lua`
 (group prefix: Scavenger/Shroud/Vukah/Undead/Ancient, none for Beasts/Drak; variant numbers dropped, tiers kept; kinds
 sharing an arsenal get their shared words, e.g. Melee01..09 -> "Scavenger Melee"). msg_feed name_of: that name, else the
-faction's, then "(level)". Waiting on the owner's look: if awful, option 2.
+faction's, then "(level)". **Owner 12:39 "its good enough for now. not worth the work of #2"**: option 1 stays; option 2
+(the game's own names through the DLL) is on the ideas list, not planned.
 
 ## How to build and publish a version
 
