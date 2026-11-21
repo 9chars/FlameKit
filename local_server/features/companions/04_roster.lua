@@ -60,10 +60,24 @@ function inv.name_key(text)
   for i = 1, #text do h = (h ~ text:byte(i)) * 0x100000001b3 end
   return h
 end
+-- (owner 18:49 "now the label isn't showing at all after I renamed it": "Butt Sniffer" hashes to 0xEF44E9F7E41EABBF, at
+-- or above 2^63: a Lua integer reads it as negative and EMF refused the spawn's stringId, "out of range (0 to 2^64 - 1)";
+-- N1 and N2 were below 2^63 by luck) the label's text is the name with as many trailing spaces as it takes for its key
+-- to be below 2^63 (half the texts are; the spaces do not show). Both the server's name table (custom_names.txt) and the
+-- spawns use this text.
+function inv.label_text(name)
+  local t = name
+  for _ = 1, 24 do
+    if inv.name_key(t) >= 0 then return t end
+    t = t .. " "
+  end
+  return name
+end
+function inv.label_key(name) return inv.name_key(inv.label_text(name)) end
 function inv.write_names()
   if not emf.dir then return end
   local list = {}
-  for _, r in ipairs(roster.list) do list[#list + 1] = r.name end
+  for _, r in ipairs(roster.list) do list[#list + 1] = inv.label_text(r.name) end
   table.sort(list)
   local text = table.concat(list, "\n") .. "\n"
   if text == inv.names_text then return end
@@ -239,7 +253,7 @@ function spawn_body(world, r, x, y, z, player)
   -- (the server probe keeps the names of custom_names.txt in the server's name table). Whether the game shows it over
   -- a creature: untested.
   inv.write_names()
-  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, { CustomPlayerString = { stringId = inv.name_key(r.name) } })
+  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, { CustomPlayerString = { stringId = inv.label_key(r.name) } })
   if not (ok and id and id ~= 0) then  -- (as the chest) without the label rather than no body
     log(string.format("roster: %s: the spawn with his name label was refused (%s): spawned without it", r.name, tostring(id)))
     ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
@@ -249,7 +263,7 @@ function spawn_body(world, r, x, y, z, player)
       k = k and k.stringId
       if type(k) ~= "number" and k then k = k.value end
       log(string.format("roster: %s: name label key on his body %s (his name's 0x%016X)", r.name,
-        k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.name_key(r.name)))
+        k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.label_key(r.name)))
     end)
   end
   if not (ok and id and id ~= 0) then

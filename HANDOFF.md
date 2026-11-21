@@ -585,6 +585,15 @@ fk_companions_load() only (no updater: it would replace the server's files with 
 settings, no install_pending); in a player's game fk_companions_load() after the rest (acts only on a hosted world).
 mod.json side "both". flamekit_server_probe removed from the repo (git history keeps it); on the server
 mods\fk_server_probe moved to emf\_to_delete\fk_server_probe_1836 and mods\flamekit_native added.
+Restart 18:36 (owner "yes"): "[flamekit_native] on a dedicated server: only the companion part runs (loaded)", all
+hooks installed; 18:37:55 N2 dropped and "registered again" (0.15.358 works). Owner 18:48 "I renamed my dog ... it
+didn't update on my dogs label when I respawned him" / "I guess I had to press enter...?": the name box only sends
+on Enter (closed by a click elsewhere 3x = dropped); a fix offered (save on a click elsewhere + relabel the body that
+is out): not answered. **Owner 18:49 "now the label isn't showing at all after I renamed it" / "its coming out
+empty"**: 18:49:02 "Butt Sniffer: the spawn with his name label was refused (stringId: out of range (0 to 2^64 - 1))":
+its FNV key 0xEF44E9F7E41EABBF >= 2^63 is negative as a Lua integer (EMF writes uint64 >= 2^63 only as floats).
+0.15.365: inv.label_text(name) = name + trailing spaces until the key is below 2^63 ("Butt Sniffer" + 2 spaces);
+inv.label_key; custom_names.txt holds the label texts; body and chest spawns use label_key.
 
 ## How to build and publish a version
 

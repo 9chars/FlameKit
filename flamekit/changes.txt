@@ -1,3 +1,6 @@
+0.15.365 Nov 20, 2026
+- Companions (test, local server only): fixed: some names (like "Butt Sniffer") gave no label over the companion or on its chest (the game refused their key); every name works now. Server only: no game change.
+
 0.15.364 Nov 20, 2026
 - FlameKit Native: the companion system's C++ part (until now the separate test mod fk_server_probe) is inside flamekit_native.dll, which now also runs on a server. On a dedicated server only that part runs (no window, no updater). Its console test commands are now fkcomp.* (were fkprobe.*).
 
