@@ -835,6 +835,15 @@ where the object broke, so one tree that falls shows the mechanism. Learned 12:4
 Health, no Destructible); the breaking hit (killed true) has no position any more; while chopping, pickups of one item
 (1853942795 x1) came with from 0 every ~5 s (ground pickups by hand? FlameKit's bag puts are from 0 too). 0.15.387
 (server only): the scan uses the object's last hit place (else the player's), 30 m.
+**Owner 12:53 "items you pick axe go straight to the bag for some reason when other things don't, I'd still like those
+logged in the loot messages also"**: learned 12:54: picking up a loose item from the ground by hand is a PickupEvent
+from 0 too (3509012331 picked 12:54:34-38), a chest take has a from. 0.15.388 (server only): every PickupEvent of a
+player is a Loot line ("> picked up" with a from, "> into bag" from 0) except hideInUi and FlameKit's own puts:
+core/own_puts.lua (note before emf.put in loot_route bag_then, claim in feed.pickup, 10 s). Test monster runes put
+into the bag (experimental) are not claimed: they show as "into bag" (wanted: loot the player got).
+Chop scan 12:54:23 (tree 95968): 26 pickups within 30 m, nearly all old world pickups (ids ~3.38e9 lying around,
+and others 18-44 m up); only 99403 (3.1 m, item 3509012331) looked new. A real chop loot needs "new since the break"
+(SpawnTime or a snapshot before), not distance alone.
 
 ## How to build and publish a version
 
