@@ -1,3 +1,6 @@
+0.15.375 Nov 21, 2026
+- Companion Roster: a game whose player is not an admin no longer asks the server for the roster (it asked every 5 seconds and was refused every time); the server logs a refusal once per player.
+
 0.15.374 Nov 20, 2026
 - Test monsters' Reward loot: more gear can be the legendary item: the Fog Nest and Hollow Hall dungeon weapons and Vorgoth's greatsword (level 43 and up), the multi-class Fog Powered and Skeleton armour sets, the tier 5 loot set and the Wards (tiers 1-7). Server only: no game change.
 
