@@ -1153,7 +1153,8 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   end
   check(per == 0 and sums >= 1, "Remove of 50: one summary line, not a line per monster (0.15.140, owner)")
   -- (0.15.141, owner) the cap is 1000 again: no 5000 button, and the server caps a bigger request
-  check(find_row("^5000$") == nil and find_row("^1000$") ~= nil, "Quantity: 1000 is the biggest button, no 5000")
+  -- (0.15.370, owner 20:12/20:13) no 1000 button any more, but the server still takes 1000 ("don't limit it")
+  check(find_row("^5000$") == nil and find_row("^1000$") == nil and find_row("^500$") ~= nil, "Quantity: 500 is the biggest button, no 1000")
   click("W:dbg:cnt:1000")
   local n3, d3 = #spawned, #destroyed
   click(find_row("^Spawn Monsters$").button)
@@ -1168,6 +1169,40 @@ do  -- (0.15.119, owner: a monster could throw a fight) no spawning in PvP; a du
   check(part < 1000 and #destroyed - d3 >= 1000, "Remove takes all 1000, a part per step (" .. part .. " at first)")
   click("W:dbg:cnt:1")
   click("W:dbg:cnt:1")
+-- (0.15.370, owner 20:08/20:16) teams: Team 1 then Team 2, spawned one after the other: both stay (a Spawn adds a
+-- group), each with its team's faction (Vukah 3, Scavenger 4), kept when the game sets another; Remove takes both
+do
+  check(find_row("^Free%-for%-all$", "dbg:team:0").selected and find_row("^4$", "dbg:team:4") ~= nil and find_row("^5$", "dbg:team:5") == nil,
+    "the Team row: Free-for-all (lit by default) and teams 1-4")
+  local a, b = 950 + #spawned + 1, 950 + #spawned + 2
+  local pos0 = SW.position
+  SW.position = function(self, id) if id == a or id == b then return 2, 0, 3 end return pos0(self, id) end
+  comps.NetworkHealth[a] = { health = 100 } comps.NetworkHealth[b] = { health = 100 }
+  comps.Faction[a] = { faction = 6 } comps.Faction[b] = { faction = 6 }
+  local d0 = #destroyed
+  click("W:dbg:team:1")
+  step(12)
+  click(find_row("^Spawn Monsters$").button)
+  step(40)
+  click("W:dbg:team:2")
+  step(12)
+  check(find_row("^2$", "dbg:team:2").selected and not find_row("^1$", "dbg:team:1").selected, "Team 2 is lit")
+  click(find_row("^Spawn Monsters$").button)
+  step(40)
+  check(#destroyed == d0 and comps.Faction[a].faction == 3 and comps.Faction[b].faction == 4,
+    "Team 1 (faction " .. tostring(comps.Faction[a].faction) .. ") is still there beside Team 2 (faction " .. tostring(comps.Faction[b].faction) .. ")")
+  comps.Faction[a].faction = 6
+  step(400)
+  check(comps.Faction[a].faction == 3, "a team monster whose faction the game changed gets its team's back")
+  click(find_row("Remove").button)
+  step(40)
+  local gone = {}
+  for i = d0 + 1, #destroyed do gone[destroyed[i]] = true end
+  check(gone[a] and gone[b], "Remove takes both teams")
+  SW.position = pos0
+  click("W:dbg:team:0")
+  step(12)
+end
   for i = #casts, casts_before + 1, -1 do casts[i] = nil end
 end
 SW.position = real_position
