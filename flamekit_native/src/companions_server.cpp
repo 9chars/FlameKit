@@ -888,11 +888,12 @@ void labels_tick(emf::World w) {
         if (!c) continue;
         const uint64_t key = fnv1a64(name);
         if (c->stringId.value == key) continue;
-        if (name_known(sys, key) == 0) {
-            uint64_t k = 0;
-            set_string_guarded(reinterpret_cast<SetStringFn>(fnp), sys, name.data(), name.size(), &k);
-            g_names_done[name] = k;
-        }
+        // (18:59: a labelled body that went away dropped the name from the server's table: the game takes back one claim
+        // per labelled entity, which a write here never made) one claim on the name for every label written (setString
+        // registers a new name or adds a claim to one that is there)
+        uint64_t k = 0;
+        set_string_guarded(reinterpret_cast<SetStringFn>(fnp), sys, name.data(), name.size(), &k);
+        g_names_done[name] = k;
         const uint64_t was = c->stringId.value;
         c->stringId.value = key;
         EMF_LOG(kMod, "labels: %u gets the label '%s' (0x%016llX, was 0x%016llX)", id, name.c_str(), (unsigned long long)key,

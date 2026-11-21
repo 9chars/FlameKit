@@ -1,3 +1,6 @@
+0.15.367 Nov 20, 2026
+- Companions (test, local server only): a name label no longer blinks out for a moment when another body with the same name goes away. Needs a server restart.
+
 0.15.366 Nov 20, 2026
 - Companions (test, local server only): the name labels over companions and on their chests are now set by FlameKit Native (C++), which can write every name's key exactly; 0.15.365's trailing spaces are gone. Renaming a companion now also updates the label of the one that is out. Needs a server restart.
 

@@ -600,6 +600,11 @@ bodies and chests spawn with CustomPlayerString.stringId 0; inv.write_labels (F.
 writes labels.txt "<entity>\t<name>" for ent_of bodies and open chests; companions_server.cpp labels_tick (every 30
 steps): registers a missing name (into g_names_done, so the drop watch covers it) and writes stringId = fnv1a64(name)
 when it differs (log "labels: <id> gets the label ..."); a rename relabels the body that is out.
+Restart 18:56 (owner "yes"; DLL 9a69d355, old fdff3726 .old_1857): 18:59:12 "labels: 28657 gets the label 'Butt
+Sniffer' (0xEF44E9F7E41EABBF ...)"; 18:59:14 renamed to Poop Eater -> the same body relabelled. **Owner 18:59 "tested the
+rename fix"**. Seen 18:59:12: the name dropped from the table when a labelled body went away (the game takes back one
+claim per labelled entity; the watch re-registered it). 0.15.367 (built, installed with the next restart): labels_tick
+calls setString (one claim) for every label it writes.
 
 ## How to build and publish a version
 
