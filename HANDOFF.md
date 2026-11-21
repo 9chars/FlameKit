@@ -609,6 +609,23 @@ DLL 21452746 put in (old 9a69d355 .old_1900; loads at the next restart). **Owner
 **Owner 19:01: "yes push it to both development AND stable and update g-portal"**. Development 0.15.367 pushed (sig
 good). Stable and G-Portal: held for one question first (the release has no companion server code: features/companions
 is local_server only, so G-Portal and hosting players would get the buttons without companions).
+**Owner 19:05: "the companion system and pets needs to get fully committed to both dev and stable"** (= put the
+companion server code into the release first). 0.15.368: local_server/features/companions.lua + companions/ +
+npc_fields.lua moved to flamekit/features/ (main.lua lists features.companions after npc_wheel_probe; the local
+server's own main.lua is gone: the server runs the release's flamekit folder as it is). core/companion_net.lua
+registers npcwheel and roster once (a second emf.net.channel of the same name replaces the first one's handlers; in a
+hosted game both ends share one Lua state); each end sets its handler (net.handle(name, "server"|"player", fn)).
+The server end's who(): the host's own messages come with the all-zero account -> world:account(from.player).
+is_admin(account, from): npc_admins (default OWNER_ACCOUNT) or EMF's admin (from.admin) or the host (from.is_local,
+F.hosts from on_player_joined p.host). The loader opens its parts with "/" (Windows takes it; the tests run on Linux).
+**FlameKit Native's mod.json "side": "both" (0.15.364) removed**: EMF compares side-both mods by exact version on
+join (a note for every player with another version; a server with mods_check=refuse kicks them); EMF_API.md says
+FlameKit leaves side unset on purpose. Unset = EMF loads it everywhere (reference.md). Tests: drive_harness 14 seeds
+identical, fight/heal/inv tests identical to 0.15.367, globals_check none, run.lua host + joined ALL PASSED (run.lua:
+travel/npcwheel/roster channels allowed, the companion parts copied into its data folder, a double registration
+fails). Local server 19:14:39: 16 features loaded, both ends' channels true, roster found again, no errors.
+Development 0.15.368 signed (sig good). G-Portal needs mods\flamekit_native too (the companion C++: drive, E offers,
+labels) and the FTP tool only writes into the FlameKit folder.
 
 ## How to build and publish a version
 
