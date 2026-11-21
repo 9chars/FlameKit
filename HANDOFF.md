@@ -1004,6 +1004,18 @@ same problem happens when i'm chopping down a tree and my inv is full"**: 0.15.4
 loose_loot logs new loose items within 10 m of a player's tool hit in the last 3 s that no break claims ("a loose item
 ... near player N's tool hit, no break"); his game restarted 17:04 (2 relay programs). Waiting: a full-bag chest take
 (another chest) and chopping with a full bag.
+17:16 "getting backpack full error": his game sent TransferItemToInventoryEvent type 2 (take all) with the chest
+3380350191 in sourceInventoryId or sourceSlotId.entityId; 17:15:57 5 loose items near his tool hits (a locked chest he
+broke open: no break claims them; logged only). 17:23 "the wood goes to the right back it looks like" (chopping with a
+full bag: Auto Loot companion took every drop). 17:25 "done": server PickupEvent from 3380350191 = the same entity
+number in his game and on the server. 0.15.410: features/chest_overflow.lua (his game: each take from a container ->
+channel flamekit/overflow {src, slot, all}; server 30 steps later: a loot container (RandomLoot or DestroyOnLoot,
+Inventory, not a player) within 8 m, Auto Loot bag/companion, a single take with no PickupEvent from that chest
+(within 90 steps) or a take all: the stacks still in it (that slot / all, no socketed gem) emf.take -> route.deliver
+"companion" from "chest" with opts no_ground + no_junk, back into the chest when nothing fits). core/loot_route.lua:
+opts { no_ground, no_junk }, no Loot line when nothing went anywhere. loot_drop's client listening off again
+(chest_overflow listens). Test flamekit_native/notes/tests/chest_overflow_test.lua; run.lua knows channel overflow.
+Restart 17:28 (18 features). A hosting game's own takes are not handled.
 
 ## How to build and publish a version
 
