@@ -42,12 +42,14 @@ end
 -- (owner 13:03: "make a button on the Experimental panel that just calls the players assigned pet") the Experimental
 -- panel asks for these rows (a TEMPORARY hook in experimental.lua) and sends clicks on "npc:" keys here
 function F.panel_rows(world)
-  return { { button = "npc:call", text = "Call my companion",
+  -- (0.15.360, owner 17:58 "Rename "Call my companion" to just "Call Companion" and get rid of one of the extra divider
+  -- lines below it, theres two in a row") the Experimental tab puts its own line after these rows
+  return { { button = "npc:call", text = "Call Companion",
     tooltip = "Brings your companion to you and has it follow you (put away or far away: it comes back next to you)." },
     { button = "npc:roster", text = "Companion Roster", same_line = true, disabled = not admin,
       tooltip = admin and "Opens or closes the Companion Roster window: every companion on this server, to rename, change, give, share or put away."
         or "Only the server's admins can use the Companion Roster." },
-    { separator = true } }
+  }
 end
 
 -- ---- the Companion Roster window (0.15.309, owner 2026-11-20 10:00) ----
@@ -156,7 +158,7 @@ function F.roster_rows(world)
     rows[#rows + 1] = { options = unshare, text = "Unshare...", same_line = true, disabled = #unshare == 0,
       tooltip = "That player can no longer command him." }
     rows[#rows + 1] = { button = "ros:main:" .. c.n, text = c.main and "Main companion" or "Set as main", selected = c.main,
-      disabled = c.main or c.o == "", tooltip = "His owner's main companion: the one Call my companion (P) brings." }
+      disabled = c.main or c.o == "", tooltip = "His owner's main companion: the one Call Companion (P) brings." }
     rows[#rows + 1] = { button = (c.out and "ros:away:" or "ros:back:") .. c.n, text = c.out and "Put away" or "Bring back",
       same_line = true, tooltip = c.out and "His body goes; he stays on the roster with his items." or
         "He comes back next to you, facing your way: a follower follows you, a stayer stays there." }

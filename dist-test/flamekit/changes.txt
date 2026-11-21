@@ -1,3 +1,6 @@
+0.15.360 Nov 20, 2026
+- Experimental tab: "Call my companion" is now "Call Companion", and the doubled divider line below it is gone.
+
 0.15.359 Nov 20, 2026
 - Experimental tab: the Companion Roster button is for the server's admins only (greyed out for everyone else); the server refuses roster changes from anyone else.
 
