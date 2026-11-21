@@ -90,6 +90,11 @@ local function player_name(acc)
 end
 
 function F.roster_rows(world)
+  -- (0.15.375, owner 2026-11-21 07:54 "if the game client isn't admin, why does it even try?") only an admin's game asks
+  -- the server for the roster: this runs every 10 steps for every player (the window's rows are kept ready even while
+  -- it is closed), and a game that was not an admin asked every 5 s and was refused every time. The server says who is
+  -- an admin ({op = "admin"}); until it does, nobody asks, and the first ask comes as soon as it says yes.
+  if not admin then return { { text = "Only the server's admins can use the Companion Roster.", color = "#ff9050" } } end
   local rows = {}
   -- (0.15.310, owner 10:47 "how do I add a new entry?") a new companion: a hound of yours, next to you, following you
   rows[#rows + 1] = { button = "ros:new:", text = "New companion",

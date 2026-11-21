@@ -695,6 +695,12 @@ WATCH (seen, not fixed): G-Portal pet Biggs (75332) "found again" then "drive 75
 beside her 19:59:53 at her base 6298 949 5188) and left 20:00:40.001; her position went 0.17 s earlier, so the drive
 stopped ("gone"). The body stayed there; the 20:41 reloads found it again and stopped again (owner away); the 04:11
 restart: "Biggs waits for its owner", spawned beside her when she joins (roster_joined / waiting).
+**Owner 07:52 "why is "the game" asking for that?" / 07:54 "lets do the fix but, if the game client isn't admin, why does
+it even try?"**: native_ui's write_ros builds the roster window's rows every 10 steps for every player (open or not);
+F.roster_rows asked {op="get"} every 5 s while it had no list, and a non-admin never gets one. 0.15.375: roster_rows
+returns only the refusal text unless the server said admin ({op="admin"}); the first ask comes once it says yes. Server:
+the refusal is logged once per account (F.denied_said). Test local_server/tests/rostui.lua (from /tmp, now in git):
+not an admin asks 0, an admin asks 1. Local server + Development; not Stable/G-Portal.
 
 ## How to build and publish a version
 
