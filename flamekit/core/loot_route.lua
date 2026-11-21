@@ -17,6 +17,7 @@
 
 local ground = require("core.ground_loot")
 
+local own_puts = require("core.own_puts")
 local route = {}
 
 route.CHOICES = { "bag", "companion", "ground", "game" }
@@ -104,6 +105,7 @@ function route.deliver(world, player, account, choice, item, count, level, rarit
   end
   local function bag_then(after)
     if left <= 0 or not player then after(world) return end
+    own_puts.note(player, item, left)  -- (0.15.388) the game reports it as a pickup from 0: the Loot tab has this line already
     local asked = pcall(emf.put, world, player, item, left, function(w, added)
       added = math.floor(tonumber(added) or 0)
       if added > 0 then r.bag = added left = left - added tally.bag = tally.bag + 1 end

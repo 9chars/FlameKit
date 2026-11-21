@@ -114,11 +114,17 @@ local function ev(by, from, item, count)
     position = "float3", targetSlotId = "InventorySlotId", timeStamp = 1 })
 end
 feed.pickup(W, ev(1, 777, 77, 3))
-feed.pickup(W, ev(1, 0, 78, 1))
+-- (0.15.388) from 0: straight into the bag (a pickaxe) is logged, FlameKit's own put (own_puts) is not
+local own_puts = require("core.own_puts")
+own_puts.note(1, 78, 2)
+feed.pickup(W, ev(1, 0, 78, 2))
+feed.pickup(W, ev(1, 0, 77, 4))
 flush()
-check(#lines(1, "loot") == 1 and #lines(2, "loot") == 1 and #lines(3, "loot") == 0, "a pickup: Ann and Bob near her, not Cid; crafting left out")
+check(#lines(1, "loot") == 2 and #lines(2, "loot") == 2 and #lines(3, "loot") == 0, "pickups: Ann and Bob near her, not Cid; FlameKit's own put left out")
 channel.on_player(W, {}, sent[1][1])
-check(notes[#notes][2] == "Ann: Iron Sword x3 > picked up", "a pickup line: " .. tostring(notes[#notes][2]))
+check(notes[#notes - 1][2] == "Ann: Iron Sword x3 > picked up", "a pickup line: " .. tostring(notes[#notes - 1][2]))
+check(notes[#notes][2] == "Ann: Iron Sword x4 > into bag", "a mined line: " .. tostring(notes[#notes][2]))
+check(own_puts.claim(1, 78, 1) == false, "a claimed put is forgotten")
 -- a companion's heal
 sent = {}
 values["0xa2"].others_battle = true

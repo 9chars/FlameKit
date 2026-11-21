@@ -21,6 +21,7 @@
 local players = require("core.players")
 local prefs = require("core.player_prefs")
 local route = require("core.loot_route")
+local own_puts = require("core.own_puts")
 
 local feed = {}
 
@@ -224,9 +225,12 @@ function feed.pickup(world, e)
     table.sort(f)
     emf.log("feed: pickup " .. table.concat(f, " "))
   end
-  if count <= 0 or from == 0 or item == 0 or not is_player(world, by) then return end
+  if count <= 0 or item == 0 or not is_player(world, by) or rawget(e, "hideInUi") == true then return end
+  -- (0.15.388, owner 12:53 "items you pick axe go straight to the bag ... I'd still like those logged") from 0: straight
+  -- into the bag (a pickaxe, test monster runes); FlameKit's own Auto Loot puts come the same way and have their line
+  if from == 0 and own_puts.claim(by, item, count) then return end
   local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
-    0, 0, "picked up")  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
+    0, 0, from == 0 and "into bag" or "picked up")  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
   local okp, x, _, z = pcall(world.position, world, by)
   for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end
