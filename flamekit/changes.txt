@@ -1,3 +1,6 @@
+0.15.387 Nov 21, 2026
+- Logging for Auto Loot of chopped and broken things: looks where the object stood (it is gone by the breaking hit), 30 m around. Server only: no game change.
+
 0.15.386 Nov 21, 2026
 - Loot tab: taking loot from a chest or a body by hand stopped the Battle and Loot tabs (an error); fixed. Server only: no game change.
 

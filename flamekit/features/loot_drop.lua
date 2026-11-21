@@ -350,8 +350,8 @@ end
 -- settings as well") logging first: what a player's hit on an object (a tree, a rock: no Faction) reports, and which
 -- loose pickups (PickupItem) appear within CHOP_R m of an object that broke, 1 s and 3 s after. At most CHOP_MAX lines a
 -- minute. Debug tool: kept, switched off by CHOP_LOG = false.
-local CHOP_LOG, CHOP_R, CHOP_MAX = true, 20, 40
-local chop = { said = 0, scans = {}, walk = nil, seen = {} }
+local CHOP_LOG, CHOP_R, CHOP_MAX = true, 30, 40  -- (0.15.387) 30 m: a falling trunk drops along its length
+local chop = { said = 0, scans = {}, walk = nil, seen = {}, last = {} }
 local function chop_note(fmt, ...)
   if chop.said < CHOP_MAX then chop.said = chop.said + 1 emf.log(string.format("loot drop: chop: " .. fmt, ...)) end
 end
@@ -362,6 +362,10 @@ local function chop_hit(world, hit)
   local player = route.player_of(world, hit.attacker)
   if not player then return end
   local x, y, z = world:position(target)
+  -- (0.15.387) the breaking hit comes when the object is already gone (no position, 12:49:18): its last hit's place,
+  -- else the player's
+  if x then chop.last[target] = { x, y, z, steps } elseif chop.last[target] then x, y, z = table.unpack(chop.last[target], 1, 3)
+  else x, y, z = world:position(player) end
   local d = get(world, "Destructible", target)
   chop_note("hit by %s on %s: %s damage, killed %s, Destructible %s, Health %s, at %s", tostring(hit.attacker), tostring(target),
     tostring(hit.amount), tostring(hit.killed), d and tostring(d.maxHealth) or "no", tostring(get(world, "Health", target) ~= nil),
@@ -372,7 +376,10 @@ local function chop_hit(world, hit)
   end
 end
 local function chop_tick(world)
-  if steps % 3600 == 0 then chop.said = 0 end
+  if steps % 3600 == 0 then
+    chop.said = 0
+    for id, l in pairs(chop.last) do if steps - l[4] > 3600 then chop.last[id] = nil end end
+  end
   if not chop.walk then
     local due = {}
     local keep = {}
