@@ -1,3 +1,285 @@
+0.15.368 Nov 20, 2026
+- Companions and pets are now part of FlameKit (they were on the local test server only): the wheel (E on your companion or pet), Call Companion (P), the Companions list in the wheel, the companion's chest, healing, name labels, and the admins' Companion Roster window. A dedicated server needs both FlameKit and FlameKit Native installed (the native part loads at the server's next restart). In a game you host, you are an admin; on a server, its EMF admins are too.
+- FlameKit Native no longer asks EMF to compare its version when a player joins (no "Missing mods for this server" note over a version difference).
+
+0.15.367 Nov 20, 2026
+- Companions (test, local server only): a name label no longer blinks out for a moment when another body with the same name goes away. Needs a server restart.
+
+0.15.366 Nov 20, 2026
+- Companions (test, local server only): the name labels over companions and on their chests are now set by FlameKit Native (C++), which can write every name's key exactly; 0.15.365's trailing spaces are gone. Renaming a companion now also updates the label of the one that is out. Needs a server restart.
+
+0.15.365 Nov 20, 2026
+- Companions (test, local server only): fixed: some names (like "Butt Sniffer") gave no label over the companion or on its chest (the game refused their key); every name works now. Server only: no game change.
+
+0.15.364 Nov 20, 2026
+- FlameKit Native: the companion system's C++ part (until now the separate test mod fk_server_probe) is inside flamekit_native.dll, which now also runs on a server. On a dedicated server only that part runs (no window, no updater). Its console test commands are now fkcomp.* (were fkprobe.*).
+
+0.15.363 Nov 20, 2026
+- Companions (test, local server only): a companion or pet gets its name as the game's name label when it spawns, the way its chest shows it (whether the game shows it over a creature is being tested). Server only: no game change.
+
+0.15.362 Nov 20, 2026
+- Companions (test, local server only): the companion code is split into 11 parts (features/companions/: follow, roster, inventory, wheel, fight, healing and attacks, console and test tools, ...) and renamed from "npc probe" to "companions" (its log lines now start with "companions:"). It works exactly as before (the same tests give the same results); nothing was removed. Server only: no game change.
+
+0.15.361 Nov 20, 2026
+- Companions (test, local server only): the detailed companion log lines (trail, slides, places, jumps, water, pets' prompts, the speed boost, fight details) only show with the companion debug log on (console: flamekit.npc debug on / off; off by default, remembered). Nothing was removed. The server probe follows the same switch (after a server restart). Server only: no game change.
+
+0.15.360 Nov 20, 2026
+- Experimental tab: "Call my companion" is now "Call Companion", and the doubled divider line below it is gone.
+
+0.15.359 Nov 20, 2026
+- Experimental tab: the Companion Roster button is for the server's admins only (greyed out for everyone else); the server refuses roster changes from anyone else.
+
+0.15.358 Nov 20, 2026
+- Companions (test, local server only): fixed: companion chests often had no name after a server start (the server dropped the names when the world's own names loaded); a lost name is now put back. Needs a server restart. Server only: no game change.
+
+0.15.357 Nov 20, 2026
+- Companions (test, local server only): a monster the companion could not reach is skipped for 10 s (was 20 s), and no longer at all once it comes within 6 m of you (a crab walked up and attacked while it was still skipped). Server only: no game change.
+
+0.15.356 Nov 20, 2026
+- Companions (test, local server only): a companion or pet that can't follow you while you swim comes back beside you in the water (it waited until you stood on land). Server only: no game change.
+
+0.15.355 Nov 20, 2026
+- Companions (test, local server only): small pets (cats, bunnies, birds, the turkey) start swimming in shallower water (0.25 m, was 0.5 m) and swim nearer the surface; the cat got stuck at the water's edge. Server only: no game change.
+
+0.15.354 Nov 20, 2026
+- Companions (test, local server only): pet speed boost, test B: found why the server froze (the boost was applied about 20 times per game step, so the pet's speed grew to infinity); now once per step and at most 10 m/s. Needs a server restart. Server only: no game change.
+
+0.15.353 Nov 20, 2026
+- Companions (test, local server only): test A for the pet speed boost (a pet more than 8 m behind you 1.6 times as fast): the boost again, without the log line from inside the game's step. Needs a server restart. Server only: no game change.
+
+0.15.352 Nov 20, 2026
+- Companions (test, local server only): the pet speed boost (0.15.351) taken out again: the server's game step stopped at the first boost. Needs a server restart. Server only: no game change.
+
+0.15.351 Nov 20, 2026
+- Companions (test, local server only): a pet more than 8 m behind you moves 1.6 times as fast until it catches up (animals have no sprint). Needs a server restart. Server only: no game change.
+
+0.15.350 Nov 20, 2026
+- Companions (test, local server only): fixed: since 0.15.349 companions and pets stopped following (an error in the new "near the player" check). Server only: no game change.
+
+0.15.349 Nov 20, 2026
+- Experimental tab, Debug: "Companion follow notices" (off by default). The companion notices about following (can't follow you, can't get up there, afraid to follow) only show with it on; they are for finding problems.
+- Companions (test, local server only): a companion within 6 m of you and level with you is never "can't follow" (one stood 1.6 m from its place and was respawned every 5 s while you stood still). Server part: no game change.
+
+0.15.348 Nov 20, 2026
+- Companions (test, local server only): 0.15.347 taken out again (the owner: zoning in does not need a fix); companions far away come back through "can't follow" as before. Server only: no game change.
+
+0.15.347 Nov 20, 2026
+- Companions (test, local server only): a companion or pet more than 80 m from you (for example after you log in somewhere else) comes back beside you at once, without the "Companion can't get up there!" notice. Server only: no game change.
+
+0.15.346 Nov 20, 2026
+- Companions (test, local server only): while a pet's chest is open, its E prompt says "Close" (it said "Talk"). Needs a server restart. Server only: no game change.
+
+0.15.345 Nov 20, 2026
+- Companion Roster: the baby animals are no longer in the Pets list (the game makes them tame, so they could be picked up, and they did not follow).
+- Companions (test, local server only): once a companion or pet has reached you, it stays where it stands while you are within 6 m of it, so you can walk up to it; further away it follows again. Changing a kind to a pet no longer says pets do not follow.
+
+0.15.344 Nov 20, 2026
+- Companions (test, local server only): a follower waiting behind another goes on once there is 3.5 m between them (it stopped and started several times a second at 2.5 m). Server only: no game change.
+
+0.15.343 Nov 20, 2026
+- Companions (test, local server only): several companions or pets keep more room: their places around you are farther out (2.5-5 m, at least 2.5 m apart), and while you run each one stays at least 2.5 m behind the one ahead. Server only: no game change.
+
+0.15.342 Nov 20, 2026
+- Companions (test, local server only): with several companions out, one standing at its place around you no longer counts as stuck (it said "Companion can't follow you!" and respawned every few seconds). Server only: no game change.
+
+0.15.341 Nov 20, 2026
+- Companions (test, local server only): a companion or pet that can't follow you while swimming is now brought back beside you, as on land (it only showed the notice). Server only: no game change.
+
+0.15.340 Nov 20, 2026
+- Companions (test, local server only): a "Companions" entry in every companion's and pet's wheel opens a wheel of all your companions and pets (name and kind); picking one brings it next to you, following you (one already out is moved to you). Server only: no game change.
+
+0.15.339 Nov 20, 2026
+- Companions (test, local server only): a pet dives all the way down with you (it was held about 3 m above you). Pets only. Server only: no game change.
+
+0.15.338 Nov 20, 2026
+- Companions (test, local server only): pets heal you like a companion in Healing mode, always: the same mana, heals, sparkle and notice (no shout, and they never heal themselves since they take no damage). Server only: no game change.
+
+0.15.337 Nov 20, 2026
+- Companions (test, local server only): a companion's heal costs 100 of his 800 mana (was 200): 8 heals from full, about one every 10 s over a long fight. Server only: no game change.
+
+0.15.336 Nov 20, 2026
+- Companions (test, local server only): Pet in a pet's wheel now says "Press E to pet <name>"; that E plays the game's petting, then his E is Talk again (the server can't start the petting by itself). Server only: no game change.
+
+0.15.335 Nov 20, 2026
+- Companions (test, local server only): pets get their own wheel (Follow me, Stay here, Pet, Inventory, Put away; no Attack). Pet is a try: the server starts the game's own petting for you. The chest name is watched in the log. Needs a server restart. Server only: no game change.
+
+0.15.334 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt gets an offer number like the game's own prompts (it had none, so the E press was not taken). Needs a server restart. Server only: no game change.
+
+0.15.333 Nov 20, 2026
+- Companions (test, local server only): the pet log also shows what can refuse an E press on the animal (its locks). Server only: no game change.
+
+0.15.332 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt is set as the animal's default action too (the game kept clearing it before an E press was handled). Needs a server restart. Server only: no game change.
+
+0.15.331 Nov 20, 2026
+- Companions (test, local server only): a pet's "Talk" prompt is also kept in place when the game checks the E press, so pressing it opens the companion wheel. Needs a server restart. Server only: no game change.
+
+0.15.330 Nov 20, 2026
+- Companions (test, local server only): a pet's E prompt ("Talk", opens the companion wheel) is now set by the server probe right before the game shows prompts, since the game turned the mod's prompt off again every step. Needs a server restart. Server only: no game change.
+
+0.15.329 Nov 20, 2026
+- Companions (test, local server only): pets are spawned wild again (the game's pick-up comes with tame animals); their E prompt is switched on by the mod and opens the companion wheel. Server only: no game change.
+
+0.15.328 Nov 20, 2026
+- Companions (test, local server only): our pets no longer get the game's "Pet" prompt and pick-up: their E is a plain "Talk" that opens the companion wheel. Server only: no game change.
+
+0.15.327 Nov 20, 2026
+- Companions (test, local server only): the pet log also shows the game's E offer on the animal (which action and word it shows), to take the game's pick-up and "Pet" off our pets. Server only: no game change.
+
+0.15.326 Nov 20, 2026
+- Companions (test, local server only): pets are spawned tame, so the game gives them its own "E Pet" prompt; pressing it opens the companion wheel (as E on a companion). Server only: no game change.
+
+0.15.325 Nov 20, 2026
+- Companions (test, local server only): fix: pets no longer shoot 10-30 m in a moment while catching up to you (animals cannot sprint: pets run at most). Needs the server probe from this version (next server start). Server only: no game change.
+
+0.15.324 Nov 20, 2026
+- Companions (test, local server only): fix: pets no longer jump around erratically while following (their follow target went through the animal's own spawn position, which the game also moves it by). Needs the server probe from this version (next server start). Server only: no game change.
+
+0.15.323 Nov 20, 2026
+- Companions (test, local server only): pets follow you with the same follow code as the companions (the animal's own AI is kept idle); they never fight and take no damage. Needs the server probe from this version (next server start). Server only: no game change.
+
+0.15.322 Nov 20, 2026
+- Companions (test, local server only): console "flamekit.npc petlog <entity> [seconds]" logs what an animal's own AI does (for making pets follow). Server only: no game change.
+
+0.15.321 Nov 20, 2026
+- Companions (test, local server only): fix: after fast travel or a glide every companion that followed you comes back (only your main one came, twice). Server only: no game change.
+
+0.15.320 Nov 20, 2026
+- Companions (test, local server only): fix: an extra follower picks a place next to you that is at least 1.5 m from the followers before him (his first place could be where another one already stood). Server only: no game change.
+
+0.15.319 Nov 20, 2026
+- Companions (test, local server only): the server log notes each follower's place next to the player when it changes (to find why two followers still stand together). Server only: no game change.
+
+0.15.318 Nov 20, 2026
+- Companions (test, local server only): fix for 0.15.317: the extra followers also take their own place when they are already close to you. Server only: no game change.
+
+0.15.317 Nov 20, 2026
+- Companions (test, local server only): fix for 0.15.316: the second and third followers really walk to their own place next to you (they still stopped together). Server only: no game change.
+
+0.15.316 Nov 20, 2026
+- Companions (test, local server only): fix: two or more companions following the same player no longer stand inside each other: they are spawned apart, and when they reach you the second, third ... each stop at their own place around you (left-behind, right-behind, behind ...). Server only: no game change.
+
+0.15.315 Nov 20, 2026
+- Companions (test, local server only): the companion's chest is put on the ground: the server looks for the ground at four places around him (his left first, then his right, behind him, in front) and takes the first one at about his height, not on top of another chest or down a drop. Needs the server probe from this version (next server start); before that it opens at his left at his height as before. Server only: no game change.
+
+0.15.314 Nov 20, 2026
+- Companions (test): the Pets section also has the flying bird.
+
+0.15.313 Nov 20, 2026
+- Companions (test): the Companion Roster's Kind list has a "Pets" section first: the game's dogs, cats, goats, bunnies, cat-deer, turkeys, desert birds, yaks, capybaras and their babies. A companion made a pet is spawned as that animal; pets do not follow or act yet (that comes next).
+
+0.15.312 Nov 20, 2026
+- Companions (test): fix: after a game restart the Companion Roster window (still open from before) stayed at "Asking the server for the roster"; it now asks the server by itself.
+
+0.15.311 Nov 20, 2026
+- Companions (test): "Bring back" in the Companion Roster brings him next to you (0.3 m to your right, facing your way): a follower follows you, a stayer stays at that new spot.
+
+0.15.310 Nov 20, 2026
+- Companions (test): the Companion Roster window has a "New companion" button at the top (a hound of yours, next to you, following you). Fix: the "Name" and "Kind" labels in the window were blank.
+
+0.15.309 Nov 20, 2026
+- Companions (test): a "Companion Roster" button next to "Call my companion" (Experimental tab) opens the new Companion Roster window: every companion on the server with his owner, kind, mode, items and chest. Rename him (type the new name in his name box, Enter), change his kind to any monster that is not a boss, give him to a player or share him (also offline players), set him as main, put him away or bring him back, delete him (two clicks).
+
+0.15.308 Nov 20, 2026
+- Companions (test, local server only): "roster delete" now refuses while the companion's chest is open or he still carries items (they would be lost); "roster away" closes his open chest first, his items kept. Server only: no game change.
+
+0.15.307 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 1.5 m to his left. Server only: no game change.
+
+0.15.306 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 1 m from him (was 2.5 m), still on the side away from you. Server only: no game change.
+
+0.15.305 Nov 20, 2026
+- Companions (test, local server only): the companion's chest now appears 2.5 m from him on the side away from you, no longer on top of you. Server only: no game change.
+
+0.15.304 Nov 20, 2026
+- Companions (test, local server only): the companion's chest is now the game's biggest storage chest (72 slots) instead of the 40-slot one. Server only: no game change.
+
+0.15.303 Nov 20, 2026
+- Companions (test, local server only): the server log notes when the owner opens the companion's chest (checks that the owner-only rule sees it). Server only: no game change.
+
+0.15.302 Nov 20, 2026
+- Companions (test, local server only): while his chest is open the companion is held in place for everyone, also while his owner is offline. Only the companion's owner can open his chest: when anyone else opens it, it closes at once and everything stays safe with the companion. Server only: no game change.
+
+0.15.301 Nov 20, 2026
+- Companions (test, local server only): fix: after logging off and back on with the companion's chest open, the "Inventory closed" notice goes to you again. Server only: no game change.
+
+0.15.300 Nov 20, 2026
+- Companions (test, local server only): the companion's chest no longer closes itself after 5 minutes; it stays open until you close it (he stays frozen next to it). Server only: no game change.
+
+0.15.299 Nov 20, 2026
+- Companions (test, local server only): console "flamekit.npc unlock <companion> <item> <n>" sets a gear piece's upgrades in the companion's record by hand (to repair the piece that lost its upgrade before 0.15.298). Server only: no game change.
+
+0.15.298 Nov 20, 2026
+- Companions (test, local server only): fix: gear upgrades (unlocked perks) are no longer lost when gear goes through the companion's chest; they are kept in his record and put back on the piece when the chest opens. Server only: no game change.
+
+0.15.297 Nov 20, 2026
+- Companions (test, local server only): the companion's chest shows his name floating over it, the way the game shows a name you give your own chest. Needs the server probe from this version (loads at the next server start); before that the chest opens without the name. Server only: no game change.
+
+0.15.296 Nov 20, 2026
+- Companions (test, local server only): "flamekit.npc names spawn <entity>" puts a test chest (gone after 60 s) next to the player carrying that entity's name, to see the game's floating name on a chest the mod made. Server only: no game change.
+
+0.15.295 Nov 20, 2026
+- Companions (test, local server only): new console command "flamekit.npc names" lists the game's own floating names (the names players give chests and altars); "names copy <from> <to>" puts one entity's name on another, to see if the companion's chest can carry a name. Server only: no game change.
+
+0.15.294 Nov 20, 2026
+- Companions (test, local server only): fix: the companion had no E prompt after his chest opened or closed (the game refused the new prompt in the same moment the old one was taken off); the new prompt is now made a moment later and retried until it is taken. Server only: no game change.
+
+0.15.293 Nov 20, 2026
+- Companions (test, local server only): fix: the companion's chest no longer saves its contents in the first second after filling, when a fresh gear piece can still read as level 0 and common; a crash in that moment could have saved it that way. Server only: no game change.
+
+0.15.292 Nov 20, 2026
+- Companions (test, local server only): while the companion's chest is open, E on the companion closes the chest at once (no wheel), and its prompt shows the game's door "Close" word (test: if it shows only "E", the word's id is wrong). Server only: no game change.
+
+0.15.291 Nov 20, 2026
+- Companions (test, local server only): while its chest is open the companion can no longer be pushed: it stays exactly where it stood when the chest opened. Server only: no game change.
+
+0.15.290 Nov 20, 2026
+- Companions (test, local server only): the server's log lists every gear piece in the companion's chest (level, quality, perks, gem, damage) when the chest is filled and when it closes, to check that gear comes back unchanged. Server only: no game change.
+
+0.15.289 Nov 20, 2026
+- Companions (test, local server only): when the companion dies with its chest open, the chest closes at once, keeping everything that was in it. Server only: no game change.
+
+0.15.288 Nov 20, 2026
+- Companions (test, local server only): while the companion's chest is open, "Call my companion" (P) is refused with "Close the chest first." Server only: no game change.
+
+0.15.287 Nov 20, 2026
+- Companions (test, local server only): the companion carries items for you. "Inventory" on its E wheel puts a large chest next to it with everything it carries; take out and put in what you like, then "Close Chest" (the only choice on its wheel while the chest is open) stores it all and the chest goes away. A chest left open closes itself after 5 minutes, keeping everything. While the chest is open the companion stays where it is and does nothing. Gear keeps its level and quality; a gem socketed into a weapon comes back as a separate gem next to the weapon. Server only: no game change.
+
+0.15.286 Nov 20, 2026
+- Companions (test, local server only): a fall safety net: when the companion falls more than 7.5 m below where it left the ground (a jump of yours it could not make), it is brought back beside you before it lands, so a missed jump no longer kills it. Server only: no game change.
+
+0.15.285 Nov 20, 2026
+- Companions (test, local server only): following rebuilt around your trail: the companion walks the way you walked, jumps where you jumped and steps up where you stepped up. When it can't follow, it is put back beside you at once and "Companion can't follow you!" shows for 5 seconds.
+- Companions (test): it keeps your pace: it walks, runs or sprints the way you did at each spot, and sprints whenever it is more than 6 m behind.
+- Companions (test): the E menu has an Attack menu: Passive (never fights), Defensive (fights once something attacks you or it), Aggressive (fights every monster within 20 m of you) and Healing (never fights, keeps you healed).
+- Companions (test): in a fight it picks the nearest monster it has a clear line to, turns to face it, runs in to lunge range (4 m) and attacks with the wolf's bite and lunge until the monster is dead, then picks the next one. When something blocks it or its attacks don't land, it hops, steps left, then right, and otherwise moves on to the next monster. It stays within 20 m of you, keeps following you while it looks for a target, and goes back to following when no monster is left. Setting Passive ends a fight at once; in Defensive, once attacked it fights every monster around you.
+- Companions (test): fast monsters such as bats: it waits at lunge range until they slow down; floating monsters: it jumps into a lunge. Only real monsters (with health) are targets.
+- Companions (test): armour: it takes a third of the damage it used to.
+- Companions (test): healing: it has its own 800 mana, refilling 10 a second. In Healing mode it keeps you at full health, then heals itself. In Defensive and Aggressive it heals itself in a fight when below 40 %, and heals you and itself to full once the fight is over. In Passive it slowly recovers its own health between fights. Each heal restores 25 % of the target's health (200 mana, at most every 4 s) with a Wolf Shout and the game's healing sparkle, and "Companion heals you for <number>!" shows in green. Server only: no game change.
+
+0.15.284 Nov 18, 2026
+- Fast travel: FlameKit's UI now hides 2 seconds later (5.3 s after you pick the destination instead of 3.3 s), so it stays up through the travel animation, and it stays hidden for the whole loading screen even when loading takes long. Server only: no game change.
+
+0.15.283 Nov 18, 2026
+- Fast travel: the minimap's old hide-until-you-move rule is removed; the minimap now hides and comes back only with the rest of FlameKit's UI.
+
+0.15.282 Nov 18, 2026
+- Fast travel: the minimap now comes back together with the rest of FlameKit's UI when loading ends, instead of only once you move.
+
+0.15.281 Nov 18, 2026
+- Fast travel: all of FlameKit's UI now hides during the travel animation and the loading screen, and comes back as soon as your game has loaded (the server's FlameKit tells your game when). Before, only the minimap hid, a little late.
+
+0.15.280 Nov 18, 2026
+- Invincible Mode keeps your air full under water too, so the drowning effect no longer shows. Server only: no game update.
+
+0.15.279 Nov 18, 2026
+- Companions (test): the companion's dot on the minimap now has the companion's name over it, in its owner's colour.
+
+0.15.278 Nov 18, 2026
+- Companions (test): the minimap shows each companion as a small dot in its owner's player colour, smaller than a player's mark and with no name; it is never taken for a player. Every status notice now also goes to the Messages window. The companion test controls are in the game: the P key calls your companion to your side, plus the wheel and the panel button.
+
 0.15.277 Nov 16, 2026
 - Fast Dive: the monster damage from the landing blast is back, exactly as in 0.15.274/0.15.275 (by crater size, fading with distance), at the owner's word. Server only: no game update.
 

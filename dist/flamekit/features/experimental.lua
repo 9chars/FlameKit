@@ -1745,6 +1745,25 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
         emf.log("experimental: mana cannot be kept full on this game version (" .. tostring(err) .. ")")
       end
     end
+    -- (0.15.280, owner 2026-11-18 12:11/12:14: with Invincible Mode on, under water "the oxygen level depletes and we get
+    -- the drowning effect on the screen") Invincible Mode keeps the air full too. EMF has no attribute name for air, so
+    -- the player's Oxygen data is written directly: dataStorage[1] = the air now, [2] = its maximum (measured on the
+    -- local server: "30 30 0 0 0 30" full, "0 30 0 0 0 30" drowning), and the game's leftover fraction
+    -- (DynamicOxygenState.accumulatedValue) back to 0.
+    if is_on(account, "immortal") and not glide.air_broken then
+      local ok, err = pcall(function()
+        local o = world:get("Oxygen", p.entity).dataStorage
+        local now, full = tonumber(o[1]), tonumber(o[2])
+        if now and full and full > 0 and now < full then
+          o[1] = full
+          pcall(function() world:get("DynamicOxygenState", p.entity).accumulatedValue = 0 end)
+        end
+      end)
+      if not ok then
+        glide.air_broken = true
+        emf.log("experimental: air cannot be kept full on this game version (" .. tostring(err) .. ")")
+      end
+    end
   end
 end
 
@@ -2310,6 +2329,11 @@ local function debug_rows(world, rows)
   rows[#rows + 1] = { button = "dbg:fakeboard", text = (fake and "On    " or "Off   ") .. "Test leaderboard data", selected = fake,
     tooltip = "Fills your PvP Leaderboard with made-up players (only in your game; the server's real board is not touched). "
       .. "Switch it off to see the real board again." }
+  -- (0.15.349, owner 2026-11-20 16:20) the companion "can't follow" notices: off by default (core/companion_notices)
+  local fn = require("core.companion_notices").on()
+  rows[#rows + 1] = { button = "dbg:fnotices", text = (fn and "On    " or "Off   ") .. "Companion follow notices", selected = fn,
+    tooltip = "Shows the companion notices about following (can't follow you, can't get up there, afraid to follow). "
+      .. "For finding problems; players do not need them." }
   local level = kit.debug_level(true)
   rows[#rows + 1] = { text = "FlameKit's log level (Ctrl+Shift+F12 in the game also switches it):" }
   for i, l in ipairs({ { "off", "Off", "Errors and warnings only" }, { "normal", "Normal", "Also what happens: windows, updates, clicks" },
@@ -2345,6 +2369,10 @@ local function panel_rows(world)
   local rows = {
     { color = "#ffb060", text = "Experimental: these bend the game's rules for you only. Every player has their own." },
   }
+  do  -- TEMPORARY (2026-11-17, owner: "make a button on the Experimental panel that just calls the players assigned pet")
+    local okp, extra = pcall(function() return require("features.npc_wheel_probe").panel_rows(world) end)
+    if okp and type(extra) == "table" then for _, r in ipairs(extra) do rows[#rows + 1] = r end end
+  end
   if not v then
     rows[#rows + 1] = { dim = true, text = (hosting(world) or peer() ~= 0) and "Asking the server..."
       or "This server does not run FlameKit (or not this version), so there is nothing to switch here." }
@@ -2547,6 +2575,7 @@ function F.minimap_waypoint(world, arg)
 end
 
 function F.click(world, key)
+  if key:sub(1, 4) == "npc:" then return pcall(function() require("features.npc_wheel_probe").click(world, key) end) end  -- TEMPORARY
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
   if key == "dbg:what:" .. RANDOM_KEY then duel_what = RANDOM_KEY return end
   local what = key:match("^dbg:what:([%x%-]+)$")
@@ -2574,6 +2603,11 @@ function F.click(world, key)
     else
       ask(msg)
     end
+    return
+  end
+  if key == "dbg:fnotices" then  -- (0.15.349) the companion follow notices; npc_wheel_probe tells the server
+    local cn = require("core.companion_notices")
+    cn.set(not cn.on())
     return
   end
   if key == "dbg:fakeboard" then
