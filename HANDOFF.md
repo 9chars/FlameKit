@@ -664,6 +664,11 @@ T3 Light, T4 The_Ancients, T5 Frost, T6 Shock; none at T7); db.pick takes the mo
 the two T7 gems and always Ring of Shock. Not in item_db at all: every shield (45, 2 of them legendary lore shields),
 Armor_T5-TX_*_Loot (15), Weapon_T7-TX_2H_GreatSwordEpic_Vorgoth (legendary). Enemy weapons, _Craft, T0, NPC/WIP
 cosmetics are left out on purpose. Some dump queries were capped at 50 names: a fresh finer dump would confirm.
+**Owner 20:24 "add the shields"**: 0.15.371 (server only, local server 20:26:07): 38 shields in db.GEAR.armor by tier
+(T1-T7 DPS/Rogue/Tank and _Loot, the two Lore shields; shields are category 1 = armour). Owner 20:24 on gems: "we've
+only seen two gem types ... look at it closer or explain how we can get those to drop". Explained: TIER_MAX_LEVEL puts
+level 50/75/100 in T7 (Armoring, HyperSpecialization), 1 and 25 give T4 FocusedLight; T5 ColdComposure (levels 30-36)
+and T6 Lycanthropy (37-42) are not reachable with the level buttons. Unfinished outfits = Vanity_TX_PartyHat_02/04_Tint_WIP.
 
 ## How to build and publish a version
 
