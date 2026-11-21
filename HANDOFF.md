@@ -964,6 +964,16 @@ Owner 15:36 "seems fine" (monsters with the DLL news: 11 bodies/piles 15:27-15:3
 taken). **Owner 15:37 "no wait on doing any major updates... the biggest problem is text wrapping around in the
 message windows now making it harder to read with the longer lines..."**: decision: no release for now (local server
 0.15.401; players and G-Portal 0.15.396). Next: the Messages window's long lines (options asked).
+**Owner 15:39 "shorten them if you can, but don't remove the player name in front of them... maybe also add a font
+size setting for each tab under the "Messages" section in the "Settings" tab? some of the monster names going into the
+text are just long" / 15:40 "get rid of the bold on the font maybe?"**: 0.15.402 (server only): Loot "Midevil: Legendary
+Runes x2 > Midevil's bag (Shroud Soldier 45)" (the source inside `where`, the last field empty so old games write no
+" from"), pickups "> Midevil's bag (picked up)", mined "> Midevil's bag"; Battle without " damage". 0.15.403 (DLL +
+mod.json): MessagesLayer lines in their own TextPainter, FW_NORMAL, size per tab from settings msg_size_chat /
+msg_size_battle / msg_size_loot (slider 9-28, default 13, group Messages), line height px + px/3 + 1; laid out again
+when the size changes. Not released: installed by hand in the owner's game (DLL c99abec9, renamed old .old_403) and
+the full Lua part 0.15.403 in his game, the local server and the work folder (the work folder had been stale: synced,
+md5 checked against the repo). His game needs a restart for the DLL.
 
 ## How to build and publish a version
 
