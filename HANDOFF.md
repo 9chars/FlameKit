@@ -974,6 +974,12 @@ msg_size_battle / msg_size_loot (slider 9-28, default 13, group Messages), line 
 when the size changes. Not released: installed by hand in the owner's game (DLL c99abec9, renamed old .old_403) and
 the full Lua part 0.15.403 in his game, the local server and the work folder (the work folder had been stale: synced,
 md5 checked against the repo). His game needs a restart for the DLL.
+**Owner 16:06 "I'm trying to loot something from a chest and its saying my back pack is full instead of pulling it into
+one of my companions chests... anyway to hook into that and move it over?"**: TransferItemToInventoryEvent (player,
+target inventory+slot, source inventory+slot, type One/Half/All/CustomAmount/Destroy, flags, amount) is the player's
+move between inventories. 0.15.404 (server only, local; restart 16:08 for the new event, his game restarted too with
+the 0.15.403 DLL): features/loot_drop.lua logs the first 30 ("loot drop: transfer: ...") and a second later the
+source's stacks ("transfer N a second later: ..."). Waiting: a chest take with a full bag.
 
 ## How to build and publish a version
 
