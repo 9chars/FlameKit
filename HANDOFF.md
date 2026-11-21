@@ -577,6 +577,7 @@ DLL goes to the server by copy and to players by the updater; a server-only C++ 
 {CustomPlayerString = {stringId = inv.name_key(name)}} (inv.write_names first; refused -> plain spawn), logs "roster:
 <n>: name label key on his body ...". Untested whether creatures show it. (#2, the name in the E word, needs a content
 mod's text table.) New check: python3 local_server/tests/globals_check.py (names read but never set in the bundle).
+**Owner 18:32 "yup it works perfect"** (the name label shows over companions and pets).
 
 ## How to build and publish a version
 
