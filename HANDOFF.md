@@ -932,6 +932,17 @@ updated (asked).
 walk(s), entities, ms in steps"). Known: EMF has no search by component or place, only world:entities(); a full
 synchronous walk with 4 checks per entity (flamekit.lootnear) took ~50 ms on the local server. Options told: merge the
 two walks into one shared core walk; or a C++ spawn hook in the DLL (no scanning; game update + server restart).
+**Owner 15:02 "seems like there was a lot of lag on the scan for dropped monster items when I was fighting them"**
+(14:32 data: kill -> bag ~2 s, the body filled ~1-2 s after the death; the drop walk ~15 steps). **15:04 "I say
+implement the DLL fix for this. the constant scanning is just not a good solution for that IMO" / 15:05 "eliminate any
+scanning for loot drops, monster body loot, chopping or axing... replace all that scanning with the DLL"** (decision).
+Research so far: init programs (flag 0x8, run on newly created entities, per batch; re_custom_programs.md):
+`pickup_item_setup` (write DestroyOnLoot, PickupItem: every new loose item) and `inventory_setup_init` (read
+Inventory, write InventorySetup: new containers: loot spots and piles); EMF C API hook_program(name, pre, post) wraps a
+program's update; the entities of a slice come from the job iterator (ENGINE_MAP: iter_begin 0x1409bab60, iter_next,
+current entity id: chunk+0x830 list after build 1273043). No C++ -> Lua bridge in EMF (the bus is Lua-only); candidate:
+setting_set("flamekit", key, text) from C++ fires Lua's emf.on_setting_changed. The body looks of loot_drop (3 looks of
+the one body) are not world scans.
 
 ## How to build and publish a version
 
