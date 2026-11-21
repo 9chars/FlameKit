@@ -844,6 +844,18 @@ into the bag (experimental) are not claimed: they show as "into bag" (wanted: lo
 Chop scan 12:54:23 (tree 95968): 26 pickups within 30 m, nearly all old world pickups (ids ~3.38e9 lying around,
 and others 18-44 m up); only 99403 (3.1 m, item 3509012331) looked new. A real chop loot needs "new since the break"
 (SpawnTime or a snapshot before), not distance alone.
+**Owner 13:00 "what? ask better questions. I only want to auto loot stuff that I mine or chop down with a pickaxe. if
+other items are on the ground already, just leave those alone. I'm not sure how much more clear I can be?" / 13:00 "a
+pickaxe or axe rather.."** (decision: only drops of objects broken with an axe or pickaxe; never items already lying
+there; my earlier yes/no restated what he had said: ask only what is really open). 0.15.389 (server only):
+features/chop_loot.lua: a hit with attack "tool" (EMF hit field) on an object (no Faction, no PlayerState) by a player:
+at the first hit every PickupItem within 30 m (and 30 m up/down) is noted (a walk, 3000 entities a step); after the
+breaking hit (killed) pickups not noted, not FlameKit's own (ground.is_own, new in core/ground_loot.lua: ids made by
+ground.drop, 5 minutes) and not taken before go through route.deliver (from "chopped") at 1, 3, 6, 10 s, by the
+player's Auto Loot ("bag"/"companion"; "ground"/"game": untouched). An object broken by its first hit: its at-once
+drops count as old (left). The chop logging moved there (LOG, "chop loot: ..."; debug, kept). Test:
+flamekit_native/notes/tests/chop_loot_test.lua. The Settings label of auto_loot ("Where a monster's loot goes when you
+kill it") is client text: changing it needs a client release (not done).
 
 ## How to build and publish a version
 
