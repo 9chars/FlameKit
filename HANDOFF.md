@@ -856,6 +856,17 @@ player's Auto Loot ("bag"/"companion"; "ground"/"game": untouched). An object br
 drops count as old (left). The chop logging moved there (LOG, "chop loot: ..."; debug, kept). Test:
 flamekit_native/notes/tests/chop_loot_test.lua. The Settings label of auto_loot ("Where a monster's loot goes when you
 kill it") is client text: changing it needs a client release (not done).
+**Owner 13:05 "you mean fix the wording of the setting? you don't actually say what you're asking"** (lesson: say what
+the question is about) / **13:07 "change it now, but theres also situations where you kill a monster and it dumps junk
+to the ground... when you kill a Shroud Fog Nest drone it just dumps the archiac essence directly to the ground...
+those types of loots also need to be auto looted....."**: 0.15.390 (Development release, client update: the label is
+client text): auto_loot label "Where loot goes: monsters you kill, things you chop or mine", help rewritten;
+features/chop_loot.lua renamed features/loose_loot.lua: also monsters (Faction, not a companion: route.player_of on the
+target) killed by the player or his companion, loose pickups within 8 m of the death (objects 30 m), Loot line with the
+monster's name. The snapshot is now every pickup in the world at the note (a walk that started after the first hit),
+so a monster moving between first hit and death cannot make old items look new. Nothing is noted for a player whose
+Auto Loot is ground/game. Old features/chop_loot.lua is still in the local server's mods folder (not loaded).
+Dev 0.15.390 with DLL b09e1d4b (0.15.377 build); the owner's game: "Update v0.15.390 is ready" 13:11.
 
 ## How to build and publish a version
 
