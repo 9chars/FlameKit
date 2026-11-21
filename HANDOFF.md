@@ -1976,6 +1976,13 @@ next restart (no yes for a restart yet).
    Development release 0.15.359 (sig good). **Owner 17:58: "Rename "Call my companion" to just "Call Companion" and get
    rid of one of the extra divider lines below it, theres two in a row..."**. 0.15.360: the button text; npc_wheel_
    probe.panel_rows no longer ends with a separator (experimental.lua adds its own).
+   Development release 0.15.360 (sig good). **Owner 18:07 "lets review for clean up then"**: review A-E given.
+   **Owner 18:11: "I'm afraid some of the clean up will make it harder to debug and fix future errors in the
+   companion/pet system we still have other templates to fix and I don't want to limit myself on that"** -> revised:
+   A detailed logs behind one server "companion debug log" switch (off by default, console toggle), nothing deleted;
+   B every test tool stays (own file); C split npc_probe.lua into modules + rename probe -> companions; D delete only
+   the 20 old probe DLL copies and 43 MB of fullrec dumps; E shorten HANDOFF keeping rules/decisions. **Owner 18:11 "go
+   ahead"**. Standing rule from this: debug tools are never removed, only switched off.
 3. ~~Teleport fallback~~ DONE (glider put-away/return, fast travel return, 2 s can't-follow respawn; owner 13:54,
    14:05). ~~Fast travel UI hide~~ DONE (0.15.281-0.15.284; owner 15:25 "we can cross that one off the list").
 4. ~~Ground under a glide path~~ DROPPED (owner 15:26: "whats the glide path? I dont think we need that one"). It was
