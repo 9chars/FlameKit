@@ -93,6 +93,9 @@ struct Settings {
     uint32_t party_vk = VK_F7;    // shows and hides the Party window (setting party_window_key, 0.15.81)
     uint32_t board_vk = VK_F5;    // shows and hides the PvP Leaderboard (setting board_window_key, 0.15.95)
     uint32_t messages_vk = VK_F8; // shows and hides the Messages window (setting messages_window_key, 0.15.123)
+    // (0.15.403, owner 2026-11-21 15:39 "add a font size setting for each tab under the "Messages" section in the
+    // "Settings" tab") the Messages window's letter height per tab: Chat, Battle, Loot (msg_size_chat/_battle/_loot)
+    int msg_px[3] = {13, 13, 13};
     int pointer_vk = VK_RMENU;    // held: the pointer for the pinned windows (setting pointer_key)
     bool pointer_toggle = false;  // pointer_toggle (0.15.79): one press shows the pointer, the next (or Esc) puts it away
     uint32_t zoom_in_vk = 0, zoom_out_vk = 0;
@@ -158,6 +161,9 @@ void read_settings() {
     s.party_vk = pwkey.empty() ? 0 : emf::keys::parse_key(std::wstring(pwkey.begin(), pwkey.end()));
     const std::string mkey = emf::setting_text(kKit, "messages_window_key", "F8");
     s.messages_vk = mkey.empty() ? 0 : emf::keys::parse_key(std::wstring(mkey.begin(), mkey.end()));
+    s.msg_px[0] = std::clamp(static_cast<int>(emf::setting_float(kKit, "msg_size_chat", 13.0) + 0.5), 9, 28);
+    s.msg_px[1] = std::clamp(static_cast<int>(emf::setting_float(kKit, "msg_size_battle", 13.0) + 0.5), 9, 28);
+    s.msg_px[2] = std::clamp(static_cast<int>(emf::setting_float(kKit, "msg_size_loot", 13.0) + 0.5), 9, 28);
     const std::string bkey = emf::setting_text(kKit, "board_window_key", "F5");
     s.board_vk = bkey.empty() ? 0 : emf::keys::parse_key(std::wstring(bkey.begin(), bkey.end()));
     // (0.15.190, owner: "bind any key to it that I want (including mouse buttons)") the pointer key is any key or
@@ -3415,7 +3421,20 @@ struct MessagesLayer : PinnedLayer {
     int shown_tab = -1;
     std::vector<std::pair<size_t, std::wstring>> lines;  // the wrapped lines of the shown messages (message index, text)
     uint64_t next_read = 0;
-    static constexpr int kLine = 18, kNew = 5, kAll = 10;
+    static constexpr int kNew = 5, kAll = 10;
+    // (0.15.403, owner 15:39 a font size per tab; 15:40 "get rid of the bold on the font maybe?") the lines' own letters:
+    // regular weight (the window's other text stays semibold), the tab's size from the Settings tab
+    TextPainter lines_text;
+    int lines_px = 0;   // the size the lines were laid out with (another size: laid out again)
+    int px_now() const { return settings().msg_px[std::clamp(tab, 0, 2)]; }
+    int line_h() const { return lines_px + lines_px / 3 + 1; }  // 13 px letters: 18, as before
+    TextPainter& lines_font() {
+        const int px = px_now();
+        if (lines_text.font_px == 0) lines_text.weight = FW_NORMAL;
+        lines_text.ready(g_screen, px);
+        lines_px = px;
+        return lines_text;
+    }
 
     // (0.15.105, owner: it holds the chat now) sized freely in both directions at its lower right corner: once the
     // player gave it a height it keeps that height and shows every kept message, scrolled to the newest (the mouse wheel
@@ -3560,7 +3579,7 @@ struct MessagesLayer : PinnedLayer {
             keyed = true;
             FK_LOG(fklog::kInfo, "messages window: %s (its key)", le.hidden ? "hidden" : "shown");
         }
-        bool counts = false;
+        bool counts = px_now() != lines_px;  // (0.15.403) the size changed in the Settings tab: laid out again
         if (f.now >= next_read) {
             next_read = f.now + 250;
             for (int i = 0; i < 3; ++i)
@@ -3589,15 +3608,17 @@ struct MessagesLayer : PinnedLayer {
         const Feed& fd = feeds[tab];
         for (size_t i : shown)  // each message wrapped to the width, words kept whole where they can be
             if (i < fd.all.size())
-                for (std::wstring& l : wrap_words(little, fd.all[i].text, width - 20)) lines.push_back({i, std::move(l)});
-        return std::max<int>(1, static_cast<int>(lines.size())) * kLine + static_cast<int>(shown.size()) * 2 + 4;
+                for (std::wstring& l : wrap_words(lines_font(), fd.all[i].text, width - 20)) lines.push_back({i, std::move(l)});
+        lines_font();
+        return std::max<int>(1, static_cast<int>(lines.size())) * line_h() + static_cast<int>(shown.size()) * 2 + 4;
     }
 
     void draw_content(int top, int width) override {
         int y = top;
         const Feed& fd = feeds[tab];
+        TextPainter& lt = lines_font();
         if (lines.empty())
-            little.draw(canvas, 10, y,
+            lt.draw(canvas, 10, y,
                         tab == 0 ? L"No messages yet"
                         : tab == 1 ? L"No battle lines yet (Settings tab, Messages: Battle messages)"
                                    : L"No loot lines yet (Settings tab, Auto Loot)",
@@ -3608,8 +3629,8 @@ struct MessagesLayer : PinnedLayer {
             const Msg& m = fd.all[i];
             if (i != last && last != static_cast<size_t>(-1)) y += 2;  // a little room between two messages
             last = i;
-            little.draw(canvas, 10, y, l, m.r, m.g, m.b);
-            y += kLine;
+            lt.draw(canvas, 10, y, l, m.r, m.g, m.b);
+            y += line_h();
         }
     }
 };
