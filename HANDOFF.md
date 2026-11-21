@@ -895,6 +895,10 @@ Offered: look for the spot from the first look (owner 13:53 "not sure what you'r
 plainly, open). **13:53 "the battle logging is wrong also Midevil heals Midevil for 18?"**: 149 such lines, ~1 a
 second in fights (healing hit, attacker = target = the player); source unknown. 0.15.395 (server only): the first 10
 self heals of a run logged whole ("feed: self heal ..."). Waiting for a fight.
+**Owner 13:59 "your code probably checks the body 3 times on purpose? so why would you change that? if theres nothing
+you can do to speed it up, so be it"**: decision: the 3 body looks stay as they are (no speed-up). (They are on
+purpose: 0.15.143 a body was still empty 0.5 s after the death and filled later.) Owner 13:57 on the self heal: "it
+could be a self heal I guess idk" (still waiting for the log).
 
 ## How to build and publish a version
 
