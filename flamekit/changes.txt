@@ -1,3 +1,6 @@
+0.15.371 Nov 20, 2026
+- Test monsters' Reward loot: shields can now be the legendary item (38 shields of tiers 1-7, the two legendary story shields included); they were never in the list. Server only: no game change.
+
 0.15.370 Nov 20, 2026
 - Test monsters: a new Team row (Free-for-all, 1, 2, 3, 4). Monsters of one team never fight each other and fight every other team (and players near them); Free-for-all fights everything, as before. Spawn Monsters now adds a group instead of replacing your monsters, so you can spawn one team, walk a bit away and spawn another. Spawn Dummy replaces only your dummy. Remove still clears them all.
 - Test monsters stand 3 m apart (was 2 m). The 1000 button is gone (Quantity goes up to 500).

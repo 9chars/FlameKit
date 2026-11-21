@@ -355,6 +355,10 @@ db.GEAR = {
       "Armor_T1_Warrior_DPS_Helmet_Loot",
       "Armor_T1_Warrior_DPS_Legs",
       "Armor_T1_Warrior_DPS_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T1_DPS",
+      "Shield_T1_DPS_Loot",
+      "Shield_T1_Lore_ShieldEpic_carpenter_hint06",
     },
     [2] = {
       "Armor_T2_Mage_BattleWand_Arms_Loot",
@@ -432,6 +436,12 @@ db.GEAR = {
       "Armor_T2_Warrior_Tank_Helmet_Loot",
       "Armor_T2_Warrior_Tank_Legs",
       "Armor_T2_Warrior_Tank_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T2_DPS",
+      "Shield_T2_DPS_Loot",
+      "Shield_T2_Lore_ShieldEpic_Ministory_17",
+      "Shield_T2_Tank",
+      "Shield_T2_Tank_Loot",
     },
     [3] = {
       "Armor_T3_Mage_BattleWand_Arms_Loot",
@@ -524,6 +534,13 @@ db.GEAR = {
       "Armor_T3_Warrior_Tank_Helmet_Loot",
       "Armor_T3_Warrior_Tank_Legs",
       "Armor_T3_Warrior_Tank_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T3_DPS",
+      "Shield_T3_DPS_Loot",
+      "Shield_T3_Rogue",
+      "Shield_T3_Rogue_Loot",
+      "Shield_T3_Tank",
+      "Shield_T3_Tank_Loot",
     },
     [4] = {
       "Armor_T4_Mage_BattleSword_Arms_Loot",
@@ -631,6 +648,13 @@ db.GEAR = {
       "Armor_T4_Warrior_Tank_Helmet_Loot",
       "Armor_T4_Warrior_Tank_Legs",
       "Armor_T4_Warrior_Tank_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T4_DPS",
+      "Shield_T4_DPS_Loot",
+      "Shield_T4_Rogue",
+      "Shield_T4_Rogue_Loot",
+      "Shield_T4_Tank",
+      "Shield_T4_Tank_Loot",
     },
     [5] = {
       "Armor_T5_Mage_BattleWand_Arms",
@@ -723,6 +747,13 @@ db.GEAR = {
       "Armor_T5_Warrior_Tank_Helmet_Loot",
       "Armor_T5_Warrior_Tank_Legs",
       "Armor_T5_Warrior_Tank_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T5_DPS",
+      "Shield_T5_DPS_Loot",
+      "Shield_T5_Rogue",
+      "Shield_T5_Rogue_Loot",
+      "Shield_T5_Tank",
+      "Shield_T5_Tank_Loot",
     },
     [6] = {
       "Armor_T6_Mage_Healer_Arms",
@@ -804,6 +835,13 @@ db.GEAR = {
       "Armor_T6_Warrior_Tank_Helmet_Loot",
       "Armor_T6_Warrior_Tank_Legs",
       "Armor_T6_Warrior_Tank_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T6_DPS",
+      "Shield_T6_DPS_Loot",
+      "Shield_T6_Rogue",
+      "Shield_T6_Rogue_Loot",
+      "Shield_T6_Tank",
+      "Shield_T6_Tank_Loot",
     },
     [7] = {
       "Armor_T7_Mage_Healer_Arms",
@@ -871,6 +909,13 @@ db.GEAR = {
       "Armor_T7_Warrior_Tank_Helmet_Loot",
       "Armor_T7_Warrior_Tank_Legs",
       "Armor_T7_Warrior_Tank_Legs_Loot",
+      -- (0.15.371, owner 2026-11-20 20:24 "add the shields") shields are armour in the game (category 1)
+      "Shield_T7_DPS",
+      "Shield_T7_DPS_Loot",
+      "Shield_T7_Rogue",
+      "Shield_T7_Rogue_Loot",
+      "Shield_T7_Tank",
+      "Shield_T7_Tank_Loot",
     },
   },
   ring = {
