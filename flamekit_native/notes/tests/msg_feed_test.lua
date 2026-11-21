@@ -95,7 +95,7 @@ flush()
 local la, lb, lc = lines(1, "loot"), lines(2, "loot"), lines(3, "loot")
 check(#la == 1 and #lb == 1 and #lc == 0, "a loot line for its player and players near")
 channel.on_player(W, {}, sent[1][1])
-check(notes[#notes][1] == "loot" and notes[#notes][2] == "Ann: legendary Iron Sword x2 (lvl 50) from Vukah(25) > bag", "the game writes it with the item's name: " .. tostring(notes[#notes][2]))
+check(notes[#notes][1] == "loot" and notes[#notes][2] == "Ann: legendary Iron Sword x2 (lvl 50) from Vukah(25) > into Ann's bag", "the game writes it with the item's name: " .. tostring(notes[#notes][2]))
 values["0xa2"].others_loot = false
 sent = {}
 feed.loot(W, { player = 1, item = 77, count = 1, junk = "delete", x = 0, z = 0 })
@@ -122,8 +122,8 @@ feed.pickup(W, ev(1, 0, 77, 4))
 flush()
 check(#lines(1, "loot") == 2 and #lines(2, "loot") == 2 and #lines(3, "loot") == 0, "pickups: Ann and Bob near her, not Cid; FlameKit's own put left out")
 channel.on_player(W, {}, sent[1][1])
-check(notes[#notes - 1][2] == "Ann: Iron Sword x3 > picked up", "a pickup line: " .. tostring(notes[#notes - 1][2]))
-check(notes[#notes][2] == "Ann: Iron Sword x4 > into bag", "a mined line: " .. tostring(notes[#notes][2]))
+check(notes[#notes - 1][2] == "Ann: Iron Sword x3 > picked up into Ann's bag", "a pickup line: " .. tostring(notes[#notes - 1][2]))
+check(notes[#notes][2] == "Ann: Iron Sword x4 > into Ann's bag", "a mined line: " .. tostring(notes[#notes][2]))
 check(own_puts.claim(1, 78, 1) == false, "a claimed put is forgotten")
 -- a companion's heal
 sent = {}

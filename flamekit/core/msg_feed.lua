@@ -214,15 +214,17 @@ end
 -- "L <colour>|<player name>|<item id>|<count>|<level>|<rarity>|<where>" (where: bag, companion name, ground, junk drop/delete)
 function feed.loot(world, r)
   if not (r and r.player) then return end
+  -- (0.15.401, owner 15:26 "it needs to say whos bag its going into") "into Midevil's bag", "into Poop Eater's bag"
   local where = {}
+  local function part(n, text) return text .. ((n ~= r.count) and (" (" .. n .. ")") or "") end
   if r.junk then where[#where + 1] = "junk " .. r.junk
   else
-    if (r.bag or 0) > 0 then where[#where + 1] = "bag" .. ((r.bag ~= r.count) and (" " .. r.bag) or "") end
-    if (r.companion or 0) > 0 then where[#where + 1] = (r.companion_name or "companion") .. ((r.companion ~= r.count) and (" " .. r.companion) or "") end
-    if (r.ground or 0) > 0 then where[#where + 1] = "ground" .. ((r.ground ~= r.count) and (" " .. r.ground) or "") end
+    if (r.bag or 0) > 0 then where[#where + 1] = part(r.bag, "into " .. name_of(world, r.player) .. "'s bag") end
+    if (r.companion or 0) > 0 then where[#where + 1] = part(r.companion, "into " .. (r.companion_name or "a companion") .. "'s bag") end
+    if (r.ground or 0) > 0 then where[#where + 1] = part(r.ground, "on the ground") end
   end
   local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|%s", r.junk and "a0a0a0" or "8cd2ff", (name_of(world, r.player):gsub("|", "/")),
-    tonumber(r.item) or 0, tonumber(r.count) or 0, tonumber(r.level) or 0, tonumber(r.rarity) or 0, table.concat(where, ", "),
+    tonumber(r.item) or 0, tonumber(r.count) or 0, tonumber(r.level) or 0, tonumber(r.rarity) or 0, (table.concat(where, ", "):gsub("|", "/")),
     ((r.from or ""):gsub("|", "/")))
   local x, z = r.x, r.z
   for _, pid in ipairs(recipients(world, "loot", { [r.player] = true }, x, z)) do queue(pid, "loot", line) end
@@ -251,7 +253,7 @@ function feed.pickup(world, e)
   -- into the bag (a pickaxe, test monster runes); FlameKit's own Auto Loot puts come the same way and have their line
   if from == 0 and own_puts.claim(by, item, count) then return end
   local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
-    0, 0, from == 0 and "into bag" or "picked up")  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
+    0, 0, (from == 0 and "into " or "picked up into ") .. (name_of(world, by):gsub("|", "/")) .. "'s bag")  -- (0.15.401) whose bag  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
   local okp, x, _, z = pcall(world.position, world, by)
   for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end
