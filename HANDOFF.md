@@ -634,6 +634,8 @@ flamekit_native/ (uploaded first; root mod.json still last). G-Portal 19:23: 29 
 NPCs. **G-Portal needs a restart**: "restart the game to receive InteractionAcceptedEvent" (the pets' E) and the DLL
 loads only at a start. After it: fetch the logs (upload with an empty outbox) and look for "[flamekit_native] on a
 dedicated server: only the companion part runs (loaded)".
+G-Portal restarted by the owner 19:25: 19:25:13 "[flamekit_native] on a dedicated server: only the companion part runs
+(loaded)", all hooks installed, 16 features, no errors; world loaded 19:25:40; the owner joined 19:26:59.
 
 ## How to build and publish a version
 
