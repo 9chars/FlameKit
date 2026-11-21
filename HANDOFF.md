@@ -707,6 +707,37 @@ the bag of whoever killed it"; 08:37 "i agree with the cap 72 stack limit.. that
 killed=true, attacker; a companion's kill counts for its owner) -> killer's bag -> killer's main companion's r.inv (cap
 72 stacks per companion; stackables merge first) -> ground; no killer known -> ground. Through a core module (Rule 0b).
 Roster save is one JSON text (1 MiB): the cap keeps it far below.
+**Owner 2026-11-21 09:35, the full spec (verbatim, replaces the 08:21-08:37 plan):**
+"The loot should go to the player (or their companion) who landed the final blow and killed the monster. The loot should
+go either into their main player bag, the bag of one of their companions, directly to the ground, or the original game
+behavior. There should be players setting to determine this looting behavior. Here are the player specific options to
+add: 1. Auto loot to main bag, or 2. Auto loot to companion bag, or 3. Let loot drop to ground, or 4. Follow original
+loot drop behavior. These settings can go into a "Auto Loot" section on the "Settings" tab ABOVE the "Features" section
+for now. We'll remove of the "Monsters drop their loot on the ground" setting on the "Server" tab and we'll remove the
+"Server" settings tab. If the player opts to have the loot go into one of their bags (main or companions) and the bag is
+full, it should default to one or the other, for instance: player opts for loot to go to companion, companions bags are
+full, try to put it in their main bag. If their main bag is full, try to put it into one of their companions bags. the
+player MUST have the companion spawned and following them for that companions bag to be considered for loot storage. If
+all the inventory bag destinations are full, it should simply be dropped to the ground. The loot MUST be evaluated by the
+auto junk list first before going to the player (or companions) to ensure the loot is processed in the way the player
+prefers (drop it, delete it, and other future possible behaviors built into that system).
+As a separate process of major changes, I would like to augment some major changes to the "Messages" window: I would like
+to replace the existing text box behavior with a tabbed control to this window. We'll add 3 tabs: Chat, Battle, Loot. All
+existing current messages will go to the new "Chat" tab. The "Battle" tab will display attack damage from both the
+monster to the player (or companion) and the damage from the player (or companion) to the monster. It should show this
+data for all players in the near vicinity of the player (or companion) -- 50 m radius? We should also move heal messages
+from the original messages text to the "Battle" tab. The "Companion heals you for..." messages should say which companion
+is healing you by name. There should be an option in the settings to filter out other players battle data messages. This
+setting should go under a new section in the "Settings" tab called "Messages". The "Loot" tab will output the loot dropped
+by monsters and the player (or companion) who received the loot. It should show this data for all players in the near
+vicinity of the player (or companion) -- 50 m radius? Messages from the auto loot system that were originally going to
+the messages text can be moved to this "Loot" tab. There should be an option in the settings to filter out other players
+loot data messages. This setting should go under a new section in the "Settings" tab called "Messages"."
+Facts found: Messages window = C++ MessagesLayer (flamekit_native.cpp ~3378) reading ui_messages.dat from kit.note; tabs
+need a DLL build. Only server setting = loot_to_ground (core/server_settings + features/server_tab go). Junk list:
+loot_filter/server.lua per account {names, opts.action drop|delete}: needs a core hook for loot_drop (Rule 0b). Heal
+line: companions 08_heal_attack say() -> features.chat.notice_to (a notice + Messages). Kill credit: emf.on_hit
+(killed, attacker). Questions asked 09:35 (defaults, transport volume for Battle, heal pop-up), not answered yet.
 
 ## How to build and publish a version
 
