@@ -645,6 +645,12 @@ travel step the new rule puts away, the old did not. Local 19:47:06, Development
 a Development/Stable publish always makes an update in every game (the release carries the companion Lua for hosted
 games); this one changes only Lua files (the DLL is the same). Say so up front next time a server-only fix is also
 asked for on dev/stable.
+**Test monsters, owner 20:07-20:12 (collecting changes before building):** "spawn multiple groups of monsters so they
+can both fight each other ... setting factions?" Proposed: a Team row (Free-for-all = HitAll as now, Team 1-4 =
+factions Vukah 3, Scavenger 4, Ancients 15, Drak 14: no friendly pairs among them; teams still fight players), each
+Spawn adds a group instead of replacing. Not yet answered: "a couple more changes first". 20:12 "can we space out the
+monsters a bit more?" (now SPOT_MIN 2 m hex grid; 3 m / 4 m offered, not picked yet). 20:12 "were going to remove the
+button option for 1000, so that can go away" (DUEL_COUNTS without 1000).
 
 ## How to build and publish a version
 
