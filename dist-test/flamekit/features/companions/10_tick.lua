@@ -25,6 +25,7 @@ function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()
   if t % 60 == 13 and next(roster.subs) then pcall(roster.ui_tick, world) end  -- (roster window) changes to its viewers
+  if inv.loot_dirty and t % inv.LOOT_SAVE == 0 then inv.loot_dirty = false pcall(roster_save) end  -- (0.15.376) Auto Loot
   if roster.petlog and t % 30 == 0 then pcall(roster.petlog_tick, world) end  -- (pets) the animal AI watched
   if next(roster.pet_mode) then pcall(roster.pet_mode_tick, world) end  -- (pets) a "Pet" from the wheel under way
   if #heal_fx_shown > 0 then  -- (healfx preview) effects go after 10 s

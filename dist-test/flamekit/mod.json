@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.375",
+  "version": "0.15.376",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -326,6 +326,33 @@
       "label": "Size (pixels)",
       "live": true,
       "group": "Minimap"
+    },
+    {
+      "key": "auto_loot",
+      "type": "select",
+      "default": "game",
+      "label": "Where a monster's loot goes when you kill it",
+      "live": true,
+      "group": "Auto Loot",
+      "options": [
+        {
+          "value": "bag",
+          "label": "Auto loot to main bag"
+        },
+        {
+          "value": "companion",
+          "label": "Auto loot to companion bag"
+        },
+        {
+          "value": "ground",
+          "label": "Let loot drop to ground"
+        },
+        {
+          "value": "game",
+          "label": "Follow original loot drop behavior"
+        }
+      ],
+      "help": "The monsters you kill (and those your companions kill) give their loot by this choice. Main bag: into your bag; when it is full, into a companion that is out and following you (your main companion first, 72 stacks each); then the ground. Companion bag: the other way round. Ground: beside the body. Original: the game's own (the body keeps it; press E). Your Auto Junk List comes first: junk is dropped or deleted as you set it there."
     }
   ]
 }

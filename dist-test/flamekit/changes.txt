@@ -1,3 +1,7 @@
+0.15.376 Nov 21, 2026
+- Auto Loot (Settings tab, above Features): where the loot of a monster you kill goes, your own choice: 1. into your main bag, 2. into a companion's bag, 3. on the ground, 4. the game's own way (the default: the body keeps it, press E). A kill by your companion or pet counts as yours. When the chosen bag is full the loot goes to the other one (a companion counts only while it is out and following you; your main companion first, at most 72 stacks each), then to the ground. Your Auto Junk List comes first: junk is dropped or deleted as you set it there.
+- The Server tab is gone, with its "Monsters drop their loot on the ground" (each player chooses now).
+
 0.15.375 Nov 21, 2026
 - Companion Roster: a game whose player is not an admin no longer asks the server for the roster (it asked every 5 seconds and was refused every time); the server logs a refusal once per player.
 
