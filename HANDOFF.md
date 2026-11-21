@@ -818,6 +818,10 @@ AnimationGraphResourceComponent2.animationGraph (77: the species); core/monster_
 sharing an arsenal get their shared words, e.g. Melee01..09 -> "Scavenger Melee"). msg_feed name_of: that name, else the
 faction's, then "(level)". **Owner 12:39 "its good enough for now. not worth the work of #2"**: option 1 stays; option 2
 (the game's own names through the DLL) is on the ideas list, not planned.
+**Owner 12:44 "loot that drops from chopping things down should also be automatically handled based on loot settings
+as well"**: 0.15.385 (server only) logging first (features/loot_drop.lua chop_hit/chop_tick, CHOP_LOG): a player's hit
+on an object (no Faction) is logged ("loot drop: chop: hit by ..."), and 1 s and 3 s after one breaks every new
+PickupItem within 20 m ("loot drop: chop: pickup ..."). Waiting: the owner's yes on the restated scope, and a chop.
 
 ## How to build and publish a version
 
