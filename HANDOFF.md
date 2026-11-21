@@ -701,6 +701,12 @@ F.roster_rows asked {op="get"} every 5 s while it had no list, and a non-admin n
 returns only the refusal text unless the server said admin ({op="admin"}); the first ask comes once it says yes. Server:
 the refusal is logged once per account (F.denied_said). Test local_server/tests/rostui.lua (from /tmp, now in git):
 not an admin asks 0, an admin asks 1. Local server + Development; not Stable/G-Portal.
+**Loot Drop rework, owner 2026-11-21 08:21-08:37 (designing, not built):** "trying to pick up loot from the ground is a bit
+cumbersome"; 08:27 "could the loot go directly into one of the players companions"; 08:29 "ideally the loot would go into
+the bag of whoever killed it"; 08:37 "i agree with the cap 72 stack limit.. thats per companion". Plan: killer (emf.on_hit
+killed=true, attacker; a companion's kill counts for its owner) -> killer's bag -> killer's main companion's r.inv (cap
+72 stacks per companion; stackables merge first) -> ground; no killer known -> ground. Through a core module (Rule 0b).
+Roster save is one JSON text (1 MiB): the cap keeps it far below.
 
 ## How to build and publish a version
 
