@@ -1,3 +1,19 @@
+0.15.374 Nov 20, 2026
+- Test monsters' Reward loot: more gear can be the legendary item: the Fog Nest and Hollow Hall dungeon weapons and Vorgoth's greatsword (level 43 and up), the multi-class Fog Powered and Skeleton armour sets, the tier 5 loot set and the Wards (tiers 1-7). Server only: no game change.
+
+0.15.373 Nov 20, 2026
+- Test monsters' Reward loot: the cosmetic can now be any of the game's 199 cosmetics (NPC outfits, event and Twitch drop sets included; before 105). Server only: no game change.
+
+0.15.372 Nov 20, 2026
+- Test monsters' Reward loot: a ring or gem is now any legendary one of the monster's tier or below, each equally likely. A level 50-100 kill can give all 5 legendary gems (Focused Light, Cold Composure, Lycanthropy, Armoring, Hyper Specialization) and all 5 legendary rings; before, it gave only Armoring or Hyper Specialization and always Ring of Shock. Server only: no game change.
+
+0.15.371 Nov 20, 2026
+- Test monsters' Reward loot: shields can now be the legendary item (38 shields of tiers 1-7, the two legendary story shields included); they were never in the list. Server only: no game change.
+
+0.15.370 Nov 20, 2026
+- Test monsters: a new Team row (Free-for-all, 1, 2, 3, 4). Monsters of one team never fight each other and fight every other team (and players near them); Free-for-all fights everything, as before. Spawn Monsters now adds a group instead of replacing your monsters, so you can spawn one team, walk a bit away and spawn another. Spawn Dummy replaces only your dummy. Remove still clears them all.
+- Test monsters stand 3 m apart (was 2 m). The 1000 button is gone (Quantity goes up to 500).
+
 0.15.369 Nov 20, 2026
 - Companions and pets: every fast travel now puts them away and brings them back beside you once you have landed, also a short one (before, only a jump of more than 50 m counted, so after a short fast travel they tried to walk to you and came back only 15-20 s later). Server only: no game change.
 

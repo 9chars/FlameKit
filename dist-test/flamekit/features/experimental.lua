@@ -2791,6 +2791,31 @@ function F.setup(k)
       for _, line in ipairs(loot_chest.describe(world, bag)) do emf.log("loot chest: " .. line) end
       emf.reply("chests: see emf_core.log")
     end, "the chests command"))
+  -- (0.15.372, owner 2026-11-20 20:30 "all cosmetics from the game data") a debug tool for item_db.lua: the debug name
+  -- of every item id in item_ids.txt beside FlameKit (a copy of a game's item_details.dat: "<hex id> ..." per line), into
+  -- item_names.txt as "<hex id>\t<name>\t<the rest of the line>" (the console's items command shows at most 50)
+  pcall(emf.command, "itemnames", "the debug names of the item ids in item_ids.txt, into item_names.txt (item_db.lua's source)",
+    kit.guard(F, function(world, args)
+      local f = io.open(emf.dir .. "\\item_ids.txt", "r")
+      if not f then emf.reply("itemnames: no item_ids.txt beside FlameKit") return end
+      local out, n, unnamed = {}, 0, 0
+      for line in f:lines() do
+        local hex, rest = line:match("^(%x+)%s*(.*)$")
+        if hex then
+          local okn, info = pcall(emf.item_info, tonumber(hex, 16))
+          local name = okn and type(info) == "table" and info.name or ""
+          if name == "" then unnamed = unnamed + 1 end
+          out[#out + 1] = hex .. "\t" .. name .. "\t" .. rest
+          n = n + 1
+        end
+      end
+      f:close()
+      local o = io.open(emf.dir .. "\\item_names.txt", "w")
+      if not o then emf.reply("itemnames: item_names.txt could not be written") return end
+      o:write(table.concat(out, "\n"), "\n")
+      o:close()
+      emf.reply(string.format("itemnames: %d item(s), %d without a name, in item_names.txt", n, unnamed))
+    end, "the itemnames command"))
   pcall(emf.command, "pvptest", "<player entity>|off: PvP on for that player (who cannot die meanwhile) and a duelist in front of them",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end
