@@ -594,6 +594,12 @@ empty"**: 18:49:02 "Butt Sniffer: the spawn with his name label was refused (str
 its FNV key 0xEF44E9F7E41EABBF >= 2^63 is negative as a Lua integer (EMF writes uint64 >= 2^63 only as floats).
 0.15.365: inv.label_text(name) = name + trailing spaces until the key is below 2^63 ("Butt Sniffer" + 2 spaces);
 inv.label_key; custom_names.txt holds the label texts; body and chest spawns use label_key.
+18:52:21 the label showed (key 0x7CAE4A3812554317). **Owner 18:53 "ummm make the C++ dll do it.. that sounds cleaner
+and better than spaces and what not" / 18:54 "the spaces is a hacky fix"**. 0.15.366: label_text/label_key removed;
+bodies and chests spawn with CustomPlayerString.stringId 0; inv.write_labels (F.tick every 30 ticks, when changed)
+writes labels.txt "<entity>\t<name>" for ent_of bodies and open chests; companions_server.cpp labels_tick (every 30
+steps): registers a missing name (into g_names_done, so the drop watch covers it) and writes stringId = fnv1a64(name)
+when it differs (log "labels: <id> gets the label ..."); a rename relabels the body that is out.
 
 ## How to build and publish a version
 

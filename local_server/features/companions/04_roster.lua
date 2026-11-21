@@ -60,24 +60,33 @@ function inv.name_key(text)
   for i = 1, #text do h = (h ~ text:byte(i)) * 0x100000001b3 end
   return h
 end
--- (owner 18:49 "now the label isn't showing at all after I renamed it": "Butt Sniffer" hashes to 0xEF44E9F7E41EABBF, at
--- or above 2^63: a Lua integer reads it as negative and EMF refused the spawn's stringId, "out of range (0 to 2^64 - 1)";
--- N1 and N2 were below 2^63 by luck) the label's text is the name with as many trailing spaces as it takes for its key
--- to be below 2^63 (half the texts are; the spaces do not show). Both the server's name table (custom_names.txt) and the
--- spawns use this text.
-function inv.label_text(name)
-  local t = name
-  for _ = 1, 24 do
-    if inv.name_key(t) >= 0 then return t end
-    t = t .. " "
-  end
-  return name
+-- (owner 18:49 "now the label isn't showing at all after I renamed it"; 18:53 "make the C++ dll do it.. that sounds
+-- cleaner and better than spaces and what not"; 18:54 "the spaces is a hacky fix") a name's key (FNV-1a 64) may be at
+-- or above 2^63 ("Butt Sniffer" 0xEF44E9F7E41EABBF), which Lua cannot hand to EMF (it refused the spawn: "out of range").
+-- So bodies and chests spawn with an empty label (stringId 0) and the C++ part writes the exact key: labels.txt beside
+-- FlameKit, a line "<entity>\t<name>" per body that is out and per open chest (inv.write_labels, every 30 ticks when it
+-- changes); the C++ registers the name in the server's table and sets CustomPlayerString.stringId (a rename relabels
+-- the body that is out the same way). 0.15.365's trailing spaces are gone.
+function inv.write_labels()
+  if not emf.dir then return end
+  local list = {}
+  for name, id in pairs(ent_of) do list[#list + 1] = tostring(id) .. "\t" .. name end
+  for name, o in pairs(inv.open) do if o.chest then list[#list + 1] = tostring(o.chest) .. "\t" .. name end end
+  table.sort(list)
+  local text = table.concat(list, "\n") .. "\n"
+  if text == inv.labels_text then return end
+  local f = io.open(emf.dir .. "\\labels.tmp", "w")
+  if not f then return end
+  f:write(text)
+  f:close()
+  os.remove(emf.dir .. "\\labels.txt")
+  os.rename(emf.dir .. "\\labels.tmp", emf.dir .. "\\labels.txt")
+  inv.labels_text = text
 end
-function inv.label_key(name) return inv.name_key(inv.label_text(name)) end
 function inv.write_names()
   if not emf.dir then return end
   local list = {}
-  for _, r in ipairs(roster.list) do list[#list + 1] = inv.label_text(r.name) end
+  for _, r in ipairs(roster.list) do list[#list + 1] = r.name end
   table.sort(list)
   local text = table.concat(list, "\n") .. "\n"
   if text == inv.names_text then return end
@@ -249,22 +258,13 @@ function spawn_body(world, r, x, y, z, player)
   -- (owner 14:20 "the 'pick up' option is still there") a pet is spawned wild again: the game's pick-up comes with its
   -- IsTame tag (0.15.326-0.15.328 spawned them tame), not with the offer; his E comes from the server probe instead.
   -- (owner 18:28 "anyway to float the companion/pets name above them?" / 18:29 "lets do #1 like how the chests show
-  -- it") the body gets the game's player-name label, as his chest: CustomPlayerString.stringId = FNV-1a 64 of his name
-  -- (the server probe keeps the names of custom_names.txt in the server's name table). Whether the game shows it over
-  -- a creature: untested.
+  -- it"; 18:32 "yup it works perfect") the body gets the game's player-name label, as his chest (CustomPlayerString)
   inv.write_names()
-  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, { CustomPlayerString = { stringId = inv.label_key(r.name) } })
+  -- (18:54) an empty label at the spawn: the C++ part writes his name's key (labels.txt, inv.write_labels)
+  local ok, id = pcall(emf.spawn, world, r.guid, x, y, z, { CustomPlayerString = { stringId = 0 } })
   if not (ok and id and id ~= 0) then  -- (as the chest) without the label rather than no body
-    log(string.format("roster: %s: the spawn with his name label was refused (%s): spawned without it", r.name, tostring(id)))
+    log(string.format("roster: %s: the spawn with a name label was refused (%s): spawned without it", r.name, tostring(id)))
     ok, id = pcall(emf.spawn, world, r.guid, x, y, z)
-  else
-    pcall(function()
-      local k = world:get("CustomPlayerString", id)
-      k = k and k.stringId
-      if type(k) ~= "number" and k then k = k.value end
-      log(string.format("roster: %s: name label key on his body %s (his name's 0x%016X)", r.name,
-        k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.label_key(r.name)))
-    end)
   end
   if not (ok and id and id ~= 0) then
     log(string.format("roster: %s could not be spawned (%s)", r.name, tostring(id)))

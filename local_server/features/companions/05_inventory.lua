@@ -268,18 +268,12 @@ end
 
 function inv.open_at(world, player, npc, rr, cx, y, cz)
   local px, _, pz = world:position(player)
-  local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz, { CustomPlayerString = { stringId = inv.label_key(rr.name) } })
+  -- (18:54) an empty label at the spawn: the C++ part writes his name's key (labels.txt, inv.write_labels)
+  local oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz, { CustomPlayerString = { stringId = 0 } })
   if not (oks and chest and chest ~= 0) then  -- (names) without the label rather than no chest
     log(string.format("inventory %s: the chest with his name label was refused (%s): spawned without it", rr.name, tostring(chest)))
     oks, chest = pcall(emf.spawn, world, inv.CHEST, cx, y, cz)
   end
-  pcall(function()  -- (owner 14:49 "it wasn't labeling the inventory chest with the pets name") the key at the spawn
-    local k = world:get("CustomPlayerString", chest)
-    k = k and k.stringId
-    if type(k) ~= "number" and k then k = k.value end
-    log(string.format("inventory %s: name label key right after the spawn %s (his name's 0x%016X)", rr.name,
-      k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.label_key(rr.name)))
-  end)
   if not (oks and chest and chest ~= 0) then
     log(string.format("inventory %s: the chest could not be spawned (%s)", rr.name, tostring(chest)))
     say(world, player, rr.name .. ": The chest could not be opened.")
@@ -378,7 +372,7 @@ function inv.tick(world)
             k = k and k.stringId
             if type(k) ~= "number" and k then k = k.value end
             log(string.format("inventory %s: name label key on the chest %s (his name's 0x%016X)", name,
-              k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.label_key(name)))
+              k == nil and "none" or (math.type(k) == "integer" and string.format("0x%016X", k) or tostring(k)), inv.name_key(name)))
           end)
         else
           c.busy = true

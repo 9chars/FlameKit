@@ -849,6 +849,57 @@ std::wstring flamekit_file(const wchar_t* name) {
     return s + L"\\flamekit\\" + name;
 }
 
+// ---- (owner 2026-11-20 18:53 "make the C++ dll do it.. that sounds cleaner and better than spaces and what not") the
+// name labels: a name's key may be at or above 2^63, which Lua cannot write (EMF refused the spawn, 18:49), so bodies
+// and chests spawn with stringId 0 and this writes the key: labels.txt beside FlameKit, "<entity>\t<name>" per line
+// (the Lua's inv.write_labels: the bodies that are out and the open chests). Every 30 steps: a name not in the server's
+// table is registered (and then watched as the others, g_names_done), and a body's CustomPlayerString.stringId that is
+// not his name's key gets it (so a rename relabels the body that is out too).
+std::map<uint32_t, std::string> g_labels;
+FILETIME g_labels_seen{};
+void labels_tick(emf::World w) {
+    if (w.tick() % 30 != 15) return;
+    static const std::wstring file = flamekit_file(L"labels.txt");
+    WIN32_FILE_ATTRIBUTE_DATA fa{};
+    if (GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &fa) && CompareFileTime(&fa.ftLastWriteTime, &g_labels_seen) != 0) {
+        if (FILE* f = _wfopen(file.c_str(), L"rb")) {
+            std::map<uint32_t, std::string> got;
+            char line[512];
+            while (std::fgets(line, sizeof line, f)) {
+                std::string l(line);
+                while (!l.empty() && (l.back() == '\n' || l.back() == '\r')) l.pop_back();
+                const size_t tab = l.find('\t');
+                if (tab == std::string::npos || tab + 1 >= l.size()) continue;
+                const uint32_t id = (uint32_t)std::strtoul(l.substr(0, tab).c_str(), nullptr, 10);
+                if (id) got[id] = l.substr(tab + 1);
+            }
+            std::fclose(f);
+            g_labels_seen = fa.ftLastWriteTime;
+            g_labels.swap(got);
+        }
+    }
+    if (g_labels.empty()) return;
+    auto* base = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* fnp = base + kSetStringRva;
+    void* sys = w.singleton("CustomPlayerStringsSystem");
+    if (!sys || std::memcmp(fnp, kSetStringStart, sizeof(kSetStringStart)) != 0) return;
+    for (const auto& [id, name] : g_labels) {
+        auto* c = w.get<emf::gen::ecs::CustomPlayerString>(id);
+        if (!c) continue;
+        const uint64_t key = fnv1a64(name);
+        if (c->stringId.value == key) continue;
+        if (name_known(sys, key) == 0) {
+            uint64_t k = 0;
+            set_string_guarded(reinterpret_cast<SetStringFn>(fnp), sys, name.data(), name.size(), &k);
+            g_names_done[name] = k;
+        }
+        const uint64_t was = c->stringId.value;
+        c->stringId.value = key;
+        EMF_LOG(kMod, "labels: %u gets the label '%s' (0x%016llX, was 0x%016llX)", id, name.c_str(), (unsigned long long)key,
+                (unsigned long long)was);
+    }
+}
+
 void names_tick(emf::World w) {
     const int64_t t = (int64_t)w.tick();
     if (t - g_names_tick < 30) return;
@@ -996,6 +1047,7 @@ bool fk_companions_load() {
     EMF_LOG(kMod, "pets: hook after locomotion_execution %s", boost ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) { drive_scan(w); });
     emf::on_tick([](emf::World w) { if (w.is_server()) names_tick(w); });  // (2026-11-20) companion chest names
+    emf::on_tick([](emf::World w) { if (w.is_server()) labels_tick(w); });  // (18:54) name labels: the exact keys
     emf::on_tick([](emf::World w) { if (w.is_server()) boost_report(w); });  // (17:00) the pet boost's log, test A
     emf::on_tick([](emf::World w) {  // (18:11) the companion debug log switch
         if (!w.is_server() || w.tick() % 120 != 0) return;

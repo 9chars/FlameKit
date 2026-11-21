@@ -139,6 +139,7 @@ function F.tick(world)
     if h.shim then pcall(roster.pet_flush, world, id, h) end  -- (pets) the drive's answer to the server probe
   end
   pcall(roster.pet_write)  -- (pets) the drive's inputs for the server probe
+  if t % 30 == 7 then pcall(inv.write_labels) end  -- (18:54) the name labels for the C++ part
   pcall(roster.pets_quiet, world)  -- (pets) their own AI kept idle
   for id, h in pairs(drives) do
     if h.go_away then
