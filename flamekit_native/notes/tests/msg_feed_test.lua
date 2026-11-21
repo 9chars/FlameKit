@@ -67,8 +67,8 @@ feed.hit(W, { attacker = 1, target = 700, amount = 1 })
 feed.hit(W, { attacker = 0, target = 1, amount = 9 })  -- no attacker
 flush()
 local a, b, c = lines(1, "battle"), lines(2, "battle"), lines(3, "battle")
-check(#a >= 2 and a[#a - 1]:find("Ann hit Vukah%(25%) for 120 damage %(crit%)") ~= nil, "Ann's own hit, with the monster's kind, level and crit: " .. tostring(a[#a - 1]))
-check(#b >= 1 and b[#b]:find("Vukah%(25%) hit Rex for 33 damage") ~= nil, "a hit on Bob's companion goes to Bob, the companion by name")
+check(#a >= 2 and a[#a - 1]:find("Ann hit Vukah%(25%) for 120 %(crit%)") ~= nil, "Ann's own hit, with the monster's kind, level and crit: " .. tostring(a[#a - 1]))
+check(#b >= 1 and b[#b]:find("Vukah%(25%) hit Rex for 33") ~= nil, "a hit on Bob's companion goes to Bob, the companion by name")
 check(#c == 0, "Cid (400 m away) sees neither")
 local objs = 0
 for _, l in ipairs(a) do if l:find("Creature") or l:find("something") then objs = objs + 1 end end
@@ -84,7 +84,7 @@ sent = {}
 for i = 1, 3000 do feed.hit(W, { attacker = 1, target = 500, amount = i }) end
 for _ = 1, 30 * 40 do feed.tick(W) end
 local got = lines(1, "battle")
-check(#got == 3000 and got[1]:find(" for 1 damage$") and got[3000]:find(" for 3000 damage$"), "3000 hits: all 3000 lines arrive, in order (" .. #got .. ")")
+check(#got == 3000 and got[1]:find(" for 1$") and got[3000]:find(" for 3000$"), "3000 hits: all 3000 lines arrive, in order (" .. #got .. ")")
 local most = 0
 for _, data in ipairs(sent[1]) do local m = emf.json.decode(data) local n = 0 for _, l in ipairs(m.lines) do n = n + #l + 4 end most = math.max(most, n) end
 check(most <= 15000, "no message over 15 KB (" .. most .. ")")
@@ -95,7 +95,7 @@ flush()
 local la, lb, lc = lines(1, "loot"), lines(2, "loot"), lines(3, "loot")
 check(#la == 1 and #lb == 1 and #lc == 0, "a loot line for its player and players near")
 channel.on_player(W, {}, sent[1][1])
-check(notes[#notes][1] == "loot" and notes[#notes][2] == "Ann: legendary Iron Sword x2 (lvl 50) from Vukah(25) > into Ann's bag", "the game writes it with the item's name: " .. tostring(notes[#notes][2]))
+check(notes[#notes][1] == "loot" and notes[#notes][2] == "Ann: legendary Iron Sword x2 (lvl 50) > Ann's bag (Vukah 25)", "the game writes it with the item's name: " .. tostring(notes[#notes][2]))
 values["0xa2"].others_loot = false
 sent = {}
 feed.loot(W, { player = 1, item = 77, count = 1, junk = "delete", x = 0, z = 0 })
@@ -122,8 +122,8 @@ feed.pickup(W, ev(1, 0, 77, 4))
 flush()
 check(#lines(1, "loot") == 2 and #lines(2, "loot") == 2 and #lines(3, "loot") == 0, "pickups: Ann and Bob near her, not Cid; FlameKit's own put left out")
 channel.on_player(W, {}, sent[1][1])
-check(notes[#notes - 1][2] == "Ann: Iron Sword x3 > picked up into Ann's bag", "a pickup line: " .. tostring(notes[#notes - 1][2]))
-check(notes[#notes][2] == "Ann: Iron Sword x4 > into Ann's bag", "a mined line: " .. tostring(notes[#notes][2]))
+check(notes[#notes - 1][2] == "Ann: Iron Sword x3 > Ann's bag (picked up)", "a pickup line: " .. tostring(notes[#notes - 1][2]))
+check(notes[#notes][2] == "Ann: Iron Sword x4 > Ann's bag", "a mined line: " .. tostring(notes[#notes][2]))
 check(own_puts.claim(1, 78, 1) == false, "a claimed put is forgotten")
 -- a companion's heal
 sent = {}

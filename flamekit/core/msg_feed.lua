@@ -190,7 +190,8 @@ function feed.hit(world, hit)
     text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), heal_target(world, a, t), math.abs(amount))
   else
     -- (0.15.381, owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?") spelled out
-    text = string.format("%s %s hit %s for %d damage%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
+    -- (0.15.402, owner 15:39 "shorten them if you can") no " damage"
+    text = string.format("%s %s hit %s for %d%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
       #flags > 0 and (" (" .. table.concat(flags, ", ") .. ")") or "")
   end
   local okp, x, _, z = pcall(world.position, world, t)
@@ -214,18 +215,22 @@ end
 -- "L <colour>|<player name>|<item id>|<count>|<level>|<rarity>|<where>" (where: bag, companion name, ground, junk drop/delete)
 function feed.loot(world, r)
   if not (r and r.player) then return end
-  -- (0.15.401, owner 15:26 "it needs to say whos bag its going into") "into Midevil's bag", "into Poop Eater's bag"
+  -- (0.15.401, owner 15:26 "it needs to say whos bag its going into") "Midevil's bag", "Poop Eater's bag"
+  -- (0.15.402, owner 15:39 "shorten them if you can, but don't remove the player name in front of them") the source
+  -- goes after the bag in brackets, sent inside `where` (the players' games write " from <source>" before the ">" when
+  -- the last field has text: it stays empty): "Midevil: Legendary Runes x2 > Midevil's bag (Shroud Soldier 45)"
   local where = {}
-  local function part(n, text) return text .. ((n ~= r.count) and (" (" .. n .. ")") or "") end
+  local function part(n, text) return text .. ((n ~= r.count) and (" " .. n) or "") end
   if r.junk then where[#where + 1] = "junk " .. r.junk
   else
-    if (r.bag or 0) > 0 then where[#where + 1] = part(r.bag, "into " .. name_of(world, r.player) .. "'s bag") end
-    if (r.companion or 0) > 0 then where[#where + 1] = part(r.companion, "into " .. (r.companion_name or "a companion") .. "'s bag") end
-    if (r.ground or 0) > 0 then where[#where + 1] = part(r.ground, "on the ground") end
+    if (r.bag or 0) > 0 then where[#where + 1] = part(r.bag, name_of(world, r.player) .. "'s bag") end
+    if (r.companion or 0) > 0 then where[#where + 1] = part(r.companion, (r.companion_name or "a companion") .. "'s bag") end
+    if (r.ground or 0) > 0 then where[#where + 1] = part(r.ground, "ground") end
   end
-  local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|%s", r.junk and "a0a0a0" or "8cd2ff", (name_of(world, r.player):gsub("|", "/")),
-    tonumber(r.item) or 0, tonumber(r.count) or 0, tonumber(r.level) or 0, tonumber(r.rarity) or 0, (table.concat(where, ", "):gsub("|", "/")),
-    ((r.from or ""):gsub("|", "/")))
+  local src = (r.from or ""):gsub("%((%d+)%)$", " %1")
+  local text = table.concat(where, ", ") .. (src ~= "" and (" (" .. src .. ")") or "")
+  local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", r.junk and "a0a0a0" or "8cd2ff", (name_of(world, r.player):gsub("|", "/")),
+    tonumber(r.item) or 0, tonumber(r.count) or 0, tonumber(r.level) or 0, tonumber(r.rarity) or 0, (text:gsub("|", "/")))
   local x, z = r.x, r.z
   for _, pid in ipairs(recipients(world, "loot", { [r.player] = true }, x, z)) do queue(pid, "loot", line) end
 end
@@ -253,7 +258,7 @@ function feed.pickup(world, e)
   -- into the bag (a pickaxe, test monster runes); FlameKit's own Auto Loot puts come the same way and have their line
   if from == 0 and own_puts.claim(by, item, count) then return end
   local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
-    0, 0, (from == 0 and "into " or "picked up into ") .. (name_of(world, by):gsub("|", "/")) .. "'s bag")  -- (0.15.401) whose bag  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
+    0, 0, (name_of(world, by):gsub("|", "/")) .. "'s bag" .. (from == 0 and "" or " (picked up)"))  -- (0.15.401/402) whose bag  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
   local okp, x, _, z = pcall(world.position, world, by)
   for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end

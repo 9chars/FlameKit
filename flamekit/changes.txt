@@ -1,3 +1,6 @@
+0.15.402 Nov 21, 2026
+- Messages window: shorter lines. Loot: "Midevil: Legendary Runes x2 > Midevil's bag (Shroud Soldier 45)"; Battle: "Midevil hit Shroud Soldier(45) for 2629 (weak spot, KILLED)". Server only: no game change.
+
 0.15.401 Nov 21, 2026
 - Loot tab: every line says whose bag the item went into ("> into Midevil's bag", "> into Poop Eater's bag", "> picked up into Midevil's bag"). Server only: no game change.
 
