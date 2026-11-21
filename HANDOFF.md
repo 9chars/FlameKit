@@ -980,6 +980,17 @@ target inventory+slot, source inventory+slot, type One/Half/All/CustomAmount/Des
 move between inventories. 0.15.404 (server only, local; restart 16:08 for the new event, his game restarted too with
 the 0.15.403 DLL): features/loot_drop.lua logs the first 30 ("loot drop: transfer: ...") and a second later the
 source's stacks ("transfer N a second later: ..."). Waiting: a chest take with a full bag.
+Owner 16:15 "done": no transfer line on the server at all (the refused take never reaches it). Owner 16:16 "it sounds
+like a lot, but sure": 0.15.405: core/game_events.on(name, fn, where) ("client" world too); loot_drop listens in the
+player's game for TransferItemToInventoryEvent and UiItemTriggerFailedEvent (client restart 16:18: "2 event relay
+program(s) added"). **16:19 "it opens a chest, but now its empty"**; 16:38 "the chest would be disappear if it was
+empty...."; at the chest (16:42): entity 3381135066, a RandomLoot chest (Inventory, InventorySetup, DefaultInventory,
+Health, RandomLoot, RandomLootLock, RandomLootPlayerScale, InventoryEmptyState, RemoveInteractionOnEmptyInventory,
+StaticCollider; no DestroyOnLoot) holding on the server Weapon_T6_2H_HammerEpic_01 and Weapon_T4_2H_Staff_02; his game
+shows it empty (also after zoning away). 16:44 "your DLL hook is doing something?"; 16:48 "I checked this chest earlier
+prior to your DLL hook" / "i didn't take the items". 16:49 "ugggh ok": 0.15.406 XFER_CLIENT = false (the client
+listening off), his game restarted 16:5x (no relay programs now). Next if still empty: the server with the old DLL
+(mods/flamekit_native/flamekit_native.dll.old = before the hooks).
 
 ## How to build and publish a version
 
