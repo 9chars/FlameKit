@@ -34,6 +34,8 @@ local queue = {}               -- deaths waiting: { id, at, look, x, y, z, t, cr
 -- (0.15.376) the killing blows: body id -> { player, at } (emf.on_hit, killed); read at the body's first look (the death
 -- event and the hit can come in either order), forgotten after a minute
 local kills = {}
+local dead = {}                -- (0.15.392) body id -> step of its death event (a second event for it is left out)
+local SPOT_TRIES = 4           -- (0.15.392) a body gone with no loot spot yet: looked for again, 1 s apart
 local retry = {}               -- (0.15.170) loot spots to look at again: { d, at }
 local bodies = {}              -- body id -> step to remove it at
 local steps = 0
@@ -69,6 +71,10 @@ local function died(world, e)
     return  -- this body is the test's: the normal Loot Drop leaves it alone
   end
   if test_tag.is(world, id) then return end  -- (0.15.156, owner) FlameKit's test monsters: their loot goes into chests
+  -- (0.15.392) the game can send one death twice (body 100463, 13:23:42.808 and .976): the second was handled as a death
+  -- without a killer (the first had used the killing blow up) and its loot spot was left to the game
+  if dead[id] and steps - dead[id] < 600 then return end
+  dead[id] = steps
   local okp, x, y, z = pcall(world.position, world, id)
   local t = spots.death_time(e)
   note("body %s died: queued (time %s)", tostring(id), tostring(t))
@@ -304,7 +310,16 @@ end
 local body_again  -- below (it uses handle)
 local function from_spot(world, d, again)
   local asked = spots.find(d.id, d.x, d.z, d.t, function(w, ids)
-    if #ids == 0 then note("body %s: no loot spot found", tostring(d.id)) tally.empty = tally.empty + 1 return end
+    if #ids == 0 then
+      -- (0.15.392, owner 13:29 "Critter carapace ... the item dropped, nothing picked it up": body 100463 was gone at its
+      -- first look, 0.5 s after the death, and its loot spot 106943 came later) no spot yet: looked for again, 1 s apart
+      d.spot_tries = (d.spot_tries or 0) + 1
+      if d.spot_tries <= SPOT_TRIES then
+        retry[#retry + 1] = { d = d, at = steps + 60, again = again }
+        return
+      end
+      note("body %s: no loot spot found", tostring(d.id)) tally.empty = tally.empty + 1 return
+    end
     for _, cid in ipairs(ids) do
       local stacks = bag.entity_stacks(w, cid)
       if #stacks == 0 and (again or 0) < 2 then  -- not filled yet: once more, a second later (the 2nd time: poked)
@@ -417,6 +432,7 @@ function F.tick(world)
   if steps % 3600 == 0 then diag = 0 end
   if steps % 600 == 0 then  -- (0.15.376) killing blows whose body never came to a look (a minute old)
     for id, k in pairs(kills) do if steps - k.at > 3600 then kills[id] = nil end end
+    for id, at in pairs(dead) do if steps - at > 600 then dead[id] = nil end end
   end
   if steps % 3600 == 0 and tally.bodies + tally.empty > 0 then
     local r = route.tally()  -- (0.15.376) where the stacks went

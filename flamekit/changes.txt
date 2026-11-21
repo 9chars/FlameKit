@@ -1,3 +1,6 @@
+0.15.392 Nov 21, 2026
+- Auto Loot: some monsters' loot was left on the ground (for example a critter's Critter Carapace): the loot pile they leave can come a moment after the body is gone, and the game sometimes reports one death twice. Both are handled now. Server only: no game change.
+
 0.15.391 Nov 21, 2026
 - Logging for Auto Loot of what monsters throw on the ground (what lies near each kill, and why it is left). Server only: no game change.
 
