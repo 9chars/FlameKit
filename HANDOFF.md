@@ -991,6 +991,13 @@ shows it empty (also after zoning away). 16:44 "your DLL hook is doing something
 prior to your DLL hook" / "i didn't take the items". 16:49 "ugggh ok": 0.15.406 XFER_CLIENT = false (the client
 listening off), his game restarted 16:5x (no relay programs now). Next if still empty: the server with the old DLL
 (mods/flamekit_native/flamekit_native.dll.old = before the hooks).
+16:53 "its still empty" (client listening off). 0.15.407: lootnear shows a RandomLoot chest's state: the chest (now
+entity 3381397210 after the restart) holds the hammer and staff, RandomLoot disabled false, lock isEmpty false,
+emptyState isEmpty false, version 0, playerCount 1. 16:54 server restarted on the old DLL (no hooks; the hooks DLL kept
+as flamekit_native.dll.hooks_400): 16:57 "nothing" (still empty) -> the DLL hook is not the cause. 0.15.408:
+XFER_SERVER = false (the server's TransferItemToInventoryEvent listening off), hooks DLL back (137dec07), restart 16:58:
+17:01 "empty still" -> none of today's additions is the cause. Owner 16:59 "just find a different chest or?": next a
+different chest. The full-bag-to-companion idea: the server never sees a refused take; both listenings stay off.
 
 ## How to build and publish a version
 
