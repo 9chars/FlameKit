@@ -1022,6 +1022,12 @@ as the earlier chest: both right after a take his full bag refused; a guess, not
 backup full error, but looks like loot went to the companions bag": take all from 3379825911 -> 7 Gold Coins to his
 bag, 2 stacks (rare Tribal Hammer, epic Amber Bow) to Poop Eater, Loot lines "(chest)". The game's own "backpack
 full" message stays (his game refuses before the server hears). Single take: not tested yet (owner looking for a chest).
+0.15.411 (server only, restart 17:50 with the owner's "sure"): loose_loot logs the server's InventoryFull event
+(fields pickedUpById, pickedUpFromId, mask; 24 bytes, it reaches Lua). 17:56 owner mining with a full bag ("getting
+back pack full"): one InventoryFull per pickaxe hit (about every 0.85 s), by 1, FROM 0, mask 16; no item, no count, no
+ground item, nothing else in the log. So a refused mined item has no entity to take it from (mined items come from 0
+= straight into the bag). The same minute a tool-broken object (3339977000) dropped items that went to Poop Eater
+(loose_loot works with a full bag).
 
 ## How to build and publish a version
 
