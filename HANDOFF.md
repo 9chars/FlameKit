@@ -867,6 +867,12 @@ monster's name. The snapshot is now every pickup in the world at the note (a wal
 so a monster moving between first hit and death cannot make old items look new. Nothing is noted for a player whose
 Auto Loot is ground/game. Old features/chop_loot.lua is still in the local server's mods folder (not loaded).
 Dev 0.15.390 with DLL b09e1d4b (0.15.377 build); the owner's game: "Update v0.15.390 is ready" 13:11.
+**Owner 13:15 "nothing is picking up the loot"**: his auto_loot was "game" (set 12:42). **13:19 "Critter carapace not auto
+looting" / 13:24 "killed more... more drops" / "not auto looted"**: 0.15.391 (server only) logs what lies near each kill.
+Found: every item left on the ground near the kills was FlameKit's own (ground.is_own) = his Auto Junk List "drop"
+entries (Corrosive Blood, Torn Cloth, Golden Steel Arrow, Aerated Banshee Gel: Loot tab "> junk drop"); Critter Carapace
+was "picked up" by hand once (from a container); the tree at 13:23 gave 2 drops (chop loot works, both junk-dropped).
+Asked the owner whether junk-list "drop" items should still go to the ground under Auto Loot.
 
 ## How to build and publish a version
 
