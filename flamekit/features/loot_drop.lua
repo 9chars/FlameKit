@@ -453,6 +453,7 @@ end
 function F.setup(k)
   kit = k
   prefs.setup()
+  require("core.loot_news").setup()  -- (0.15.399) the DLL's new containers: core/loot_spots.lua answers from them
   local okh, hooked = pcall(emf.on_hit, kit.guard(F, on_hit, "a hit"))
   if not (okh and hooked ~= false) then emf.log("loot drop: emf.on_hit is not there: no killer is known, every monster keeps its loot (the game's own way)") end
   local ok = pcall(emf.on_event, "EntityDiedEvent", kit.guard(F, died, "a death"), "server")

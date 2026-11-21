@@ -7342,6 +7342,7 @@ void updater_thread() { fklog::guarded("updater", updater_body); }
 }  // namespace
 
 bool fk_companions_load();  // companions_server.cpp (0.15.364): the companion system's server part
+bool fk_loot_news_load();   // loot_news.cpp (0.15.399): new loose items and containers to the Lua part, as events
 
 // (0.15.364, owner 2026-11-20 17:39 "lets get everything folded into one DLL") this DLL now also runs on a dedicated
 // server (mod.json side "both"). There only the companion part runs: no window, no updater (a server's FlameKit is
@@ -7361,6 +7362,8 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     if (dedicated_server_process()) {
         if (!emf::init(api)) return false;
         const bool ok = fk_companions_load();
+        const bool news = fk_loot_news_load();
+        FK_LOG(news ? fklog::kInfo : fklog::kWarn, "start: loot news %s", news ? "on" : "NOT on");
         FK_LOG(ok ? fklog::kInfo : fklog::kWarn, "start: on a dedicated server: only the companion part runs (%s)", ok ? "loaded" : "NOT loaded");
         EMF_LOG(kMod, "on a dedicated server: only the companion part runs (%s)", ok ? "loaded" : "NOT loaded");
         return true;
@@ -7428,6 +7431,7 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
     std::thread(ui_thread).detach();
     std::thread(monitor_thread).detach();
     // (0.15.364) the companion system's server part: it acts only on a world this game hosts
+    fk_loot_news_load();  // (0.15.399) a game that hosts: its server world
     const bool companions = fk_companions_load();
     FK_LOG(companions ? fklog::kInfo : fklog::kWarn, "start: the companion part %s", companions ? "loaded" : "NOT loaded");
     FK_LOG(fklog::kInfo, "start: loaded (the native part of FlameKit)");
