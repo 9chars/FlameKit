@@ -786,6 +786,11 @@ lines move to the Loot tab too ("Messages from the auto loot system ... can be m
 **Owner 10:24:** "#1 I think the 100 m radius is fine for now. I can bump it up or down depending on what I find. -- #2 It
 should go to the loot tab." 0.15.378: feed.RADIUS = 100 (core/msg_feed.lua, one constant); loot_filter/client.lua's
 "done" summary (Junk discarded/dropped) -> kit.note_tab("loot") (the info lines stay in Chat). run.lua reads ui_loot.dat.
+**Owner 11:53 "where are my pets? they didn't respawn and they're not following me?" / 11:54 "it took way too long for
+them to teleport to me, fix it" / 11:55 "yes"**: joined 11:51:51, both "follow again" 57 m away and 34 m lower, no trail
+(he had not moved) until 11:53:50. 0.15.379 (server only, local server): roster_joined marks the drive joined=true;
+drive_put_away at its first step with both positions: farther than JOIN_FAR = 20 m (3D) -> go_away "joined" (back
+beside him once on the ground, like a fast travel). Test local_server/tests/fight/joinfar_test.lua; drive harness same.
 
 ## How to build and publish a version
 

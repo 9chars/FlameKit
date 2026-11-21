@@ -1,3 +1,6 @@
+0.15.379 Nov 21, 2026
+- Companions and pets: when you join, those that are more than 20 m from you come straight back beside you once you stand on the ground (before, they stood where you left them until you moved, up to minutes). Server only: no game change.
+
 0.15.378 Nov 21, 2026
 - The Auto Junk List's lines ("Junk discarded: Twigs x3") are in the Messages window's Loot tab now, not in Chat.
 - Battle and Loot: other players' lines within 100 m of you (was 150 m).

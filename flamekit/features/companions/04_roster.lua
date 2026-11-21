@@ -343,7 +343,7 @@ function roster_joined(world, p)
     if r.out and r.mode == "follow" and r.owner == p.account then
       local ent = ent_of[r.name]
       if still_ours(world, ent) then
-        drives[ent] = { player = p.player, trail = {} }
+        drives[ent] = { player = p.player, trail = {}, joined = true }  -- (0.15.379) joined: see drive_put_away
         log(string.format("roster: %s follows %s again", r.name, tostring(p.player)))
       else
         waiting[r.name] = { player = p.player, tries = 0 }  -- spawned once his body is in the world
