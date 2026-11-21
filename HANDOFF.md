@@ -889,6 +889,12 @@ have no line found: asked which chop (open). **13:45 "dropped a ton of Critter C
 Inventory InventorySetup DefaultInventory DestroyOnLoot Faction SpawnTime StaticCollider (no DoNotSave, empty until
 opened); core/loot_spots.lua wanted DoNotSave. 0.15.394 (server only): DoNotSave or Faction (a world chest or urn, e.g.
 80693, has no Faction). Not yet seen working.
+**Owner 13:51 "looks like its picking them up now.. the logging of the items is a bit slow?"**: measured: a Loot line is
+on screen <1 s after the take; death -> take is 1.5-5 s (body looks 0.5/1.5/3 s, then the spot, opened, +0.5 s).
+Offered: look for the spot from the first look (owner 13:53 "not sure what you're saying honestly": asked again
+plainly, open). **13:53 "the battle logging is wrong also Midevil heals Midevil for 18?"**: 149 such lines, ~1 a
+second in fights (healing hit, attacker = target = the player); source unknown. 0.15.395 (server only): the first 10
+self heals of a run logged whole ("feed: self heal ..."). Waiting for a fight.
 
 ## How to build and publish a version
 
