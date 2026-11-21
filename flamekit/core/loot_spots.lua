@@ -67,6 +67,7 @@ end
 -- (0.15.399) each step: every question waiting is answered from the DLL's new containers (no walk)
 function M.tick(world)
   if not next(wanted) then return end
+  news.tick(world, true, true)  -- the newest news first
   local asked = wanted
   wanted = {}
   local okt, now = pcall(world.tick, world)

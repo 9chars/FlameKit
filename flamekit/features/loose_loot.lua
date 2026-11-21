@@ -14,8 +14,8 @@
 --
 -- (0.15.399, owner 15:05 "eliminate any scanning for loot drops ... replace all that scanning with the DLL") no walk of
 -- the world: FlameKit's DLL reports each loose item the moment the game makes it (core/loot_news.lua). A new loose item
--- within reach of something a player broke or killed in the last WINDOW_TICKS is its drop (the nearest one); it is
--- taken at once. Items that were there before are never reported, so they are never taken.
+-- (made at or after the break, within WINDOW_TICKS, within reach) is the drop of the nearest thing a player broke or
+-- killed; it is taken at once. The news are read only while a drop is awaited. Items that were there before are never reported, so they are never taken.
 -- Learned on the local server (2026-11-21 12:49-12:54): trees are entities with Health and no Faction; the breaking
 -- hit (killed) comes when the tree is gone (no position: the hit's own position is used).
 -- Uses only core modules (HANDOFF rule 0b).
@@ -103,7 +103,8 @@ local function on_pickup(world, id, x, y, z, now)
     if now - b.tick <= WINDOW_TICKS then
       keep[#keep + 1] = b
       local d = (x - b.x) ^ 2 + (z - b.z) ^ 2
-      if d <= b.r * b.r and math.abs(y - b.y) <= UP and (not best_d or d < best_d) then best, best_d = b, d end
+      -- made at or after the break (a step's slack: the hit and the drop can come in one step)
+      if now >= b.tick - 1 and d <= b.r * b.r and math.abs(y - b.y) <= UP and (not best_d or d < best_d) then best, best_d = b, d end
     end
   end
   broken = keep
@@ -124,6 +125,8 @@ end
 
 function F.tick(world)
   steps = steps + 1
+  if #broken > 0 and tick_of(world) - broken[#broken].tick > WINDOW_TICKS then broken = {} end
+  news.tick(world, #broken > 0)  -- (0.15.399) the DLL's news only while a drop is awaited
   if steps % 3600 == 0 then
     said = 0
     ground.forget_old()

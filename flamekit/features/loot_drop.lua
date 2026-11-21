@@ -363,6 +363,7 @@ end
 
 function F.tick(world)
   steps = steps + 1
+  pcall(require("core.loot_news").tick, world, #queue > 0 or #retry > 0)  -- (0.15.399) loot piles: news while a death waits
   pcall(spots.tick, world)
   pcall(pull_tick, world)  -- (0.15.178) bodies and spots opened into a receiving chest
   if #fx_shown > 0 then  -- (0.15.180) preview effects go after 10 s

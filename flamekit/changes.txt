@@ -1,3 +1,6 @@
+0.15.400 Nov 21, 2026
+- (0.15.399 continued) the DLL hands the new items and loot piles over in a small file (loot_news.txt) that FlameKit reads only in the seconds after a kill or a chop. Needs a server restart.
+
 0.15.399 Nov 21, 2026
 - Auto Loot without scanning the world: FlameKit's DLL now reports every new item on the ground and every new loot pile the moment the game makes it, and the Lua part takes what belongs to a kill or a chopped tree straight from that (the world is no longer searched over and over). Needs a server restart.
 

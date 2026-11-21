@@ -10,7 +10,7 @@ emf = { log = function() end, on_hit = function(fn) hit_fn = fn return true end,
   destroy = function(w, id) ents[id] = nil end, spawn = function() return 0 end }
 package.loaded["core.player_prefs"] = { setup = function() end, get = function() return choice end }
 package.loaded["core.msg_feed"] = { name = function(w, id) return "Drone(5)" end }
-package.loaded["core.loot_news"] = { setup = function() return true end, on_pickup = function(fn) pickup_fn = fn end }
+package.loaded["core.loot_news"] = { setup = function() return true end, tick = function() end, on_pickup = function(fn) pickup_fn = fn end }
 package.loaded["core.loot_route"] = { DEFAULT = "game",
   player_of = function(w, a) if a == 1 or a == 900 then return 1 end return nil end,
   deliver = function(w, p, acc, ch, item, count, l, r, x, y, z, g, b, from) delivered[#delivered + 1] = { ch = ch, item = item, from = from } end }
