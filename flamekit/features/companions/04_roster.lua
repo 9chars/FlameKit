@@ -41,7 +41,12 @@ players = require("core.players")
 OWNER_ACCOUNT = "0x485890b753e75ad1"  -- the server owner, the first admin
 admins = store.load("npc_admins", nil)
 if type(admins) ~= "table" then admins = { OWNER_ACCOUNT } store.save("npc_admins", admins) end
-function is_admin(account)
+-- (0.15.368, the release: other servers and hosted games) also an admin: EMF's own admins (the server's console, its
+-- [chat] admins, a user group that may kick and ban: from.admin) and the host of a hosted game (from.is_local, F.hosts)
+F.hosts = F.hosts or {}
+function is_admin(account, from)
+  if from and (from.admin == true or from.is_local == true) then return true end
+  if account and F.hosts[account] then return true end
   for _, a in ipairs(admins) do if a == account then return true end end
   return false
 end

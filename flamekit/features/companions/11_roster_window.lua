@@ -308,7 +308,7 @@ function roster.ui_do(world, from, data)
   if not pid then return end
   -- (owner 17:42 "I think the Companion Roster needs to be protected by admin rights"; 17:46 "yes": only admins use it,
   -- the server refuses everyone else; the game greys the button out from {op = "admin"} on npcwheel)
-  if not is_admin(from.account) then
+  if not is_admin(from.account, from) then
     roster.ui_send(world, pid, emf.json.encode({ op = "denied", text = "Only admins can use the Companion Roster." }))
     log(string.format("roster window: player %s is not an admin: %s refused", tostring(pid), tostring(m.op)))
     return

@@ -222,19 +222,17 @@ end
 
 function F.setup(k)
   kit = k
-  local ok = emf.net.channel(CHANNEL, { version = 1, to = "both", max = 1024, per_10s = 60,
-    on_player = function(world, from, data)
-      local okm, err = pcall(on_message, world, from, data)
-      if not okm then log("failed: " .. tostring(err)) end
-    end,
-    on_server = function() end })
+  -- (0.15.368) the channels are core/companion_net's: features/companions sets the server end of the same two
+  local net = require("core.companion_net")
+  local ok = net.handle(CHANNEL, "player", function(world, from, data)
+    local okm, err = pcall(on_message, world, from, data)
+    if not okm then log("failed: " .. tostring(err)) end
+  end)
   log("channel: " .. tostring(ok))
-  local okr = emf.net.channel(ROSTER, { version = 1, to = "both", max = 16384, per_10s = 60,
-    on_player = function(world, from, data)
-      local okm, err = pcall(on_roster, world, from, data)
-      if not okm then log("roster: failed: " .. tostring(err)) end
-    end,
-    on_server = function() end })
+  local okr = net.handle(ROSTER, "player", function(world, from, data)
+    local okm, err = pcall(on_roster, world, from, data)
+    if not okm then log("roster: failed: " .. tostring(err)) end
+  end)
   log("roster channel: " .. tostring(okr))
   -- (owner 2026-11-18 07:06: "a key binding on P and make that action call the companion") the same as the
   -- "Call my companion" button, on the client world

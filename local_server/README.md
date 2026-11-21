@@ -1,16 +1,12 @@
 # local_server
 
-The companion system as it runs on the owner's local test server (not published, not in any release). These files
-are the live copies from `<server folder>\emf\mods\flamekit\`:
-
-- `features/npc_probe.lua`: the companion system (roster, spawning, following drive, water, jumps, glider/teleport
-  put-away and return, the wheel's server side, test console commands).
-- `features/npc_fields.lua`: generated field list for npc_probe's full recorder (logging).
-- `main.lua`: the local server's own main.lua (lists `features.npc_probe` and not `features.npc_wheel_probe`).
-  Never overwrite the server's main.lua with the repository's; edit it in place.
-
-The C++ hook that goes with it is `../flamekit_server_probe/` (installed as `<server>\emf\mods\fk_server_probe\`).
-Whenever any of these change on the server, copy them here and commit (owner 2026-11-18 15:39: "get it into git").
+Since 0.15.368 (owner 2026-11-20 19:05: "the companion system and pets needs to get fully committed to both dev and
+stable") the companion system is part of the release: `flamekit/features/companions.lua` + `flamekit/features/companions/`
+(the server end), `flamekit/features/npc_fields.lua` (the full recorder's field list), `flamekit/features/npc_wheel_probe.lua`
+(the player's end), `flamekit/core/companion_net.lua` (their two channels, registered once) and the C++ part in
+`flamekit_native/src/companions_server.cpp`. The local test server runs the release's `flamekit` folder as it is
+(its own main.lua is gone). This folder only keeps the companion tests:
+`python3 local_server/tests/bundle.py` (the parts as one file), `globals_check.py`, `drive_harness.lua`, `fight/`.
 
 ## tests/drive_harness.lua
 

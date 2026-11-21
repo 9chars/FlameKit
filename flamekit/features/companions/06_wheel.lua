@@ -152,7 +152,7 @@ function on_pick(world, from, data)
       log(string.format("prefs: player %s (%s): follow notices %s", tostring(from.player), tostring(from.account), m.notices == true and "on" or "off"))
     end
     -- (owner 17:46) the answer: whether he is an admin (his game greys the Companion Roster button out otherwise)
-    pcall(emf.net.send_to, world, from.player, WHEEL, emf.json.encode({ op = "admin", admin = is_admin(from.account) }))
+    pcall(emf.net.send_to, world, from.player, WHEEL, emf.json.encode({ op = "admin", admin = is_admin(from.account, from) }))
     return
   end
   if not (okd and type(m) == "table" and m.op == "pick") then return end

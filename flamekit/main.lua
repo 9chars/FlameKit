@@ -23,7 +23,8 @@ kit.start({
   "features.leaderboard",     -- the PvP Leaderboard (kills and deaths between players)
   "features.loot_drop",       -- (0.15.142) monsters drop their loot on the ground (a Server tab setting)
   "features.travel_hide",     -- (0.15.281) FlameKit's UI hides during a fast travel (the server tells the game when)
-  "features.npc_wheel_probe",  -- companion test code (2026-11-17; in the release since 0.15.278; the local test server's
-                               -- main.lua leaves it out: its features.npc_probe owns the channel npcwheel there)
+  "features.npc_wheel_probe",  -- the companion system, the player's end: the wheel, the Companion Roster window (2026-11-17)
+  "features.companions",       -- the companion system, the server end (0.15.362; in the release since 0.15.368, owner
+                               -- 2026-11-20 19:05). Both share their channels through core/companion_net
   -- "features.my_next_feature",
 })

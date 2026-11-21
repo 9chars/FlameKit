@@ -5,6 +5,17 @@
 --           (Both halves run in this one Lua state; `side` says whose code is running, as emf.local_player() differs.)
 local MOD, TMP, MODE = arg[1], arg[2], arg[3] or "host"
 package.path = MOD .. "/?.lua;" .. MOD .. "/?/init.lua"
+-- (0.15.368) features/companions.lua loads its parts from emf.dir (the mod's folder in the game): copy them there
+do
+  local lfs = require("lfs")
+  lfs.mkdir(TMP .. "/features"); lfs.mkdir(TMP .. "/features/companions")
+  for name in lfs.dir(MOD .. "/features/companions") do
+    if name:match("%.lua$") then
+      local i = assert(io.open(MOD .. "/features/companions/" .. name, "rb")); local t = i:read("a"); i:close()
+      local o = assert(io.open(TMP .. "/features/companions/" .. name, "wb")); o:write(t); o:close()
+    end
+  end
+end
 local JOINED = MODE == "joined"
 
 local ITEMS = { Material_T1_Twigs = 0x11, Material_T1_Wood_Logs = 0x22, Weapon_T1_Sword = 0x33, Material_T1_Stone = 0x44,
@@ -213,7 +224,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" or name == "chat" or name == "board" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" then assert(def.to == "both") else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
+      if name == "map" or name == "party" or name == "chat" or name == "board" or name == "travel" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" or name == "npcwheel" or name == "roster" then assert(def.to == "both"); assert(not channels[name], "a channel registered twice: " .. name) else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true

@@ -50,25 +50,35 @@ function F.setup(k)
     if not oka then log("inventory: open check failed: " .. tostring(erra)) end
   end, "server")
   pcall(emf.on_player_joined, function(world, p)
-    log(string.format("join: player %s (account %s)", tostring(p.player), tostring(p.account)))
+    log(string.format("join: player %s (account %s)%s", tostring(p.player), tostring(p.account), p.host and " (the host)" or ""))
+    if p.host and p.account then F.hosts[p.account] = true end  -- (0.15.368) the host of a hosted game is an admin
     pcall(roster.ui_known, world)  -- (roster window) his name kept for when he is offline
     local okr, errr = pcall(roster_joined, world, p)
     if not okr then log("roster: join failed: " .. tostring(errr)) end
   end)
-  local okc = emf.net.channel(WHEEL, { version = 1, to = "both", max = 1024, per_10s = 60,
-    on_server = function(world, from, data)
-      local okw, errw = pcall(on_pick, world, from, data)
-      if not okw then log("wheel: " .. tostring(errw)) end
-    end,
-    on_player = function() end })
+  -- (0.15.368) the channels are core/companion_net's: features/npc_wheel_probe sets the player's end of the same two.
+  -- who(): in a game someone hosts, the host's own messages come with the all-zero account (EMF's docs): his real
+  -- one is his player's
+  local function who(world, from)
+    local w = {}
+    for k, v in pairs(from or {}) do w[k] = v end
+    if (not w.account or tostring(w.account):match("^0x0*$")) and w.player then
+      local oka, acc = pcall(world.account, world, w.player)
+      if oka and acc then w.account = acc end
+    end
+    return w
+  end
+  local net = require("core.companion_net")
+  local okc = net.handle(WHEEL, "server", function(world, from, data)
+    local okw, errw = pcall(function() return on_pick(world, who(world, from), data) end)
+    if not okw then log("wheel: " .. tostring(errw)) end
+  end)
   log("wheel channel: " .. tostring(okc))
   -- (owner 2026-11-20 10:00) the Companion Roster window in the players' games: their asks and actions come here
-  local okr = emf.net.channel(roster.RCH, { version = 1, to = "both", max = 16384, per_10s = 60,
-    on_server = function(world, from, data)
-      local oku, erru = pcall(roster.ui_do, world, from, data)
-      if not oku then log("roster window: " .. tostring(erru)) end
-    end,
-    on_player = function() end })
+  local okr = net.handle(roster.RCH, "server", function(world, from, data)
+    local oku, erru = pcall(function() return roster.ui_do(world, who(world, from), data) end)
+    if not oku then log("roster window: " .. tostring(erru)) end
+  end)
   log("roster window channel: " .. tostring(okr))
   -- the roster lives in the world's data. (loot_filter registers an empty one only to ask for the data; this one,
   -- registered later, does that too.) TODO for the release: one owner of the world data in FlameKit's core.

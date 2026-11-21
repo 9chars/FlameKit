@@ -21,7 +21,7 @@ for k, v in pairs(_G) do env[k] = v end  -- the standard names, looked up direct
 setmetatable(env, { __index = _G })
 local F
 for _, name in ipairs(PARTS) do
-  local path = emf.dir .. "\\features\\companions\\" .. name .. ".lua"
+  local path = emf.dir .. "/features/companions/" .. name .. ".lua"  -- (0.15.368) "/": Windows takes it too, and the tests run on Linux
   local chunk, err
   if load then
     local f = assert(io.open(path, "r"), "companions: cannot open " .. path)
