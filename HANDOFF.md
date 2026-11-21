@@ -957,6 +957,9 @@ core/loot_spots.lua: candidates = news containers within 4 m made in the last 20
 Tests: flamekit_native/notes/tests/loot_news_test.lua, loose_loot_test.lua. **Owner 15:24 "looks like its working
 quickly"**: 15:23 5 objects broken, 19 drops taken right after each break; fkloot.stats 1072 loose items, 631
 containers, 166 file writes (in ~3 min). Monster piles/drops not yet seen since the restart.
+**Owner 15:25 "when it says "into bag" it should say "into Poop Eater's bag"" / 15:26 "yes, it needs to say whos bag its
+going into"**: 0.15.401 (server only, local): feed.loot "> into <player>'s bag", "> into <companion>'s bag", "> on the
+ground" (a part: " (n)"); feed.pickup "> into <player>'s bag" (from 0: mined) and "> picked up into <player>'s bag".
 
 ## How to build and publish a version
 
