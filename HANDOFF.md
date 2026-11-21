@@ -899,6 +899,21 @@ self heals of a run logged whole ("feed: self heal ..."). Waiting for a fight.
 you can do to speed it up, so be it"**: decision: the 3 body looks stay as they are (no speed-up). (They are on
 purpose: 0.15.143 a body was still empty 0.5 s after the death and filled later.) Owner 13:57 on the self heal: "it
 could be a self heal I guess idk" (still waiting for the log).
+**Owner 14:07 "did you fuck up something on stable because users are reporting none of their UI's are working on the
+mod"**: nothing of mine had touched dist (0.15.374 since 11-20 20:40) or G-Portal (07:42 only a log fetch). Screenshot
+(14:14): FlameKit v0.15.374 window, tabs there, "..." in the tab = the DLL waits for the Lua part's rows (it never
+answers). G-Portal log (fetched 14:19, owner's yes): SuperB (0x05891a85470cffe2) joined with 13 mod channels on 11-20
+20:42/20:44, with 1 channel at every join today from 10:30 (owner 14 channels): his FlameKit Lua part mostly not
+loading since his first start after the 0.15.374 release (the held Lua part is put in place at that start: reading,
+not proven). Owner 14:15 "they tried rebooting their PC and the game.. same result.. I tested it with my computer and
+I'm not having that happen"; 14:17 "they're not capable of" sending logs; 14:19 "they were playing just fine last night
+with that version". The updater (DLL) re-downloads every listed file that differs on disk when a newer version comes.
+**Owner 14:22 "no committ all todays changes to development, and then push it to release" + "update G-portal" + "if his
+stuff is still broke I'll update him manually"**: 0.15.396 = Development and Stable (DLL b09e1d4b, the 0.15.377 build),
+G-Portal: 28 Lua files changed since 0.15.374 + flamekit_native/mod.json (no DLL); G-Portal reloaded 14:24:51, 17
+feature(s) loaded, no error (it reloaded every second while the files came in: loose_loot/msg_tabs missing in between).
+Old core/server_settings.lua and features/server_tab.lua are still on G-Portal (not loaded). The owner's game: "Update
+v0.15.396 is ready" 14:25. Not yet seen in a game: 0.15.390+ client part (owner's game had not restarted on it).
 
 ## How to build and publish a version
 
