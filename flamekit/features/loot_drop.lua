@@ -584,6 +584,14 @@ function F.setup(k)
               items[#items + 1] = string.format("%s x%s", tostring(st.item), tostring(st.count))
             end
             if pick then items[#items + 1] = string.format("pickup %s x%s", tostring(pick.itemId), tostring(pick.pickupAmount)) end
+            -- (0.15.407, owner 16:53 a random-loot chest shows empty in his game while it holds items here) its loot state
+            local function fld(c, k) local okf, v = pcall(function() local x = get(world, c, id) return x and x[k] end) return okf and v end
+            if get(world, "RandomLoot", id) then
+              items[#items + 1] = string.format("[RandomLoot disabled %s, lock isEmpty %s, emptyState isEmpty %s, version %s, players %s]",
+                tostring(fld("RandomLoot", "disableRandomLoot")), tostring(fld("RandomLootLock", "isEmpty")),
+                tostring(fld("InventoryEmptyState", "isEmpty")), tostring(fld("RandomLootContainer", "spawnedLootVersion")),
+                tostring(fld("RandomLootPlayerScale", "playerCount")))
+            end
             emf.log(string.format("lootnear: %s at %.1f m (%.1f up): %s | %s", tostring(id), math.sqrt((x - px) ^ 2 + (z - pz) ^ 2),
               y - py, table.concat(flags, " "), table.concat(items, ", ")))
           end
