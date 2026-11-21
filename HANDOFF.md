@@ -916,6 +916,8 @@ Old core/server_settings.lua and features/server_tab.lua are still on G-Portal (
 v0.15.396 is ready" 14:25. Not yet seen in a game: 0.15.390+ client part (owner's game had not restarted on it).
 **Owner 14:27 "looks like the update fixed his issue"**: SuperB's UI works again on 0.15.396 (the re-download of the
 files that differed repaired his install, as far as known).
+**Owner 14:32 "it was logging it, it was just delayed so I did not see it right away"**: the chop Loot lines (13:43
+question, the 13:33 tree) are there: closed. (Chop drops are looked for 1, 3, 6 and 10 s after the break.)
 
 ## How to build and publish a version
 
