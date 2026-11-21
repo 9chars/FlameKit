@@ -605,6 +605,10 @@ Sniffer' (0xEF44E9F7E41EABBF ...)"; 18:59:14 renamed to Poop Eater -> the same b
 rename fix"**. Seen 18:59:12: the name dropped from the table when a labelled body went away (the game takes back one
 claim per labelled entity; the watch re-registered it). 0.15.367 (built, installed with the next restart): labels_tick
 calls setString (one claim) for every label it writes.
+DLL 21452746 put in (old 9a69d355 .old_1900; loads at the next restart). **Owner 18:59 "appears to work".**
+**Owner 19:01: "yes push it to both development AND stable and update g-portal"**. Development 0.15.367 pushed (sig
+good). Stable and G-Portal: held for one question first (the release has no companion server code: features/companions
+is local_server only, so G-Portal and hosting players would get the buttons without companions).
 
 ## How to build and publish a version
 

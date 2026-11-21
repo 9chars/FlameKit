@@ -1,3 +1,24 @@
+0.15.367 Nov 20, 2026
+- Companions (test, local server only): a name label no longer blinks out for a moment when another body with the same name goes away. Needs a server restart.
+
+0.15.366 Nov 20, 2026
+- Companions (test, local server only): the name labels over companions and on their chests are now set by FlameKit Native (C++), which can write every name's key exactly; 0.15.365's trailing spaces are gone. Renaming a companion now also updates the label of the one that is out. Needs a server restart.
+
+0.15.365 Nov 20, 2026
+- Companions (test, local server only): fixed: some names (like "Butt Sniffer") gave no label over the companion or on its chest (the game refused their key); every name works now. Server only: no game change.
+
+0.15.364 Nov 20, 2026
+- FlameKit Native: the companion system's C++ part (until now the separate test mod fk_server_probe) is inside flamekit_native.dll, which now also runs on a server. On a dedicated server only that part runs (no window, no updater). Its console test commands are now fkcomp.* (were fkprobe.*).
+
+0.15.363 Nov 20, 2026
+- Companions (test, local server only): a companion or pet gets its name as the game's name label when it spawns, the way its chest shows it (whether the game shows it over a creature is being tested). Server only: no game change.
+
+0.15.362 Nov 20, 2026
+- Companions (test, local server only): the companion code is split into 11 parts (features/companions/: follow, roster, inventory, wheel, fight, healing and attacks, console and test tools, ...) and renamed from "npc probe" to "companions" (its log lines now start with "companions:"). It works exactly as before (the same tests give the same results); nothing was removed. Server only: no game change.
+
+0.15.361 Nov 20, 2026
+- Companions (test, local server only): the detailed companion log lines (trail, slides, places, jumps, water, pets' prompts, the speed boost, fight details) only show with the companion debug log on (console: flamekit.npc debug on / off; off by default, remembered). Nothing was removed. The server probe follows the same switch (after a server restart). Server only: no game change.
+
 0.15.360 Nov 20, 2026
 - Experimental tab: "Call my companion" is now "Call Companion", and the doubled divider line below it is gone.
 
