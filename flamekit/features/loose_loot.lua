@@ -35,7 +35,7 @@ local LOOKS = { 60, 180, 360, 600 }        -- steps after the break or death (1,
 local PER_STEP = 3000                      -- entities looked at a step (the production server has ~37,000)
 local FORGET = 3600 * 2                    -- a target hit but not broken or killed is forgotten after 2 minutes
 -- the logging of 0.15.385-389 (debug tool: kept, switched off): each first hit, break and drop taken
-local LOG, LOG_MAX = true, 40
+local LOG, LOG_MAX = true, 200
 
 local steps = 0
 -- target id -> { player, x, y, z, r, at, known = { pickup id = true } (the pickups there at the note) or nil,
@@ -117,7 +117,16 @@ end
 local function take(world, tid, t, found)
   local choice, acc = choice_of(world, t.player)
   if choice ~= "bag" and choice ~= "companion" then return end
+  local seen = 0
   for _, f in ipairs(found) do
+    if LOG and seen < 6 and (f.x - t.x) ^ 2 + (f.z - t.z) ^ 2 <= 20 * 20 then  -- (0.15.391) what lies near, and why it stays
+      seen = seen + 1
+      local p = get(world, "PickupItem", f.id)
+      note("%s %s look %d: pickup %s item %s x%s at %.1f m (%.1f up): known %s, taken %s, own %s", t.monster and "monster" or "object",
+        tostring(tid), t.looks, tostring(f.id), p and tostring(p.itemId) or "?", p and tostring(p.pickupAmount) or "?",
+        math.sqrt((f.x - t.x) ^ 2 + (f.z - t.z) ^ 2), f.y - t.y, tostring(t.known[f.id] == true), tostring(t.taken[f.id] == true),
+        tostring(ground.is_own(f.id)))
+    end
     if not t.known[f.id] and not t.taken[f.id] and near(t, f.x, f.y, f.z) and not ground.is_own(f.id) then
       t.taken[f.id] = true  -- never looked at again, whatever happens below
       local p = get(world, "PickupItem", f.id)
@@ -142,6 +151,8 @@ local function after_walk(world, w)
   for tid, t in pairs(targets) do
     if t.known == nil and t.asked and t.asked <= w.started then
       t.known = w.set
+      note("%s %s: noted %d step(s) after its first hit (walk began %d after)", t.monster and "monster" or "object", tostring(tid),
+        steps - t.at, w.started - t.asked)
     elseif t.known and t.broke and t.due and t.due <= w.started then
       t.due = nil
       t.looks = t.looks + 1

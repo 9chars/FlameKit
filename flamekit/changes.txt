@@ -1,3 +1,6 @@
+0.15.391 Nov 21, 2026
+- Logging for Auto Loot of what monsters throw on the ground (what lies near each kill, and why it is left). Server only: no game change.
+
 0.15.390 Nov 21, 2026
 - Auto Loot: what a monster you kill throws on the ground (for example a Shroud Fog Nest Drone's Archaic Essence) goes into your bag or your companions' bags too, by your Auto Loot setting. Items that were already lying on the ground are left alone.
 - Settings, Auto Loot: the setting now reads "Where loot goes: monsters you kill, things you chop or mine", and its help says what it covers.
