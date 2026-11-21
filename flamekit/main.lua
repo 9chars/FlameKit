@@ -14,7 +14,6 @@ kit.start({
   "features.minimap",
   "features.experimental",  -- its Debug section has the party's test players
   "features.settings",
-  "features.server_tab",     -- (0.15.142) the Server tab: settings for the whole server
   "features.party",         -- no tab of its own
   "features.native_ui",
   "features.server_save",

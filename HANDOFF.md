@@ -754,6 +754,19 @@ data can turn it on -- #6 ok I agree with you. #8 I like the new message count, 
 changing the current tab focus when a new message comes in." So: "Battle messages" switch, OFF by default (the server
 sends nothing then); radius = your own and your companions' at any distance, party members at any distance, everyone
 else within 100 m (Battle and Loot); unselected tabs show a new-line count, the selected tab never changes by itself.
+**0.15.376, Part 1 Auto Loot built:** core/loot_route.lua (deliver: junk hook first -> by choice bag/companion/ground
+with the fallbacks; hooks set_junk (loot_filter/server.lua: state/resolve/removable, opts.auto), set_owner +
+set_companion (companions 05_inventory inv.loot_owner / inv.loot_into: following the killer, main first, 72 stacks,
+open chest skipped, roster saved every 300 steps while dirty), set_report (for the Loot tab)); core/player_prefs.lua
+(channel flamekit/prefs to=server, the client sends {op=set,values} on change + every 30 s; the host's own values kept
+directly, prefs.get(account, key, world) matches him; no value = default "game"); features/settings.lua (groups Auto
+Loot and Messages are the tab's own, above Features; client_tick sends auto_loot); mod.json setting auto_loot (select
+bag/companion/ground/game, default game); loot_drop.lua: emf.on_hit killed -> kills[target] = route.player_of(attacker),
+read at the body's first look (killer_of), no killer or "game" = skip (the body keeps its loot), else every take goes
+to deliver (back into the body when even the ground refuses). Server tab + core/server_settings.lua removed (Rule 0n).
+Test monsters keep their own reward loot (experimental.lua). Tests: run.lua host + joined (Settings section, the game's
+own leaves the body alone, ground choice as before), flamekit_native/notes/tests/loot_route_test.lua (order, junk),
+local_server/tests/fight/autoloot_test.lua (companions), drive harness identical to 0.15.375.
 
 ## How to build and publish a version
 

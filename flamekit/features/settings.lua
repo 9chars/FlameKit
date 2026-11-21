@@ -1,6 +1,6 @@
 -- features/settings.lua: the Settings tab of FlameKit's window (F4), and the settings rows other tabs show.
 --
--- The Settings tab has FlameKit's own settings only (groups "FlameKit" and "FlameKit label") and the switch that turns
+-- The Settings tab has FlameKit's own settings only (groups "FlameKit", "FlameKit label", "Auto Loot", "Messages") and the switch that turns
 -- each feature on or off (a feature switched off has no tab). Every other setting belongs to its feature and is shown
 -- in that feature's tab: F.rows(keys) gives the rows for a list of setting keys, with keys "set:..."; the feature's
 -- click hands a "set:..." click to F.click without the prefix (the Minimap tab does; the Auto Junk List's own view
@@ -15,6 +15,8 @@
 --   keybind  "<label>: <key>", then Change (the next key pressed in FlameKit's window: FlameKit's DLL sends it as
 --            "key <name>" through ui_actions.txt), No key and Default
 --   text     not shown (map_hide is set by the Minimap tab's marker filters)
+
+local prefs = require("core.player_prefs")
 
 local F = { id = "settings", title = "Settings" }
 
@@ -58,8 +60,11 @@ local function set(s, v)
 end
 
 -- The settings of the Settings tab itself: FlameKit's own groups, and the features' on/off switches.
+-- (0.15.376, owner 2026-11-21 09:35) the Auto Loot section ("on the "Settings" tab ABOVE the "Features" section");
+-- later the Messages section
+local OWN_GROUPS = { ["FlameKit"] = true, ["FlameKit label"] = true, ["Auto Loot"] = true, ["Messages"] = true }
 local function own(s)
-  if s.group == "FlameKit" or s.group == "FlameKit label" then return true end
+  if OWN_GROUPS[s.group] then return true end
   for _, f in ipairs(kit.features) do
     if f.enabled_setting == s.key then return true end
   end
@@ -150,7 +155,7 @@ function F.panel(world)
   local group, features = nil, {}
   for _, s in ipairs(list) do
     if own(s) then
-      local is_feature = s.group ~= "FlameKit" and s.group ~= "FlameKit label"
+      local is_feature = not OWN_GROUPS[s.group]
       if is_feature then
         features[#features + 1] = s
       else
@@ -222,8 +227,14 @@ function F.key(world, name)
   set(s, name)
 end
 
+-- (0.15.376) the choices the server needs (core/player_prefs.lua): sent when one changes and every 30 s
+function F.client_tick(world)
+  prefs.client_tick(world, { auto_loot = kit.setting("auto_loot", "game") }, kit.is_host())
+end
+
 function F.setup(k)
   kit = k
+  prefs.setup()
 end
 
 return F

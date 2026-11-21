@@ -78,11 +78,11 @@ local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
 local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", map_show = true, show_label = true, lf_enabled = true, lf_auto = true,
-  lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-" }
+  lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-", auto_loot = "game" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil
 local teleports = {}
-local srv_up = {}  -- (0.15.142) Server tab messages a joined game sent
+local prefs_up = {}  -- (0.15.376) the player's choices a joined game sent (core/player_prefs.lua)
 local bodies_tp = {}  -- (0.15.140) teleports of test monsters onto the ground
 left_fns = {}
 died_fns = {}  -- the leaderboard's emf.on_player_died
@@ -197,7 +197,8 @@ emf = {
     if ITEMS[n] then return ITEMS[n] end
     -- (0.15.142) the loot items (core/item_db.lua): a made-up id each
     if type(n) == "string" and (n:match("^Material_T%d_Token_WeaponUpgrade_Rune") or n:match("^Weapon_T") or n:match("^Armor_T")
-        or n:match("^Ring_T") or n:match("^Vanity_T") or n:match("^T%d_Gem_")) then
+        or n:match("^Ring_T") or n:match("^Vanity_T") or n:match("^T%d_Gem_") or n:match("^Shield_T") or n:match("^Ward_T")
+        or n:match("^NO_Vanity_")) then  -- (0.15.371-0.15.374: shields, wards, every cosmetic)
       local h = 0
       for i = 1, #n do h = (h * 31 + n:byte(i)) % 0x7fffffff end
       return 0x10000000 + h % 0x0fffffff
@@ -224,7 +225,7 @@ emf = {
   net = {
     channel = function(name, def)
       assert(def.version == 1)
-      if name == "map" or name == "party" or name == "chat" or name == "board" or name == "travel" then assert(def.to == "players") elseif name == "party_test" then assert(def.to == "server") elseif name == "ver" or name == "npcwheel" or name == "roster" then assert(def.to == "both"); assert(not channels[name], "a channel registered twice: " .. name) else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
+      if name == "map" or name == "party" or name == "chat" or name == "board" or name == "travel" then assert(def.to == "players") elseif name == "party_test" or name == "prefs" then assert(def.to == "server") elseif name == "ver" or name == "npcwheel" or name == "roster" then assert(def.to == "both"); assert(not channels[name], "a channel registered twice: " .. name) else assert((name == "lf" or name == "exp" or name == "upd" or name == "srv") and def.to == "both") end
       channels[name] = def
       if name == "lf" then channel = def end
       return true
@@ -234,7 +235,7 @@ emf = {
       assert(JOINED and side == "client", "emf.net.send is for a joined game here")
       assert(#data <= 16384)
       if name == "exp" then exp_up[#exp_up + 1] = data; return true end
-      if name == "srv" then srv_up[#srv_up + 1] = data; return true end
+      if name == "prefs" then prefs_up[#prefs_up + 1] = data; return true end  -- (0.15.376)
       if name == "party_test" then ptest_up[#ptest_up + 1] = data; last_ask = data; return true end
       if name == "ver" then ver_asks = (ver_asks or 0) + 1; return true end
       to_server[#to_server + 1] = data
@@ -289,6 +290,7 @@ emf = {
 
 do local m = io.open(TMP .. "\\mod.json", "w"); m:write('{"version":"9.9.9","authors":["Tester"],"settings":['
   .. '{"key":"pointer_key","type":"select","default":"right_alt","label":"Pointer key","group":"FlameKit","options":[{"value":"right_alt","label":"Right Alt"},{"value":"right_ctrl","label":"Right Ctrl"}]},'
+  .. '{"key":"auto_loot","type":"select","default":"game","label":"Where a monster\'s loot goes","group":"Auto Loot","options":[{"value":"bag","label":"Auto loot to main bag"},{"value":"companion","label":"Auto loot to companion bag"},{"value":"ground","label":"Let loot drop to ground"},{"value":"game","label":"Follow original loot drop behavior"}]},'
   .. '{"key":"map_show","type":"bool","default":true,"label":"Minimap","group":"Minimap"},'
   .. '{"key":"lf_enabled","type":"bool","default":true,"label":"Auto Junk List","group":"Auto Junk List"},'
   .. '{"key":"lf_dump_key","type":"keybind","default":"","label":"Dump key","group":"Auto Junk List"},'
@@ -321,6 +323,9 @@ local function step(n)
     local ups = exp_up
     exp_up = {}
     for _, data in ipairs(ups) do channels.exp.on_server(SW, { player = PLAYER, account = ACCOUNT, admin = ADMIN }, data) end
+    local pups = prefs_up  -- (0.15.376) the player's choices (core/player_prefs.lua)
+    prefs_up = {}
+    for _, data in ipairs(pups) do channels.prefs.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
     local asks = ptest_up
     ptest_up = {}
     for _, data in ipairs(asks) do channels.party_test.on_server(SW, { player = PLAYER, account = ACCOUNT }, data) end
@@ -1845,30 +1850,49 @@ do  -- (0.15.142, owner) core/item_db.lua: the gear tier for a monster's level, 
     "item database: the tier for a monster level")
   local w = db.pick("weapon", 25, function(n) return 1 end)
   -- (0.15.168) gems only from the legendary-by-type ones: a level-1 monster gets the nearest, a tier 4 gem
-  check(w and w:match("^Weapon_T4_") and db.pick("gem", 1):match("^T4_Gem_") and db.pick_cosmetic():match("^Vanity_"),
+  check(w and w:match("^Weapon_T4_") and db.pick("gem", 1):match("^T4_Gem_") and db.pick_cosmetic():match("Vanity_"),
     "item database: a level-25 weapon is tier 4; a level-1 gem is the nearest legendary one; cosmetics: " .. tostring(w))
 end
-do  -- (0.15.142, owner) the Server tab: a warning, and its setting changed (where you host: at once; joined: a message)
-  local st = require("features.server_tab")
-  local server = require("core.server_settings")
+do  -- (0.15.376, owner 2026-11-21 09:35) the Settings tab: the Auto Loot section above Features, the game's own by default
+  local st = require("features.settings")
   local rows = st.panel(UI)
-  check(rows[1].text:find("Server wide settings apply to all players", 1, true) and rows[1].color, "the Server tab starts with the server-wide warning")
-  if not JOINED then
-    local on
-    for _, r in ipairs(rows) do if r.button == "on:loot_to_ground" then on = r end end
-    check(on and not on.selected and server.get("loot_to_ground") == false, "loot to the ground: off by default")
-    st.click(UI, "on:loot_to_ground")
-    check(server.get("loot_to_ground") == true, "a click on On switches it on for the whole server")
-  else
-    local n = #srv_up
-    st.click(UI, "on:loot_to_ground")
-    check(#srv_up == n + 1 and srv_up[#srv_up]:find('"set"', 1, true), "a joined game sends the change to the server")
-    server.set("loot_to_ground", true)
+  local at_auto, at_feat, sel = nil, nil, nil
+  for i, r in ipairs(rows) do
+    if r.heading == "Auto Loot" then at_auto = i end
+    if r.heading == "Features" then at_feat = i end
+    if r.button == "s:auto_loot:4" then sel = r.selected end
   end
+  check(at_auto and at_feat and at_auto < at_feat and sel == true, "Settings: the Auto Loot section is above Features; Follow original loot drop behavior is lit by default")
+  local server_tab = false
+  for _, f in ipairs(require("core.kit").features) do if f.id == "server_tab" or f.title == "Server" then server_tab = true end end
+  check(not server_tab, "the Server tab is gone")
 end
 do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the ground (same quality and level),
     -- its body removed 8 s later; a piece with a socketed gem stays in the body (and the body with it)
   local BODY = 7001
+  -- (0.15.376) Auto Loot: the killing blows come from the player (emf.on_hit), whose choice is the ground
+  comps.PlayerState = comps.PlayerState or {}
+  comps.PlayerState[PLAYER] = {}
+  local function killed(body) for _, fn in ipairs(hit_fns) do fn(SW, { killed = true, target = body, attacker = PLAYER }) end end
+  -- the player's choice is his Settings tab's (features/settings.lua sends it: core/player_prefs.lua)
+  local stt = require("features.settings")
+  local function choose(i) stt.click(UI, "s:auto_loot:" .. i) step(1900) end
+  choose(4)
+  do  -- the game's own (the default): the body keeps its loot
+    local G = 6999
+    comps.Faction[G] = { faction = 6 }
+    comps.InventorySetup[G] = { linksEntities = { G, 0 }, linksCategories = { 4, 0 } }
+    comps.Inventory[G] = inv({ stack(0x11, 2) })
+    local pb = SW.position
+    SW.position = function(self, id) if id == G then return 5, 0, 5 end return pb(self, id) end
+    local n = #spawned
+    killed(G)
+    events["EntityDiedEvent"](SW, { deadEntityId = G })
+    step(40)
+    check(#spawned == n and comps.Inventory[G].slots[1].id == 0x11, "Auto Loot: the game's own way leaves the loot in the body")
+    SW.position = pb
+  end
+  choose(3)  -- Let loot drop to ground
   comps.Faction[BODY] = { faction = 6 }
   comps.InventorySetup[BODY] = { linksEntities = { BODY, 0 }, linksCategories = { 4, 0 } }
   comps.ItemState[7500] = { itemRarityUi = 3, itemLevelUi = 22, baseDamageUi = 1, itemState = 0 }
@@ -1876,6 +1900,7 @@ do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the 
   local pos_before = SW.position
   SW.position = function(self, id) if id == BODY then return 5, 0, 5 end return pos_before(self, id) end
   local n0, d0 = #spawned, #destroyed
+  killed(BODY)
   events["EntityDiedEvent"](SW, { deadEntityId = BODY })
   step(35)
   local got = {}
@@ -1897,6 +1922,7 @@ do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the 
   end
   SW.position = function(self, id) if id == B2 or id == B3 then return 6, 0, 6 end return pos_before(self, id) end
   local n1, d1b = #spawned, #destroyed
+  killed(B2) killed(B3)
   events["EntityDiedEvent"](SW, { deadEntityId = B2 })
   events["EntityDiedEvent"](SW, { deadEntityId = B3 })
   step(40)
@@ -1921,6 +1947,7 @@ do  -- (0.15.142, owner) Loot Drop: a monster that dies has its loot put on the 
   end
   SW.position = function(self, id) if id == B4 or id == B5 then return 7, 0, 7 end return pos_before(self, id) end
   local n2 = #spawned
+  killed(B4) killed(B5)
   events["EntityDiedEvent"](SW, { deadEntityId = B4 })  -- stays empty: looked at at 0.5, 1.5, 3 and 6 s
   step(35)
   events["EntityDiedEvent"](SW, { deadEntityId = B5 })  -- its first look is due at 0.5 s, before B4's second (1.5 s)
