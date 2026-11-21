@@ -569,6 +569,9 @@ players seen joining); a more forgiving fight line check for monsters below (off
 tuning (humanoids, their own attacks); shared inventory per player (on hold); admin system for other servers; the
 older items in HANDOFF_companions_history.md ("Open list": glider, crumb meta data, inventory, blocked-by notices,
 hot reload, companions in the party list, ...). Versions: Stable 0.15.277, Development 0.15.360, server 0.15.362.
+Owner 18:26 "once its folded into the DLL we can still make changes and update it correct?" (yes: Lua reloads; the
+DLL goes to the server by copy and to players by the updater; a server-only C++ fix: server copy only, Rule 0d) /
+**18:27 "k well everyone will be updating"** (the version gap between server and players' DLL is no concern).
 
 ## How to build and publish a version
 
