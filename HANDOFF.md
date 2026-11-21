@@ -737,7 +737,18 @@ Facts found: Messages window = C++ MessagesLayer (flamekit_native.cpp ~3378) rea
 need a DLL build. Only server setting = loot_to_ground (core/server_settings + features/server_tab go). Junk list:
 loot_filter/server.lua per account {names, opts.action drop|delete}: needs a core hook for loot_drop (Rule 0b). Heal
 line: companions 08_heal_attack say() -> features.chat.notice_to (a notice + Messages). Kill credit: emf.on_hit
-(killed, attacker). Questions asked 09:35 (defaults, transport volume for Battle, heal pop-up), not answered yet.
+(killed, attacker). Questions asked 09:35 (defaults, transport volume for Battle, heal pop-up).
+**Owner 09:44 answers:** "#1 default it back to game's own behavior -- #2 correct -- #3 default it back to game's own
+behavior -- #4 main companion first #5 the purpose of the battle chat is to analyze the attack and damage data. if the
+messages are filtered or truncated, it would defeat the purpose of this feature. batch the messages out to the player in
+a way you feel is most optimal. I would argue, maybe we need an option to turn those messages off completely all
+together. #6 -- I have no idea, this was just a guess, is that too small or too big? some players may run ahead to do an
+attack and I would still want to record that data.. I'm not sure what the sweet spot would be for this.. suggestions?
+#7 notice messages should stay for heals for now. #8 not sure I understand the question. To my knowledge the message
+window is always on the screen -- you mean if the user has the window hidden? #9 -- on by default."
+So: default = game's own (4) for players and for kills without a player; others (no FlameKit) = 4; main companion first;
+Battle: every hit, no truncation (net channel max 16384 bytes, compact batches); heal notice stays; filters on by default.
+Open (asked 09:45): Battle on/off switch, the radius (#6), what a new line does to an unselected tab (#8).
 
 ## How to build and publish a version
 
