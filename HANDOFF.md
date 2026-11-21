@@ -918,6 +918,13 @@ v0.15.396 is ready" 14:25. Not yet seen in a game: 0.15.390+ client part (owner'
 files that differed repaired his install, as far as known).
 **Owner 14:32 "it was logging it, it was just delayed so I did not see it right away"**: the chop Loot lines (13:43
 question, the 13:33 tree) are there: closed. (Chop drops are looked for 1, 3, 6 and 10 s after the break.)
+**Owner 14:43 "there isn't a trigger when the items drop? you have to just scan the ground for drop items orr???"**:
+answered: no event for a dropped item or a new entity (SDK event list: PickupEvent only on pick up;
+TransformedToLootEvent, OnDestroyNotifyEvent carry no pickup); offered scanning every second for 10 s (open, not
+answered). **14:44 "the self heal is valid.. can you just make the log say "Midevil heals themselves for 18" whenever
+you see a character healing themselves?"**: 0.15.397 (server only, local server): heal_target() -> "themselves" when
+healer = target (feed.hit and feed.heal: companions too); the self heal logging switched off (SELF_LOG 0). G-Portal not
+updated (asked).
 
 ## How to build and publish a version
 
