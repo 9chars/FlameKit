@@ -66,7 +66,7 @@ name_of = function(world, id)
       local kind = f and FACTION_NAME[tonumber(f.faction) or -1] or "Monster"
       local lv = get(world, "Level", id)
       local l = lv and lv.dataStorage and tonumber(lv.dataStorage[1])
-      name = l and l > 0 and string.format("%s (lvl %d)", kind, l) or kind
+      name = l and l > 0 and string.format("%s(%d)", kind, l) or kind  -- (0.15.381, owner 12:05 "just say Fogger(45)")
     end
   end
   name_cache[id] = { name = name, at = steps }
@@ -153,7 +153,8 @@ function feed.hit(world, hit)
   if hit.healing or amount < 0 then
     text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), name_of(world, t), math.abs(amount))
   else
-    text = string.format("%s %s > %s: %d%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
+    -- (0.15.381, owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?") spelled out
+    text = string.format("%s %s hit %s for %d damage%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
       #flags > 0 and (" (" .. table.concat(flags, ", ") .. ")") or "")
   end
   local okp, x, _, z = pcall(world.position, world, t)

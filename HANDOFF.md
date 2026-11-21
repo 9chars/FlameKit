@@ -798,6 +798,8 @@ according to my settings."** (Facts: 3 kills 11:57:02-23 judged with "game" befo
 crafting is 0), a Loot line "<name>: <item> xN > picked up" by the same recipients; core/game_events.lua registers each
 engine event once and fans out (loot_filter's PickupEvent moved there). The first 20 PickupEvents of a run are logged
 whole ("feed: pickup ...") to see what a container take sends (WATCH: if from = 0 there, the filter drops them).
+**Owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?" / 12:05 "you can just say Fogger(45) not "Fogger(lvl
+45)""**: 0.15.381 (server only): "<a> hit <b> for N damage (flags)", monsters "Kind(level)".
 
 ## How to build and publish a version
 

@@ -1,3 +1,6 @@
+0.15.381 Nov 21, 2026
+- Battle tab: the lines say it plainly ("Fogger(45) hit Midevil for 85 damage", "Midevil hit Vukah(25) for 120 damage (crit)"), and a monster's level is written after its kind, Fogger(45). Server only: no game change.
+
 0.15.380 Nov 21, 2026
 - Loot tab: loot you pick up by hand (from a body, a chest, the ground) is listed too, by the same settings (yours always; other players' near you unless "Show other players' loot messages" is off). Server only: no game change.
 

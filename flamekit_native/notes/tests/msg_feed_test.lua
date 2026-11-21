@@ -63,8 +63,8 @@ feed.hit(W, { attacker = 500, target = 600, amount = 33 })
 feed.hit(W, { attacker = 500, target = 501, amount = 33 })  -- monsters among themselves: nobody
 flush()
 local a, b, c = lines(1, "battle"), lines(2, "battle"), lines(3, "battle")
-check(#a >= 2 and a[#a - 1]:find("Ann > Vukah %(lvl 25%): 120 %(crit%)") ~= nil, "Ann's own hit, with the monster's kind, level and crit: " .. tostring(a[#a - 1]))
-check(#b >= 1 and b[#b]:find("Vukah %(lvl 25%) > Rex: 33") ~= nil, "a hit on Bob's companion goes to Bob, the companion by name")
+check(#a >= 2 and a[#a - 1]:find("Ann hit Vukah%(25%) for 120 damage %(crit%)") ~= nil, "Ann's own hit, with the monster's kind, level and crit: " .. tostring(a[#a - 1]))
+check(#b >= 1 and b[#b]:find("Vukah%(25%) hit Rex for 33 damage") ~= nil, "a hit on Bob's companion goes to Bob, the companion by name")
 check(#c == 0, "Cid (400 m away) sees neither")
 check(sent[4] == nil, "a game without the channel gets nothing")
 values["0xa2"].others_battle = false
@@ -77,18 +77,18 @@ sent = {}
 for i = 1, 3000 do feed.hit(W, { attacker = 1, target = 500, amount = i }) end
 for _ = 1, 30 * 40 do feed.tick(W) end
 local got = lines(1, "battle")
-check(#got == 3000 and got[1]:find(": 1$") and got[3000]:find(": 3000$"), "3000 hits: all 3000 lines arrive, in order (" .. #got .. ")")
+check(#got == 3000 and got[1]:find(" for 1 damage$") and got[3000]:find(" for 3000 damage$"), "3000 hits: all 3000 lines arrive, in order (" .. #got .. ")")
 local most = 0
 for _, data in ipairs(sent[1]) do local m = emf.json.decode(data) local n = 0 for _, l in ipairs(m.lines) do n = n + #l + 4 end most = math.max(most, n) end
 check(most <= 15000, "no message over 15 KB (" .. most .. ")")
 -- loot: Ann's item, near Bob (others on), not Cid
 sent = {}
-feed.loot(W, { player = 1, item = 77, count = 2, level = 50, rarity = 4, bag = 2, companion = 0, ground = 0, x = 0, z = 0, from = "Vukah (lvl 25)" })
+feed.loot(W, { player = 1, item = 77, count = 2, level = 50, rarity = 4, bag = 2, companion = 0, ground = 0, x = 0, z = 0, from = "Vukah(25)" })
 flush()
 local la, lb, lc = lines(1, "loot"), lines(2, "loot"), lines(3, "loot")
 check(#la == 1 and #lb == 1 and #lc == 0, "a loot line for its player and players near")
 channel.on_player(W, {}, sent[1][1])
-check(notes[#notes][1] == "loot" and notes[#notes][2] == "Ann: legendary Iron Sword x2 (lvl 50) from Vukah (lvl 25) > bag", "the game writes it with the item's name: " .. tostring(notes[#notes][2]))
+check(notes[#notes][1] == "loot" and notes[#notes][2] == "Ann: legendary Iron Sword x2 (lvl 50) from Vukah(25) > bag", "the game writes it with the item's name: " .. tostring(notes[#notes][2]))
 values["0xa2"].others_loot = false
 sent = {}
 feed.loot(W, { player = 1, item = 77, count = 1, junk = "delete", x = 0, z = 0 })
