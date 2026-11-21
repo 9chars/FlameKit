@@ -652,6 +652,7 @@ Spawn adds a group instead of replacing. Not yet answered: "a couple more change
 monsters a bit more?" (now SPOT_MIN 2 m hex grid; 3 m / 4 m offered, not picked yet). 20:12 "were going to remove the
 button option for 1000, so that can go away" (DUEL_COUNTS without 1000).
 20:13 "don't limit it": the server's cap MAX_DUELISTS stays 1000 (only the button goes).
+20:14 "bump it out to 3 m for 500" / 20:15 "put them all to 3 m I think": SPOT_MIN 3 for every quantity.
 
 ## How to build and publish a version
 
