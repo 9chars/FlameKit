@@ -651,6 +651,7 @@ factions Vukah 3, Scavenger 4, Ancients 15, Drak 14: no friendly pairs among the
 Spawn adds a group instead of replacing. Not yet answered: "a couple more changes first". 20:12 "can we space out the
 monsters a bit more?" (now SPOT_MIN 2 m hex grid; 3 m / 4 m offered, not picked yet). 20:12 "were going to remove the
 button option for 1000, so that can go away" (DUEL_COUNTS without 1000).
+20:13 "don't limit it": the server's cap MAX_DUELISTS stays 1000 (only the button goes).
 
 ## How to build and publish a version
 
