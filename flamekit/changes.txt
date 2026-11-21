@@ -1,3 +1,6 @@
+0.15.383 Nov 21, 2026
+- A debug tool for the monster names in the Battle tab (the console's flamekit.monprints). Server only: no game change.
+
 0.15.382 Nov 21, 2026
 - Battle tab: only hits between you (or your companions) and real monsters or other players; hits on trees, rocks and other objects are left out. Server only: no game change.
 
