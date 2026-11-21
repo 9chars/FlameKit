@@ -1,3 +1,6 @@
+0.15.408 Nov 21, 2026
+- The chest logging on the server switched off (testing whether it made a chest look empty). Server only.
+
 0.15.407 Nov 21, 2026
 - Debug: flamekit.lootnear shows a random-loot chest's loot state. Server only: no game change.
 

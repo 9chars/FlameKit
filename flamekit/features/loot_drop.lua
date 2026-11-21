@@ -367,6 +367,7 @@ end
 -- still in the slot it came from (a full bag refused it). The first XFER_MAX of a run. Debug tool: kept, can be off.
 local XFER_LOG, XFER_MAX = true, 30
 local XFER_CLIENT = false  -- (0.15.406) the client-side listening: off (see F.setup)
+local XFER_SERVER = false  -- (0.15.408) the server-side listening: off (see F.setup)
 local xfer = { said = 0, later = {} }
 local function slot_text(v)
   if type(v) ~= "table" and type(v) ~= "userdata" then return tostring(v) end
@@ -506,7 +507,9 @@ end
 function F.setup(k)
   kit = k
   prefs.setup()
-  require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer"))  -- (0.15.404) logging
+  -- (0.15.404) logging; (0.15.408, owner 16:57: the chest still empty with the old DLL and no listening in his game)
+  -- switched off to test whether the server's listening is what empties chests in the player's view (debug tool kept)
+  if XFER_SERVER then require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer")) end
   -- (0.15.405, owner 16:16 "sure") the same in the player's own game (the server never heard of a refused take, 16:15),
   -- and the game's "item could not be used" event there. (0.15.406, owner 16:44: a chest opened empty in his game
   -- right after this came in, 16:19, while the server still had its items: switched off to test that; debug tool kept)
