@@ -104,8 +104,17 @@ check(#lines(2, "loot") == 0 and lines(1, "loot")[1]:find("junk delete"), "Bob w
 -- (0.15.380) a pickup by hand: logged for its player (and players near); crafting (from entity 0) is not
 sent = {}
 values["0xa2"].others_loot = true
-feed.pickup(W, { pickedUpByEntityId = 1, pickedUpFromEntityId = 777, itemId = 77, itemCount = 3 })
-feed.pickup(W, { pickedUpByEntityId = 1, pickedUpFromEntityId = 0, itemId = 78, itemCount = 1 })
+-- (0.15.386) the game's event is strict (a field it has not is an error: "PickupEvent has no field itemLevel") and
+-- has these fields only (local server log 12:12)
+local function strict(t)
+  return setmetatable(t, { __index = function(_, k) error("PickupEvent has no field " .. tostring(k)) end })
+end
+local function ev(by, from, item, count)
+  return strict({ hideInUi = false, itemCount = count, itemId = item, pickedUpByEntityId = by, pickedUpFromEntityId = from,
+    position = "float3", targetSlotId = "InventorySlotId", timeStamp = 1 })
+end
+feed.pickup(W, ev(1, 777, 77, 3))
+feed.pickup(W, ev(1, 0, 78, 1))
 flush()
 check(#lines(1, "loot") == 1 and #lines(2, "loot") == 1 and #lines(3, "loot") == 0, "a pickup: Ann and Bob near her, not Cid; crafting left out")
 channel.on_player(W, {}, sent[1][1])

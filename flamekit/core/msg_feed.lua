@@ -209,13 +209,16 @@ end
 -- (0.15.380, owner 2026-11-21 12:00 "if I pick up loot, it needs to be logged into the loot window according to my
 -- settings") a pickup by hand: the game's PickupEvent (from a body, a chest, the ground; anything with a source
 -- entity: crafting and FlameKit's own puts come from entity 0 and are left out). The event has the item and how many.
-local pickups_logged = 0
+local pickups_logged = {}  -- "from" / "none" -> lines logged
 function feed.pickup(world, e)
   if type(e) ~= "table" then return end
   local by, from, item, count = tonumber(e.pickedUpByEntityId) or 0, tonumber(e.pickedUpFromEntityId) or 0,
     tonumber(e.itemId) or 0, tonumber(e.itemCount) or 0
-  if pickups_logged < 20 then  -- the first ones of a run, to see what the game sends (Logging is live)
-    pickups_logged = pickups_logged + 1
+  -- the first ones of a run, to see what the game sends (Logging is live); (0.15.386) 20 with a "from" and 20 without:
+  -- FlameKit's own puts into a bag (Auto Loot) come with from 0 and filled the first 20 before any chest take
+  local kind = from == 0 and "none" or "from"
+  if (pickups_logged[kind] or 0) < 20 then
+    pickups_logged[kind] = (pickups_logged[kind] or 0) + 1
     local f = {}
     for k, v in pairs(e) do f[#f + 1] = tostring(k) .. "=" .. tostring(v) end
     table.sort(f)
@@ -223,7 +226,7 @@ function feed.pickup(world, e)
   end
   if count <= 0 or from == 0 or item == 0 or not is_player(world, by) then return end
   local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
-    tonumber(e.itemLevel) or 0, tonumber(e.rarity) or 0, "picked up")
+    0, 0, "picked up")  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
   local okp, x, _, z = pcall(world.position, world, by)
   for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end
