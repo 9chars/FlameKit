@@ -943,6 +943,20 @@ program's update; the entities of a slice come from the job iterator (ENGINE_MAP
 current entity id: chunk+0x830 list after build 1273043). No C++ -> Lua bridge in EMF (the bus is Lua-only); candidate:
 setting_set("flamekit", key, text) from C++ fires Lua's emf.on_setting_changed. The body looks of loot_drop (3 looks of
 the one body) are not world scans.
+Owner 15:09 "go ahead" (local server restarts for the test builds). 0.15.399 (DLL + Lua): flamekit_native/src/loot_news.cpp
+hooks pickup_item_setup and inventory_setup_init (post): ids = CurrentEntityId (EMF resolve) for 1..ctx->entityIndex,
+server world only (job+0 -> storage, storage+8 == 0); first sent as TestEvent1/2 events: the hooks worked (15:15
+restart: 289 loose items, 588 containers at the world load) but EMF delivers no 4-byte event to Lua ("the queue layout
+of 4-byte events is not known yet"). 0.15.400: the DLL writes emf\mods\flamekit\loot_news.txt after each server step
+with news (tmp + MoveFileEx; retried after a failed move), the newest 512 lines "<n> <p|c> <entity> <tick>";
+core/loot_news.lua reads it only while a feature waits (loose_loot: a break/kill within 15 s; loot_drop: deaths queued
+or retried; loot_spots: forced when answering), at most every 6 steps; the first read only learns the newest number;
+a smaller newest number = the server restarted. features/loose_loot.lua: no walks, no snapshot: a new loose item made
+at or after a break/kill (15 s window, 30 m objects / 8 m monsters) goes to the nearest such target's player.
+core/loot_spots.lua: candidates = news containers within 4 m made in the last 20 s. Console: fkloot.stats.
+Tests: flamekit_native/notes/tests/loot_news_test.lua, loose_loot_test.lua. **Owner 15:24 "looks like its working
+quickly"**: 15:23 5 objects broken, 19 drops taken right after each break; fkloot.stats 1072 loose items, 631
+containers, 166 file writes (in ~3 min). Monster piles/drops not yet seen since the restart.
 
 ## How to build and publish a version
 
