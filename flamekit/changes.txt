@@ -1,3 +1,6 @@
+0.15.393 Nov 21, 2026
+- A debug tool for loot left on the ground (the console's flamekit.lootnear). Server only: no game change.
+
 0.15.392 Nov 21, 2026
 - Auto Loot: some monsters' loot was left on the ground (for example a critter's Critter Carapace): the loot pile they leave can come a moment after the body is gone, and the game sometimes reports one death twice. Both are handled now. Server only: no game change.
 
