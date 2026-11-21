@@ -75,6 +75,7 @@ local function new_world()
   end
   mover(PLAYER) mover(HOUND)
   c(PLAYER, "DynamicOxygenState", { accumulatedValue = 0 })
+  c(PLAYER, "TeleportCount", { counter = 0 })  -- (0.15.369) a "travel" step raises it, as the game's fast travel does
   c(HOUND, "DynamicEnemy01BehaviorState", { enabled = true, homeZonePosition = { x = 0, y = 0, z = 0 }, movementTarget = { x = 0, y = 0, z = 0 },
     movementTargetIsValid = false, combatData = { targetOfMyTarget = false, isTargetInsideLeash = false } })
   c(HOUND, "ServerSubmerge", { submergeDepth = 0 })
@@ -162,7 +163,7 @@ local function run(file, seed)
     if k == "djhere" and st_t == 25 then pvy = 9 ploc.jumpCount = 2 end
     if st_t == 1 and k == "hold" then F._holds[HOUND] = { target = ANIMAL, untill = tick + 100 } end
     if st_t == 1 and k == "lure" then h.lure = { x = px + 5, y = py, z = pz + 5, untill = tick + 120 } end
-    if st_t == 1 and k == "travel" then px, pz = px + 120, pz + 30 end
+    if st_t == 1 and k == "travel" then if SHORTHOP then px, pz = px + 20, pz + 15 else px, pz = px + 120, pz + 30 end end
     if st_t == 1 and k == "ledge" then px, pz = 25, 0 end
     if st_t == 1 and k == "cliff" then px, pz = -25, 0 end
     if st_t == 1 and k == "lake" then px, pz = 0, 45 end
@@ -211,6 +212,17 @@ local function run(file, seed)
       end
     end
     pv.x, pv.y, pv.z = mx * 60, pvy, mz * 60
+    -- (0.15.369) the game raises the player's TeleportCount when it moves him (fast travel): here every move of more
+    -- than 50 m in one tick (the travel step and the scenario's jumps to their places), so the old FAR_JUMP rule and
+    -- the new TeleportCount rule see the same teleports; SHORTHOP (arg 5 "shorthop") also counts a 25 m travel step
+    do
+      local ox, _, oz = W:position(PLAYER)
+      local hop = (ox - px) ^ 2 + (oz - pz) ^ 2
+      if hop > 50 ^ 2 or (SHORTHOP and st_t == 1 and k == "travel") then
+        local tc = W:get("TeleportCount", PLAYER)
+        tc.counter = tc.counter + 1
+      end
+    end
     W:set_pos(PLAYER, px, py, pz)
     -- the hound (a stand-in for the game and the C++ hook)
     local a = W:get("DynamicEnemy01BehaviorState", HOUND)
@@ -267,6 +279,7 @@ local function run(file, seed)
   return snaps, steps
 end
 
+if arg[5] == "shorthop" then SHORTHOP = true end
 if arg[5] == "dump" then
   DUMP = true
   run(OLD, SEED)
