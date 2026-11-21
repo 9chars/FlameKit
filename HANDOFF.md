@@ -677,7 +677,7 @@ also doing it right"**: 0.15.372 (server only): db.pick for rings/gems = every l
 itself). Note: legendary rings have fixed levels (5, 15, 20, 30, 40), so a lower-tier ring from a level 100 kill is
 low level; gems are level 1-105.
 **Owner 20:30 "we want the NPC outfits in there as well. all cosmetics from the game data"**: new debug command
-flamekit.itemnames (experimental.lua): item_ids.txt (a copy of item_details.dat) -> item_names.txt via emf.item_info
+flamekit.itemnames (experimental.lua, 0.15.372; cosmetics 0.15.373): item_ids.txt (a copy of item_details.dat) -> item_names.txt via emf.item_info
 (4213 items, 0 unnamed); kept as tools/gamedata/item_names_1287369.txt (id, name, rarity, levels, category). db.COSMETICS
 = all 199 Vanity items (was 105: the old item lists were capped at 50 names a query, so my 20:19 "9 left out" was wrong:
 94 were missing). Still not in item_db, found with the full list: TX dungeon weapons (FogNest, HollowHall: 19, many

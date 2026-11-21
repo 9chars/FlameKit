@@ -1,5 +1,8 @@
+0.15.373 Nov 20, 2026
+- Test monsters' Reward loot: the cosmetic can now be any of the game's 199 cosmetics (NPC outfits, event and Twitch drop sets included; before 105). Server only: no game change.
+
 0.15.372 Nov 20, 2026
-- Test monsters' Reward loot: a ring or gem is now any legendary one of the monster's tier or below, each equally likely. A level 50-100 kill can give all 5 legendary gems (Focused Light, Cold Composure, Lycanthropy, Armoring, Hyper Specialization) and all 5 legendary rings; before, it gave only Armoring or Hyper Specialization and always Ring of Shock. The cosmetic can now be any of the game's 199 cosmetics (NPC outfits, event and Twitch drop sets included; before 105). Server only: no game change.
+- Test monsters' Reward loot: a ring or gem is now any legendary one of the monster's tier or below, each equally likely. A level 50-100 kill can give all 5 legendary gems (Focused Light, Cold Composure, Lycanthropy, Armoring, Hyper Specialization) and all 5 legendary rings; before, it gave only Armoring or Hyper Specialization and always Ring of Shock. Server only: no game change.
 
 0.15.371 Nov 20, 2026
 - Test monsters' Reward loot: shields can now be the legendary item (38 shields of tiers 1-7, the two legendary story shields included); they were never in the list. Server only: no game change.
