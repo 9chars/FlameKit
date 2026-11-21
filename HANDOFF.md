@@ -686,6 +686,11 @@ Wards T1-T7 (+_Loot, 14), Craft_ copies of the Lore weapons/shields (left out: c
 **Owner 20:36 "yes, add them"**: 0.15.374 (server only): weapon T7 + the 19 Weapon_TX_ (FogNest, HollowHall; levels 1-55)
 and Weapon_T7-TX_2H_GreatSwordEpic_Vorgoth; armour: MultiClass T2/T4/T6, Armor_T5-TX_*_Loot in T5, Ward_T1..T7 (+_Loot)
 in their tiers (64 names, all checked against the full list, no duplicates).
+**Owner 20:40 "lets get everything update. push it to dev and stable and g-portal"**: 0.15.374 on Development and
+Stable (sig good, commit 79874ba) and G-Portal 20:41 (5 files changed since 0.15.369: changes.txt, core/item_db.lua,
+features/experimental.lua, mod.json, flamekit_native/mod.json; reload 20:41:16, 16 features, no "restart the game").
+WATCH (seen, not fixed): G-Portal pet Biggs (75332) "found again" then "drive 75332: gone, stopped" at every reload
+(also 20:00:39); player 3 (0x05891a85470cffe2, not an admin) gets "roster window: get refused" every 5 s.
 
 ## How to build and publish a version
 
