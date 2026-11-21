@@ -1,3 +1,6 @@
+0.15.404 Nov 21, 2026
+- Logging: what the game reports when you move an item out of a chest (for taking items into a companion when your bag is full). Server only: no game change (needs a server restart).
+
 0.15.403 Nov 21, 2026
 - Messages window: the lines in regular (not bold) letters, and a text size for each tab (Settings tab, Messages: Chat, Battle and Loot tab text size).
 
