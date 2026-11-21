@@ -1,3 +1,7 @@
+0.15.390 Nov 21, 2026
+- Auto Loot: what a monster you kill throws on the ground (for example a Shroud Fog Nest Drone's Archaic Essence) goes into your bag or your companions' bags too, by your Auto Loot setting. Items that were already lying on the ground are left alone.
+- Settings, Auto Loot: the setting now reads "Where loot goes: monsters you kill, things you chop or mine", and its help says what it covers.
+
 0.15.389 Nov 21, 2026
 - Auto Loot: what falls out of a tree, rock or other object you break with an axe or pickaxe goes into your bag or your companions' bags too, by your Auto Loot setting ("ground" and "game": left where it falls). Items that were already lying on the ground are left alone. Server only: no game change.
 

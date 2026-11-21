@@ -1,3 +1,40 @@
+0.15.390 Nov 21, 2026
+- Auto Loot: what a monster you kill throws on the ground (for example a Shroud Fog Nest Drone's Archaic Essence) goes into your bag or your companions' bags too, by your Auto Loot setting. Items that were already lying on the ground are left alone.
+- Settings, Auto Loot: the setting now reads "Where loot goes: monsters you kill, things you chop or mine", and its help says what it covers.
+
+0.15.389 Nov 21, 2026
+- Auto Loot: what falls out of a tree, rock or other object you break with an axe or pickaxe goes into your bag or your companions' bags too, by your Auto Loot setting ("ground" and "game": left where it falls). Items that were already lying on the ground are left alone. Server only: no game change.
+
+0.15.388 Nov 21, 2026
+- Loot tab: what goes straight into your bag (mining with a pickaxe, picking up loose items from the ground) is listed too ("> into bag"). Auto Loot's own lines are not doubled. Server only: no game change.
+
+0.15.387 Nov 21, 2026
+- Logging for Auto Loot of chopped and broken things: looks where the object stood (it is gone by the breaking hit), 30 m around. Server only: no game change.
+
+0.15.386 Nov 21, 2026
+- Loot tab: taking loot from a chest or a body by hand stopped the Battle and Loot tabs (an error); fixed. Server only: no game change.
+
+0.15.385 Nov 21, 2026
+- Logging for Auto Loot of what drops from chopping and breaking things (what a hit on a tree or rock reports, which loose items appear). Server only: no game change.
+
+0.15.384 Nov 21, 2026
+- Battle tab: monsters by their own names (e.g. "Scavenger Ranger Crossbow(45)", "Shroud Soldier(30)") instead of the faction (Fogger). A monster FlameKit does not know yet still shows its faction. Server only: no game change.
+
+0.15.383 Nov 21, 2026
+- A debug tool for the monster names in the Battle tab (the console's flamekit.monprints). Server only: no game change.
+
+0.15.382 Nov 21, 2026
+- Battle tab: only hits between you (or your companions) and real monsters or other players; hits on trees, rocks and other objects are left out. Server only: no game change.
+
+0.15.381 Nov 21, 2026
+- Battle tab: the lines say it plainly ("Fogger(45) hit Midevil for 85 damage", "Midevil hit Vukah(25) for 120 damage (crit)"), and a monster's level is written after its kind, Fogger(45). Server only: no game change.
+
+0.15.380 Nov 21, 2026
+- Loot tab: loot you pick up by hand (from a body, a chest, the ground) is listed too, by the same settings (yours always; other players' near you unless "Show other players' loot messages" is off). Server only: no game change.
+
+0.15.379 Nov 21, 2026
+- Companions and pets: when you join, those that are more than 20 m from you come straight back beside you once you stand on the ground (before, they stood where you left them until you moved, up to minutes). Server only: no game change.
+
 0.15.378 Nov 21, 2026
 - The Auto Junk List's lines ("Junk discarded: Twigs x3") are in the Messages window's Loot tab now, not in Chat.
 - Battle and Loot: other players' lines within 100 m of you (was 150 m).

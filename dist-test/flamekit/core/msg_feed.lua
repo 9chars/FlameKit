@@ -15,11 +15,13 @@
 --   feed.hit(world, hit)                  the server: one emf.on_hit hit
 --   feed.heal(world, healer, target, amount)   the server: a companion's heal
 --   feed.loot(world, report)              the server: core/loot_route.lua's report of one item
+--   feed.pickup(world, event)             the server: the game's PickupEvent (loot taken by hand)
 --   feed.tick(world)                      the server, every step: sends the batches
 
 local players = require("core.players")
 local prefs = require("core.player_prefs")
 local route = require("core.loot_route")
+local own_puts = require("core.own_puts")
 
 local feed = {}
 
@@ -35,6 +37,7 @@ local namer = nil
 local out = {}             -- player entity -> { battle = {lines}, loot = {lines} }
 local steps = 0
 local name_cache = {}      -- entity -> { name, at }
+local monster_print = require("core.monster_print")
 
 local FACTION_NAME = { [1] = "Monster", [2] = "Fogger", [3] = "Vukah", [4] = "Scavenger", [5] = "Animal", [6] = "Beast",
   [9] = "Monster", [10] = "Skeleton", [12] = "Farm animal", [13] = "Cyclops", [14] = "Drak", [15] = "Ancient" }
@@ -62,10 +65,12 @@ name_of = function(world, id)
     if namer then local ok, n = pcall(namer, world, id) if ok and n then name = n end end
     if not name then
       local f = get(world, "Faction", id)
-      local kind = f and FACTION_NAME[tonumber(f.faction) or -1] or "Monster"
+      -- (0.15.384, owner 12:15 "it need to say the actual monster's name") the kind's name (core/monster_names.lua),
+      -- the faction's only for a monster that table does not know
+      local kind = monster_print.name(world, id) or (f and FACTION_NAME[tonumber(f.faction) or -1]) or "Creature"
       local lv = get(world, "Level", id)
       local l = lv and lv.dataStorage and tonumber(lv.dataStorage[1])
-      name = l and l > 0 and string.format("%s (lvl %d)", kind, l) or kind
+      name = l and l > 0 and string.format("%s(%d)", kind, l) or kind  -- (0.15.381, owner 12:05 "just say Fogger(45)")
     end
   end
   name_cache[id] = { name = name, at = steps }
@@ -137,6 +142,17 @@ function feed.hit(world, hit)
   local a, t = tonumber(hit.attacker) or 0, tonumber(hit.target) or 0
   local pa, pt = route.player_of(world, a), route.player_of(world, t)
   if not pa and not pt then return end  -- monsters among themselves
+  -- (0.15.382, owner 2026-11-21 12:08 "only log damage to and from actual monsters or other players (PvP)") the other
+  -- side has to be a creature too: a player, a companion, or something with a faction other than Environment (0).
+  -- Hits on trees, rocks, crates and the like (no faction: "Midevil > Monster 1") are left out, and so is damage with
+  -- no attacker.
+  local function creature(id, p)
+    if p then return true end
+    if id == 0 then return false end
+    local f = get(world, "Faction", id)
+    return f ~= nil and (tonumber(f.faction) or 0) ~= 0
+  end
+  if not (creature(a, pa) and creature(t, pt)) then return end
   local owners = {}
   if pa then owners[pa] = true end
   if pt then owners[pt] = true end
@@ -152,7 +168,8 @@ function feed.hit(world, hit)
   if hit.healing or amount < 0 then
     text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), name_of(world, t), math.abs(amount))
   else
-    text = string.format("%s %s > %s: %d%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
+    -- (0.15.381, owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?") spelled out
+    text = string.format("%s %s hit %s for %d damage%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
       #flags > 0 and (" (" .. table.concat(flags, ", ") .. ")") or "")
   end
   local okp, x, _, z = pcall(world.position, world, t)
@@ -188,6 +205,34 @@ function feed.loot(world, r)
     ((r.from or ""):gsub("|", "/")))
   local x, z = r.x, r.z
   for _, pid in ipairs(recipients(world, "loot", { [r.player] = true }, x, z)) do queue(pid, "loot", line) end
+end
+
+-- (0.15.380, owner 2026-11-21 12:00 "if I pick up loot, it needs to be logged into the loot window according to my
+-- settings") a pickup by hand: the game's PickupEvent (from a body, a chest, the ground; anything with a source
+-- entity: crafting and FlameKit's own puts come from entity 0 and are left out). The event has the item and how many.
+local pickups_logged = {}  -- "from" / "none" -> lines logged
+function feed.pickup(world, e)
+  if type(e) ~= "table" then return end
+  local by, from, item, count = tonumber(e.pickedUpByEntityId) or 0, tonumber(e.pickedUpFromEntityId) or 0,
+    tonumber(e.itemId) or 0, tonumber(e.itemCount) or 0
+  -- the first ones of a run, to see what the game sends (Logging is live); (0.15.386) 20 with a "from" and 20 without:
+  -- FlameKit's own puts into a bag (Auto Loot) come with from 0 and filled the first 20 before any chest take
+  local kind = from == 0 and "none" or "from"
+  if (pickups_logged[kind] or 0) < 20 then
+    pickups_logged[kind] = (pickups_logged[kind] or 0) + 1
+    local f = {}
+    for k, v in pairs(e) do f[#f + 1] = tostring(k) .. "=" .. tostring(v) end
+    table.sort(f)
+    emf.log("feed: pickup " .. table.concat(f, " "))
+  end
+  if count <= 0 or item == 0 or not is_player(world, by) or rawget(e, "hideInUi") == true then return end
+  -- (0.15.388, owner 12:53 "items you pick axe go straight to the bag ... I'd still like those logged") from 0: straight
+  -- into the bag (a pickaxe, test monster runes); FlameKit's own Auto Loot puts come the same way and have their line
+  if from == 0 and own_puts.claim(by, item, count) then return end
+  local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
+    0, 0, from == 0 and "into bag" or "picked up")  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
+  local okp, x, _, z = pcall(world.position, world, by)
+  for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end
 
 local RARITY = { [0] = "", [1] = "uncommon ", [2] = "rare ", [3] = "epic ", [4] = "legendary " }

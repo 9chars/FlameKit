@@ -1,8 +1,8 @@
-0.15.378
+0.15.390
 2020 a354e5f1 flamekit/README.md
-115825 0adff481 flamekit/changes.txt
-1927 33c3a594 flamekit/main.lua
-13336 bbd5ed4d flamekit/mod.json
+118669 61ba4fe8 flamekit/changes.txt
+2067 08d46bdb flamekit/main.lua
+13599 e61bb406 flamekit/mod.json
 6141 5030250d flamekit/core/bag.lua
 4217 613fb13d flamekit/core/bases.lua
 1880 f4e4be39 flamekit/core/companion_net.lua
@@ -10,16 +10,20 @@
 796 c7846037 flamekit/core/companions.lua
 21504 dbe7cc73 flamekit/core/dive.lua
 1580 51edc5ae flamekit/core/fall_guard.lua
-8405 0a0e4fbb flamekit/core/ground_loot.lua
+1064 b3843c8a flamekit/core/game_events.lua
+8822 a818e241 flamekit/core/ground_loot.lua
 52061 38abb00d flamekit/core/item_db.lua
 8501 7015348a flamekit/core/items.lua
 20249 ec1aea3b flamekit/core/kit.lua
 11964 e858f024 flamekit/core/leap.lua
 12617 83936925 flamekit/core/loot_chest.lua
-5979 15e9e0b2 flamekit/core/loot_route.lua
+6149 a5e76ecc flamekit/core/loot_route.lua
 4554 bc049fe6 flamekit/core/loot_spots.lua
+12795 0ca9f86e flamekit/core/monster_names.lua
+2584 228c964d flamekit/core/monster_print.lua
 23486 22490b54 flamekit/core/monsters.lua
-13120 ee76efab flamekit/core/msg_feed.lua
+16407 7731224f flamekit/core/msg_feed.lua
+1571 15d2ad9e flamekit/core/own_puts.lua
 3769 efcada73 flamekit/core/pets.lua
 3603 f4ac930f flamekit/core/player_prefs.lua
 2778 3208929c flamekit/core/players.lua
@@ -33,9 +37,10 @@
 2180 9ece9151 flamekit/features/companions.lua
 171671 6fa8d7b4 flamekit/features/experimental.lua
 9805 7711eb6f flamekit/features/leaderboard.lua
+9822 df6bd68b flamekit/features/loose_loot.lua
 27567 59262df2 flamekit/features/loot_drop.lua
 12695 c9d19be7 flamekit/features/minimap.lua
-1407 3e8d9594 flamekit/features/msg_tabs.lua
+5782 5fa49a7a flamekit/features/msg_tabs.lua
 17159 99e86111 flamekit/features/native_ui.lua
 172277 ec2e24b8 flamekit/features/npc_fields.lua
 14193 0ff3e738 flamekit/features/npc_wheel_probe.lua
@@ -46,8 +51,8 @@
 5920 7a4e0969 flamekit/features/travel_hide.lua
 4389 5aa3161d flamekit/features/companions/01_base.lua
 3707 b4fd32e6 flamekit/features/companions/02_fullrec.lua
-61375 22c90cc2 flamekit/features/companions/03_follow.lua
-25587 b5895f53 flamekit/features/companions/04_roster.lua
+62230 87dbd128 flamekit/features/companions/03_follow.lua
+25644 5699828e flamekit/features/companions/04_roster.lua
 27554 c2b0f6bc flamekit/features/companions/05_inventory.lua
 10173 cdedd965 flamekit/features/companions/06_wheel.lua
 20801 10aaf99d flamekit/features/companions/07_fight.lua
@@ -57,6 +62,6 @@
 22159 6f274554 flamekit/features/companions/11_roster_window.lua
 14332 c8482461 flamekit/features/loot_filter/client.lua
 2187 55496808 flamekit/features/loot_filter/init.lua
-17856 6c7dd46d flamekit/features/loot_filter/server.lua
+17904 e15a0db9 flamekit/features/loot_filter/server.lua
 994816 59e719fa flamekit_native/flamekit_native.dll
-464 79f69f6f flamekit_native/mod.json
+464 f2eeb969 flamekit_native/mod.json

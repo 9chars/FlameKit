@@ -21,7 +21,7 @@ kit.start({
   "features.chat",            -- chat copied into the Messages window, FlameKit's announcements there
   "features.leaderboard",     -- the PvP Leaderboard (kills and deaths between players)
   "features.loot_drop",       -- (0.15.142) a killed monster's loot; since 0.15.376 by the killer's Auto Loot setting
-  "features.chop_loot",       -- (0.15.389) what a tool breaks (trees, rocks) by the player's Auto Loot setting
+  "features.loose_loot",      -- (0.15.389, 0.15.390) loose drops of what a tool breaks or a kill leaves, by the player's Auto Loot setting
   "features.travel_hide",     -- (0.15.281) FlameKit's UI hides during a fast travel (the server tells the game when)
   "features.npc_wheel_probe",  -- the companion system, the player's end: the wheel, the Companion Roster window (2026-11-17)
   "features.msg_tabs",         -- (0.15.377) the Messages window's Battle and Loot tabs (the server's half and the channel)
