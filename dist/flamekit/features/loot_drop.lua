@@ -1,8 +1,11 @@
--- features/loot_drop.lua (0.15.142, owner): "Monsters drop their loot on the ground", a server setting (the Server
--- tab). Where the world is hosted, when it is on: every monster that dies (the game's own and FlameKit's test
--- monsters) gets its loot taken out of its body and put on the ground beside it, as the same items with the same
--- quality and level (core/ground_loot.lua), so nobody has to press E. Its body is removed 8 s after the death, a
--- boss's (Boss component) after 45 s. Players and their bodies are never touched.
+-- features/loot_drop.lua (0.15.142, owner): a killed monster's loot taken out of its body. Since 0.15.376 (owner
+-- 2026-11-21 09:35, "Auto Loot") it goes by the KILLER's own choice (Settings tab, Auto Loot; core/player_prefs.lua):
+-- into his bag, his companions' bags, on the ground, or the game's own way (the default: nothing is touched). The
+-- killer is the player who landed the killing blow, or the owner of the companion or pet that did (emf.on_hit,
+-- killed). No killer known (a fall, another monster): the game's own way. Each item goes through core/loot_route.lua
+-- (the killer's Auto Junk List first). It replaces the server-wide "Monsters drop their loot on the ground" (the
+-- Server tab, gone). The game's own and FlameKit's test monsters' bodies: a looted body is removed 8 s after the
+-- death, a boss's (Boss component) after 45 s. Players and their bodies are never touched.
 -- What a loose item cannot carry (core/ground_loot.lua): a gem socketed into a weapon. A piece that has one stays in
 -- the body (pressing E still gets it) and the body is then left to the game.
 -- Uses only core modules (HANDOFF rule 0b). The death event (EntityDiedEvent) needs one server restart after the
@@ -10,7 +13,9 @@
 
 local bag = require("core.bag")
 local ground = require("core.ground_loot")
-local server = require("core.server_settings")
+local route = require("core.loot_route")     -- (0.15.376) where each item goes
+local prefs = require("core.player_prefs")   -- (0.15.376) the killer's Auto Loot choice
+local feed = require("core.msg_feed")        -- (0.15.377) the monster's name for the Loot tab
 local test_tag = require("core.test_tag")
 local spots = require("core.loot_spots")  -- (0.15.170) a creature's separate loot spot
 local players = require("core.players")   -- (0.15.179) the nearest player opens a body that fills only when opened
@@ -25,7 +30,12 @@ local LOOKS = { 30, 90, 180, 360 }
 local BODY_S, BOSS_BODY_S = 8, 45
 local PER_STEP = 20            -- bodies handled per step (a big fight stays within EMF's time per step)
 
-local queue = {}               -- deaths waiting: { id, at, look, x, y, z, t, creature }
+local queue = {}               -- deaths waiting: { id, at, look, x, y, z, t, creature, ctx }
+-- (0.15.376) the killing blows: body id -> { player, at } (emf.on_hit, killed); read at the body's first look (the death
+-- event and the hit can come in either order), forgotten after a minute
+local kills = {}
+local dead = {}                -- (0.15.392) body id -> step of its death event (a second event for it is left out)
+local SPOT_TRIES = 4           -- (0.15.392) a body gone with no loot spot yet: looked for again, 1 s apart
 local retry = {}               -- (0.15.170) loot spots to look at again: { d, at }
 local bodies = {}              -- body id -> step to remove it at
 local steps = 0
@@ -60,14 +70,18 @@ local function died(world, e)
     test.armed, test.id, test.step, test.sent = false, id, steps, nil
     return  -- this body is the test's: the normal Loot Drop leaves it alone
   end
-  if not server.get("loot_to_ground") then return end
   if test_tag.is(world, id) then return end  -- (0.15.156, owner) FlameKit's test monsters: their loot goes into chests
+  -- (0.15.392) the game can send one death twice (body 100463, 13:23:42.808 and .976): the second was handled as a death
+  -- without a killer (the first had used the killing blow up) and its loot spot was left to the game
+  if dead[id] and steps - dead[id] < 600 then return end
+  dead[id] = steps
   local okp, x, y, z = pcall(world.position, world, id)
   local t = spots.death_time(e)
   note("body %s died: queued (time %s)", tostring(id), tostring(t))
   -- (0.15.198) whether it is a creature is told here, at the death: a later look may come after the body lost its Faction
+  local okn, from = pcall(feed.name, world, id)  -- (0.15.377) read at the death (the body loses its Faction later)
   queue[#queue + 1] = { id = id, at = steps + LOOKS[1], look = 1, x = okp and x or nil, y = okp and y or nil,
-                        z = okp and z or nil, t = t, creature = get(world, "Faction", id) ~= nil }
+                        z = okp and z or nil, t = t, creature = get(world, "Faction", id) ~= nil, from = okn and from or nil }
 end
 
 local FX_CANDIDATES = {  -- (0.15.180) for flamekit.fx
@@ -100,7 +114,34 @@ local function dump(v, depth)
   return "{" .. table.concat(parts, ", ") .. "}"
 end
 
-local function handle(world, id, look, creature)
+-- (0.15.376) who gets this body's loot and how: { player, account, choice }, or nil: the game's own way (no killer
+-- known, or his choice is the game's own). Looked up once per death, at its first look.
+local function killer_of(world, d)
+  if d.ctx ~= nil then return d.ctx or nil end
+  d.ctx = false
+  local k = kills[d.id]
+  kills[d.id] = nil
+  if not (k and k.player) then note("body %s: no killer known: the game's own loot", tostring(d.id)) return nil end
+  local oka, acc = pcall(world.account, world, k.player)
+  acc = oka and acc or nil
+  local choice = acc and prefs.get(acc, "auto_loot", world) or route.DEFAULT
+  if choice ~= "bag" and choice ~= "companion" and choice ~= "ground" then
+    note("body %s: killed by player %s, Auto Loot %s: the game's own loot", tostring(d.id), tostring(k.player), tostring(choice))
+    return nil
+  end
+  d.ctx = { player = k.player, account = acc, choice = choice, from = d.from }
+  note("body %s: killed by player %s, Auto Loot %s", tostring(d.id), tostring(k.player), choice)
+  return d.ctx
+end
+
+-- (0.15.376) one taken stack, by the killer's choice (core/loot_route.lua); `back(w, n)`: into `home` again
+local function deliver(world, ctx, st, taken, x, y, z, home)
+  route.deliver(world, ctx.player, ctx.account, ctx.choice, st.item, taken, st.level or 0, st.rarity or 0, x, y, z, st.gear,
+    function(w, n) emf.put(w, home, st.item, n, nil, { level = st.level or 0, rarity = st.rarity or 0 }) end, ctx.from)
+  tally.items = tally.items + 1
+end
+
+local function handle(world, id, look, creature, ctx)
   -- players never; a creature is known by its Faction at the first look only (0.15.147: the body loses it about when
   -- the game fills it with loot, 1.5-3 s after the death, and later looks skipped the body with its loot in it)
   if get(world, "PlayerState", id) then note("body %s: a player, skipped", tostring(id)) return "skip" end
@@ -128,17 +169,8 @@ local function handle(world, id, look, creature)
       keep = true  -- a socketed gem would be lost on the ground: this piece stays in the body
       tally.kept = tally.kept + 1
     else
-      local level, rarity = st.level or 0, st.rarity or 0
       emf.take(world, st.owner, st.item, st.count, function(w, taken)
-        if taken and taken > 0 then
-          local made, pid = ground.drop(w, st.item, taken, x, y, z, level, rarity, 2.5)
-          if made > 0 then
-            if pid then ground.mark(w, pid) ground.sparkle(w, pid) end  -- (0.15.174) the body's sparkle on it (experiment)
-            tally.items = tally.items + 1
-          else
-            emf.put(w, id, st.item, taken, nil, { level = level, rarity = rarity })  -- not dropped: back, nothing is lost
-          end
-        end
+        if taken and taken > 0 then deliver(w, ctx, st, taken, x, y, z, id) end  -- (0.15.376) by the killer's choice
       end, { slot = st.slot, exact = true })
     end
   end
@@ -234,7 +266,7 @@ local function open_as_player(world, id, label)
   return oke and done ~= false
 end
 
-local function poke(world, id, x, y, z, label)
+local function poke(world, id, x, y, z, label, ctx)
   if not x then
     local okp, px, py, pz = pcall(world.position, world, id)
     if not okp or not px then note("%s: no position, cannot be opened", tostring(label)) return false end
@@ -242,7 +274,7 @@ local function poke(world, id, x, y, z, label)
   end
   local ok, chest = pcall(emf.spawn, world, TEMP_CHEST, x, y - 3, z)
   if not ok or not chest or chest == 0 then note("%s: the game refused the receiving chest", tostring(label)) return false end
-  pulls[#pulls + 1] = { host = id, chest = chest, x = x, y = y, z = z, at = steps + 30, stage = 1, label = label }
+  pulls[#pulls + 1] = { host = id, chest = chest, x = x, y = y, z = z, at = steps + 30, stage = 1, label = label, ctx = ctx }
   return true
 end
 
@@ -260,16 +292,11 @@ local function pull_tick(world)
     elseif p.stage == 2 then
       local stacks = bag.entity_stacks(world, p.chest)
       for _, st in ipairs(stacks) do
-        local level, rarity = st.level or 0, st.rarity or 0
         emf.take(world, st.owner, st.item, st.count, function(w, taken)
-          if taken and taken > 0 then
-            local made, pid = ground.drop(w, st.item, taken, p.x, p.y, p.z, level, rarity, 2.5)
-            if made > 0 then tally.items = tally.items + 1 if pid then ground.mark(w, pid) end
-            else emf.put(w, p.host, st.item, taken, nil, { level = level, rarity = rarity }) end
-          end
+          if taken and taken > 0 then deliver(w, p.ctx, st, taken, p.x, p.y, p.z, p.host) end
         end, { slot = st.slot, exact = true })
       end
-      note("%s: %d stack(s) from the receiving chest to the ground", tostring(p.label), #stacks)
+      note("%s: %d stack(s) from the receiving chest, Auto Loot %s", tostring(p.label), #stacks, tostring(p.ctx.choice))
       if #stacks > 0 then tally.bodies = tally.bodies + 1 else tally.empty = tally.empty + 1 end
       p.stage, p.at = 3, steps + 30
       keep[#keep + 1] = p
@@ -283,7 +310,16 @@ end
 local body_again  -- below (it uses handle)
 local function from_spot(world, d, again)
   local asked = spots.find(d.id, d.x, d.z, d.t, function(w, ids)
-    if #ids == 0 then note("body %s: no loot spot found", tostring(d.id)) tally.empty = tally.empty + 1 return end
+    if #ids == 0 then
+      -- (0.15.392, owner 13:29 "Critter carapace ... the item dropped, nothing picked it up": body 100463 was gone at its
+      -- first look, 0.5 s after the death, and its loot spot 106943 came later) no spot yet: looked for again, 1 s apart
+      d.spot_tries = (d.spot_tries or 0) + 1
+      if d.spot_tries <= SPOT_TRIES then
+        retry[#retry + 1] = { d = d, at = steps + 60, again = again }
+        return
+      end
+      note("body %s: no loot spot found", tostring(d.id)) tally.empty = tally.empty + 1 return
+    end
     for _, cid in ipairs(ids) do
       local stacks = bag.entity_stacks(w, cid)
       if #stacks == 0 and (again or 0) < 2 then  -- not filled yet: once more, a second later (the 2nd time: poked)
@@ -291,7 +327,7 @@ local function from_spot(world, d, again)
           if open_as_player(w, cid, "loot spot " .. tostring(cid)) then
             retry[#retry + 1] = { d = d, at = steps + 30, again = 2 }
           else
-            poke(w, cid, nil, nil, nil, "loot spot " .. tostring(cid))  -- (0.15.178) into a receiving chest
+            poke(w, cid, nil, nil, nil, "loot spot " .. tostring(cid), d.ctx)  -- (0.15.178) into a receiving chest
           end
           return
         end
@@ -304,18 +340,13 @@ local function from_spot(world, d, again)
       local moved = 0
       for _, st in ipairs(stacks) do
         if not st.gem then
-          local level, rarity = st.level or 0, st.rarity or 0
           emf.take(w, st.owner, st.item, st.count, function(w2, taken)
-            if taken and taken > 0 then
-              local made, pid = ground.drop(w2, st.item, taken, x, y, z, level, rarity, 2.5)
-              if made > 0 then tally.items = tally.items + 1 if pid then ground.mark(w2, pid) ground.sparkle(w2, pid) end
-              else emf.put(w2, cid, st.item, taken, nil, { level = level, rarity = rarity }) end
-            end
+            if taken and taken > 0 then deliver(w2, d.ctx, st, taken, x, y, z, cid) end
           end, { slot = st.slot, exact = true })
           moved = moved + 1
         end
       end
-      note("body %s: loot spot %s, %d stack(s) to the ground", tostring(d.id), tostring(cid), moved)
+      note("body %s: loot spot %s, %d stack(s), Auto Loot %s", tostring(d.id), tostring(cid), moved, tostring(d.ctx and d.ctx.choice))
       tally.bodies = tally.bodies + 1
       if moved == #stacks then bodies[cid] = steps + 60 end  -- the emptied spot goes a second later
     end
@@ -325,7 +356,7 @@ end
 
 body_again = function(world, r)
   local d = r.d
-  local okh, res = pcall(handle, world, d.id, #LOOKS, true)
+  local okh, res = pcall(handle, world, d.id, #LOOKS, true, d.ctx)
   if okh and res == "empty" then pcall(from_spot, world, d)
   elseif okh and res == "gone" then pcall(from_spot, world, d) end
 end
@@ -362,19 +393,22 @@ function F.tick(world)
     if d.at > steps or n >= PER_STEP then waiting[#waiting + 1] = d
     else
       n = n + 1
-      local ok, r = pcall(handle, world, d.id, d.look, d.creature)
+      local okk, ctx = pcall(killer_of, world, d)
+      local ok, r
+      if not (okk and ctx) then ok, r = true, "skip"  -- (0.15.376) the game's own way: the body keeps its loot
+      else ok, r = pcall(handle, world, d.id, d.look, d.creature, ctx) end
       if not ok then
         kit.debug("warn", "loot drop: body %s: %s", tostring(d.id), tostring(r))
       elseif r == "empty" then
         if d.look < #LOOKS then
           waiting[#waiting + 1] = { id = d.id, at = steps + LOOKS[d.look + 1] - LOOKS[d.look], look = d.look + 1,
-                                    x = d.x, y = d.y, z = d.z, t = d.t, creature = d.creature }
+                                    x = d.x, y = d.y, z = d.z, t = d.t, creature = d.creature, ctx = d.ctx, from = d.from }
         elseif not d.poked and (get(world, "InventorySetup", d.id) or get(world, "Inventory", d.id)) then
           -- (0.15.176) a body with an inventory that stayed empty: filled only when opened
           d.poked = true
           if open_as_player(world, d.id, "body " .. tostring(d.id)) then
             retry[#retry + 1] = { body = true, d = d, at = steps + 30 }  -- looked at again: its loot to the ground
-          elseif not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id)) then
+          elseif not poke(world, d.id, nil, nil, nil, "body " .. tostring(d.id), d.ctx) then
             pcall(from_spot, world, d)
           end
         else
@@ -396,15 +430,31 @@ function F.tick(world)
     end
   end
   if steps % 3600 == 0 then diag = 0 end
+  if steps % 600 == 0 then  -- (0.15.376) killing blows whose body never came to a look (a minute old)
+    for id, k in pairs(kills) do if steps - k.at > 3600 then kills[id] = nil end end
+    for id, at in pairs(dead) do if steps - at > 600 then dead[id] = nil end end
+  end
   if steps % 3600 == 0 and tally.bodies + tally.empty > 0 then
-    emf.log(string.format("loot drop: last minute: %d bodies, %d stacks on the ground, %d kept in a body (socketed gem), %d empty",
-      tally.bodies, tally.items, tally.kept, tally.empty))
+    local r = route.tally()  -- (0.15.376) where the stacks went
+    emf.log(string.format("loot drop: last minute: %d bodies, %d stacks taken (bag %d, companions %d, ground %d, junk dropped %d, junk deleted %d), %d kept in a body (socketed gem), %d empty",
+      tally.bodies, tally.items, r.bag, r.companion, r.ground, r.junk_drop, r.junk_delete, tally.kept, tally.empty))
     tally = { bodies = 0, items = 0, kept = 0, empty = 0 }
   end
 end
 
+-- (0.15.376) a killing blow: who gets the loot (the player, or the owner of the companion or pet that landed it)
+local function on_hit(world, hit)
+  if not (hit and hit.killed) then return end
+  local target = tonumber(hit.target)
+  if not target or target == 0 then return end
+  kills[target] = { player = route.player_of(world, hit.attacker), at = steps }
+end
+
 function F.setup(k)
   kit = k
+  prefs.setup()
+  local okh, hooked = pcall(emf.on_hit, kit.guard(F, on_hit, "a hit"))
+  if not (okh and hooked ~= false) then emf.log("loot drop: emf.on_hit is not there: no killer is known, every monster keeps its loot (the game's own way)") end
   local ok = pcall(emf.on_event, "EntityDiedEvent", kit.guard(F, died, "a death"), "server")
   ground.emits()  -- (0.15.174) the sparkle event for dropped items (named here: EMF wants it in the first run)
   if not ok then emf.log("loot drop: no death events: monsters keep their loot in their bodies") end
@@ -439,6 +489,40 @@ function F.setup(k)
         emf.reply("fx " .. n .. ": refused")
       end
     end, "the fx command"))
+  -- (0.15.393) debug: every container or loose item within R m (default 20) of a player, with the components that tell a
+  -- monster's loot spot apart (core/loot_spots.lua is_loot_container), in emf_core.log. One walk at once: local tests only.
+  pcall(emf.command, "lootnear", "[player entity] [m]: containers and loose items near a player, in emf_core.log (debug)",
+    kit.guard(F, function(world, args)
+      if not world:is_server() then emf.reply("Only on the server world.") return end
+      local pid = tonumber(args[1]) or 1
+      local r = tonumber(args[2]) or 20
+      local px, py, pz = world:position(pid)
+      if not px then emf.reply("lootnear: no player " .. tostring(pid)) return end
+      local n = 0
+      for _, id in ipairs(world:entities()) do
+        local inv, setup, pick, def = get(world, "Inventory", id), get(world, "InventorySetup", id), get(world, "PickupItem", id), get(world, "DefaultInventory", id)
+        if inv or setup or pick or def then
+          local x, y, z = world:position(id)
+          if x and (x - px) ^ 2 + (z - pz) ^ 2 <= r * r and n < 60 then
+            n = n + 1
+            local flags = {}
+            for _, c in ipairs({ "Inventory", "InventorySetup", "DefaultInventory", "PickupItem", "DestroyOnLoot", "DoNotSave",
+                                 "CreateItemLoot", "ForceSave", "Health", "PlayerState", "Faction", "SpawnTime", "StaticCollider" }) do
+              if get(world, c, id) then flags[#flags + 1] = c end
+            end
+            local items = {}
+            for i, st in ipairs(bag.entity_stacks(world, id)) do
+              if i > 6 then break end
+              items[#items + 1] = string.format("%s x%s", tostring(st.item), tostring(st.count))
+            end
+            if pick then items[#items + 1] = string.format("pickup %s x%s", tostring(pick.itemId), tostring(pick.pickupAmount)) end
+            emf.log(string.format("lootnear: %s at %.1f m (%.1f up): %s | %s", tostring(id), math.sqrt((x - px) ^ 2 + (z - pz) ^ 2),
+              y - py, table.concat(flags, " "), table.concat(items, ", ")))
+          end
+        end
+      end
+      emf.reply(string.format("lootnear: %d near player %s (emf_core.log)", n, tostring(pid)))
+    end, "the lootnear command"))
   pcall(emf.command, "loottest", "on|watch|off: (watch: only logs, no event) the next monster that dies gets LootInteractionEvent with itself as guest and host; its items are logged, nothing is moved",
     kit.guard(F, function(world, args)
       if not world:is_server() then emf.reply("Only on the server world.") return end

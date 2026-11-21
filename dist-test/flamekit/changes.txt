@@ -1,3 +1,21 @@
+0.15.396 Nov 21, 2026
+- Release (Development and Stable): everything since 0.15.374 (the lines below), including Auto Loot, the Messages window's Battle and Loot tabs and a repair of damaged FlameKit installs (every file that differs from the release is downloaded again).
+
+0.15.395 Nov 21, 2026
+- Logging for the Battle tab's "heals himself" lines (what the game says about them). Server only: no game change.
+
+0.15.394 Nov 21, 2026
+- Auto Loot: the loot piles some monsters leave (for example critters with their Critter Carapace) were not recognized as loot and stayed on the ground. Server only: no game change.
+
+0.15.393 Nov 21, 2026
+- A debug tool for loot left on the ground (the console's flamekit.lootnear). Server only: no game change.
+
+0.15.392 Nov 21, 2026
+- Auto Loot: some monsters' loot was left on the ground (for example a critter's Critter Carapace): the loot pile they leave can come a moment after the body is gone, and the game sometimes reports one death twice. Both are handled now. Server only: no game change.
+
+0.15.391 Nov 21, 2026
+- Logging for Auto Loot of what monsters throw on the ground (what lies near each kill, and why it is left). Server only: no game change.
+
 0.15.390 Nov 21, 2026
 - Auto Loot: what a monster you kill throws on the ground (for example a Shroud Fog Nest Drone's Archaic Essence) goes into your bag or your companions' bags too, by your Auto Loot setting. Items that were already lying on the ground are left alone.
 - Settings, Auto Loot: the setting now reads "Where loot goes: monsters you kill, things you chop or mine", and its help says what it covers.

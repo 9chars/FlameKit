@@ -409,7 +409,18 @@ end
 
 function S.setup(k, F)
   kit, items, bag = k, k.items, k.bag
-  emf.on_event("PickupEvent", kit.guard(F, S.on_pickup, "PickupEvent"), "server")
+  -- (0.15.376, owner 2026-11-21 09:35 "The loot MUST be evaluated by the auto junk list first") Auto Loot asks here,
+  -- through core/loot_route.lua, what this player's list does with an item: "drop", "delete" or nil (keep). The same
+  -- rule as a pickup: the list on, the item on it, gear and kept kinds only while the player shows all items.
+  require("core.loot_route").set_junk(function(world, account, item, gear)
+    if not kit.enabled(F) then return nil end  -- (kit.guard drops the answer: checked here)
+    local st = state(account)
+    if not st or not st.opts.auto or next(st.junk) == nil then return nil end
+    resolve(st)
+    if removable(st, { item = item, gear = gear and true or false }) then return st.opts.action end
+    return nil
+  end)
+  require("core.game_events").on("PickupEvent", kit.guard(F, S.on_pickup, "PickupEvent"))  -- (0.15.380) shared with the Loot tab
   emf.on_world_data(function() end)  -- asks EMF for this world's saved data: the players' lists are kept beside it
   emf.on_player_left(kit.guard(F, function(world, p)
     players[p.account] = nil  -- the list stays saved with the world; what was running for them stops

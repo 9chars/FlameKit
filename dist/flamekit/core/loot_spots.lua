@@ -30,8 +30,12 @@ local function get(world, c, id)
   return nil
 end
 
+-- (0.15.393, owner 13:45 "dropped a ton of Critter Carapace and nothing picked it up") some monsters' loot piles are
+-- saved (no DoNotSave) but carry the monster's Faction (flamekit.lootnear, 13:46: Inventory InventorySetup DefaultInventory
+-- DestroyOnLoot Faction SpawnTime StaticCollider, empty until opened); a world chest or urn has no Faction
 local function is_loot_container(world, id)
-  return get(world, "DestroyOnLoot", id) and get(world, "DefaultInventory", id) and get(world, "DoNotSave", id)
+  return get(world, "DestroyOnLoot", id) and get(world, "DefaultInventory", id)
+    and (get(world, "DoNotSave", id) or get(world, "Faction", id))
     and not get(world, "CreateItemLoot", id) and not get(world, "ForceSave", id) and not get(world, "Health", id)
     and not get(world, "PlayerState", id) and not get(world, "PickupItem", id)
     and (get(world, "Inventory", id) or get(world, "InventorySetup", id))

@@ -1,3 +1,74 @@
+0.15.396 Nov 21, 2026
+- Release (Development and Stable): everything since 0.15.374 (the lines below), including Auto Loot, the Messages window's Battle and Loot tabs and a repair of damaged FlameKit installs (every file that differs from the release is downloaded again).
+
+0.15.395 Nov 21, 2026
+- Logging for the Battle tab's "heals himself" lines (what the game says about them). Server only: no game change.
+
+0.15.394 Nov 21, 2026
+- Auto Loot: the loot piles some monsters leave (for example critters with their Critter Carapace) were not recognized as loot and stayed on the ground. Server only: no game change.
+
+0.15.393 Nov 21, 2026
+- A debug tool for loot left on the ground (the console's flamekit.lootnear). Server only: no game change.
+
+0.15.392 Nov 21, 2026
+- Auto Loot: some monsters' loot was left on the ground (for example a critter's Critter Carapace): the loot pile they leave can come a moment after the body is gone, and the game sometimes reports one death twice. Both are handled now. Server only: no game change.
+
+0.15.391 Nov 21, 2026
+- Logging for Auto Loot of what monsters throw on the ground (what lies near each kill, and why it is left). Server only: no game change.
+
+0.15.390 Nov 21, 2026
+- Auto Loot: what a monster you kill throws on the ground (for example a Shroud Fog Nest Drone's Archaic Essence) goes into your bag or your companions' bags too, by your Auto Loot setting. Items that were already lying on the ground are left alone.
+- Settings, Auto Loot: the setting now reads "Where loot goes: monsters you kill, things you chop or mine", and its help says what it covers.
+
+0.15.389 Nov 21, 2026
+- Auto Loot: what falls out of a tree, rock or other object you break with an axe or pickaxe goes into your bag or your companions' bags too, by your Auto Loot setting ("ground" and "game": left where it falls). Items that were already lying on the ground are left alone. Server only: no game change.
+
+0.15.388 Nov 21, 2026
+- Loot tab: what goes straight into your bag (mining with a pickaxe, picking up loose items from the ground) is listed too ("> into bag"). Auto Loot's own lines are not doubled. Server only: no game change.
+
+0.15.387 Nov 21, 2026
+- Logging for Auto Loot of chopped and broken things: looks where the object stood (it is gone by the breaking hit), 30 m around. Server only: no game change.
+
+0.15.386 Nov 21, 2026
+- Loot tab: taking loot from a chest or a body by hand stopped the Battle and Loot tabs (an error); fixed. Server only: no game change.
+
+0.15.385 Nov 21, 2026
+- Logging for Auto Loot of what drops from chopping and breaking things (what a hit on a tree or rock reports, which loose items appear). Server only: no game change.
+
+0.15.384 Nov 21, 2026
+- Battle tab: monsters by their own names (e.g. "Scavenger Ranger Crossbow(45)", "Shroud Soldier(30)") instead of the faction (Fogger). A monster FlameKit does not know yet still shows its faction. Server only: no game change.
+
+0.15.383 Nov 21, 2026
+- A debug tool for the monster names in the Battle tab (the console's flamekit.monprints). Server only: no game change.
+
+0.15.382 Nov 21, 2026
+- Battle tab: only hits between you (or your companions) and real monsters or other players; hits on trees, rocks and other objects are left out. Server only: no game change.
+
+0.15.381 Nov 21, 2026
+- Battle tab: the lines say it plainly ("Fogger(45) hit Midevil for 85 damage", "Midevil hit Vukah(25) for 120 damage (crit)"), and a monster's level is written after its kind, Fogger(45). Server only: no game change.
+
+0.15.380 Nov 21, 2026
+- Loot tab: loot you pick up by hand (from a body, a chest, the ground) is listed too, by the same settings (yours always; other players' near you unless "Show other players' loot messages" is off). Server only: no game change.
+
+0.15.379 Nov 21, 2026
+- Companions and pets: when you join, those that are more than 20 m from you come straight back beside you once you stand on the ground (before, they stood where you left them until you moved, up to minutes). Server only: no game change.
+
+0.15.378 Nov 21, 2026
+- The Auto Junk List's lines ("Junk discarded: Twigs x3") are in the Messages window's Loot tab now, not in Chat.
+- Battle and Loot: other players' lines within 100 m of you (was 150 m).
+
+0.15.377 Nov 21, 2026
+- The Messages window has tabs: Chat (everything it showed before), Battle and Loot. A tab you are not looking at shows how many new lines it has, e.g. "Battle (12)"; the window never switches tabs by itself.
+- Battle: every hit you and your companions land or take, with its damage (crit, backstab, weak spot, blocked, parried, killed), and the companions' heals, by name ("Rex heals you for 120!": the green notice stays, its line is in the Battle tab now). Off by default (Settings tab, new Messages section: Battle messages), so the server sends nothing until you turn it on. Other players' hits near you too, unless you turn "Show other players' battle messages" off.
+- Loot: what Auto Loot gave you (and other players near you, unless "Show other players' loot messages" is off): the item, how many, its quality and level, the monster, and where it went (bag, companion, ground, junk).
+
+0.15.376 Nov 21, 2026
+- Auto Loot (Settings tab, above Features): where the loot of a monster you kill goes, your own choice: 1. into your main bag, 2. into a companion's bag, 3. on the ground, 4. the game's own way (the default: the body keeps it, press E). A kill by your companion or pet counts as yours. When the chosen bag is full the loot goes to the other one (a companion counts only while it is out and following you; your main companion first, at most 72 stacks each), then to the ground. Your Auto Junk List comes first: junk is dropped or deleted as you set it there.
+- The Server tab is gone, with its "Monsters drop their loot on the ground" (each player chooses now).
+
+0.15.375 Nov 21, 2026
+- Companion Roster: a game whose player is not an admin no longer asks the server for the roster (it asked every 5 seconds and was refused every time); the server logs a refusal once per player.
+
 0.15.374 Nov 20, 2026
 - Test monsters' Reward loot: more gear can be the legendary item: the Fog Nest and Hollow Hall dungeon weapons and Vorgoth's greatsword (level 43 and up), the multi-class Fog Powered and Skeleton armour sets, the tier 5 loot set and the Wards (tiers 1-7). Server only: no game change.
 

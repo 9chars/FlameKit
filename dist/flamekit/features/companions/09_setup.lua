@@ -68,6 +68,14 @@ function F.setup(k)
     end
     return w
   end
+  -- (0.15.376) Auto Loot (core/loot_route.lua): a companion's kill is its player's; loot into the companions' bags
+  local route = require("core.loot_route")
+  route.set_owner(function(world, entity) return inv.loot_owner(world, entity) end)
+  route.set_companion(function(world, player, account, item, count, level, rarity)
+    return inv.loot_into(world, player, account, item, count, level, rarity)
+  end)
+  -- (0.15.377) the Battle tab names companions by their own names (core/msg_feed.lua)
+  require("core.msg_feed").set_namer(function(world, entity) return name_of[entity] end)
   local net = require("core.companion_net")
   local okc = net.handle(WHEEL, "server", function(world, from, data)
     local okw, errw = pcall(function() return on_pick(world, who(world, from), data) end)

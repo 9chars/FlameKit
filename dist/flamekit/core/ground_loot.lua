@@ -25,6 +25,18 @@ local RARITY = { common = 0, uncommon = 1, rare = 2, epic = 3, legendary = 4 }
 -- Drops `count` of `item` (an id or a debug name) at x, y, z, `spread` m to a random side (default 2), with
 -- `level` (0: the game's default) and `rarity` (0-4 or a name; default 0). Returns the number of pickups made.
 -- `template` (optional): another pickup template (ground.PICKUP_VFX); if the game refuses it, the plain one is used.
+-- (0.15.389) the pickups FlameKit made (entity -> os.time()), kept 5 minutes: features/chop_loot.lua leaves them alone
+local own = {}
+function ground.is_own(id)
+  local t = own[id]
+  if t and os.time() - t > 300 then own[id] = nil t = nil end
+  return t ~= nil
+end
+function ground.forget_old()
+  local now = os.time()
+  for id, t in pairs(own) do if now - t > 300 then own[id] = nil end end
+end
+
 function ground.drop(world, item, count, x, y, z, level, rarity, spread, template)
   if type(item) == "string" then
     local ok, id = pcall(emf.item, item)
@@ -44,7 +56,7 @@ function ground.drop(world, item, count, x, y, z, level, rarity, spread, templat
     local ok, id = false, nil
     if template and template ~= ground.PICKUP then ok, id = pcall(emf.spawn, world, template, px, py, pz, parts) end
     if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, ground.PICKUP, px, py, pz, parts) end
-    if ok and id and id ~= 0 then made, last = made + 1, id else break end
+    if ok and id and id ~= 0 then made, last = made + 1, id own[id] = os.time() else break end
     count = count - n
   end
   return made, last  -- (0.15.152) also the last pickup's entity id, for a caller that marks it

@@ -108,6 +108,45 @@ function kit.note(text, colour, always, who)
   messages_dirty = true
 end
 
+-- (0.15.377, owner 2026-11-21 09:35) the Messages window's Battle and Loot tabs: a line in tab "battle" or "loot"
+-- (core/msg_feed.lua brings them from the server), written to emf\mods\flamekit\ui_battle.dat and ui_loot.dat in the
+-- same "m <number> <rrggbb> <text>" form, then "end"; at most TAB_MOST lines each, written at most 4 times a second.
+-- Not in the log (a big fight would flood it).
+local TAB_MOST = { battle = 1000, loot = 300 }
+local tabs = { battle = { list = {}, n = 0, dirty = false }, loot = { list = {}, n = 0, dirty = false } }
+local tab_steps = 0
+function kit.note_tab(tab, text, colour)
+  local t = tabs[tab]
+  if not t then return end
+  t.n = t.n + 1
+  t.list[#t.list + 1] = { n = t.n, colour = (type(colour) == "string" and colour:match("^#?(%x%x%x%x%x%x)$")) or "ffb060",
+    text = (tostring(text):gsub("[%c]", " ")) }
+  if #t.list > TAB_MOST[tab] then
+    local keep = {}
+    for i = #t.list - TAB_MOST[tab] + 1, #t.list do keep[#keep + 1] = t.list[i] end
+    t.list = keep
+  end
+  t.dirty = true
+end
+
+local function write_tabs()
+  tab_steps = tab_steps + 1
+  if tab_steps % 15 ~= 0 then return end  -- (every 15 steps of your own world: 4 times a second)
+  for tab, t in pairs(tabs) do
+    if t.dirty then
+      local lines = {}
+      for _, m in ipairs(t.list) do lines[#lines + 1] = string.format("m %d %s %s", m.n, m.colour, m.text) end
+      lines[#lines + 1] = "end"
+      local f = io.open(emf.dir .. "\\ui_" .. tab .. ".dat", "w")
+      if f then
+        f:write(table.concat(lines, "\n") .. "\n")
+        f:close()
+        t.dirty = false
+      end
+    end
+  end
+end
+
 -- Notices (since 0.15.54): warnings that stay on screen in FlameKit's Notices window until the feature takes them back,
 -- written into emf\mods\flamekit\ui_notices.dat: "n <tag> <rrggbb> <text>" lines, then "end" (DLL: NoticeLayer).
 -- kit.notice(tag, text, colour) puts one up (or changes it), kit.notice(tag) takes it back. The file is written at the
@@ -292,6 +331,7 @@ end
 
 local function hud_tick(world)
   write_messages()
+  write_tabs()  -- (0.15.377)
   expire_notices()
   write_notices()
   local label = ""

@@ -436,3 +436,62 @@ inv.adopt = function(world, r)
     rule = okr and rule or nil }
   log(string.format("inventory %s: chest %s taken up again after a reload", r.name, tostring(ch.id)))
 end
+
+-- ===== Auto Loot (0.15.376, owner 2026-11-21 09:35) =========================================================================
+-- core/loot_route.lua puts a killed monster's loot into the bags of the companions that are out and following the
+-- killer ("the player MUST have the companion spawned and following them"): his main companion first, then the others
+-- in roster order; each holds at most inv.LOOT_CAP stacks (owner 08:37 "i agree with the cap 72 stack limit.. thats per
+-- companion"), the same item with the same level and quality fills an existing stack first. A companion whose chest is
+-- open gets nothing meanwhile (what is in the chest is saved from the chest). The roster is saved at most every
+-- inv.LOOT_SAVE steps while loot comes in (every kill saving the whole roster would be too much). Returns how many it stored.
+inv.LOOT_CAP, inv.LOOT_SAVE = 72, 300
+inv.loot_dirty = false
+function inv.loot_into(world, player, account, item, count, level, rarity)
+  local items = require("core.items")
+  local cands = {}
+  for _, r in ipairs(roster.list) do
+    local ent = ent_of[r.name]
+    local d = ent and drives[ent]
+    if r.out and r.mode == "follow" and d and d.player == player and not r.chest then
+      cands[#cands + 1] = r
+    end
+  end
+  local main = account and roster.main[account]
+  table.sort(cands, function(a, b) return (a.name == main and 0 or 1) < (b.name == main and 0 or 1) end)
+  local max = items.max_stack(item) or 1
+  local left, stored, first = count, 0, nil
+  for _, r in ipairs(cands) do
+    if left <= 0 then break end
+    if type(r.inv) ~= "table" then r.inv = {} end
+    local list, n0 = r.inv, 0
+    for _, e in ipairs(list) do
+      if left <= 0 then break end
+      if e.item == item and (e.level or 0) == (level or 0) and (e.rarity or 0) == (rarity or 0) and not e.unlocked and (e.count or 0) < max then
+        local add = math.min(left, max - (e.count or 0))
+        e.count, left, n0 = (e.count or 0) + add, left - add, n0 + add
+      end
+    end
+    while left > 0 and #list < inv.LOOT_CAP do
+      local add = math.min(left, max)
+      list[#list + 1] = { item = item, count = add, level = level or 0, rarity = rarity or 0 }
+      left, n0 = left - add, n0 + add
+    end
+    if n0 > 0 then
+      stored = stored + n0
+      first = first or r.name
+      inv.loot_dirty = true
+      log(string.format("auto loot: %s took %d of item %s (%d stack(s) now)", r.name, n0, tostring(item), #list))
+    end
+  end
+  return stored, first
+end
+
+-- The player whose companion or pet `entity` is: the one he follows, else his owner when online; nil when it is none.
+function inv.loot_owner(world, entity)
+  local name = name_of[entity]
+  local r = name and find(name)
+  if not r then return nil end
+  local d = drives[entity]
+  if d and d.player then return d.player end
+  return player_of(world, r.owner)
+end
