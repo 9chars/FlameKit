@@ -25,6 +25,8 @@ local prefs = require("core.player_prefs")
 local ground = require("core.ground_loot")
 local feed = require("core.msg_feed")  -- the monster's name for the Loot tab
 local news = require("core.loot_news")
+local bag = require("core.bag")
+local events = require("core.game_events")
 
 local F = { id = "loose_loot", title = "Loose Loot" }
 local kit
@@ -43,6 +45,11 @@ local tally = { objects = 0, monsters = 0, stacks = 0 }
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   return ok and v or nil
+end
+
+local function field(v, k)
+  local ok, x = pcall(function() return v[k] end)
+  return ok and x or nil
 end
 
 local function note(fmt, ...)
@@ -157,13 +164,54 @@ local function on_pickup(world, id, x, y, z, now)
     function(w, n) ground.drop(w, item, n, x, y, z, level, rarity) end, best.from)
 end
 
+-- (0.15.411, owner 17:44 "i get backpack full when I pickaxe too") debug: the server's InventoryFull event (the game's
+-- mining_node_events, loot_pickup_item and immediate_loot_action send it when a bag refuses): who, from what, and
+-- what that entity holds then and half a second later (does a refused mined item stay in the node?). Kept, can be
+-- switched off.
+local FULL_LOG, FULL_MAX = true, 30
+local full_said, full_later = 0, {}
+local FULL_FLAGS = { "MiningNode", "DynamicMiningNode", "ResourceNodePickupDrops", "Inventory", "InventorySetup",
+  "DefaultInventory", "PickupItem", "DestroyOnLoot", "RandomLoot", "Health", "PlayerState" }
+local function full_look(world, from, what)
+  local flags, items = {}, {}
+  for _, c in ipairs(FULL_FLAGS) do if get(world, c, from) then flags[#flags + 1] = c end end
+  for i, st in ipairs(bag.entity_stacks(world, from)) do
+    if i > 8 then break end
+    items[#items + 1] = string.format("%s x%s", tostring(st.item), tostring(st.count))
+  end
+  emf.log(string.format("loose loot: full bag: %s: entity %s: %s | %s", what, tostring(from), table.concat(flags, " "),
+    #items > 0 and table.concat(items, ", ") or "(nothing)"))
+end
+local function on_full(world, e)
+  if not FULL_LOG or full_said >= FULL_MAX then return end
+  full_said = full_said + 1
+  local by = tonumber(field(e, "pickedUpById")) or 0
+  local from = tonumber(field(e, "pickedUpFromId")) or 0
+  local px, _, pz = world:position(by)
+  local fx, _, fz = world:position(from)
+  emf.log(string.format("loose loot: full bag: InventoryFull by %d from %d mask %s at %.1f m", by, from,
+    tostring(field(e, "mask")), (px and fx) and math.sqrt((px - fx) ^ 2 + (pz - fz) ^ 2) or -1))
+  if from ~= 0 then
+    full_look(world, from, "now")
+    if #full_later < 30 then full_later[#full_later + 1] = { from = from, at = steps + 30 } end
+  end
+end
+
 function F.tick(world)
   steps = steps + 1
+  if #full_later > 0 then
+    local keep = {}
+    for _, l in ipairs(full_later) do
+      if steps < l.at then keep[#keep + 1] = l else pcall(full_look, world, l.from, "half a second later") end
+    end
+    full_later = keep
+  end
   if #broken > 0 and tick_of(world) - broken[#broken].tick > WINDOW_TICKS then broken = {} end
   if #tool_hits > 0 and tick_of(world) - tool_hits[#tool_hits].tick > HIT_TICKS then tool_hits = {} end
   news.tick(world, #broken > 0 or #tool_hits > 0)  -- (0.15.399) the DLL's news only while a drop is awaited (0.15.409: or a tool is in use)
   if steps % 3600 == 0 then
     said = 0
+    full_said = 0
     ground.forget_old()
     if tally.objects + tally.monsters > 0 then
       emf.log(string.format("loose loot: last minute: %d object(s) broken with a tool, %d monster(s) killed, %d drop(s) taken",
@@ -180,6 +228,9 @@ function F.setup(k)
   news.on_pickup(kit.guard(F, on_pickup, "a new loose item"))
   local okh, hooked = pcall(emf.on_hit, kit.guard(F, on_hit, "a hit"))
   if not (okh and hooked ~= false) then emf.log("loose loot: emf.on_hit is not there: loose drops stay the game's") end
+  if FULL_LOG and not events.on("InventoryFull", kit.guard(F, on_full, "a full bag")) then
+    emf.log("loose loot: InventoryFull cannot be heard")
+  end
 end
 
 return F
