@@ -174,7 +174,8 @@ function C.receive(world, msg)
     acked = true
     unacked = 0
   elseif msg.op == "done" and type(msg.total) == "number" then
-    kit.note(server.summary(msg), JUNK_RED)
+    -- (0.15.378, owner 2026-11-21 10:24 "It should go to the loot tab") the Messages window's Loot tab, not Chat
+    kit.note_tab("loot", server.summary(msg), JUNK_RED)
   elseif msg.op == "autoloot" then
     auto_loot = msg.on == true
     refresh_warning()

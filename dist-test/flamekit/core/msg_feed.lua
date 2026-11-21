@@ -23,7 +23,7 @@ local route = require("core.loot_route")
 
 local feed = {}
 
-feed.RADIUS = 150          -- m (pending the owner's choice, 2026-11-21 10:0x)
+feed.RADIUS = 100          -- m (owner 2026-11-21 10:24 "I think the 100 m radius is fine for now")
 local CHANNEL = "feed"
 local MAX_BYTES = 15000    -- one message (the channel allows 16384)
 local SEND_EVERY = 30      -- steps between two batches to a player

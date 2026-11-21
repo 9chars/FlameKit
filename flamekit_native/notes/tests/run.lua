@@ -97,7 +97,16 @@ local emf_hud = {}  -- what the mod asked EMF to show (nothing since 0.15.14: Fl
 -- The lower-left lines as the DLL would draw them: ui_hud.dat in the mod's folder (kit.lua writes it).
 -- status: the newest message in FlameKit's Messages window (ui_messages.dat, kit.note), messages: how many there are
 local hud = setmetatable({}, { __index = function(_, key)
-  local t = { label = nil, status = "", status_colour = nil, messages = 0, newest = 0, build = false }
+  local t = { label = nil, status = "", status_colour = nil, messages = 0, newest = 0, build = false,
+              loot = "", loot_colour = nil, loot_newest = 0 }  -- (0.15.378) the Loot tab: ui_loot.dat
+  local lf = io.open(TMP .. "\\ui_loot.dat", "r")
+  if lf then
+    for line in lf:lines() do
+      local n, rgb, text = line:match("^m (%d+) (%x%x%x%x%x%x) (.*)$")
+      if n then t.loot, t.loot_colour, t.loot_newest = text, "#" .. rgb, tonumber(n) end
+    end
+    lf:close()
+  end
   local f = io.open(TMP .. "\\ui_hud.dat", "r")
   if f then
     for line in f:lines() do
@@ -497,8 +506,9 @@ step(10)
 check(count(201, 0x11) == 0, "your pickup of junk empties the backpack of it")
 check(count(202, 0x11) == 0, "(0.15.189, owner) the action bar is emptied of junk too")
 check(count(201, 0x22) == 50, "other items are untouched")
-check(hud.status == "Junk discarded: Twigs x42", "a status line says what was discarded: " .. tostring(hud.status))
-check(hud.status_colour == "#ff4a3d", "the status line is red")
+step(16)  -- (0.15.378) the Loot tab's file is written 4 times a second
+check(hud.loot == "Junk discarded: Twigs x42", "(0.15.378, owner: junk lines go to the Loot tab) the Loot tab says what was discarded: " .. tostring(hud.loot))
+check(hud.loot_colour == "#ff4a3d", "the line is red")
 check(hud.label == "FlameKit v9.9.9", "the label line carries the version while show_label is on (the DLL uses it for the main screen): " .. tostring(hud.label))
 step(500)
 check(hud.messages >= 1, "the message stays in the Messages window's list")
@@ -522,11 +532,12 @@ check(hud.build == false, "the tool is put away (mask 0, the cursor where it was
 comps.ClientPlayerInput[PLAYER].data.mask = 256
 step(2)
 check(hud.build == false, "mask 256 (seen while playing normally) is not build mode")
-local newest_before = hud.newest
+local newest_before = hud.loot_newest
 comps.Inventory[201].slots[1] = stack(0x11, 4)
 pickup({ itemId = 0x11, itemCount = 4, pickedUpByEntityId = PLAYER, pickedUpFromEntityId = 0 })
 step(10)
-check(count(201, 0x11) == 0 and hud.newest > newest_before, "junk goes, and the Messages window always says so (0.15.106: no setting to switch it off)")
+step(16)
+check(count(201, 0x11) == 0 and hud.loot_newest > newest_before, "junk goes, and the Loot tab always says so (0.15.106: no setting to switch it off)")
 check(next(emf_hud) == nil, "nothing is drawn by EMF: no emf.hud line")
 
 -- gear, tools and summoning items are never junk, whatever a list or a command says

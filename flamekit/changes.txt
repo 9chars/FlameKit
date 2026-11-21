@@ -1,3 +1,7 @@
+0.15.378 Nov 21, 2026
+- The Auto Junk List's lines ("Junk discarded: Twigs x3") are in the Messages window's Loot tab now, not in Chat.
+- Battle and Loot: other players' lines within 100 m of you (was 150 m).
+
 0.15.377 Nov 21, 2026
 - The Messages window has tabs: Chat (everything it showed before), Battle and Loot. A tab you are not looking at shows how many new lines it has, e.g. "Battle (12)"; the window never switches tabs by itself.
 - Battle: every hit you and your companions land or take, with its damage (crit, backstab, weak spot, blocked, parried, killed), and the companions' heals, by name ("Rex heals you for 120!": the green notice stays, its line is in the Battle tab now). Off by default (Settings tab, new Messages section: Battle messages), so the server sends nothing until you turn it on. Other players' hits near you too, unless you turn "Show other players' battle messages" off.

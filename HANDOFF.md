@@ -783,6 +783,9 @@ it); games without the channel get nothing; the host's own lines go straight in)
 others_battle, others_loot default true). Tests: msg_feed_test.lua (recipients, filters, 3000 hits all arrive, <= 15 KB,
 loot text), run.lua host + joined. DLL b09e1d4b (built 10:05). Open question: should Auto Junk's "Junk discarded..."
 lines move to the Loot tab too ("Messages from the auto loot system ... can be moved to this Loot tab").
+**Owner 10:24:** "#1 I think the 100 m radius is fine for now. I can bump it up or down depending on what I find. -- #2 It
+should go to the loot tab." 0.15.378: feed.RADIUS = 100 (core/msg_feed.lua, one constant); loot_filter/client.lua's
+"done" summary (Junk discarded/dropped) -> kit.note_tab("loot") (the info lines stay in Chat). run.lua reads ui_loot.dat.
 
 ## How to build and publish a version
 
