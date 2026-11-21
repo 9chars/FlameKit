@@ -925,6 +925,8 @@ answered). **14:44 "the self heal is valid.. can you just make the log say "Mide
 you see a character healing themselves?"**: 0.15.397 (server only, local server): heal_target() -> "themselves" when
 healer = target (feed.hit and feed.heal: companions too); the self heal logging switched off (SELF_LOG 0). G-Portal not
 updated (asked).
+**Owner 14:57 "it seems fine to me"** (taken as: the chop scan timing stays 1/3/6/10 s, no change; G-Portal stays on
+0.15.396 until he says so).
 
 ## How to build and publish a version
 
