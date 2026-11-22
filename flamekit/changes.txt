@@ -1,3 +1,6 @@
+0.15.433 Nov 22, 2026
+- Free build: logging of the building tool signal sent to the server.
+
 0.15.432 Nov 22, 2026
 - Free build: fixed 0.15.431 (the server never updated its list of players with the building tool out).
 

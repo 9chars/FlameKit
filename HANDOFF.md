@@ -1185,6 +1185,10 @@ server list = Free build on AND tool out (FB.tool), written at once; the DLL rea
 (0.15.431): the server's list stayed "1" (the file from before) and never changed: FB.server_list was defined above
 `local online`/`is_on` (both nil there; pcall hid it). 0.15.432 (Lua only): defined just before F.tick. Note: the
 DLL reads the old files at start; Lua rewrites them within a second (not checked yet).
+08:33 owner: "it does look like the border disappears when I'm off the build tools"; 08:34 "does it still send the
+network traffic?" (19 zone sends in ~4 min since the grid). 08:35 "the border was staying steady when I stayed in one
+spot with the tool out" but the server list stayed "nobody" after 08:34:25 (the client's tool=true never arrived).
+0.15.433: debug log of each "tool" send with the raw displayCursor value (and accept 1 as true).
 
 ## How to build and publish a version
 

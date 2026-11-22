@@ -2351,15 +2351,19 @@ function F.client_tick(world)
   FB.steps = FB.steps + 1
   if FB.steps % 6 == 0 then  -- (0.15.431) Free build: tell the server whether my building tool is out
     local me_id = emf.local_player()
+    local raw
     local okc, shown = pcall(function()
       local c = world:get("ClientCursor", me_id)
-      return c ~= nil and c.displayCursor == true
+      raw = c and c.displayCursor
+      return c ~= nil and (raw == true or raw == 1)  -- (0.15.433) a bool field may come as 1
     end)
     local okv, v = pcall(my_view, world)
     local tool = okc and shown == true and okv and v and v.freebuild == true or false
     FB.tool_steps = FB.tool_steps + 6
     if tool ~= FB.tool_sent or (tool and FB.tool_steps >= 600) then
       FB.tool_sent, FB.tool_steps = tool, 0
+      emf.log(string.format("experimental: free build: building tool %s, told the server (displayCursor %s, read %s)",
+        tool and "out" or "away", tostring(raw), okc and "ok" or tostring(shown)))  -- (0.15.433) debug
       if hosting(world) then
         local account, player = me(world)
         if account then pcall(handle, world, account, player, { op = "tool", on = tool }) end
