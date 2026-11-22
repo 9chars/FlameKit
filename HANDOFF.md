@@ -1031,6 +1031,17 @@ ground item, nothing else in the log. So a refused mined item has no entity to t
 17:58 owner: "it digs away the ground" (the material of a refused hit is lost). Offered "make room" (on InventoryFull
 from mining move one full stack of the item last mined to the companion) or a DLL catch; 18:03 owner: "no don't worry
 about it". IDEA (kept, not to build unless asked): mining with a full bag -> companion ("make room" or a DLL catch).
+18:05 owner: "I'd like to see if I could adjust the build area of the flames alters" -> found: program
+upgrade_building_range (flags 0x0) writes the altar's TriggerShape from Level + BalancingRegistry (UpgradableBuildingRange);
+TriggerShape is not saved; local altars show range 20 or 80 (half widths). Offered a 2x DLL test; 18:09 owner asked
+instead about building anywhere ("Needs a Flame Altar nearby"); 18:12 owner: "lets try to change the may I build here
+check". Game build 1287369: client_cursor update fn 0x140294620, server_cursor_no_prediction 0x140297840 (program
+descriptors at 0x141df8400 / 0x141df8e20: +0 name, +0x10 fn), addZone 0x140e6f2e0 (the docs' signature).
+0.15.412 features/build_anywhere.lua (logging only): ClientCursor/ServerCursor primaryFlags+secondaryFlags changes.
+Loaded by EMF's reload (no restart). 18:16-18:18 test at the altar 6298.8 5187.2 (range 80): bit 3 (0x8) on in
+ClientCursor primary+secondary and ServerCursor primary exactly when the player was >= 80 m out (3 crossings: 18:17:10,
+18:17:38, 18:17:58), off back inside (the player's position, not the cursor's). Server bit 12 often with it. Bit 0, 5, 8,
+11 come and go inside too. Likely: bit 3 = outside every build zone.
 
 ## How to build and publish a version
 
