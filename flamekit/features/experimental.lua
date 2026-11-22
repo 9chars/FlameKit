@@ -2257,7 +2257,10 @@ end
 -- each cell's centre in m, one a line), which adds a build zone over each remembered cell from the moment the server
 -- starts, before the world loads: the save and the load treat them like altar areas (owner 10:22 "it worked"). At most
 -- FB.SPOTS_MAX cells. A piece torn down leaves its cell; admins forget a spot with "Forget this spot" (FB.forget_spot).
-FB.SPOT_STEP, FB.SPOTS_MAX = 32, 2000
+-- (0.15.449, owner 14:58 "put a cap on it for now") at most 100 spots: each is one more zone in the game's building-area
+-- list, which the game sends whole to every player at each change (48 bytes a zone: the game already warns "message
+-- BuildingZones is big" at about 1.1 KB)
+FB.SPOT_STEP, FB.SPOTS_MAX = 32, 100
 FB.SPOT_EDGE = 2  -- (0.15.444) m kept free inside a spot's area edge for the piece itself
 function FB.spots_get()
   if FB.spots == nil then
@@ -2337,6 +2340,13 @@ function FB.on_place(world, e)
   for _ in pairs(spots) do n = n + 1 end
   if n >= FB.SPOTS_MAX then
     emf.log("experimental: free build: remembered spots full (" .. n .. "), not kept: " .. key)
+    -- (0.15.449) the player is told (once a minute at most): what he builds here is not kept
+    FB.full_told = FB.full_told or {}
+    if tell_player and os.time() - (FB.full_told[account] or 0) >= 60 then
+      FB.full_told[account] = os.time()
+      pcall(tell_player, world, owner, account, string.format("Free build: the server's limit of %d remembered spots is reached. "
+        .. "What you build here is not kept: it goes at the next restart or after about 30 minutes. An admin can forget spots in Experimental > Building.", FB.SPOTS_MAX))
+    end
     return
   end
   spots[key] = { cx * st + st / 2, cy * st + st / 2, cz * st + st / 2 }

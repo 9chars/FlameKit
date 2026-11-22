@@ -1350,6 +1350,14 @@ the server log of that run, the 11:28:14 world save). On a new crash: BEFORE any
 (EMF overwrites it at every start), logs\enshrouded_server.log, the new crash_dumps folder and the client's
 enshrouded.log into crash_reports\<date>_<what>\, then analyse the dump (stack walk, function region strings, compare
 with 0x140907875) and add the README.
+14:45 owner asked for a review of the last days' systems ("stability and high quality code are absolutely paramount");
+I listed 10 points. 14:58 owner answers: #1 "put a cap on it for now" (done: 0.15.449, FB.SPOTS_MAX 2000 -> 100, the
+placing player told through tell_player, the tab's note line, once a minute); facts given: "BuildingZones is big"
+is in the game's own logs on production too (11-20, before Free build), 48 bytes per zone; "Cannot increase slice
+capacity" is never in any log, only a string in a game function on the crash stack. #2 the crash was on the local server
+with 0.15.442 (the new Free build); the new map's water dispenser came from G-Portal's old Free build. #4 a player's
+"transfer all" on a companion chest lost half his items (maybe another bug: to look at). #6 not a big deal. #10 "lets
+make this happen. it should be its own feature anyways" (Free build out of experimental.lua). #5 #7 #8 #9 explained.
 
 ## How to build and publish a version
 

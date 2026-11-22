@@ -1,3 +1,6 @@
+0.15.449 Nov 22, 2026
+- Free build: at most 100 remembered spots for now (was 2000). When the limit is reached, a player who builds a new spot is told that it is not kept.
+
 0.15.448 Nov 22, 2026
 - Free build: "Forget this spot" and "Forget all spots" are always shown in Experimental > Building, greyed out when they cannot be used (no spot near you, no spots, or not an admin).
 
