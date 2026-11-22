@@ -1602,6 +1602,8 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
    restart the server": saved 16:52:38 with the water flowing, up 16:53:25, joined 16:54:50: no water warning in the
    server log; **16:57 owner: "yeah looks to be working the same normally"**: flowing water in a remembered spot survives
    a save and restart. Still to test: forget the spot, then the reset (30 min or a restart: ask first).
+   16:58:29 owner forgot the spot (0 left), no error; 16:58:51 he zoned to 7501 1064 4825 (about 1,700 m away, in an
+   altar area). The game's ~30-minute reset of the dispenser's place is expected from about 17:28.
 
 ## Things learned the hard way
 
