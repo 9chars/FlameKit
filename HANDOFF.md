@@ -1358,6 +1358,17 @@ capacity" is never in any log, only a string in a game function on the crash sta
 with 0.15.442 (the new Free build); the new map's water dispenser came from G-Portal's old Free build. #4 a player's
 "transfer all" on a companion chest lost half his items (maybe another bug: to look at). #6 not a big deal. #10 "lets
 make this happen. it should be its own feature anyways" (Free build out of experimental.lua). #5 #7 #8 #9 explained.
+15:09 owner: #4 happened "last night" (G-Portal log 22:10:04: Bark Twain's chest 56 stacks/13,850 items emptied at once
+by player 1; 22:11 Chewbarka's 54 stacks over 30 s; where they went is not in the log: to investigate); #5 "is this
+something we can check for and throw an error ... is there a way to make free build mode not require a flame alter? I
+think we should look into that hook"; #10 "I'm good with it having its own tab ... move all the building stuff we added
+into the "Settings" tab over to the new tab" (asked: the Building section is in Experimental, not Settings).
+**15:16:56 local server CRASH again (15:20 owner "the server kicked me out again")**, the new map, 0.15.449, 0 spots,
+the player inside an altar area (no FlameKit zone). The SAME instruction 0x140907875 (water flow), same chain. Logs
+copied before any restart: crash_reports\2026-11-22_1516_crash (dump, server/client logs, emf logs, world 15:16:34,
+README). G-Portal's own dump of 2026-11-20 04:26 UTC (production_stable_logs\crash_dumps) is the same crash at the same
+instruction with only emf_core.dll loaded (no flamekit_native, no building-area changes then): a game bug in the water
+flow code, not FlameKit's. Copied into the report. Not restarted yet (asked).
 
 ## How to build and publish a version
 
