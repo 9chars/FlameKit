@@ -222,20 +222,21 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         return q * step + step / 2;
     };
     for (uint32_t id : ids) {
-        // (0.15.429, owner 08:19 "it looks like it draws that grid regardless if I'm in build more or not"): the box only
-        // while the building tool is out: the input mask's two low bits (kit.lua in_build_mode, measured 0.15.62: 3 while
-        // the tool is out); the server reads the same bits from what the player's game sent (PlayerInput.fromClient).
-        int build = -1;
-        if (w.is_server()) {
-            if (auto* in = w.get<gen::ecs::PlayerInput>(id)) build = (in->fromClient.mask & 3) != 0;
-        } else if (auto* in = w.get<gen::ecs::ClientPlayerInput>(id)) {
-            build = (in->data.mask & 3) != 0;
-        }
-        if (build < 0) {
-            static std::atomic<int> said{0};
-            if (said.fetch_add(1) == 0) EMF_LOG(kMod, "free build (%s): the player input cannot be read: the box stays on", side);
-        } else if (build == 0) {
-            continue;
+        // (0.15.429, owner 08:19 "it looks like it draws that grid regardless if I'm in build more or not") the box only
+        // while the building tool is out. (0.15.430, owner 08:23 "its giving me the needs flame alter nearby error again"):
+        // 0.15.429 read the input mask's two low bits (kit.lua in_build_mode, measured 0.15.62); they never came on any
+        // more (kit.lua logged "build mode: off" and never "on" while he built), so no box was made. Now: in the player's
+        // game, ClientCursor.displayCursor (logged when it changes, to check it); on the server the box is always there
+        // while Free build is on (the server draws nothing; on a 32 m grid it changes rarely).
+        if (!w.is_server()) {
+            auto* cur = w.get<gen::ecs::ClientCursor>(id);
+            static int last_shown = -1;
+            const int shown = cur ? (cur->displayCursor ? 1 : 0) : -1;
+            if (shown != last_shown) {
+                last_shown = shown;
+                EMF_LOG(kMod, "free build (this game): the building cursor is %s", shown < 0 ? "not readable (the box stays on)" : shown ? "shown" : "hidden");
+            }
+            if (shown == 0) continue;
         }
         auto* ct = w.get<gen::ecs::CurrentTransform>(id);
         if (!ct) continue;

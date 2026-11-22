@@ -1,3 +1,6 @@
+0.15.430 Nov 22, 2026
+- Free build: fixed "Needs a Flame Altar nearby" coming back in 0.15.429 (building tool detection).
+
 0.15.429 Nov 22, 2026
 - Free build: the moving building area is there only while your building tool is out (its border is no longer drawn all the time).
 

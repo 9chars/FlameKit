@@ -1171,6 +1171,10 @@ Restart 08:12 (his game sat 3 min in the menu again: WATCH); "Build zones change
 "it looks like it draws that grid regardless if I'm in build more or not" -> 0.15.429: the box only while the building
 tool is out (client ClientPlayerInput.data.mask & 3, server PlayerInput.fromClient.mask & 3).
 08:20 owner: the game sat at the menu because he was away from the PC: the slow joins are not a problem (WATCH closed). Restart 08:20 (0.15.429), joined 08:22:52; no box while the tool is put away (no zone line).
+08:23 owner: "its giving me the needs flame alter nearby error again. so maybe those flags DO need to be flipped..?":
+log: no box was ever made: the input mask & 3 never came on (kit.lua too: "build mode: off", never "on", while the
+cursor flags moved at 08:23: kit's build mode detection is broken since some game update: noted, not fixed). 0.15.430:
+client box gated by ClientCursor.displayCursor (logged on change); server box always while Free build is on.
 
 ## How to build and publish a version
 
