@@ -1636,6 +1636,12 @@ the same state the old Free build left behind (the earlier water warnings came a
 world). Plan offered: leave the dispenser, restart (needed anyway for 0.15.453), watch the start-up log for the water
 warnings. If they come back: forgetting a spot with water in it must be handled (refuse/warn, or remove the water
 objects too, or no water pieces in Free build spots). Owner decides.
+17:49 owner: "ok lets do the restart and see what errors we get"; "Hide all of FlameKit in build mode" works fine, no
+issues (Claude's doubt was wrong: drop it); "#5 after this test is done" (research: Free build without any altar).
+0.15.453 Lua installed 17:49:16 (server, client, work folder); restart 17:49:28, saved 17:49:29, world loaded 17:50:17,
+owner in 17:51:47 (Building tab answered at once). FACT: the zone list is rebuilt on the world's own thread (t22136, the
+same as the Lua's). No water warning at start or at his join (he joined about 490 m from the dispenser at 5808 816 5104;
+in the earlier map the "BlockWater Entity not found: Outside of Simulation area" warnings came at the join).
 
 ## Things learned the hard way
 
