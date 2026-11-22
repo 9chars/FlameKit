@@ -1284,6 +1284,9 @@ at 5795.0 818.0 5371.5 made a 4th spot 5808 816 5360 (next 32 m cell). **11:57 o
 locations... the blocks I placed were all very close to each other, should be all within the same spot".** 0.15.444
 (Lua, hot-reloaded 11:57:52): a piece inside any spot's area (|d| <= 24 - FB.SPOT_EDGE 2 m) makes no new spot. The 4th
 spot 5808 816 5360 is still there (asked the owner).
+12:04 owner "yes remove that extra spot you added": removed by hand (data only, no version): key 181,25,167 taken out
+of the server's free_build_spots.json (backup claude_scratch/free_build_spots_before_1204.json), Lua reloaded 12:04:47,
+DLL "3 remembered spot(s)". Left: A 5776 5232, C 5776 5392, B 5808 5104.
 
 ## How to build and publish a version
 
