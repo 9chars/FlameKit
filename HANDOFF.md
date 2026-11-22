@@ -1144,6 +1144,11 @@ with the command's loca Guid: the message is DATA in the hammer's action sequenc
 found yet. 0.15.426 test: in the addZone detour, once per world step (g_steps from on_tick) and per BuildZoneSystem
 (matched with World::singleton("BuildZoneSystem")), a zone box 80 m wide around each Free build player (server: the
 list; client: the local player), entity 0, empty base id.
+Restart 07:50; 07:52 "a build zone 80 m wide around player 1" on both sides. 07:50 owner: "is there also a way to stop
+the map from resetting every 30 minutes?"; 07:51 "so free build items stay? we haven't really tested if items stay or
+not", "we know they reset during reboots..". **07:53 owner (far from altars, Free build on): "it works".** Open: is the
+cursor flag clearing still needed with the zone (clean-up test); the 30-minute reset (not tested; stopping it: not
+looked at); release.
 
 ## How to build and publish a version
 
