@@ -1220,6 +1220,11 @@ normally, the border disappears when I move off the tool. everything appears to 
 names: ui_base_name (client, 0x201) reads ClientBaseIdComponent + CustomPlayerString and writes PlayerBasesSystemClient;
 the "Base N" text is not in the exe (loca data). Guess (not checked): the Free build box went into the save as a base
 zone (empty base id) and came back at load as an unnamed base ("Base 1"), so the villager's spot is inside a base now.
+09:29 owner: "yes.. I'm wondering it putting an NPC there is "holding" the base, because in previous tests, the blocks did
+not survive restarts". Test: spot A near the villager (owner walked away), spot B where he stood (~5811 5190) during
+the restart 09:37 (saved 09:37:47). 09:37 owner: with the pickaxe out the border comes back, with the axe not (noted,
+no action). **09:40 owner: "the NPC is still there but objects from both A and B are gone"**: neither the villager nor
+the player box at save time keeps Free build pieces.
 
 ## How to build and publish a version
 
