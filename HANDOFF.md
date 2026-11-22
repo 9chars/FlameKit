@@ -1105,6 +1105,12 @@ load (before the world) too; no altar_size_server.txt yet = 1.5 on a server, a p
 Installed 20:44 (the Lua reload switched it on in the running game), restart 20:45: "bigger altar areas (server, at
 start): on, 1.5x", "(this game, at start): on, 1.5x". His game took ~4.5 min to join (log silent at the start: WATCH).
 20:51 owner: "it looks like its on".
+**Owner 20:54 "ok so lets check everything in to dev and then to the stable release, I want to push a new update and get
+g-portal updated"**: 0.15.423 = Development (dist-test signed, sig good, commit 8c7b26a) and Stable (dist = dist-test,
+sig good, commit 0642456), DLL a98a4fa6 (the 0.15.423 build). G-Portal 20:56: 14 Lua files changed since 0.15.396 +
+flamekit_native.dll + its mod.json uploaded (outbox md5 checked against the local server). The fetched G-Portal logs:
+emf_core.log ends 20:54:36 and enshrouded_server.log ends "Close Log file" (the G-Portal server was shut down at about
+20:54, before the upload; who/why not known). It loads 0.15.423 (DLL + Lua) at its next start; fetch the logs then.
 
 ## How to build and publish a version
 
