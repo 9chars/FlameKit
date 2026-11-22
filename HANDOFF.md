@@ -1088,6 +1088,7 @@ not advised; reaching 16 at a lower Flame level maybe (not looked at). Restart 1
 Restart 19:42 (2x test blocks placed); 19:49 owner: "it definitely fails at 2x" (blocks in the outer ring lost at a
 restart). So far: 1.5x keeps everything (one restart), 2x loses some, 4x froze. Why: not known (the keep/reset rule is
 elsewhere than the build zones, not found).
+19:51 owner "yeah" to 1.5x through several restarts (1.5x had passed only one; the 2x loss came at the 2nd) -> 0.15.421.
 
 ## How to build and publish a version
 

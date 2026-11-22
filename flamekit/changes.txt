@@ -1,3 +1,6 @@
+0.15.421 Nov 21, 2026
+- The bigger altar areas test: back to one and a half times as wide (twice as wide loses blocks at a restart), for a test through several restarts.
+
 0.15.420 Nov 21, 2026
 - The bigger altar areas test: twice as wide again, for more tests (one and a half times kept every block through a restart).
 
