@@ -260,13 +260,20 @@ bool fk_build_anywhere_load(bool dedicated) {
     // the world loads (the game decides what to keep then), not only at the first world step
     if (dedicated) read_factor(L"altar_size_server.txt", "server, at start", kMaxFactor);
     else read_factor(L"altar_size_client.txt", "this game, at start");
-    bool c = false;
-    if (!dedicated) c = a->hook_program("client_cursor", nullptr, client_post, nullptr);
-    const bool s = a->hook_program("server_cursor_no_prediction", nullptr, server_post, nullptr);
+    // (0.15.427, owner 07:55 "lets see the minimum amount of changes we need to make this work"): with the player's
+    // build zone (0.15.426) the cursor words should come out right by themselves; the cursor hooks (bits 1, 3, 10 off)
+    // are a debug tool now, switched off here, not removed.
+    constexpr bool kClearCursorFlags = false;
+    bool c = false, s = false;
+    if (kClearCursorFlags) {
+        if (!dedicated) c = a->hook_program("client_cursor", nullptr, client_post, nullptr);
+        s = a->hook_program("server_cursor_no_prediction", nullptr, server_post, nullptr);
+    }
     const bool al = emf::hook_pattern("flamekit: build zone (bigger altar areas)", "48 83 EC 78 8B 84 24 A8 00 00 00 4C",
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
     EMF_LOG(kMod, "free build: hook after client_cursor %s, after server_cursor_no_prediction %s; bigger altar areas (up to x%.1f, the world's option): hook on addZone %s",
-            dedicated ? "(not here)" : (c ? "installed" : "NOT installed"), s ? "installed" : "NOT installed", kMaxFactor,
+            !kClearCursorFlags ? "(off)" : dedicated ? "(not here)" : (c ? "installed" : "NOT installed"),
+            !kClearCursorFlags ? "(off)" : s ? "installed" : "NOT installed", kMaxFactor,
             al ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) {  // the lists of players, every 60 steps of each world
         g_steps.fetch_add(1);  // (0.15.426) the player boxes: once per step
@@ -303,5 +310,5 @@ bool fk_build_anywhere_load(bool dedicated) {
                   g_free_on.load() ? "on" : "off", ns, nc, (unsigned long long)g_server_cleared.load(),
                   (unsigned long long)g_client_cleared.load(), g_altar_on.load() ? "on" : "off", (unsigned long long)g_altars.load());
     });
-    return c || s;
+    return al;
 }

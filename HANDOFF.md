@@ -1149,6 +1149,7 @@ the map from resetting every 30 minutes?"; 07:51 "so free build items stay? we h
 not", "we know they reset during reboots..". **07:53 owner (far from altars, Free build on): "it works".** Open: is the
 cursor flag clearing still needed with the zone (clean-up test); the 30-minute reset (not tested; stopping it: not
 looked at); release.
+07:55 owner: "yeah lets see the minimum amount of changes we need to make this work" -> 0.15.427: cursor hooks off (kClearCursorFlags false; debug tool kept), only the player zone.
 
 ## How to build and publish a version
 
