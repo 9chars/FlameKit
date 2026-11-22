@@ -105,13 +105,6 @@ FB.tool_sent, FB.tool_steps = nil, 0  -- player's game: what was last told, step
 FB.ALTAR_FACTOR = "1.5"
 FB.admins = require("core.admins")
 FB.world = nil  -- the world switch, loaded once
-function FB.server_list()  -- (0.15.415; 0.15.431 only with the building tool out) the server's file for FlameKit Native
-  local ids = {}
-  for account, p in pairs(online) do
-    if p.entity and is_on(account, "freebuild") and FB.tool[account] then ids[#ids + 1] = tostring(p.entity) end
-  end
-  FB.write("server", ids)
-end
 function FB.world_on()
   if FB.world == nil then
     local ok, w = pcall(kit.store.load, "experimental_world", {})
@@ -2194,6 +2187,16 @@ local function pvp(world)
     local okg, errg = pcall(guard_pets, world, any)
     if not okg then emf.log("experimental: PvP: protecting pets failed: " .. tostring(errg)) end
   end
+end
+
+-- (0.15.415; 0.15.431 only with the building tool out) the server's file for FlameKit Native. (0.15.432: defined here,
+-- after `online` and `is_on`; 0.15.431 had it above them, where both were nil, so it never ran: pcall hid the error.)
+function FB.server_list()
+  local ids = {}
+  for account, p in pairs(online) do
+    if p.entity and is_on(account, "freebuild") and FB.tool[account] then ids[#ids + 1] = tostring(p.entity) end
+  end
+  FB.write("server", ids)
 end
 
 function F.tick(world)

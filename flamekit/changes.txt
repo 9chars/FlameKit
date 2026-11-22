@@ -1,3 +1,6 @@
+0.15.432 Nov 22, 2026
+- Free build: fixed 0.15.431 (the server never updated its list of players with the building tool out).
+
 0.15.431 Nov 22, 2026
 - Free build: the server's moving building area (and its border) is there only while your building tool is out; your game tells the server.
 

@@ -1181,6 +1181,10 @@ hidden" 08:27:35, "shown" 08:28:31 (displayCursor follows the tool). 08:28 owner
 tool away" -> the drawn border comes from the server's zones. 0.15.431: the player's game sends op "tool" (displayCursor
 and Free build on; on a change and every 10 s) to the server (experimental channel; hosting: handle directly);
 server list = Free build on AND tool out (FB.tool), written at once; the DLL reads the lists every 15 steps (was 60).
+08:30 owner (on 0.15.430): "looks like the border still moves and follows me with the tool away tool". Restart 08:30
+(0.15.431): the server's list stayed "1" (the file from before) and never changed: FB.server_list was defined above
+`local online`/`is_on` (both nil there; pcall hid it). 0.15.432 (Lua only): defined just before F.tick. Note: the
+DLL reads the old files at start; Lua rewrites them within a second (not checked yet).
 
 ## How to build and publish a version
 
