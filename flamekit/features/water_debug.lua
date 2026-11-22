@@ -4,6 +4,9 @@
 -- in the game's water flow code: crash_reports\2026-11-22_*). Nothing in the world changes.
 --
 --   /flamekit.water [radius]   (chat or console; admins only; radius in m, default 100, at most 1000)
+--   /flamekit.water all [radius]   (0.15.451, owner 16:38 "I built the water feature, ran the command and it doesnt
+--     appear to see it?") every entity within radius (default 5 m, at most 20) with EVERY component it has (the names of
+--     features/npc_fields.lua, about 600), to find which components a water piece really has
 -- Every entity within `radius` of the player that has one of the game's water components (BlockWater, WaterDispenser,
 -- WaterDrain, WaterEffector) goes into the server's log (emf_core.log) as "water debug: ..." with its id, position,
 -- distance and components; at most LINES_MAX lines, then the counts. The world's entities (some 37,000) are walked a
@@ -44,7 +47,7 @@ local function scan_tick(world)
       local d2 = (x - scan.x) ^ 2 + (y - scan.y) ^ 2 + (z - scan.z) ^ 2
       if d2 <= r2 then
         local comps = {}
-        for _, c in ipairs(COMPONENTS) do
+        for _, c in ipairs(scan.names or COMPONENTS) do
           if has(world, c, id) then
             comps[#comps + 1] = c
             scan.found[c] = (scan.found[c] or 0) + 1
@@ -60,6 +63,7 @@ local function scan_tick(world)
   if scan.i <= #ids then return end
   local parts = {}
   for _, c in ipairs(COMPONENTS) do parts[#parts + 1] = string.format("%s %d", c, scan.found[c] or 0) end
+  if scan.names then parts = { string.format("%d entities with components listed in the log", scan.lines) } end
   local summary = string.format("within %d m of %.0f %.0f %.0f: %s (%d entities looked at%s)", scan.r, scan.x, scan.y, scan.z,
     table.concat(parts, ", "), #ids, scan.lines > LINES_MAX and string.format("; %d lines, the first %d logged", scan.lines, LINES_MAX) or "")
   emf.log("water debug: done: " .. summary)
@@ -82,11 +86,22 @@ local function command(world, args)
   if scan then emf.reply("flamekit.water: a scan is still under way.") return end
   local x, y, z = world:position(player)
   if not x then emf.reply("flamekit.water: your position cannot be read.") return end
-  local r = math.max(1, math.min(RADIUS_MAX, math.floor(tonumber(args[1]) or RADIUS_DEFAULT)))
+  local all = tostring(args[1] or ""):lower() == "all"  -- (0.15.451) every component of every entity near
+  local names = nil
+  if all then
+    local okf, fields = pcall(require, "features.npc_fields")
+    if not (okf and type(fields) == "table") then emf.reply("flamekit.water all: the component list cannot be read.") return end
+    names = {}
+    for name in pairs(fields) do names[#names + 1] = name end
+    table.sort(names)
+  end
+  local r = all and math.max(1, math.min(20, math.floor(tonumber(args[2]) or 5)))
+    or math.max(1, math.min(RADIUS_MAX, math.floor(tonumber(args[1]) or RADIUS_DEFAULT)))
   local okl, ids = pcall(world.entities, world)
   if not okl or type(ids) ~= "table" then emf.reply("flamekit.water: the world's entities cannot be read.") return end
-  scan = { ids = ids, i = 1, x = x, y = y, z = z, r = r, found = {}, lines = 0, by = player, account = account }
-  emf.log(string.format("water debug: started by player %s within %d m of %.1f %.1f %.1f (%d entities)", tostring(player), r, x, y, z, #ids))
+  scan = { ids = ids, i = 1, x = x, y = y, z = z, r = r, found = {}, lines = 0, by = player, account = account, names = names }
+  emf.log(string.format("water debug: started by player %s within %d m of %.1f %.1f %.1f (%d entities%s)", tostring(player), r, x, y, z, #ids,
+    all and string.format(", every component: %d names", #names) or ""))
   emf.reply(string.format("flamekit.water: looking at %d entities within %d m of you; the result comes in a few seconds.", #ids, r))
 end
 

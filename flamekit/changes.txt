@@ -1,3 +1,6 @@
+0.15.451 Nov 22, 2026
+- Debug: /flamekit.water all [radius] lists every entity within a few metres of you with every component it has, to find what a water piece is made of.
+
 0.15.450 Nov 22, 2026
 - Debug: /flamekit.water [radius] (admins) lists the water pieces the game knows near you into the server's log, to find water left over from removed pieces. Nothing in the world changes.
 

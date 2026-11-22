@@ -1580,6 +1580,10 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
    confirmed problem, we'll need to block the use of water in these areas OR make the areas friendly with the game so
    water works in them". Known risks: forgetting a spot with water pieces, the 100-spot cap, a missed BuildingPlaceEvent,
    spot zones without a base id (water is saved per base).
+   16:27 owner "yeah lets do the water test". 16:36:24 spot 5808 816 5104 remembered (his water feature at about
+   5801-5806 825 5093); /flamekit.water 30 there: 0 (100 m: 5 BlockWater 57-95 m away, ids ~2967994xxx, at 5739-5808
+   846-879 5021-5049): his piece has none of the 4 water components. 0.15.451 (live 16:4x): /flamekit.water all [r]
+   lists every component of every entity within r m (npc_fields names), to find what a water piece is made of.
 
 ## Things learned the hard way
 
