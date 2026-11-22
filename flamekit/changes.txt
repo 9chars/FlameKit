@@ -1,3 +1,6 @@
+0.15.422 Nov 21, 2026
+- Bigger altar areas (Experimental tab, Building section): every flame altar's building area 1.5 times as wide, high and deep, for the whole server. Only FlameKit admins can switch it; everyone is told. Off unless an admin switches it on. What you build in the bigger area is kept like anything inside an altar's area.
+
 0.15.421 Nov 21, 2026
 - The bigger altar areas test: back to one and a half times as wide (twice as wide loses blocks at a restart), for a test through several restarts.
 

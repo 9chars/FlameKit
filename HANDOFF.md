@@ -1089,6 +1089,13 @@ Restart 19:42 (2x test blocks placed); 19:49 owner: "it definitely fails at 2x" 
 restart). So far: 1.5x keeps everything (one restart), 2x loses some, 4x froze. Why: not known (the keep/reset rule is
 elsewhere than the build zones, not found).
 19:51 owner "yeah" to 1.5x through several restarts (1.5x had passed only one; the 2x loss came at the 2nd) -> 0.15.421.
+Restart 20:13 (1.5x blocks placed 80-120 m); 20:20 owner: "1.5 seems safe so lets add an option for that. does it
+scale with flame level or you're not sure?" (answer: it multiplies each altar's own zone, so an altar's own level still
+sets its size: 40 -> 60 m, 160 -> 240 m; the world's Flame level only sets how many altars). Asked where: 20:21
+"Building, admins only". 0.15.422: core/admins.lua (EMF admins, hosts, npc_admins.json); experimental.lua: button
+"bigaltars" under Building (disabled "(admins only)" for others; v.admin in the server's answer), world switch in
+experimental_world.json, files altar_size_server.txt / altar_size_client.txt ("1.5" or "1"); build_anywhere.cpp
+reads the factor (1..kMaxFactor 1.5), off by default.
 
 ## How to build and publish a version
 

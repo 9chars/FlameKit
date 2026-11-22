@@ -20,7 +20,7 @@
 // programs evidently read another copy). 0.15.417 instead: the game's BuildZoneSystem_addZone (the one function that
 // puts every build zone box into the list, server and player's game; EMF's engine notes 3.5, signature found in both
 // exes) is hooked; a base zone (list 0, owner kind 0: what add_buildzones_server/_client pass for each altar) gets a
-// box kAltarFactor times as wide, tall and deep around the same centre. On for everyone while testing (local only).
+// box kAltarFactor times as wide, tall and deep around the same centre. (0.15.422) the world's option (below).
 // addZone(bzs, u8 list, u8 flag, u8 ownerKind, WorldAABB* {min xyz, max xyz int64, 2^32 per m}, u32 entity,
 // u8 wasAbandoned, BaseId*) (the call in add_buildzones_server, server exe 0x1400ee750).
 //
@@ -45,7 +45,12 @@ namespace gen = emf::gen;
 namespace {
 constexpr const char* kMod = "flamekit build";
 constexpr uint32_t kOutsideZone = 0x8 | 0x2;  // bit 3 "needs a flame altar", bit 1 "needs building area"
-constexpr float kAltarFactor = 1.5f;  // (0.15.421, owner 19:51 "yeah" to 1.5x through several restarts: 2x lost outer blocks at restarts (0.15.418, 0.15.420: 19:49 "it definitely fails at 2x"); 4x froze the server, 0.15.417)
+// (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that", 20:21 admins only) the factor comes from
+// FlameKit's Lua part: altar_size_server.txt (the server) / altar_size_client.txt (a player's own game), "1" = off.
+// Tested: 1.5x kept every block through restarts (0.15.419/421); 2x lost outer blocks at restarts (0.15.418/420); 4x
+// froze the server (0.15.417). Values above kMaxFactor are not used.
+constexpr float kMaxFactor = 1.5f;
+std::atomic<float> g_factor{1.0f};
 
 
 std::atomic<bool> g_free_on{true}, g_altar_on{true};
@@ -87,6 +92,17 @@ void read_list(const wchar_t* name, std::set<uint32_t>& out, const char* side) {
 bool free_for(std::set<uint32_t>& list, uint32_t id) {
     std::lock_guard<std::mutex> lk(g_mx);
     return list.count(id) != 0;
+}
+
+void read_factor(const wchar_t* name, const char* side) {
+    float f = 1.0f;
+    if (FILE* file = _wfopen(lua_file(name).c_str(), L"rb")) {
+        float v = 1.0f;
+        if (std::fscanf(file, "%f", &v) == 1 && v >= 1.0f && v <= kMaxFactor) f = v;
+        std::fclose(file);
+    }
+    const float old = g_factor.exchange(f);
+    if (old != f) EMF_LOG(kMod, "bigger altar areas (%s): %s", side, f > 1.001f ? (f > 1.49f ? "on, 1.5x" : "on") : "off");
 }
 
 void client_post(void*, void*) {
@@ -132,7 +148,8 @@ std::atomic<int> g_zone_said{0};
 
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
-    if (g_altar_on.load() && box && list == 0 && owner == 0) {
+    const float kAltarFactor = g_factor.load();
+    if (g_altar_on.load() && kAltarFactor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];
         for (int i = 0; i < 3; ++i) {
             const int64_t lo = box[i], hi = box[3 + i];
@@ -167,15 +184,21 @@ bool fk_build_anywhere_load(bool dedicated) {
     const bool s = a->hook_program("server_cursor_no_prediction", nullptr, server_post, nullptr);
     const bool al = emf::hook_pattern("flamekit: build zone (bigger altar areas)", "48 83 EC 78 8B 84 24 A8 00 00 00 4C",
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
-    EMF_LOG(kMod, "free build: hook after client_cursor %s, after server_cursor_no_prediction %s; bigger altar areas (x%.0f, test): hook on addZone %s",
-            dedicated ? "(not here)" : (c ? "installed" : "NOT installed"), s ? "installed" : "NOT installed", kAltarFactor,
+    EMF_LOG(kMod, "free build: hook after client_cursor %s, after server_cursor_no_prediction %s; bigger altar areas (up to x%.1f, the world's option): hook on addZone %s",
+            dedicated ? "(not here)" : (c ? "installed" : "NOT installed"), s ? "installed" : "NOT installed", kMaxFactor,
             al ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) {  // the lists of players, every 60 steps of each world
         static uint32_t steps_server = 0, steps_client = 0;
         if (w.is_server()) {
-            if (steps_server++ % 60 == 0) read_list(L"free_build_server.txt", g_free_server, "server");
+            if (steps_server++ % 60 == 0) {
+                read_list(L"free_build_server.txt", g_free_server, "server");
+                read_factor(L"altar_size_server.txt", "server");
+            }
         } else if (w.is_client()) {
-            if (steps_client++ % 60 == 0) read_list(L"free_build_client.txt", g_free_client, "this game");
+            if (steps_client++ % 60 == 0) {
+                read_list(L"free_build_client.txt", g_free_client, "this game");
+                if (!emf::server_world()) read_factor(L"altar_size_client.txt", "this game");  // a hosting game: the server's file counts
+            }
         }
     });
     emf::add_command("fkbuild", " stats | free on|off | altar on|off: Free build and the bigger altar areas (debug)",
