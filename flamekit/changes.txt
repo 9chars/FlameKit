@@ -1,3 +1,7 @@
+0.15.445 Nov 22, 2026
+- Free build: new tooltip. Free build works outside flame altar areas, and what you build there is remembered and kept through restarts.
+- Free build: clean-up. A test that did not work is taken out of FlameKit Native (giving the Free build area an altar's base id), and old comments are updated. Free build works as before; all its logging stays.
+
 0.15.444 Nov 22, 2026
 - Free build: a piece placed inside an existing remembered spot's area no longer starts a new spot, even when it is over a 32 m grid line.
 

@@ -39,10 +39,10 @@ local SWITCHES = {
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
   { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
   { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
-  -- (0.15.415, owner 2026-11-21 18:38 "add a setting for this and call it "Free build" -- build anywhere in the world,
-  -- but note its temporary"; "make it player specific and put these settings under the "Experimental" tab under a new
-  -- section called "Building""): FlameKit Native (build_anywhere.cpp) lets the build hammer work outside every flame
-  -- altar's area for the players listed in free_build_server.txt (the server) / free_build_client.txt (his own game)
+  -- (0.15.415, owner 2026-11-21 18:38 "call it "Free build""; "make it player specific and put these settings under
+  -- the "Experimental" tab under a new section called "Building""): FlameKit Native (build_anywhere.cpp) lets the build
+  -- hammer work outside every flame altar's area for the players listed in free_build_server.txt (the server) /
+  -- free_build_client.txt (his own game); what is built is kept through remembered spots (FB.on_place)
   { "freebuild", "Free build", nil, "Free build" },
 }
 
@@ -82,7 +82,7 @@ local TIPS = {
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
   fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
-  freebuild = "Build anywhere in the world, not only inside a flame altar's area. Outside an altar's area it is temporary: the game removes what you built there after about 30 minutes or when the server restarts. Out there the hammer uses only the materials in your bag. Needs FlameKit on the server too. Off while you are in PvP. Everyone on the server is told when you switch it.",
+  freebuild = "Build anywhere outside flame altar areas. What you build is remembered and kept through restarts. Inside an altar's area the game's normal building rules apply. Outside them the hammer uses only the materials in your bag. Needs FlameKit on the server too. Off while you are in PvP. Everyone on the server is told when you switch it.",  -- (0.15.445, owner 12:16 "change the tool tip")
 }
 -- (0.15.415) Free build's bits in one table (the main chunk is at Lua's 200 locals): SECTION = switches shown under
 -- their own heading in the tab, not in the list at the top; write = the players it is on for, to FlameKit Native in a
@@ -2192,13 +2192,13 @@ local function pvp(world)
   end
 end
 
--- (0.15.440, owner 2026-11-22 09:50 "restart, if it fails we'll try to make it remember those areas"; 10:00 the
--- borrowed base id kept nothing either) Free build's remembered spots: every piece a player with Free build on places
+-- (0.15.440, owner 2026-11-22 09:50 "restart, if it fails we'll try to make it remember those areas") Free build's
+-- remembered spots: every piece a player with Free build on places
 -- (the server's BuildingPlaceEvent: position, ownerId) marks its 32 m grid cell (the same grid as the moving area). The
 -- cells are kept in free_build_spots.json (kit.store) and handed to FlameKit Native in free_build_spots.txt ("x y z" of
 -- each cell's centre in m, one a line), which adds a build zone over each remembered cell from the moment the server
--- starts, before the world loads: the save and the load should then treat them like altar areas. At most
--- FB.SPOTS_MAX cells. Nothing is forgotten yet (a piece torn down leaves its cell).
+-- starts, before the world loads: the save and the load treat them like altar areas (owner 10:22 "it worked"). At most
+-- FB.SPOTS_MAX cells. A piece torn down leaves its cell; admins forget a spot with "Forget this spot" (FB.forget_spot).
 FB.SPOT_STEP, FB.SPOTS_MAX = 32, 2000
 FB.SPOT_EDGE = 2  -- (0.15.444) m kept free inside a spot's area edge for the piece itself
 function FB.spots_get()
@@ -2340,7 +2340,7 @@ function FB.forget_spot(world, entity)
 end
 
 -- (0.15.415) the server's list for FlameKit Native: online players with Free build on. (0.15.432: defined here,
--- after `online` and `is_on`; above them both are nil.) (0.15.438: the building tool signal of 0.15.431-0.15.437 taken out.)
+-- after `online` and `is_on`; above them both are nil.)
 function FB.server_list()
   local ids = {}
   for account, p in pairs(online) do

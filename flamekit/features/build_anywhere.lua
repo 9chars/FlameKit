@@ -1,13 +1,8 @@
--- features/build_anywhere.lua (0.15.412, owner 2026-11-21 18:09 "what about adjusting the build hammer to allow you to
--- build anywhere. I get an error that says "Needs a Flame Altar nearby"", 18:12 "lets try to change the may I build
--- here check").
---
--- Step 1 (this version): logging only, nothing in the game changes. The game's placement check is not known (EMF's
--- engine notes: inside client_cursor / server_cursor_no_prediction, not isolated). Both cursors keep flag words:
--- ClientCursor.primaryFlags / secondaryFlags (the player's own game) and ServerCursor.primaryFlags / secondaryFlags
--- (the server). This logs every change of them for the local player (his game) and every online player (the
--- server), so the bit that means "no flame altar here" can be found by pointing the hammer inside and outside an
--- altar's area. Debug log: kept, can be switched off (LOG).
+-- features/build_anywhere.lua: Free build's debug log (nothing in the game changes). Logs, on change, the cursor flag
+-- words (ClientCursor in the player's own game, ServerCursor on the server: primaryFlags / secondaryFlags, with the
+-- player's position) and the server's view of the building tool (NetworkCursor currentBuildingItemId, cursorEntityId,
+-- serverFlags; ServerCursor cursorEntityId and building item). At most LOG_MAX lines a minute; LOG switches it off.
+-- Free build itself: features/experimental.lua and FlameKit Native (build_anywhere.cpp).
 -- Uses only core modules (HANDOFF rule 0b).
 
 local players = require("core.players")
@@ -15,7 +10,7 @@ local players = require("core.players")
 local F = { id = "build_anywhere", title = "Build Anywhere" }
 local kit
 
-local LOG, LOG_MAX = true, 200   -- changes logged per minute at most (0.15.415: off; 0.15.424 on again: owner 2026-11-22 07:23 Free build "getting errors and it wasn't letting us build" on G-Portal with the bigger altar areas)
+local LOG, LOG_MAX = true, 200   -- changes logged per minute at most
 local said, steps = 0, 0
 local last = {}                  -- "<side>:<id>" -> "<primary>/<secondary>"
 
@@ -51,9 +46,8 @@ local function look(world, side, comp, id)
     bits(p), bits(s), x or 0, y or 0, z or 0))
 end
 
--- (0.15.436, owner 2026-11-22 08:57 "Keep digging" for a reliable "building tool out" signal: the cursor's
--- displayCursor was not seen at addZone time) the server's own view of the building tool, logged when it changes:
--- NetworkCursor.currentBuildingItemId and .cursorEntityId, ServerCursor.cursorEntityId and the building item.
+-- the server's own view of the building tool, logged when it changes: NetworkCursor.currentBuildingItemId and
+-- .cursorEntityId, ServerCursor.cursorEntityId and the building item.
 local tool_last = {}
 local function val(v)
   if type(v) == "userdata" or type(v) == "table" then
@@ -109,7 +103,7 @@ end
 
 function F.setup(k)
   kit = k
-  if LOG then emf.log("build anywhere: logging the cursors' flags (nothing in the game changes)") end
+  if LOG then emf.log("build anywhere: Free build debug log on (cursor flags, building tool; nothing in the game changes)") end
 end
 
 return F

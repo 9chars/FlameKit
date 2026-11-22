@@ -1287,6 +1287,15 @@ spot 5808 816 5360 is still there (asked the owner).
 12:04 owner "yes remove that extra spot you added": removed by hand (data only, no version): key 181,25,167 taken out
 of the server's free_build_spots.json (backup claude_scratch/free_build_spots_before_1204.json), Lua reloaded 12:04:47,
 DLL "3 remembered spot(s)". Left: A 5776 5232, C 5776 5392, B 5808 5104.
+12:12:04 altar test: "placed by 1 at 6288.5 948.5 5195.5, in an altar area: no spot" (owner placed it inside an altar).
+**12:16 owner: "change the tool tip, also clean up any old code we added that didn't work ... I don't want any of that
+stuff in the source so clean it up. also I want to keep all the logging".** 0.15.445: tooltip "Build anywhere outside
+flame altar areas. What you build is remembered and kept through restarts. Inside an altar's area the game's normal
+building rules apply. ..." (my wording, offered 12:12, owner said change it); build_anywhere.cpp: the base id test
+(kBoxUsesAltarBase) taken out, header rewritten to the current design (history stays here in HANDOFF); comments in
+experimental.lua / build_anywhere.lua updated. Logging all kept (build_anywhere.lua cursor flags + tool signals, all
+"free build" lines). DLL built 12:18 (766ec8b23e802c683a6b7620bdbf2a5e), copied into server and client (running
+ones renamed .old_443): takes effect at the next restart; Lua reloaded live 12:19:37.
 
 ## How to build and publish a version
 

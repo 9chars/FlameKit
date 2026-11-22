@@ -1,28 +1,23 @@
-// build_anywhere.cpp: Free build and Bigger altar areas (both through the game's build zone list).
+// build_anywhere.cpp: Free build and Bigger altar areas, both through the game's build zone list.
 //
-// FREE BUILD (owner 2026-11-21 18:38 "add a setting for this and call it "Free build" -- build anywhere in the world,
-// but note its temporary"; per player, Experimental tab > Building). How it works (0.15.426, owner 2026-11-22 08:00
-// "it works", 09:07 "its working exactly as it should"): every step, right after the game puts the first altar zone of
-// the step into its build zone list (BuildZoneSystem_addZone, hooked below), a zone box around each player Free build
-// is on for is added to the same list, in the server and in that player's own game. Every check that asks the list
-// ("Needs a Flame Altar nearby" far from altars, "needs building area") then sees a build zone. The box sits on a
-// kGridStep grid (0.15.428: a box that followed the player smoothly made the server send every player the whole zone
-// list each step: 4,678 times in a minute). The game draws its border only while the building tool is selected.
-// Who: features/experimental.lua writes the entity ids, one a line, into free_build_server.txt (the server) and
-// free_build_client.txt (the player's own game) beside FlameKit's Lua part; read every 15 steps.
-// What did not work and was taken out (0.15.438, owner 09:17 "clean up all the old free build stuff that didn't work
-// ... keep all the logging"): switching off the cursor's "outside" bits after client_cursor / server_cursor_no_prediction
-// (0.15.413-0.15.425: enough only near an altar, ~90 m); showing the box only while the building tool is out
-// (0.15.429-0.15.435: no reliable signal; the input mask is dead, displayCursor flickers and is not seen at addZone).
-// The save keeps terrain inside the list's zones at save time (0x140932a30, called by the ServerSaveGame save): what is
-// built with Free build is still gone after a restart or the game's 30-minute reset (not solved).
+// FREE BUILD (per player, Experimental tab > Building). Hooked: BuildZoneSystem_addZone. On each rebuild of the build
+// zone list, when the game adds its first altar zone, this adds to the same list:
+//  - the server only: a zone over each remembered spot (free_build_spots.txt, "x y z" in m per line, written by
+//    features/experimental.lua): a 48 m box, from the server's start, so what was built there is saved and kept like
+//    inside an altar's area;
+//  - a box around each player Free build is on for (free_build_server.txt / free_build_client.txt, entity ids, read
+//    every 15 steps), in the server and in that player's own game. The box sits on a kGridStep grid (a box that moved
+//    smoothly made the server resend the whole zone list every step). The game draws its border only while the
+//    building tool is selected.
+// Free build works only outside flame altar areas (owner 2026-11-22 11:06): no player box while the player stands in
+// an altar's area (as added, after the bigger size). The server writes its altar areas to altar_areas_server.txt
+// (min xyz, max xyz in m per line) for the Lua, which then makes no remembered spot for a piece placed in one.
 //
-// BIGGER ALTAR AREAS (owner 2026-11-21 18:05 / 18:38; the world's option, admins only, on by default 0.15.423): a base
-// zone (list 0, owner kind 0: what add_buildzones_server/_client pass for each altar) gets a box g_factor times as wide,
-// high and deep around the same centre. 1.5x kept every block through restarts (0.15.419/421), 2x lost outer blocks
-// (0.15.418/420), 4x froze the server (0.15.417). The altars' TriggerShape (0.15.415/416) did not reach the zones.
-// addZone(bzs, u8 list, u8 flag, u8 ownerKind, WorldAABB* {min xyz, max xyz int64, 2^32 per m}, u32 entity,
-// u8 wasAbandoned, BaseId*) (the call in add_buildzones_server, server exe 0x1400ee750; signature in both exes).
+// BIGGER ALTAR AREAS (the world's option, admins only, on by default): an altar zone (list 0, owner kind 0: what
+// add_buildzones_server/_client pass for each altar) gets a box g_factor times as wide, high and deep around the same
+// centre (altar_size_server.txt / altar_size_client.txt; at most kMaxFactor 1.5: 2x lost outer blocks, 4x froze the
+// server). addZone(bzs, u8 list, u8 flag, u8 ownerKind, WorldAABB* {min xyz, max xyz int64, 2^32 per m}, u32 entity,
+// u8 wasAbandoned, BaseId*) (called in add_buildzones_server, server exe 0x1400ee750; signature in both exes).
 //
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
 #include <windows.h>
@@ -137,7 +132,6 @@ std::atomic<int> g_zone_said{0};
 
 constexpr double kPlayerHalf = 40.0;  // m each way the box always covers around the player
 constexpr double kGridStep = 32.0;    // m: the box moves only when the player crosses a grid line
-constexpr bool kBoxUsesAltarBase = false;  // (0.15.439 TEST, kept nothing: 10:00 "blocks are gone as we assumed"; off 0.15.440)
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 std::atomic<int> g_box_said{0};
 
@@ -189,7 +183,7 @@ void write_altar_areas(void* bzs) {
     }
 }
 
-void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32_t altar_entity) {
+void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
     // once per rebuild of the zone list: a new world step (on_tick) or (0.15.440) the altar that came first in the
     // last rebuild coming again (while the world loads, before any on_tick, the list is rebuilt too: the remembered
     // spots must be in it then)
@@ -271,19 +265,8 @@ void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32
         if (inside) continue;
         const int64_t cx = cell_mid(p.x), cy = cell_mid(p.y), cz = cell_mid(p.z);
         int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
-        // (0.15.439 TEST, owner 09:43 "we can try that for testing, but ideally that would not be a long term fix"):
-        // the box gets the base id of the altar zone the game is adding right now (the first of the step), so the game
-        // may count it as part of that altar's base: does the save then keep what is built in it? (0.15.426-0.15.438:
-        // an empty base id; 09:40 A/B test: nothing kept.)
-        uint8_t base[16] = {};
-        if (kBoxUsesAltarBase && altar_base_id) std::memcpy(base, altar_base_id, 16);
-        g_add_zone(bzs, 0, flag, 0, b, 0, 0, base);
-        static std::atomic<int> base_said{0};
-        if (kBoxUsesAltarBase && base_said.fetch_add(1) < 2) {
-            char hex[33] = {};
-            for (int i = 0; i < 16; ++i) std::snprintf(hex + i * 2, 3, "%02x", base[i]);
-            EMF_LOG(kMod, "free build (%s): the box of player %u uses the base id %s (of altar %u's zone)", side, id, hex, altar_entity);
-        }
+        uint8_t no_base[16] = {};
+        g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
         g_boxes.fetch_add(1);
         if (g_box_said.fetch_add(1) < 4)
             EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
@@ -295,7 +278,7 @@ void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
     // (0.15.443) called with Free build off too: it starts each rebuild's altar list (then adds no boxes)
-    if (box && list == 0 && owner == 0) add_player_boxes(bzs, flag, base_id, entity);
+    if (box && list == 0 && owner == 0) add_player_boxes(bzs, flag, entity);
     const float factor = g_factor.load();
     if (g_altar_on.load() && factor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];
