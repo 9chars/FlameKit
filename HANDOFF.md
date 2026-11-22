@@ -1304,6 +1304,13 @@ the game's ~30-minute reset while the server runs. (A and B not checked in this 
 signed (check_sig good), committed and pushed. Stable (dist) and G-Portal stay on 0.15.423 (no word for them).
 13:07 owner also: "make sure you're documenting the source code well enough for other users to read it. the EMF
 developer will be looking through everything and may need to incorporate some of our findings into his framework".
+13:10 build_anywhere.cpp got a "WHAT WE FOUND ABOUT THE GAME" header (comments only, no version). **13:14 owner: "I want
+to keep track of all changes that we needed to make to work around things EMF could not do. I also want ALL the source
+code properly documented as we've done a lot".** Asked; answers: workarounds go in notes/EMF_REQUESTS.md (new section
+"Workarounds FlameKit uses": what EMF lacks, what FlameKit does instead, which file); documentation depth "Headers +
+functions": every file a clear header (what, how, which game/EMF parts), every function a one-line purpose; existing
+comments and version/owner notes kept, unclear ones fixed; no code changes. Standing rule from now: new code gets the
+same (header + function purpose), and every new EMF workaround gets an entry in that section.
 
 ## How to build and publish a version
 
