@@ -1028,6 +1028,9 @@ back pack full"): one InventoryFull per pickaxe hit (about every 0.85 s), by 1, 
 ground item, nothing else in the log. So a refused mined item has no entity to take it from (mined items come from 0
 = straight into the bag). The same minute a tool-broken object (3339977000) dropped items that went to Poop Eater
 (loose_loot works with a full bag).
+17:58 owner: "it digs away the ground" (the material of a refused hit is lost). Offered "make room" (on InventoryFull
+from mining move one full stack of the item last mined to the companion) or a DLL catch; 18:03 owner: "no don't worry
+about it". IDEA (kept, not to build unless asked): mining with a full bag -> companion ("make room" or a DLL catch).
 
 ## How to build and publish a version
 
