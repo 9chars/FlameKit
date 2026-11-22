@@ -1616,6 +1616,18 @@ the "Building" tab"; "Hide all of FlameKit in build mode" not understood; #4: no
 17:26 owner: "my mod it saying "FlameKit not supported by server!"": caused by building.lua's F.connected (peer of the new
 channel "build" is 0 until a rejoin, and kit.connected answers false when any feature says false). Removed F.connected
 (live 17:27:08). Nothing was wrong with the server or the connection.
+17:29 owner: "#9 ok fix this -- add the setting for admin free build mode staying on inside other peoples bases";
+"Hide all of FlameKit in build mode" belongs in the Windows tab (it already is there). 0.15.453 (DLL + Lua, commit
+57800a0, DLL md5 85565aca878eac0efc780ae738093755, built 17:35:43): #9 spot size in one place (building.lua SPOT_HALF ->
+free_build_spot_half.txt, the DLL reads it, default 24); #8 files written to .tmp and moved in place (Lua and DLL), a
+reader that finds no file keeps the old lists; #7 the players' positions read in on_tick (the world thread), the addZone
+code uses the cache, thread id logged twice; admin setting "Free build inside altar areas" (Building tab, saved in
+building.json altars={account=true}, admins only, list line "<id> a", DLL: box also inside altar areas); #5 the tab says
+"This map has no flame altar yet" after 60 s with 0 altar areas. Research still open: hooking the zone-list rebuild so
+Free build needs no altar at all. DLL installed on server and client (running ones renamed .old_452), takes effect at the
+next restart. The Lua (building.lua, changes.txt, mod.json in claude_scratch\v453) is NOT installed yet on purpose: the
+old DLL treats a briefly missing file as empty; it goes in together with the restart. Tests all passed (host, joined,
+building 26 checks). Waiting for the owner's yes to restart (rule 0x).
 
 ## Things learned the hard way
 
