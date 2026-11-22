@@ -8,6 +8,10 @@
 // Test: a hook after each of those programs (EMF hook_program, post) switches bit 3 off again in the players' cursors,
 // so the cursor's check says "inside a build zone" everywhere. OPEN: whether placing then works (the building programs
 // may check the zone again on the server).
+// (0.15.414, 18:24 owner: "it lets me pull out the hammer but it gives me "needs building area"") with bit 3 off,
+// bit 1 (0x2) stays on outside (client primary + secondary, server primary; never inside on the client): switched off
+// too. The server's secondaryFlags have bits 1, 2, 3 on INSIDE an altar's area (0.15.412 log): a different meaning,
+// so the server's secondary word is left alone now (0.15.413 cleared its bit 3).
 // Console: fkbuild on|off|stats (on at start, debug).
 #include <windows.h>
 
@@ -23,7 +27,7 @@ namespace gen = emf::gen;
 
 namespace {
 constexpr const char* kMod = "flamekit build";
-constexpr uint32_t kOutsideZone = 0x8;  // bit 3
+constexpr uint32_t kOutsideZone = 0x8 | 0x2;  // bit 3 "needs a flame altar", bit 1 "needs building area"
 
 std::atomic<bool> g_on{true};
 std::atomic<uint64_t> g_client_calls{0}, g_server_calls{0}, g_client_cleared{0}, g_server_cleared{0}, g_client_missing{0};
@@ -54,9 +58,8 @@ void server_post(void*, void*) {
     for (uint32_t id = 1; id <= 64; ++id) {  // players are entities 1..; the first 64 are enough for a test
         auto* c = w.get<gen::ecs::ServerCursor>(id);
         if (!c) continue;
-        if ((c->primaryFlags | c->secondaryFlags) & kOutsideZone) {
+        if (c->primaryFlags & kOutsideZone) {
             c->primaryFlags &= ~kOutsideZone;
-            c->secondaryFlags &= ~kOutsideZone;
             if (g_server_cleared.fetch_add(1) == 0 || g_said.fetch_add(1) < 10)
                 EMF_LOG(kMod, "server: cursor of %u: \"outside every build zone\" switched off", id);
         }
