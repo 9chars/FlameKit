@@ -1112,6 +1112,9 @@ flamekit_native.dll + its mod.json uploaded (outbox md5 checked against the loca
 emf_core.log ends 20:54:36 and enshrouded_server.log ends "Close Log file" (the G-Portal server was shut down at about
 20:54, before the upload; who/why not known). It loads 0.15.423 (DLL + Lua) at its next start; fetch the logs then.
 21:01 owner: "I stopped g-portal yes".
+21:03 owner: "server is coming up now". G-Portal log (fetched ~21:05): 21:02:51 loot news hooks installed, "bigger altar
+areas (server, at start): on, 1.5x", free build + addZone hooks installed, "on a dedicated server: only the companion
+part runs (loaded)", 19 feature(s) loaded; world loaded 21:03:19; zones 40 -> 60 m, 160 -> 240 m; no error lines.
 
 ## How to build and publish a version
 
