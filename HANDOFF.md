@@ -1189,6 +1189,10 @@ DLL reads the old files at start; Lua rewrites them within a second (not checked
 network traffic?" (19 zone sends in ~4 min since the grid). 08:35 "the border was staying steady when I stayed in one
 spot with the tool out" but the server list stayed "nobody" after 08:34:25 (the client's tool=true never arrived).
 0.15.433: debug log of each "tool" send with the raw displayCursor value (and accept 1 as true).
+08:35 owner running with the tool away: no zone sends. 08:37 owner: "Needs a flame Alter nearby" again: the Lua part
+sent only "away" (displayCursor false: Lua reads after the step; the DLL in addZone sees it). 0.15.434: the DLL's
+client branch keeps the tool "out" while displayCursor was seen within 60 steps, logs changes and writes
+free_build_tool.txt ("1"/"0"); the Lua part reads that file and tells the server.
 
 ## How to build and publish a version
 

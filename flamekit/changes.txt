@@ -1,3 +1,6 @@
+0.15.434 Nov 22, 2026
+- Free build: the "building tool out" signal now comes from FlameKit Native (the Lua part could not see it), so the server gets it.
+
 0.15.433 Nov 22, 2026
 - Free build: logging of the building tool signal sent to the server.
 
