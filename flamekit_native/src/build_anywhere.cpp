@@ -305,16 +305,16 @@ bool fk_build_anywhere_load(bool dedicated) {
             !kClearCursorFlags ? "(off)" : dedicated ? "(not here)" : (c ? "installed" : "NOT installed"),
             !kClearCursorFlags ? "(off)" : s ? "installed" : "NOT installed", kMaxFactor,
             al ? "installed" : "NOT installed");
-    emf::on_tick([](emf::World w) {  // the lists of players, every 60 steps of each world
+    emf::on_tick([](emf::World w) {  // the lists of players, every 15 steps of each world (0.15.431: was 60; the tool out/away must show quickly)
         g_steps.fetch_add(1);  // (0.15.426) the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
         if (w.is_server()) {
-            if (steps_server++ % 60 == 0) {
+            if (steps_server++ % 15 == 0) {
                 read_list(L"free_build_server.txt", g_free_server, "server");
                 read_factor(L"altar_size_server.txt", "server", kMaxFactor);
             }
         } else if (w.is_client()) {
-            if (steps_client++ % 60 == 0) {
+            if (steps_client++ % 15 == 0) {
                 read_list(L"free_build_client.txt", g_free_client, "this game");
                 if (!emf::server_world()) read_factor(L"altar_size_client.txt", "this game");  // a hosting game: the server's file counts
             }

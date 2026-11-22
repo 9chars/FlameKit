@@ -1175,6 +1175,12 @@ tool is out (client ClientPlayerInput.data.mask & 3, server PlayerInput.fromClie
 log: no box was ever made: the input mask & 3 never came on (kit.lua too: "build mode: off", never "on", while the
 cursor flags moved at 08:23: kit's build mode detection is broken since some game update: noted, not fixed). 0.15.430:
 client box gated by ClientCursor.displayCursor (logged on change); server box always while Free build is on.
+08:26 owner: "server always keeps the area while Free build is on: how do you know? we didn't test that?" (right: it was
+the design, not a test result). Restart 08:25; server box from 08:27:31 (tool away), client "the building cursor is
+hidden" 08:27:35, "shown" 08:28:31 (displayCursor follows the tool). 08:28 owner: "I see the border drawn with the
+tool away" -> the drawn border comes from the server's zones. 0.15.431: the player's game sends op "tool" (displayCursor
+and Free build on; on a change and every 10 s) to the server (experimental channel; hosting: handle directly);
+server list = Free build on AND tool out (FB.tool), written at once; the DLL reads the lists every 15 steps (was 60).
 
 ## How to build and publish a version
 
