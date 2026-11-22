@@ -132,6 +132,47 @@ void server_post(void*, void*) {
 std::mutex g_altar_mx;
 std::unordered_map<uint64_t, float> g_altar_written;
 
+std::set<uint64_t> g_altar_ids;  // (0.15.416) kind<<32 | entity: every altar the program wrote, for zones_pre
+
+// makes one altar's range kAltarFactor times the game's, unless it is ours already; under g_altar_mx
+void grow(gen::ecs::TriggerShape* t, uint8_t kind, uint32_t id) {
+    if (!t || !(t->rangeX > 0.0f)) return;
+    const uint64_t key = (uint64_t(kind) << 32) | id;
+    auto it = g_altar_written.find(key);
+    if (it != g_altar_written.end() && std::fabs(it->second - t->rangeX) < 0.001f) return;  // ours already
+    const bool first = it == g_altar_written.end();
+    const float x0 = t->rangeX, z0 = t->rangeZ;
+    t->rangeX *= kAltarFactor;
+    t->rangeY *= kAltarFactor;
+    t->rangeZ *= kAltarFactor;
+    g_altar_written[key] = t->rangeX;
+    g_altar_ids.insert(key);
+    g_altars.fetch_add(1);
+    // (0.15.416) the game writes the range again every step on the server (0.15.415: ~4,500 log lines a second):
+    // logged only the first time per altar and world
+    if (first) EMF_LOG(kMod, "bigger altar areas (%s world): altar %u from %.0f x %.0f to %.0f x %.0f m (half widths)",
+                       kind == 0 ? "server" : "client", id, x0, z0, t->rangeX, t->rangeZ);
+}
+
+// (0.15.416, owner 18:46 "building size is still the same": the write after upgrade_building_range did not reach the
+// build zones) also right BEFORE the game builds the zones from the altars (add_buildzones_server / _client)
+void zones_pre(void* raw, void*) {
+    if (!g_altar_on.load()) return;
+    auto* ctx = static_cast<ProgramContext*>(raw);
+    if (!ctx || !ctx->job) return;
+    const uint8_t* storage = *reinterpret_cast<uint8_t* const*>(ctx->job);
+    if (!storage) return;
+    const uint8_t kind = storage[8];
+    emf::World w = kind == 0 ? emf::server_world() : emf::client_world();
+    if (!w) return;
+    std::lock_guard<std::mutex> lk(g_altar_mx);
+    for (uint64_t key : g_altar_ids) {
+        if (uint8_t(key >> 32) != kind) continue;
+        const uint32_t id = uint32_t(key);
+        grow(w.get<gen::ecs::TriggerShape>(id), kind, id);
+    }
+}
+
 void altar_post(void* raw, void*) {
     if (!g_altar_on.load() || !g_current) return;
     auto* ctx = static_cast<ProgramContext*>(raw);
@@ -148,23 +189,9 @@ void altar_post(void* raw, void*) {
         uint32_t buf[4] = {0, 0, 0, 0};
         const uint32_t* idp = g_current(&c, buf);
         if (!idp || !*idp) continue;
-        auto* t = w.get<gen::ecs::TriggerShape>(*idp);
-        if (!t || !(t->rangeX > 0.0f)) continue;
-        const uint64_t key = (uint64_t(kind) << 32) | *idp;
         std::lock_guard<std::mutex> lk(g_altar_mx);
-        auto it = g_altar_written.find(key);
-        if (it != g_altar_written.end() && std::fabs(it->second - t->rangeX) < 0.001f) continue;  // ours already
-        const float x0 = t->rangeX, z0 = t->rangeZ;
-        t->rangeX *= kAltarFactor;
-        t->rangeY *= kAltarFactor;
-        t->rangeZ *= kAltarFactor;
-        const bool first = g_altar_written.find(key) == g_altar_written.end();
-        g_altar_written[key] = t->rangeX;
-        g_altars.fetch_add(1);
-        // (0.15.416) the game writes the range again every step on the server (0.15.415: ~4,500 log lines a second):
-        // logged only the first time per altar and world
-        if (first) EMF_LOG(kMod, "bigger altar areas (%s world): altar %u from %.0f x %.0f to %.0f x %.0f m (half widths)",
-                kind == 0 ? "server" : "client", *idp, x0, z0, t->rangeX, t->rangeZ);
+        g_altar_ids.insert((uint64_t(kind) << 32) | *idp);
+        grow(w.get<gen::ecs::TriggerShape>(*idp), kind, *idp);
     }
 }
 }  // namespace
@@ -181,6 +208,10 @@ bool fk_build_anywhere_load(bool dedicated) {
     if (!dedicated) c = a->hook_program("client_cursor", nullptr, client_post, nullptr);
     const bool s = a->hook_program("server_cursor_no_prediction", nullptr, server_post, nullptr);
     const bool al = g_current && a->hook_program("upgrade_building_range", nullptr, altar_post, nullptr);
+    const bool zs = a->hook_program("add_buildzones_server", zones_pre, nullptr, nullptr);
+    const bool zc = !dedicated && a->hook_program("add_buildzones_client", zones_pre, nullptr, nullptr);
+    EMF_LOG(kMod, "bigger altar areas: hook before add_buildzones_server %s, before add_buildzones_client %s",
+            zs ? "installed" : "NOT installed", dedicated ? "(not here)" : (zc ? "installed" : "NOT installed"));
     EMF_LOG(kMod, "free build: hook after client_cursor %s, after server_cursor_no_prediction %s; bigger altar areas (x%.0f, test): hook after upgrade_building_range %s",
             dedicated ? "(not here)" : (c ? "installed" : "NOT installed"), s ? "installed" : "NOT installed", kAltarFactor,
             al ? "installed" : "NOT installed");
