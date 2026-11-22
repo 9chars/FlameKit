@@ -222,7 +222,11 @@ void add_player_boxes(void* bzs, uint8_t flag) {
                 }
             }
         }
-        if (me && out && free_for(g_free_client, me)) ids.push_back(me);
+        // (0.15.437, owner 08:58 "this needs to work.. it was working before"): the tool signal above is not reliable, so
+        // the box no longer waits for it (as in 0.15.428, which worked); the signal is still logged while a better one is
+        // looked for.
+        (void)out;
+        if (me && free_for(g_free_client, me)) ids.push_back(me);
     } else {
         static std::atomic<int> said{0};
         if (said.fetch_add(1) == 0)

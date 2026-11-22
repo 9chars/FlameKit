@@ -2194,7 +2194,7 @@ end
 function FB.server_list()
   local ids = {}
   for account, p in pairs(online) do
-    if p.entity and is_on(account, "freebuild") and FB.tool[account] then ids[#ids + 1] = tostring(p.entity) end
+    if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end  -- (0.15.437) no longer waits for the tool signal (not reliable): as 0.15.428
   end
   FB.write("server", ids)
 end

@@ -1,3 +1,6 @@
+0.15.437 Nov 22, 2026
+- Free build works again far from altars: the moving building area is on whenever Free build is on (as in 0.15.428); its border shows while Free build is on.
+
 0.15.436 Nov 22, 2026
 - Logging: what the server knows about a player's building tool (for Free build).
 
