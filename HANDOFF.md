@@ -1299,6 +1299,11 @@ ones renamed .old_443): takes effect at the next restart; Lua reloaded live 12:1
 30-min reset test: 12:24:42 owner forgot C (2 left), 12:25:07 he was at 3695 1217 (far away); no restart, no crash.
 **13:05 owner: "it looks like it worked. everything at spot C is gone and cleaned up"**: a forgotten spot resets with
 the game's ~30-minute reset while the server runs. (A and B not checked in this test.)
+13:07 owner "go ahead and do the restart": restarted 13:07-13:09, 0.15.445 DLL (766ec8b2) loaded in server and client.
+**13:09 owner: "you need to commit all our changes today into development git"**: Development (dist-test) 0.15.445 made,
+signed (check_sig good), committed and pushed. Stable (dist) and G-Portal stay on 0.15.423 (no word for them).
+13:07 owner also: "make sure you're documenting the source code well enough for other users to read it. the EMF
+developer will be looking through everything and may need to incorporate some of our findings into his framework".
 
 ## How to build and publish a version
 

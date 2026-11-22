@@ -1,3 +1,70 @@
+0.15.445 Nov 22, 2026
+- Free build: new tooltip. Free build works outside flame altar areas, and what you build there is remembered and kept through restarts.
+- Free build: clean-up. A test that did not work is taken out of FlameKit Native (giving the Free build area an altar's base id), and old comments are updated. Free build works as before; all its logging stays.
+
+0.15.444 Nov 22, 2026
+- Free build: a piece placed inside an existing remembered spot's area no longer starts a new spot, even when it is over a 32 m grid line.
+
+0.15.443 Nov 22, 2026
+- Free build works only outside flame altar areas. Inside an altar's area the game's own building rules apply, and pieces you place there don't become remembered spots. Needs this version in your own game too.
+
+0.15.442 Nov 22, 2026
+- Free build: Experimental > Building now shows your nearest remembered spot within 64 m and how far its centre is, instead of only the spot whose area you stand in. "Forget this spot" forgets that nearest spot.
+
+0.15.441 Nov 22, 2026
+- Free build: Experimental > Building shows how many spots are remembered and the one you stand in; admins can forget it ("Forget this spot"). What was built there is temporary again.
+
+0.15.440 Nov 22, 2026
+- Test: Free build remembers where you built (32 m squares) and keeps a building area there from the moment the server starts, so what you built there may stay through restarts.
+
+0.15.439 Nov 22, 2026
+- Test (test server only): Free build's moving building area borrows an altar's base, to see whether the game then keeps what is built in it.
+
+0.15.438 Nov 22, 2026
+- Free build: clean-up. The parts that did not work are taken out (changing the build hammer's checks, the building tool signal and its messages to the server). Free build works as before; the logging stays.
+
+0.15.437 Nov 22, 2026
+- Free build works again far from altars: the moving building area is on whenever Free build is on (as in 0.15.428); its border shows while Free build is on.
+
+0.15.436 Nov 22, 2026
+- Logging: what the server knows about a player's building tool (for Free build).
+
+0.15.435 Nov 22, 2026
+- Free build: fixed 0.15.434 (the building tool was only looked at while the moving area was already on).
+
+0.15.434 Nov 22, 2026
+- Free build: the "building tool out" signal now comes from FlameKit Native (the Lua part could not see it), so the server gets it.
+
+0.15.433 Nov 22, 2026
+- Free build: logging of the building tool signal sent to the server.
+
+0.15.432 Nov 22, 2026
+- Free build: fixed 0.15.431 (the server never updated its list of players with the building tool out).
+
+0.15.431 Nov 22, 2026
+- Free build: the server's moving building area (and its border) is there only while your building tool is out; your game tells the server.
+
+0.15.430 Nov 22, 2026
+- Free build: fixed "Needs a Flame Altar nearby" coming back in 0.15.429 (building tool detection).
+
+0.15.429 Nov 22, 2026
+- Free build: the moving building area is there only while your building tool is out (its border is no longer drawn all the time).
+
+0.15.428 Nov 22, 2026
+- Free build: the moving building area moves in 32 m steps, so the server no longer sends every player the building areas each moment you move.
+
+0.15.427 Nov 22, 2026
+- Test: Free build with only the moving building area (the build hammer's checks are no longer changed).
+
+0.15.426 Nov 22, 2026
+- Test: Free build far from every flame altar: a building area moves with each player who has Free build on.
+
+0.15.425 Nov 22, 2026
+- Test: Free build far from every flame altar (a third check of the build hammer switched off), with logging.
+
+0.15.424 Nov 22, 2026
+- Logging for the build hammer again, to find why Free build gave errors on the server.
+
 0.15.423 Nov 21, 2026
 - Bigger altar areas is on by default (an admin can switch it off), and is in place from the moment the server starts.
 
