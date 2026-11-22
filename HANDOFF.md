@@ -1151,6 +1151,19 @@ cursor flag clearing still needed with the zone (clean-up test); the 30-minute r
 looked at); release.
 07:55 owner: "yeah lets see the minimum amount of changes we need to make this work" -> 0.15.427: cursor hooks off (kClearCursorFlags false; debug tool kept), only the player zone.
 Restart 07:56; zone around player 1 from 07:58:43 on both sides; **08:00 owner (far from altars): "it works"** with only the player zone.
+08:01 owner: "it should also survive the server reboot which, if you disable the 30 min reset, it should?"; 08:03 "yeah
+because it would still be nice to have the 30 min reset on terrain and other things that probably impacts the game"
+(= keep the reset for normal terrain, keep Free build pieces); 08:03 "i turned bigger alter areas back on".
+RE (server exe, build 1287369): the save's "base zones" come from the BuildZoneSystem's list 0 at save time: fn
+0x140932a30 (called from the ServerSaveGame save 0x1407c3bbb, r8 = BuildZoneSystem: entries of 0x48 B at +0x10, count
++0x18: int64 AABB min/max (2^32 per m) +0..0x30, baseId 16 B +0x30, entity u32 +0x40, a skip byte +0x46), error
+"[server] Failed to save 'ServerSaveGame', while getting base zones". So our zones (bigger altars AND the Free build
+player boxes, empty base id) go into the save as base zones. Terraforming save data: loader 0x140830430 ("Invalid
+macro chunk position", "Invalid chunk position"). "[server_save] Create/Clear Chunk Persistent Data" at 0x1407c10b5 /
+0x1407a8b68. PROBLEM found: the moving player box makes the server log "[ecs] Build zones changed" and send a
+BuildingZones message (1,135 B, "[ecss] message BuildingZones is big") EVERY step while the player moves (4,678 in
+one minute): network + log load. Fix offered: snap the box to a grid so it changes only when the player crosses a
+grid line. Not known yet: what a saved zone with an empty base id does at load; why 2x lost outer blocks.
 
 ## How to build and publish a version
 
