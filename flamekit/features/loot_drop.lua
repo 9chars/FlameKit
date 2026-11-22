@@ -49,6 +49,7 @@ local tally = { bodies = 0, items = 0, kept = 0, empty = 0 }  -- summed, logged 
 -- this needs one server restart after the update (emf.emits in F.setup).
 local test = { armed = false, id = nil, step = 0, sent = nil, looks = { 1, 30, 90, 180 } }
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   if ok then return v end
@@ -57,10 +58,12 @@ end
 
 local diag = 0  -- (0.15.169) detail lines this minute (at most DIAG_MAX; was 10 for the whole run)
 local DIAG_MAX = 60  -- (0.15.198) 60: a fight of 10 monsters fits in it
+-- A detail log line (at most DIAG_MAX a minute).
 local function note(fmt, ...)
   if diag < DIAG_MAX then diag = diag + 1 emf.log(string.format("loot drop: " .. fmt, ...)) end
 end
 
+-- A death (EntityDiedEvent): queues the body to be looked at (not test bodies, not a second report of one death), with its place, time and name.
 local function died(world, e)
   local id = e and e.deadEntityId
   if type(id) == "table" then id = id.id end
@@ -98,6 +101,7 @@ local FX_CANDIDATES = {  -- (0.15.180) for flamekit.fx
 }
 local fx_shown = {}  -- { id, at }: preview effects to remove
 local fx_said = 0  -- (0.15.173) bodies whose effect components were logged (3 per run)
+-- Debug: a game value as text (tables two levels deep, 24 fields at most).
 local function dump(v, depth)
   depth = depth or 0
   if type(v) ~= "table" and type(v) ~= "userdata" then return tostring(v) end
@@ -179,6 +183,7 @@ local function handle(world, id, look, creature, ctx)
   return "done"
 end
 
+-- Debug (loottest): logs what body `id` holds.
 local function describe(world, id, what)
   local stacks = bag.entity_stacks(world, id)
   local parts = {}
@@ -193,6 +198,7 @@ end
 -- 0.15.145: lootAll and bypassInteraction are Lua booleans (EMF lua.md: 1 was dropped, "needs true or false"), and the
 -- event waits for the body's inventory (0.15.144 measured: none at the death, there between 0.5 and 1.5 s after it)
 local WAIT_MAX = 180  -- steps: send at the latest 3 s after the death
+-- Debug (loottest): looks at the test body at set times after its death and sends the test's event.
 local function test_tick(world)
   if not test.id then return end
   local age = steps - test.step
@@ -246,6 +252,7 @@ local pulls = {}  -- { host, chest, x, y, z, at, stage, label }
 -- opener's PlayerInput: the opener must be a player). So first that event, with the nearest player as the opener; the
 -- body is then looked at again and its loot goes on the ground as usual. Needs one server restart (emf.emits).
 local opened = {}  -- body id -> true once opened this way
+-- Has the nearest player open body `id` (InteractionAcceptedEvent) so the game rolls its loot; false when it cannot (once per body).
 local function open_as_player(world, id, label)
   if opened[id] then return false end
   local okp, x, _, z = pcall(world.position, world, id)
@@ -266,6 +273,7 @@ local function open_as_player(world, id, label)
   return oke and done ~= false
 end
 
+-- Starts moving body `id`'s loot into a receiving chest spawned under it (pull_tick does the rest).
 local function poke(world, id, x, y, z, label, ctx)
   if not x then
     local okp, px, py, pz = pcall(world.position, world, id)
@@ -278,6 +286,7 @@ local function poke(world, id, x, y, z, label, ctx)
   return true
 end
 
+-- The receiving chests, half a second per stage: the loot event (body into chest), then the chest's items delivered by Auto Loot, then the chest removed.
 local function pull_tick(world)
   if #pulls == 0 then return end
   local keep = {}
@@ -308,6 +317,7 @@ local function pull_tick(world)
 end
 
 local body_again  -- below (it uses handle)
+-- A body that is gone or empty: finds its loot spot (the pile the game made, core/loot_spots.lua) and delivers what is in it; looked for again while there is none.
 local function from_spot(world, d, again)
   local asked = spots.find(d.id, d.x, d.z, d.t, function(w, ids)
     if #ids == 0 then
@@ -354,6 +364,7 @@ local function from_spot(world, d, again)
   if not asked then note("body %s: gone, and its death has no time or place: its loot spot cannot be told", tostring(d.id)) end
 end
 
+-- A queued second look at a body; when it is empty or gone, its loot spot.
 body_again = function(world, r)
   local d = r.d
   local okh, res = pcall(handle, world, d.id, #LOOKS, true, d.ctx)
@@ -369,11 +380,13 @@ local XFER_LOG, XFER_MAX = true, 30
 local XFER_CLIENT = false  -- (0.15.406) the client-side listening: off (see F.setup); (0.15.409) on again: the empty chest (16:19-17:01) was not it; (0.15.410) off: features/chest_overflow.lua listens
 local XFER_SERVER = false  -- (0.15.408) the server-side listening: off (see F.setup)
 local xfer = { said = 0, later = {} }
+-- Debug: an inventory slot as "entity/slot".
 local function slot_text(v)
   if type(v) ~= "table" and type(v) ~= "userdata" then return tostring(v) end
   local ok, t = pcall(function() return string.format("%s/%s", tostring(v.entityId), tostring(v.slotIndex)) end)
   return ok and t or tostring(v)
 end
+-- Debug: logs a TransferItemToInventoryEvent and what the source held (looked at again a second later).
 local function on_transfer(world, e)
   if not XFER_LOG or xfer.said >= XFER_MAX then return end
   xfer.said = xfer.said + 1
@@ -387,6 +400,7 @@ local function on_transfer(world, e)
   f[#f + 1] = "targetSlot=" .. (okt and slot_text(ts) or "?")
   f[#f + 1] = "sourceSlot=" .. (oks and slot_text(ss) or "?")
   emf.log("loot drop: transfer: " .. table.concat(f, " "))
+  -- Field `k` of a game value as a number, or nil.
   local function field(v, k)
     local ok, x = pcall(function() return v[k] end)
     return ok and tonumber(x) or nil
@@ -397,6 +411,7 @@ local function on_transfer(world, e)
   if src then for _, st in ipairs(bag.entity_stacks(world, src)) do before[#before + 1] = st end end
   xfer.later[#xfer.later + 1] = { at = steps + 60, src = src, idx = idx, n = #before, say = xfer.said }
 end
+-- Debug: the transfers' second looks that are due.
 local function transfer_tick(world)
   if #xfer.later == 0 then return end
   local keep = {}
@@ -413,6 +428,7 @@ local function transfer_tick(world)
   xfer.later = keep
 end
 
+-- Every server step: the loot news, spots, receiving chests, retries and queued bodies; preview effects go after 10 s; once a minute the counts.
 function F.tick(world)
   steps = steps + 1
   pcall(require("core.loot_news").tick, world, #queue > 0 or #retry > 0)  -- (0.15.399) loot piles: news while a death waits
@@ -504,6 +520,7 @@ local function on_hit(world, hit)
   kills[target] = { player = route.player_of(world, hit.attacker), at = steps }
 end
 
+-- Listens for deaths, sets up the events it sends (loot, interaction) and its debug commands.
 function F.setup(k)
   kit = k
   prefs.setup()

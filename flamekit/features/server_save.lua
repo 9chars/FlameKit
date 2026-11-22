@@ -12,6 +12,7 @@ local kit
 local steps = 0
 local handled = nil  -- the request number last handled (nil: none yet in this run)
 
+-- A file's text, or nil.
 local function read(path)
   local f = io.open(path, "r")
   if not f then return nil end
@@ -20,6 +21,7 @@ local function read(path)
   return text
 end
 
+-- Every 30 steps: a new save_now.request (the restart helper's) asks EMF to save the world; save_now.done says when it is done.
 function F.tick(world)
   steps = steps + 1
   if steps % 30 ~= 0 then return end
@@ -38,6 +40,7 @@ function F.tick(world)
   end
 end
 
+-- Keeps kit.
 function F.setup(k)
   kit = k
 end

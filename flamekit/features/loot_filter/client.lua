@@ -39,6 +39,7 @@ local function auto_loot_problem()
   return auto_loot == true and emf.setting("lf_action") ~= "delete" and emf.setting("lf_enabled") ~= false
 end
 
+-- Shows or takes away the red notice about the game's Auto-Collect Scattered Loot setting, when that changed.
 local function refresh_warning()
   local show = auto_loot_problem()
   if show == warning_shown then return end
@@ -48,6 +49,7 @@ end
 
 -- ---- the list ----
 
+-- The junk list's item names, sorted.
 local function sorted_names()
   local names = {}
   for name in pairs(junk) do names[#names + 1] = name end
@@ -62,6 +64,7 @@ local function show_all()
   return kit.setting("lf_show_all", false) == true
 end
 
+-- Loads this player's junk list from its file (kit.store).
 local function load_list()
   junk = {}
   local data = kit.store.load(FILE, {})
@@ -72,10 +75,12 @@ local function load_list()
   resolved = false
 end
 
+-- Saves this player's junk list to its file.
 local function save_list()
   kit.store.save(FILE, { version = 1, items = sorted_names() })
 end
 
+-- Puts item `name` on the junk list or takes it off (kept kinds only with Show all; at most MAX_ITEMS), saved and sent to the server.
 local function set_junk(name, on)
   kit.debug("info", "junk list (client): %s %s", on and "junk" or "keep", tostring(name))
   if on and items.is_keeper(name) and not show_all() then return end  -- weapons, armour, rings, tools, ...: kept
@@ -100,6 +105,7 @@ local function resolve()
   resolved = true
 end
 
+-- The list's options as they are sent to the server half (auto, action, show_all).
 local function options()
   return {
     auto = emf.setting("lf_auto") == true,
@@ -149,6 +155,7 @@ local function request(world, msg)
   return ok and sent == true
 end
 
+-- Sends the whole list and its options to the server half (a joined server answers "synced").
 local function sync(world)
   local names = sorted_names()
   if request(world, { op = "sync", items = names, opts = options() }) then
@@ -204,6 +211,7 @@ end
 
 -- ---- the feature's callbacks (init.lua hands them on) ----
 
+-- Loads the list and registers the dump key.
 function C.setup(k, F, s)
   kit, items, bag, server = k, k.items, k.bag, s
   load_list()
@@ -243,6 +251,7 @@ function C.client_tick(world)
   if dirty and version ~= 0 and since_sync >= 30 then sync(world) end  -- at most twice a second
 end
 
+-- An lf_ setting changed: the options are sent again and the warning looked at.
 function C.setting_changed(key)
   if key:sub(1, 3) == "lf_" then
     dirty = true
@@ -250,6 +259,7 @@ function C.setting_changed(key)
   end
 end
 
+-- Whether a bag stack is junk by this player's list (gear and kept kinds only with Show all).
 local function removable(stack)
   if not junk_ids[stack.item] then return false end
   if not show_all() and (stack.gear or items.is_keeper(junk_ids[stack.item])) then return false end

@@ -12,6 +12,7 @@ local F = { id = "loot_filter", title = "Auto Junk List", enabled_setting = "lf_
 local server = require("features.loot_filter.server")
 local client = require("features.loot_filter.client")
 
+-- Sets up both halves (server and player's game) and the Auto Junk List's net channel.
 function F.setup(kit)
   server.setup(kit, F)
   client.setup(kit, F, server)
@@ -33,6 +34,7 @@ function F.setup(kit)
   if not ok then emf.log("the channel flamekit/lf was refused: the Auto Junk List works only in worlds you host") end
 end
 
+-- Every server step: the server half, and in a world you host your own list straight to it.
 function F.tick(world)
   server.tick(world)
   client.server_tick(world)  -- in a world you host: your list goes straight to the server half

@@ -33,10 +33,12 @@ local session = nil
 S.to_local = nil         -- set by init.lua: function(world, msg) for the player whose game hosts the world
 S.CHANNEL = "lf"
 
+-- The options a player has before his game sent any.
 local function default_opts()
   return { auto = true, action = "drop", keep_hotbar = true, show_all = false }
 end
 
+-- A new player state: his list, options, entity, the queue of stacks to remove and the counts.
 local function new_state(account)
   return { account = account, junk = {}, ids = nil, opts = default_opts(), entity = 0,
            queue = {}, inflight = 0, inflight_since = 0, sweep_at = nil, again = false, tally = {}, auto_loot = nil }
@@ -44,6 +46,7 @@ end
 
 -- ---- a player's state ----
 
+-- A junk list from a message, checked: names only, at most 96 characters each, no doubles, at most MAX_ITEMS.
 local function clean_names(list)
   local junk, n = {}, 0
   if type(list) == "table" then
@@ -58,6 +61,7 @@ local function clean_names(list)
   return junk
 end
 
+-- Options from a message, checked (anything else keeps its default).
 local function clean_opts(o)
   local opts = default_opts()
   if type(o) == "table" then
@@ -69,6 +73,7 @@ local function clean_opts(o)
   return opts
 end
 
+-- A player's junk list, sorted.
 function S.names(st)
   local names = {}
   for name in pairs(st.junk) do names[#names + 1] = name end
@@ -96,12 +101,14 @@ local function state(account)
   return st
 end
 
+-- Saves a player's list and options with the world (emf.save_player_data).
 local function save(st)
   local text = emf.json.encode({ items = S.names(st), opts = st.opts })
   local ok, saved = pcall(emf.save_player_data, st.account, text)
   if not ok or not saved then emf.log("the junk list of player " .. tostring(st.entity) .. " was not saved with the world") end  -- never the account in a log
 end
 
+-- The account of player entity `entity` (kept once known).
 local function account_of(world, entity)
   if not entity or entity == 0 then return nil end
   local account = by_entity[entity]
@@ -184,6 +191,7 @@ local early = {}  -- account -> the latest "sync" message
 
 -- ---- removing ----
 
+-- Whether a bag stack is junk by this player's list (gear and kept kinds only while he shows all items).
 local function removable(st, stack)
   if not st.ids[stack.item] then return false end
   -- (0.15.189, owner) the action bar is wiped too, whatever an older game sends as keep_hotbar
@@ -206,6 +214,7 @@ local function sweep(world, st)
   return #st.queue
 end
 
+-- A sweep is done: tells the player what was dropped or deleted, and sweeps again soon when more came in meanwhile.
 local function finish(world, st)
   local total, list = 0, {}
   for id, count in pairs(st.tally) do
@@ -223,6 +232,7 @@ local function finish(world, st)
   end
 end
 
+-- EMF took a junk stack out of the bag: dropped on the ground (marked as the list's own) or deleted, and counted.
 local function on_taken(world, st, stack, taken, action, run)
   if run ~= session then return end  -- an answer from the world before this one
   st.inflight = math.max(0, st.inflight - 1)
@@ -241,6 +251,7 @@ local function on_taken(world, st, stack, taken, action, run)
   if st.inflight == 0 and #st.queue == 0 then finish(world, st) end
 end
 
+-- Takes up to PER_STEP queued junk stacks out of the player's bag this step (emf.take).
 local function pump(world, st)
   if #st.queue == 0 then return end
   local action, run = st.opts.action, session
@@ -314,6 +325,7 @@ function S.on_pickup(world, e)
   if st.ids[e.itemId] then st.sweep_at = now + SETTLE_STEPS end
 end
 
+-- Every server step: forgets everything in a new world session; per player the due sweep, the Auto Loot check (every 60 steps) and the queue.
 function S.tick(world)
   local s = emf.session()
   if s ~= session then  -- another world: entity ids and saved lists of the old one mean nothing
@@ -407,6 +419,7 @@ local function command(world, args)
   end
 end
 
+-- Answers Auto Loot's junk question (core/loot_route.lua), listens for pickups and registers the junk command.
 function S.setup(k, F)
   kit, items, bag = k, k.items, k.bag
   -- (0.15.376, owner 2026-11-21 09:35 "The loot MUST be evaluated by the auto junk list first") Auto Loot asks here,

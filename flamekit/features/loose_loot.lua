@@ -42,20 +42,24 @@ local said = 0
 local steps = 0
 local tally = { objects = 0, monsters = 0, stacks = 0 }
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   return ok and v or nil
 end
 
+-- Field `k` of a game value, or nil when it cannot be read.
 local function field(v, k)
   local ok, x = pcall(function() return v[k] end)
   return ok and x or nil
 end
 
+-- A log line (at most LOG_MAX a minute).
 local function note(fmt, ...)
   if LOG and said < LOG_MAX then said = said + 1 emf.log(string.format("loose loot: " .. fmt, ...)) end
 end
 
+-- Whether a hit was made with a tool (pickaxe or axe).
 local function is_tool(hit)
   if hit.attack == "tool" then return true end
   if type(hit.attacks) == "table" then
@@ -64,12 +68,14 @@ local function is_tool(hit)
   return false
 end
 
+-- A player's Auto Loot choice (and account).
 local function choice_of(world, player)
   local oka, acc = pcall(world.account, world, player)
   acc = oka and acc or nil
   return acc and prefs.get(acc, "auto_loot", world) or route.DEFAULT, acc
 end
 
+-- The world's step count (0 when it cannot be read).
 local function tick_of(world)
   local ok, t = pcall(world.tick, world)
   return ok and tonumber(t) or 0
@@ -80,6 +86,7 @@ end
 -- may throw on the ground while chopping). Debug tool: kept, can be switched off.
 local HIT_LOG, HIT_TICKS, HIT_R = true, 60 * 3, 10
 local tool_hits = {}  -- { player, x, y, z, tick }
+-- Debug: keeps where a player hit something with a tool (the last 64, HIT_TICKS).
 local function note_tool_hit(world, hit)
   if not (HIT_LOG and hit and is_tool(hit)) then return end
   local player = route.player_of(world, hit.attacker)
@@ -127,6 +134,7 @@ local function hit_near(x, y, z, now)
   return nil
 end
 
+-- A new loose item: when it is the drop of something a player just broke or killed nearby, it goes by his Auto Loot setting (bag or companion) instead of staying on the ground.
 local function on_pickup(world, id, x, y, z, now)
   if ground.is_own(id) then return end
   if HIT_LOG and #broken == 0 then
@@ -172,6 +180,7 @@ local FULL_LOG, FULL_MAX = true, 30
 local full_said, full_later = 0, {}
 local FULL_FLAGS = { "MiningNode", "DynamicMiningNode", "ResourceNodePickupDrops", "Inventory", "InventorySetup",
   "DefaultInventory", "PickupItem", "DestroyOnLoot", "RandomLoot", "Health", "PlayerState" }
+-- Debug: logs what entity `from` is and holds when a bag refused an item from it.
 local function full_look(world, from, what)
   local flags, items = {}, {}
   for _, c in ipairs(FULL_FLAGS) do if get(world, c, from) then flags[#flags + 1] = c end end
@@ -182,6 +191,7 @@ local function full_look(world, from, what)
   emf.log(string.format("loose loot: full bag: %s: entity %s: %s | %s", what, tostring(from), table.concat(flags, " "),
     #items > 0 and table.concat(items, ", ") or "(nothing)"))
 end
+-- Debug: the server's InventoryFull event: who, from what, how far (and a look half a second later).
 local function on_full(world, e)
   if not FULL_LOG or full_said >= FULL_MAX then return end
   full_said = full_said + 1
@@ -197,6 +207,7 @@ local function on_full(world, e)
   end
 end
 
+-- Every server step: the debug looks that are due, forgets old breaks and tool hits, reads the DLL's loot news while a drop is awaited; once a minute the counts.
 function F.tick(world)
   steps = steps + 1
   if #full_later > 0 then
@@ -221,6 +232,7 @@ function F.tick(world)
   end
 end
 
+-- Listens for new loose items (loot news), hits (breaks and kills) and full bags.
 function F.setup(k)
   kit = k
   prefs.setup()

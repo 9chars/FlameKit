@@ -25,6 +25,7 @@ local kit
 -- that player's colour, the same as their symbol in the Party window and on the minimap (0.15.82, owner). The colour is
 -- worked out only in the DLL (player_style), since 0.15.112; before, this file had its own copy of it.
 local announce_n = 0  -- (0.15.134) each announcement notice has its own tag
+-- Shows a chat message from the server: a notice only ("n"), an announcement, or a player's line in the Messages window.
 local function show(msg)
   if type(msg) ~= "table" or type(msg.t) ~= "string" or msg.t == "" then return end
   if msg.c == "n" then  -- (0.15.205) a notice only
@@ -77,6 +78,7 @@ function F.notice_to(world, player, text, colour, seconds, opts)
   end
 end
 
+-- A player's character name ("A player" when it is not known).
 local function name_of(world, entity)
   return players.name(world, entity, "A player")  -- core/players.lua: the character name first
 end
@@ -105,6 +107,7 @@ function F.tick(world)
   end
 end
 
+-- Listens for players joining and leaving (told to everyone) and opens the chat's net channel.
 function F.setup(k)
   kit = k
   players.setup(k)
