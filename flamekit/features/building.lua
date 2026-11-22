@@ -11,6 +11,11 @@
 -- of each cell's centre in m), which keeps a 48 m building area over each from the server's start, so what is built
 -- there is saved like inside an altar's area. At most SPOTS_MAX spots. Admins forget the nearest spot or all of them.
 --
+-- FREE BUILD INSIDE ALTAR AREAS (0.15.453, owner 17:19 "alter area rule for admins" -> "make this a setting and put it
+-- into the "Building" tab", 17:29 "add the setting for admin free build mode staying on inside other peoples bases"): an
+-- admin's own switch; while it is on, his Free build also works inside flame altar areas (other players' bases too).
+-- In the list files his line is "<entity> a". Only admins can switch it on; it works only while he is an admin.
+--
 -- BIGGER ALTAR AREAS (the world's option, admins only, on unless switched off): every altar's area 1.5 times as big.
 -- Kept in experimental_world.json ({ bigaltars = false } when off; the same file as before the move); FlameKit Native
 -- reads the factor from altar_size_server.txt (the server) / altar_size_client.txt (a player's own game).
@@ -44,15 +49,24 @@ local TIP = "Build anywhere outside flame altar areas. What you build is remembe
 
 -- ---- the server's half (where the world is hosted) ----
 
-local S = { saved = nil, world = nil, spots = nil, written = {}, said = {}, full_told = {}, steps = 0, notes = {} }
+local S = { saved = nil, altars = nil, world = nil, spots = nil, written = {}, said = {}, full_told = {}, steps = 0, notes = {},
+            admin_seen = {}, no_altar_since = nil }
 
--- Writes `text` to file `name` beside the Lua part for FlameKit Native, only when it changed.
+-- Writes `text` to file `name` beside the Lua part for FlameKit Native, only when it changed. (0.15.453) Through a
+-- temporary file put in its place, so FlameKit Native never reads half a file (while the name is missing for a moment it
+-- keeps what it read before).
 local function write_file(name, text, what)
   if S.written[name] == text then return end
-  local f = io.open(emf.dir .. "\\" .. name, "w")
+  local path = emf.dir .. "\\" .. name
+  local f = io.open(path .. ".tmp", "w")
   if not f then return end
   f:write(text)
   f:close()
+  os.remove(path)
+  if not os.rename(path .. ".tmp", path) then
+    emf.log("building: " .. name .. " could not be put in place")
+    return
+  end
   S.written[name] = text
   if what then emf.log("building: " .. what .. " now " .. (text ~= "" and text:gsub("\n", " ") or "(nobody)")) end
 end
@@ -63,15 +77,16 @@ local function saved()
   local ok, t = pcall(kit.store.load, "building", nil)
   if ok and type(t) == "table" then
     S.saved = type(t.freebuild) == "table" and t.freebuild or {}
+    S.altars = type(t.altars) == "table" and t.altars or {}
     return S.saved
   end
-  S.saved = {}
+  S.saved, S.altars = {}, {}
   local okx, x = pcall(kit.store.load, "experimental", {})
   local n = 0
   for account, set in pairs(okx and type(x) == "table" and x or {}) do
     if type(set) == "table" and set.freebuild == true then S.saved[account] = true n = n + 1 end
   end
-  pcall(kit.store.save, "building", { freebuild = S.saved })
+  pcall(kit.store.save, "building", { freebuild = S.saved, altars = S.altars })
   emf.log(string.format("building: Free build switches copied from experimental.json: %d player(s)", n))
   return S.saved
 end
@@ -79,6 +94,36 @@ end
 -- Whether Free build works for this player now: switched on and not in PvP.
 local function free_on(account)
   return account ~= nil and saved()[tostring(account)] == true and not pvp_state.on(account)
+end
+
+-- Saves both switches (building.json).
+local function save_switches()
+  saved()
+  pcall(kit.store.save, "building", { freebuild = S.saved, altars = S.altars })
+end
+
+-- Whether this player is an admin: core/admins' list, or seen as one in a message (EMF's own admins, the host).
+local function is_admin(account, from)
+  account = tostring(account)
+  local yes = admins.is(account, from) == true
+  if from then S.admin_seen[account] = yes or nil end  -- a message says what he is now (also when he stopped being one)
+  return yes or S.admin_seen[account] == true
+end
+
+-- Whether this player's Free build also works inside altar areas: his switch, while he is an admin.
+local function altars_on(account)
+  saved()
+  return account ~= nil and S.altars[tostring(account)] == true and is_admin(account, nil)
+end
+
+-- How many altar areas the server knows (altar_areas_server.txt, written by FlameKit Native); nil while there is no file.
+local function altar_count()
+  local f = io.open(emf.dir .. "\\altar_areas_server.txt", "r")
+  if not f then return nil end
+  local n = 0
+  for line in f:lines() do if line:match("%d") then n = n + 1 end end
+  f:close()
+  return n
 end
 
 -- The world's Bigger altar areas: on unless an admin switched it off (experimental_world.json).
@@ -115,6 +160,7 @@ local function spots_write(save)
     lines[n] = string.format("%.1f %.1f %.1f", c[1], c[2], c[3])
   end
   table.sort(lines)
+  write_file("free_build_spot_half.txt", string.format("%d\n", SPOT_HALF))  -- (0.15.453) the one place the size is set
   write_file("free_build_spots.txt", table.concat(lines, "\n") .. (n > 0 and "\n" or ""))
   return n
 end
@@ -220,9 +266,11 @@ end
 -- A player's state for his tab.
 local function state(world, account, entity, from)
   account = tostring(account)
+  local admin = is_admin(account, from)
   local st = { op = "state", freebuild = saved()[account] == true or nil, pvp = pvp_state.on(account) or nil,
-               bigaltars = big_on() or nil, admin = admins.is(account, from) or nil, spot = spot_info(world, account, entity),
-               note = S.notes[account] }
+               altars = S.altars[account] == true or nil, altars_on = altars_on(account) or nil,
+               bigaltars = big_on() or nil, admin = admin or nil, spot = spot_info(world, account, entity),
+               noaltars = (S.no_altar_since ~= nil and os.time() - S.no_altar_since >= 60) or nil, note = S.notes[account] }
   S.notes[account] = nil
   return st
 end
@@ -242,19 +290,28 @@ local function handle(world, account, entity, msg, from)
     local on = msg.on == true
     if (saved()[account] == true) ~= on then
       saved()[account] = on or nil
-      pcall(kit.store.save, "building", { freebuild = saved() })
+      save_switches()
       emf.log(string.format("building: player %s switched Free build %s", tostring(entity), on and "on" or "off"))  -- never the account in a log
       announce(world, string.format("%s turned %s free build.", players.name(world, entity, "a player"), on and "ON" or "OFF"))
     end
+  elseif msg.op == "set" and msg.key == "altars" then  -- (0.15.453) an admin's Free build inside altar areas
+    if not is_admin(account, from) then return refused("Only FlameKit admins can use Free build inside altar areas.") end
+    local on = msg.on == true
+    saved()
+    if (S.altars[account] == true) ~= on then
+      S.altars[account] = on or nil
+      save_switches()
+      emf.log(string.format("building: player %s switched Free build inside altar areas %s", tostring(entity), on and "on" or "off"))
+    end
   elseif msg.op == "set" and msg.key == "bigaltars" then
-    if not admins.is(account, from) then return refused("Only FlameKit admins can switch Bigger altar areas.") end
+    if not is_admin(account, from) then return refused("Only FlameKit admins can switch Bigger altar areas.") end
     big_on()
     if msg.on == true then S.world.bigaltars = nil else S.world.bigaltars = false end  -- only "off" is kept
     pcall(kit.store.save, "experimental_world", S.world)
     emf.log(string.format("building: player %s switched bigger altar areas %s", tostring(entity), msg.on == true and "on" or "off"))
     announce(world, string.format("%s turned %s bigger altar areas.", players.name(world, entity, "a player"), msg.on == true and "ON" or "OFF"))
   elseif msg.op == "forget_spot" then
-    if not admins.is(account, from) then return refused("Only FlameKit admins can forget Free build spots.") end
+    if not is_admin(account, from) then return refused("Only FlameKit admins can forget Free build spots.") end
     local key, c = spot_for(world, entity)
     if not key then return refused("There is no remembered spot within " .. SPOT_NEAR .. " m of you.") end
     spots()[key] = nil
@@ -262,7 +319,7 @@ local function handle(world, account, entity, msg, from)
     emf.log(string.format("building: free build: player %s forgot the spot at %.0f %.0f %.0f (%d left)", tostring(entity), c[1], c[2], c[3], total))
     return refused(string.format("Forgot the spot at %.0f, %.0f. What was built there is temporary again.", c[1], c[3]))
   elseif msg.op == "forget_all_spots" then
-    if not admins.is(account, from) then return refused("Only FlameKit admins can forget Free build spots.") end
+    if not is_admin(account, from) then return refused("Only FlameKit admins can forget Free build spots.") end
     local n = spot_count()
     S.spots = {}
     spots_write(true)
@@ -281,9 +338,13 @@ function F.tick(world)
   local ids = {}
   for _, id in ipairs(players.ids(world)) do
     local ok, account = pcall(world.account, world, id)
-    if ok and account and free_on(account) then ids[#ids + 1] = tostring(id) end
+    if ok and account and free_on(account) then ids[#ids + 1] = tostring(id) .. (altars_on(account) and " a" or "") end
   end
   table.sort(ids)
+  -- (0.15.453, owner 17:19 "#5 go ahead") a map without any flame altar: Free build cannot work yet (FlameKit Native adds
+  -- its areas when the game adds an altar's); the tab says so once it has been so for a minute
+  local altars = altar_count()
+  if altars == 0 then S.no_altar_since = S.no_altar_since or os.time() else S.no_altar_since = nil end
   write_file("free_build_server.txt", table.concat(ids, "\n") .. (#ids > 0 and "\n" or ""), "free build: server list")
   write_file("altar_size_server.txt", (big_on() and ALTAR_FACTOR or "1") .. "\n", "bigger altar areas: altar_size_server.txt")
   spots_write(false)
@@ -352,7 +413,7 @@ function F.client_tick(world)
   if not v then return end
   local me = emf.local_player()
   local on = v and v.freebuild == true and not v.pvp and me and me ~= 0
-  write_file("free_build_client.txt", on and (tostring(me) .. "\n") or "", "free build: this game's list")
+  write_file("free_build_client.txt", on and (tostring(me) .. (v.altars_on and " a" or "") .. "\n") or "", "free build: this game's list")
   write_file("altar_size_client.txt", ((v and v.bigaltars == true) and ALTAR_FACTOR or "1") .. "\n", "bigger altar areas: altar_size_client.txt")
 end
 
@@ -375,6 +436,14 @@ function F.panel(world)
   end
   local admin = v.admin == true
   local only = admin and "" or " (admins only)"
+  rows[#rows + 1] = { button = "b:altars", text = (v.altars and "On    " or "Off   ") .. "Free build inside altar areas" .. only,
+    selected = v.altars == true, disabled = (not admin) or nil,
+    tooltip = "For admins: your Free build keeps working inside flame altar areas too, other players' bases included, so you can "
+      .. "fix or remove pieces there. Only for you, and only while Free build is on. Off: inside an altar's area the game's "
+      .. "normal building rules apply." .. (admin and "" or " Only FlameKit admins can use it.") }
+  if v.noaltars then
+    rows[#rows + 1] = { color = "#ffb060", text = "This map has no flame altar yet: Free build needs at least one flame altar somewhere on the map for now." }
+  end
   local on = v.bigaltars == true
   rows[#rows + 1] = { heading = "Flame altars" }
   rows[#rows + 1] = { button = "b:big", text = (on and "On    " or "Off   ") .. "Bigger altar areas (1.5x)" .. only,
@@ -415,6 +484,8 @@ function F.click(world, key)
   if key == "b:free" then
     if v.pvp then return end
     act(world, { op = "set", key = "freebuild", on = not (v.freebuild == true) })
+  elseif key == "b:altars" then
+    act(world, { op = "set", key = "altars", on = not (v.altars == true) })
   elseif key == "b:big" then
     act(world, { op = "set", key = "bigaltars", on = not (v.bigaltars == true) })
   elseif key == "b:forget" then
@@ -467,6 +538,6 @@ end
 F._state = function(world, account, entity, from) return state(world, account, entity, from) end
 F._handle = function(world, account, entity, msg, from) return handle(world, account, entity, msg, from) end
 F._on_place = function(world, e) return on_place(world, e) end
-F._reset = function() S.saved, S.world, S.spots, S.written, S.said, S.notes = nil, nil, nil, {}, {}, {} end
+F._reset = function() S.saved, S.altars, S.world, S.spots, S.written, S.said, S.notes = nil, nil, nil, nil, {}, {}, {} end
 
 return F

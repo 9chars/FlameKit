@@ -3,15 +3,18 @@
 // FREE BUILD (per player, Experimental tab > Building). Hooked: BuildZoneSystem_addZone. On each rebuild of the build
 // zone list, when the game adds its first altar zone, this adds to the same list:
 //  - the server only: a zone over each remembered spot (free_build_spots.txt, "x y z" in m per line, written by
-//    features/experimental.lua): a 48 m box, from the server's start, so what was built there is saved and kept like
+//    features/building.lua): a 48 m box, from the server's start, so what was built there is saved and kept like
 //    inside an altar's area;
-//  - a box around each player Free build is on for (free_build_server.txt / free_build_client.txt, entity ids, read
-//    every 15 steps), in the server and in that player's own game. The box sits on a kGridStep grid (a box that moved
-//    smoothly made the server resend the whole zone list every step). The game draws its border only while the
-//    building tool is selected.
+//  - a box around each player Free build is on for (free_build_server.txt / free_build_client.txt: one player a line,
+//    "<entity id>" or "<entity id> a"; read every 15 steps), in the server and in that player's own game. The box sits
+//    on a kGridStep grid (a box that moved smoothly made the server resend the whole zone list every step). The
+//    players' positions are read on the world's own step (on_tick) and kept for this code, which runs inside the
+//    game's addZone. The game draws the border only while the building tool is selected.
 // Free build works only outside flame altar areas (owner 2026-11-22 11:06): no player box while the player stands in
-// an altar's area (as added, after the bigger size). The server writes its altar areas to altar_areas_server.txt
-// (min xyz, max xyz in m per line) for the Lua, which then makes no remembered spot for a piece placed in one.
+// an altar's area (as added, after the bigger size), unless the player's line has "a" (an admin's "Free build inside
+// altar areas" in the Building tab, owner 17:29). A remembered spot's area reaches free_build_spot_half.txt m from its
+// centre. The server writes its altar areas to altar_areas_server.txt (min xyz, max xyz in m per line) for the Lua,
+// which then makes no remembered spot for a piece placed in one.
 //
 // BIGGER ALTAR AREAS (the world's option, admins only, on by default): an altar zone (list 0, owner kind 0: what
 // add_buildzones_server/_client pass for each altar) gets a box g_factor times as wide, high and deep around the same
@@ -45,6 +48,7 @@
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
 #include <windows.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -70,9 +74,11 @@ std::atomic<float> g_factor{1.0f};
 std::atomic<bool> g_free_on{true}, g_altar_on{true};
 std::atomic<uint64_t> g_altars{0}, g_boxes{0};
 
-// the players Free build is on for, per side (read from the files on the world's own tick thread)
+// the players Free build is on for, per side (read from the files on the world's own tick thread), and (0.15.453, owner
+// 2026-11-22 17:19/17:29 "add the setting for admin free build mode staying on inside other peoples bases") those whose
+// Free build works inside altar areas too (an admin's switch in the Building tab: an "a" after the id in the file)
 std::mutex g_mx;
-std::set<uint32_t> g_free_server, g_free_client;
+std::set<uint32_t> g_free_server, g_free_client, g_alt_server, g_alt_client;
 
 std::wstring lua_file(const wchar_t* name) {  // <this DLL's folder>\..\flamekit\<name>
     HMODULE me = nullptr;
@@ -86,40 +92,66 @@ std::wstring lua_file(const wchar_t* name) {  // <this DLL's folder>\..\flamekit
     return s + L"\\flamekit\\" + name;
 }
 
-// Reads a list of entity ids (one a line) from the Lua part's file `name` into `out`; logged when it changed.
-void read_list(const wchar_t* name, std::set<uint32_t>& out, const char* side) {
-    std::set<uint32_t> ids;
-    if (FILE* f = _wfopen(lua_file(name).c_str(), L"rb")) {
+// Reads the Lua part's list file `name` (one player a line: "<entity id>" or "<entity id> a", a: Free build also inside
+// altar areas) into `out` and `alt`; logged when it changed. (0.15.453) A file that cannot be opened (the Lua part is
+// just replacing it) leaves the lists as they are.
+void read_list(const wchar_t* name, std::set<uint32_t>& out, std::set<uint32_t>& alt, const char* side) {
+    std::set<uint32_t> ids, alts;
+    FILE* f = _wfopen(lua_file(name).c_str(), L"rb");
+    if (!f) return;
+    char line[64];
+    while (std::fgets(line, sizeof line, f)) {
         unsigned v = 0;
-        while (std::fscanf(f, "%u", &v) == 1) if (v) ids.insert(v);
-        std::fclose(f);
+        char flag = 0;
+        const int got = std::sscanf(line, "%u %c", &v, &flag);
+        if (got >= 1 && v) {
+            ids.insert(v);
+            if (got == 2 && flag == 'a') alts.insert(v);
+        }
     }
+    std::fclose(f);
     std::lock_guard<std::mutex> lk(g_mx);
-    if (ids != out) {
+    if (ids != out || alts != alt) {
         std::string list;
-        for (uint32_t id : ids) list += " " + std::to_string(id);
+        for (uint32_t id : ids) list += " " + std::to_string(id) + (alts.count(id) ? " (also in altar areas)" : "");
         EMF_LOG(kMod, "free build (%s): on for%s", side, list.empty() ? " nobody" : list.c_str());
         out.swap(ids);
+        alt.swap(alts);
     }
 }
 
-// Whether Free build is on for entity `id` in `list`.
+// Whether entity `id` is in `list`.
 bool free_for(std::set<uint32_t>& list, uint32_t id) {
     std::lock_guard<std::mutex> lk(g_mx);
     return list.count(id) != 0;
 }
 
 // (0.15.440) Free build's remembered spots: the centres (m) of the 32 m grid cells where pieces were placed with Free
-// build (features/experimental.lua writes free_build_spots.txt). The server adds a build zone over each, every step,
+// build (features/building.lua writes free_build_spots.txt). The server adds a build zone over each, every step,
 // from its start: what was built there should be kept like inside an altar's area.
-constexpr double kSpotHalf = 16.0 + 8.0;  // m each way: the 32 m cell and 8 m more (pieces can stick out of their cell)
+// (0.15.453, owner 17:29 "#9 ok fix this") how far a spot's area reaches from its centre comes from the Lua part
+// (free_build_spot_half.txt, features/building.lua's SPOT_HALF), so the area and the tab's "nearest spot" always agree;
+// kSpotHalfDefault until the file is there.
+constexpr double kSpotHalfDefault = 24.0;
+std::atomic<double> g_spot_half{kSpotHalfDefault};
 std::vector<std::array<int64_t, 3>> g_spots;  // under g_mx
 std::string g_spots_text;
 
-// Reads free_build_spots.txt ("x y z" in m per line) into g_spots (2^32 per m); logged when it changed.
+// Reads free_build_spot_half.txt and free_build_spots.txt ("x y z" in m per line) into g_spot_half and g_spots (2^32 per
+// m); logged when they changed.
 void read_spots(const char* side) {
+    if (FILE* f = _wfopen(lua_file(L"free_build_spot_half.txt").c_str(), L"rb")) {
+        double h = 0;
+        if (std::fscanf(f, "%lf", &h) == 1 && h >= 8.0 && h <= 64.0 && h != g_spot_half.load()) {
+            g_spot_half = h;
+            EMF_LOG(kMod, "free build (%s): a remembered spot's area reaches %.0f m from its centre", side, h);
+        }
+        std::fclose(f);
+    }
     std::string text;
-    if (FILE* f = _wfopen(lua_file(L"free_build_spots.txt").c_str(), L"rb")) {
+    FILE* f = _wfopen(lua_file(L"free_build_spots.txt").c_str(), L"rb");
+    if (!f) return;  // (0.15.453) the Lua part is just replacing it: the spots stay as they are
+    {
         char buf[4096];
         size_t n;
         while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
@@ -160,6 +192,12 @@ std::atomic<int> g_zone_said{0};
 constexpr double kPlayerHalf = 40.0;  // m each way the box always covers around the player
 constexpr double kGridStep = 32.0;    // m: the box moves only when the player crosses a grid line
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
+// (0.15.453, owner 17:19 "#7 go ahead") the positions of the players Free build is on for, read on each world's own
+// step (on_tick, the world thread) and used by the box code, which runs inside the game's addZone (its thread is not
+// known): no game data is read there. Per side: 1 the server, 0 the player's own game.
+struct Pos { int64_t x, y, z; };
+std::mutex g_pos_mx;
+std::unordered_map<uint64_t, Pos> g_pos;  // (side << 32 | entity) -> position (2^32 per m), under g_pos_mx
 std::atomic<int> g_box_said{0};
 
 // (0.15.443, owner 11:04 "the free build mode should not work while inside a flame alter base", 11:06 "if you're
@@ -192,6 +230,7 @@ bool in_box(const Box& b, int64_t x, int64_t y, int64_t z) {
     return x >= b[0] && x <= b[3] && y >= b[1] && y <= b[4] && z >= b[2] && z <= b[5];
 }
 std::string g_altars_text;  // what altar_areas_server.txt holds (the tick thread only)
+bool g_altars_written = false;  // (0.15.453) written once at least, also when there is no altar (a new map: "" not the old map's)
 // Writes zone list `bzs`'s altar areas to altar_areas_server.txt for the Lua (min xyz, max xyz in m per line), when they changed.
 void write_altar_areas(void* bzs) {
     std::string text;
@@ -201,11 +240,19 @@ void write_altar_areas(void* bzs) {
                       double(b[2]) / 4294967296.0, double(b[3]) / 4294967296.0, double(b[4]) / 4294967296.0, double(b[5]) / 4294967296.0);
         text += line;
     }
-    if (text == g_altars_text) return;
-    if (FILE* f = _wfopen(lua_file(L"altar_areas_server.txt").c_str(), L"wb")) {
-        std::fwrite(text.data(), 1, text.size(), f);
+    if (g_altars_written && text == g_altars_text) return;
+    // (0.15.453, owner 17:19 "#8 go ahead") a temporary file moved over the old one, so the Lua part never reads half a file
+    const std::wstring dest = lua_file(L"altar_areas_server.txt"), tmp = lua_file(L"altar_areas_server.tmp");
+    if (FILE* f = _wfopen(tmp.c_str(), L"wb")) {
+        const bool ok = text.empty() || std::fwrite(text.data(), 1, text.size(), f) == text.size();
         std::fclose(f);
-        const bool first = g_altars_text.empty();
+        if (!ok || !MoveFileExW(tmp.c_str(), dest.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+            static std::atomic<int> said{0};
+            if (said.fetch_add(1) < 3) EMF_LOG(kMod, "free build (server): altar_areas_server.txt could not be written (error %lu)", GetLastError());
+            return;
+        }
+        const bool first = !g_altars_written;
+        g_altars_written = true;
         g_altars_text = text;
         size_t n = 0;
         for (char c : text) n += c == '\n';
@@ -245,7 +292,7 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
             ids.assign(g_free_server.begin(), g_free_server.end());
             spots = g_spots;
         }
-        const int64_t sh = int64_t(kSpotHalf * 4294967296.0);
+        const int64_t sh = int64_t(g_spot_half.load() * 4294967296.0);
         for (const auto& c : spots) {  // (0.15.440) the remembered spots
             int64_t b[6] = {c[0] - sh, c[1] - sh, c[2] - sh, c[0] + sh, c[1] + sh, c[2] + sh};
             uint8_t no_base[16] = {};
@@ -253,7 +300,7 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
         }
         static std::atomic<int> spots_said{0};
         if (!spots.empty() && spots_said.fetch_add(1) == 0)
-            EMF_LOG(kMod, "free build (server): %zu remembered spot zone(s) %.0f m wide in the zone list", spots.size(), kSpotHalf * 2);
+            EMF_LOG(kMod, "free build (server): %zu remembered spot zone(s) %.0f m wide in the zone list", spots.size(), g_spot_half.load() * 2);
     } else if (wc && wc.singleton("BuildZoneSystem") == bzs) {
         w = wc;
         side = "this game";
@@ -273,12 +320,28 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
         if (v % step < 0) --q;  // floor for negative values
         return q * step + step / 2;
     };
+    {
+        static std::atomic<int> thread_said{0};
+        if (thread_said.fetch_add(1) < 2)
+            EMF_LOG(kMod, "free build (%s): the zone list is rebuilt on thread %lu", side, GetCurrentThreadId());  // (0.15.453, #7)
+    }
+    const uint64_t side_bit = uint64_t(w.is_server() ? 1 : 0) << 32;
+    std::set<uint32_t> bypass;
+    {
+        std::lock_guard<std::mutex> lk(g_mx);
+        bypass = w.is_server() ? g_alt_server : g_alt_client;
+    }
     for (uint32_t id : ids) {
-        auto* ct = w.get<gen::ecs::CurrentTransform>(id);
-        if (!ct) continue;
-        const auto& p = ct->transform.position;
+        Pos p{};
+        {
+            std::lock_guard<std::mutex> lk(g_pos_mx);
+            auto it = g_pos.find(side_bit | id);
+            if (it == g_pos.end()) continue;  // not read on a world step yet
+            p = it->second;
+        }
         bool inside = false;  // (0.15.443) in an altar's area: the game's own rules, no Free build box
         for (const Box& a : altars) if (in_box(a, p.x, p.y, p.z)) { inside = true; break; }
+        const bool also = inside && bypass.count(id) != 0;  // (0.15.453) an admin's "also inside altar areas"
         {
             static std::mutex said_mx;
             static std::unordered_map<uint64_t, bool> said;  // (world side, player) -> inside, logged on change
@@ -289,10 +352,10 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
                 said[k] = inside;
                 EMF_LOG(kMod, "free build (%s): player %u at %.1f %.1f %.1f is %s an altar area (%zu known)%s", side, id,
                         double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0, inside ? "inside" : "outside",
-                        altars.size(), inside ? ": no Free build box" : "");
+                        altars.size(), inside ? (also ? ": Free build box anyway (admin, also in altar areas)" : ": no Free build box") : "");
             }
         }
-        if (inside) continue;
+        if (inside && !also) continue;
         const int64_t cx = cell_mid(p.x), cy = cell_mid(p.y), cz = cell_mid(p.z);
         int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
         uint8_t no_base[16] = {};
@@ -348,16 +411,41 @@ bool fk_build_anywhere_load(bool dedicated) {
     emf::on_tick([](emf::World w) {  // the lists of players and the factor, every 15 steps of each world
         g_steps.fetch_add(1);  // the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
+        // (0.15.453, #7) the positions of the players Free build is on for, every step, here on the world's own thread
+        {
+            const bool server = w.is_server();
+            std::vector<uint32_t> ids;
+            {
+                std::lock_guard<std::mutex> lk(g_mx);
+                if (server) ids.assign(g_free_server.begin(), g_free_server.end());
+                else if (w.is_client()) {
+                    const uint32_t me = emf::local_player();
+                    if (me && g_free_client.count(me)) ids.push_back(me);
+                }
+            }
+            const uint64_t side_bit = uint64_t(server ? 1 : 0) << 32;
+            std::lock_guard<std::mutex> lk(g_pos_mx);
+            for (auto it = g_pos.begin(); it != g_pos.end();) {  // players no longer on the list
+                if ((it->first >> 32) == (side_bit >> 32) && std::find(ids.begin(), ids.end(), uint32_t(it->first)) == ids.end()) it = g_pos.erase(it);
+                else ++it;
+            }
+            for (uint32_t id : ids) {
+                if (auto* ct = w.get<gen::ecs::CurrentTransform>(id)) {
+                    const auto& p = ct->transform.position;
+                    g_pos[side_bit | id] = Pos{p.x, p.y, p.z};
+                }
+            }
+        }
         if (w.is_server()) {
             if (steps_server++ % 15 == 0) {
-                read_list(L"free_build_server.txt", g_free_server, "server");
+                read_list(L"free_build_server.txt", g_free_server, g_alt_server, "server");
                 read_spots("server");
                 read_factor(L"altar_size_server.txt", "server", kMaxFactor);
                 if (void* bzs = w.singleton("BuildZoneSystem")) write_altar_areas(bzs);  // (0.15.443)
             }
         } else if (w.is_client()) {
             if (steps_client++ % 15 == 0) {
-                read_list(L"free_build_client.txt", g_free_client, "this game");
+                read_list(L"free_build_client.txt", g_free_client, g_alt_client, "this game");
                 if (!emf::server_world()) read_factor(L"altar_size_client.txt", "this game");  // a hosting game: the server's file counts
             }
         }

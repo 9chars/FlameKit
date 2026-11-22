@@ -36,16 +36,20 @@ every new workaround gets an entry here. Game addresses are for game build 12873
 4. **A channel between a native (C++) mod and a Lua mod** (request 8 below). The DLL and the Lua part talk through
    small files in `emf\mods\flamekit`, polled: the UI (`ui_*.dat`, `ui_actions.txt`, `ui_layout.txt`, `*.request`),
    loot news (`loot_news.txt`), Free build (`free_build_server.txt`, `free_build_client.txt`, `free_build_spots.txt`,
-   `altar_size_server.txt`, `altar_size_client.txt`, `altar_areas_server.txt`), companions (`labels.txt`,
+   `free_build_spot_half.txt`, `altar_size_server.txt`, `altar_size_client.txt`, `altar_areas_server.txt`), companions (`labels.txt`,
    `pet_drive.txt`, `custom_names.txt`, `companion_debug.txt`, `chest_ground.request`), the updater
    (`update_status.txt`). `features/native_ui.lua`, `flamekit_native.cpp`, `build_anywhere.cpp`,
-   `companions_server.cpp`, `loot_news.cpp`.
+   `companions_server.cpp`, `loot_news.cpp`. Since a file can be read while the other side is writing it, Free
+   build's files are written to a temporary name and then moved over the old one (0.15.453); a reader that finds no
+   file keeps what it read before.
 5. **4-byte events to Lua.** EMF delivers no 4-byte event to Lua's `emf.on_event` ("the queue layout of 4-byte events
    is not known yet"). New loose items and containers are reported through `loot_news.txt` instead.
    `flamekit_native/src/loot_news.cpp`, `core/loot_news.lua`.
 6. **Build zones (where building is allowed).** No EMF call adds, removes or lists build zones. FlameKit hooks the
    game's `BuildZoneSystem_addZone` by byte pattern (Free build, remembered spots, Bigger altar areas, the list of
-   altar areas). `flamekit_native/src/build_anywhere.cpp` (its header has what we found).
+   altar areas). `flamekit_native/src/build_anywhere.cpp` (its header has what we found). The hook runs inside the
+   game's own code on a thread EMF says nothing about, so (0.15.453) no game data is read there: the players'
+   positions are read on the world's step (`emf::on_tick`) and kept for the hook.
 7. **Air (oxygen).** `emf.attribute` has no name for air. Invincible Mode writes the player's Oxygen component
    directly (`dataStorage[1]` air now, `[2]` maximum, `DynamicOxygenState.accumulatedValue`). `features/experimental.lua`.
 8. **Game values with no EMF call** (glider speed, the updraft burst, climbing with the glider, keeping stamina, mana

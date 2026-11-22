@@ -1,3 +1,10 @@
+0.15.453 Nov 22, 2026
+- Building tab: new admin setting "Free build inside altar areas". While it is on, an admin's Free build also works inside flame altar areas, other players' bases included, so pieces there can be fixed or removed. Off by default; other players are not affected.
+- Building tab: a map without any flame altar now says so. Free build needs at least one flame altar somewhere on the map for now.
+- Free build: the size of a remembered spot's area is now set in one place, so the area and the tab's "nearest spot" always agree.
+- Free build: the files FlameKit and FlameKit Native share are now written whole and then put in place, so neither side can read half a file.
+- Free build: FlameKit Native reads the players' positions on the world's own step instead of inside the game's building code.
+
 0.15.452 Nov 22, 2026
 - New Building tab: Free build, Bigger altar areas and the remembered spots moved here from the Experimental tab. Your Free build setting carries over.
 

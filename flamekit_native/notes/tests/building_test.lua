@@ -1,4 +1,4 @@
--- features/building.lua (0.15.452): Free build's switch, PvP, Bigger altar areas, remembered spots, the files.
+-- features/building.lua (0.15.453): Free build's switch, PvP, Bigger altar areas, remembered spots, the files.
 -- texlua flamekit_native/notes/tests/building_test.lua   (from the repo's top folder)
 package.path = "flamekit/?.lua;" .. package.path
 local fails = 0
@@ -18,6 +18,13 @@ local function fake_open(path, mode)
            close = function() files[name] = table.concat(buf) end }
 end
 io.open = fake_open
+os.remove = function(path) files[path:match("[^\\]+$")] = nil return true end
+os.rename = function(a, b)
+  local na, nb = a:match("[^\\]+$"), b:match("[^\\]+$")
+  if files[na] == nil then return nil end
+  files[nb], files[na] = files[na], nil
+  return true
+end
 emf = { dir = dir, log = function(s) logs[#logs + 1] = s end, local_player = function() return 1 end,
   json = { encode = function(t) return t end, decode = function(t) return t end },
   net = { channel = function() return true end, send = function() return true end, send_to = function() return true end,
@@ -86,8 +93,27 @@ n = 0 for _ in pairs(store.free_build_spots) do n = n + 1 end
 check(n == 100 and B._state(W, "0xa1", 1, nil).note:find("limit of 100"), "at 100 spots: not kept, the player told")
 check(B._handle(W, "0xa1", 1, { op = "forget_all_spots" }).note:find("Forgot all 100"), "forget all spots")
 
+check(files["free_build_spot_half.txt"] == "24\n", "the spot size written for FlameKit Native")
+check(files["free_build_server.txt.tmp"] == nil, "no temporary file left behind")
+
+-- Free build inside altar areas (admins)
+check(B._handle(W, "0xb2", 2, { op = "set", key = "altars", on = true }).note:find("Only FlameKit admins"), "inside altar areas: admins only")
+B._handle(W, "0xa1", 1, { op = "set", key = "altars", on = true })
+for _ = 1, 30 do B.tick(W) end
+check(store.building.altars["0xa1"] == true and files["free_build_server.txt"] == "1 a\n2\n", "an admin's line has \" a\": " .. tostring(files["free_build_server.txt"]))
+local sa = B._state(W, "0xa1", 1, nil)
+check(sa.altars == true and sa.altars_on == true, "the tab: inside altar areas on")
+B._handle(W, "0xa1", 1, { op = "set", key = "altars", on = false })
+for _ = 1, 30 do B.tick(W) end
+check(files["free_build_server.txt"] == "1\n2\n" and store.building.altars["0xa1"] == nil, "switched off again")
+
+-- the map without a flame altar
+files["altar_areas_server.txt"] = ""
+for _ = 1, 30 do B.tick(W) end
+check(B._state(W, "0xa1", 1, nil).noaltars == nil, "no altar: not told before a minute")
+
 local rows = B.panel(W)
 local keys = {}
 for _, r in ipairs(rows) do if r.button then keys[#keys + 1] = r.button .. (r.disabled and "(off)" or "") end end
-check(table.concat(keys, " ") == "b:free b:big b:forget(off) b:forgetall(off)", "the tab's buttons, always shown: " .. table.concat(keys, " "))
+check(table.concat(keys, " ") == "b:free b:altars b:big b:forget(off) b:forgetall(off)", "the tab's buttons, always shown: " .. table.concat(keys, " "))
 print(fails == 0 and "ALL PASSED (building)" or (fails .. " FAILED"))
