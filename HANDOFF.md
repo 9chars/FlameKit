@@ -1318,7 +1318,7 @@ build_anywhere.cpp, web_update.hpp, fk_log.hpp, item_icons.hpp, loot_news.cpp). 
 against 31c94b0 (before the pass): Lua token streams without comments identical (a tokenizer, /tmp/luatok.py), C++
 identical after the preprocessor strips comments (gcc -fpreprocessed); Lua tests ALL PASSED, syntax ok, DLL built OK
 13:29 (not installed: same code). Lua and mod.json installed live 13:31 (server, client, work folder; md5 checked
-against git before and after). How to check again: for each changed file compare the comment-free code with git's.
+against git before and after). How to check again: tools/comments_only.sh <ref> (tools/lua_tokens.py for Lua).
 
 ## How to build and publish a version
 
