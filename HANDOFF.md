@@ -1077,6 +1077,10 @@ Cause NOT known (guesses: the game does something per zone volume, 64x bigger; o
 19:08 owner: "try it 2x I guess" -> 0.15.418 kAltarFactor 2 (+ log of the first 3 addZone returns): restart 19:09 ok,
 no freeze; zones 160 -> 320 m, 40 -> 80 m on the server and in his game. 19:12 owner: "that seemed to have worked".
 Next: restart test whether pieces in the new ring are kept.
+19:13 owner: "yes I put some blocks down.. reboot to test it": restart 19:13; 19:17 "its still there, but id like to do one
+more reboot test.... some of them might be a bit different looking..."; restart 19:18; 19:21 "some blocks are there, but
+some are missing, so something odd is definitely happening" ("fairly close to the edge": which edge not answered).
+19:22 owner: "instead of 2x lets do 1x bigger?" -> asked; "1.5" -> 0.15.419 kAltarFactor 1.5.
 
 ## How to build and publish a version
 

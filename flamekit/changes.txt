@@ -1,3 +1,6 @@
+0.15.419 Nov 21, 2026
+- The bigger altar areas test: one and a half times as wide (at twice as wide some blocks in the outer ring were gone after a restart).
+
 0.15.418 Nov 21, 2026
 - The bigger altar areas test: twice as wide instead of four times (four times froze the test server).
 
