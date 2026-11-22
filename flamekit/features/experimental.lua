@@ -2770,20 +2770,22 @@ local function panel_rows(world)
         tooltip = "Places where someone built with Free build. Each is a 32 m square of the world with a building area over it (48 m wide and high), so what was built there stays through restarts like inside an altar's area." }
       if sp.key then  -- (0.15.442) the nearest spot within 64 m, with how far its centre is
         rows[#rows + 1] = { dim = true, text = string.format("Nearest spot: %d, %d (height %d), centre %d m away", sp.x, sp.z, sp.y, sp.dist or 0) }
-        if admin then
-          rows[#rows + 1] = { button = "fbforget", text = "Forget this spot",
-            tooltip = string.format("Forgets the remembered spot at %d, %d. What was built in it is temporary again: the game removes it at the next restart or after about 30 minutes. Its border shows while your building tool is out.", sp.x, sp.z) }
-        end
       else
         rows[#rows + 1] = { dim = true, text = "No remembered spot within 64 m of you." }
       end
+      -- (0.15.448, owner 13:58 "anyway to keep the buttons always present and just disable them? I don't like the hidden
+      -- buttons thing") both buttons always shown; greyed out (with the reason) when they cannot be used
+      local only = admin and "" or " (admins only)"
+      rows[#rows + 1] = { button = "fbforget", text = "Forget this spot" .. only, disabled = (not admin or not sp.key) or nil,
+        tooltip = sp.key and string.format("Forgets the remembered spot at %d, %d. What was built in it is temporary again: the game removes it at the next restart or after about 30 minutes. Its border shows while your building tool is out.%s", sp.x, sp.z, admin and "" or " Only FlameKit admins can use it.")
+          or ("No remembered spot within 64 m of you: walk to one to forget it." .. (admin and "" or " Only FlameKit admins can use it.")) }
       -- (0.15.447) every spot at once, admins only; a second click within 5 s does it
-      if admin and (sp.total or 0) > 0 then
-        local asked = FB.all_asked and os.time() - FB.all_asked <= 5
-        rows[#rows + 1] = { button = "fbforgetall", selected = asked or nil,
-          text = asked and string.format("Click again to forget all %d spots", sp.total) or string.format("Forget all spots (%d)", sp.total),
-          tooltip = "Forgets every remembered Free build spot on the map at once. What was built in them is temporary again: the game removes it at the next restart or after about 30 minutes. Click twice within 5 seconds." }
-      end
+      local total = sp.total or 0
+      local asked = admin and total > 0 and FB.all_asked and os.time() - FB.all_asked <= 5
+      rows[#rows + 1] = { button = "fbforgetall", selected = asked or nil, disabled = (not admin or total == 0) or nil,
+        text = asked and string.format("Click again to forget all %d spots", total) or (string.format("Forget all spots (%d)", total) .. only),
+        tooltip = "Forgets every remembered Free build spot on the map at once. What was built in them is temporary again: the game removes it at the next restart or after about 30 minutes. Click twice within 5 seconds."
+          .. (total == 0 and " There are no remembered spots now." or "") .. (admin and "" or " Only FlameKit admins can use it.") }
     end
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below

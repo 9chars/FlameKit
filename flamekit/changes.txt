@@ -1,3 +1,6 @@
+0.15.448 Nov 22, 2026
+- Free build: "Forget this spot" and "Forget all spots" are always shown in Experimental > Building, greyed out when they cannot be used (no spot near you, no spots, or not an admin).
+
 0.15.447 Nov 22, 2026
 - Free build: admins can forget every remembered spot at once ("Forget all spots" in Experimental > Building; click twice within 5 seconds). What was built in them is temporary again.
 

@@ -1328,6 +1328,10 @@ shipped), signed (check_sig good), committed and pushed. Stable and G-Portal sta
 once".** 0.15.447 (Lua, live 13:5x): Building section, admins only, "Forget all spots (N)", shown while there are spots;
 a second click within 5 s does it (my choice: the same two-click guard as the roster's delete; told the owner);
 op forget_all_spots -> FB.forget_all_spots (store and file emptied, logged "forgot all N remembered spot(s)").
+**13:58 owner: "anyway to keep the buttons always present and just disable them? I don't like the hidden buttons
+thing".** Standing UI rule from now: buttons are never hidden, they are shown greyed out (disabled) with the reason in
+the tooltip. 0.15.448 (Lua, live 13:59:42): "Forget this spot" and "Forget all spots (N)" always shown; disabled when no
+spot is within 64 m / there are no spots / not an admin ("(admins only)" after the text, as Bigger altar areas).
 
 ## How to build and publish a version
 
