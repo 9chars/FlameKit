@@ -1395,6 +1395,9 @@ end
 -- A word from a player about their own switches. Returns the view to send back.
 local function handle(world, account, entity, msg, from)
   load_saved()
+  -- (0.15.442) the panel's spot needs the player's position from this message's own world: the world kept from
+  -- the last step gave no position here ("entity 1 at no position"), so no spot and no Forget button
+  if world and world.is_server and world:is_server() then FB.world_ref = world end
   account = tostring(account)
   seen(account, entity)
   online[account].kit = true  -- this player's game runs FlameKit: only then is the glider's burst note taken away
@@ -1522,7 +1525,7 @@ local function handle(world, account, entity, msg, from)
     v = view(account)
     v.admin = true
     v.note = c and string.format("Forgot the spot at %.0f, %.0f. What was built there is temporary again.", c[1], c[3])
-      or "There is no remembered spot where you stand."
+      or "There is no remembered spot within 64 m of you."
     return v
   end
   if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
@@ -2238,7 +2241,11 @@ function FB.on_place(world, e)
   local cx, cy, cz = math.floor(x / st), math.floor(y / st), math.floor(z / st)
   local key = cx .. "," .. cy .. "," .. cz
   local spots = FB.spots_get()
-  if spots[key] then return end
+  if spots[key] then  -- (0.15.442) logged too, for debugging where blocks land
+    emf.log(string.format("experimental: free build: placed by %d at %.1f %.1f %.1f, in the remembered spot %.0f %.0f %.0f",
+      owner, x, y, z, spots[key][1], spots[key][2], spots[key][3]))
+    return
+  end
   local n = 0
   for _ in pairs(spots) do n = n + 1 end
   if n >= FB.SPOTS_MAX then
@@ -2254,31 +2261,45 @@ end
 
 -- (0.15.441, owner 10:24 "we definitely need a way to remove the remember spots incase we have issues or theres too
 -- many of them", 10:2x "it just has to be clear what spot im in that I'd be clearing out") the spot where a player
--- stands: their own 32 m cell if it is remembered, else the nearest remembered spot whose 48 m area holds them.
+-- stands. (0.15.442, owner 10:32 "im literally standing right next to the block I put down", 10:34 "I walked to the
+-- other side of the block. it still says in not in the right area ... it needs to work") a spot's box is centred on
+-- its 32 m grid square, not on the block, so a player beside the block can stand outside it: now the nearest
+-- remembered spot whose centre is within FB.SPOT_NEAR m across (and 48 m up or down), with how far its centre is.
+FB.SPOT_NEAR = 64
 function FB.spot_for(world, entity)
   if not world or not entity then return nil end
   local okp, x, y, z = pcall(world.position, world, entity)
-  if not okp or not x then return nil end
-  local st, spots = FB.SPOT_STEP, FB.spots_get()
-  local key = math.floor(x / st) .. "," .. math.floor(y / st) .. "," .. math.floor(z / st)
-  if spots[key] then return key, spots[key] end
-  local best, bk, bc = nil, nil, nil
-  for k, c in pairs(spots) do
-    local dx, dy, dz = math.abs(x - c[1]), math.abs(y - c[2]), math.abs(z - c[3])
-    if dx <= 24 and dy <= 24 and dz <= 24 then
-      local d = dx * dx + dy * dy + dz * dz
-      if not best or d < best then best, bk, bc = d, k, c end
-    end
+  if not okp or not x then
+    if FB.spot_err ~= tostring(x) then FB.spot_err = tostring(x) emf.log("experimental: free build: no position for " .. tostring(entity) .. ": " .. tostring(x)) end
+    return nil
   end
-  return bk, bc
+  local best, bk, bc = nil, nil, nil
+  for k, c in pairs(FB.spots_get()) do
+    local dx, dy, dz = x - c[1], y - c[2], z - c[3]
+    local d = math.sqrt(dx * dx + dz * dz)
+    if d <= FB.SPOT_NEAR and math.abs(dy) <= 48 and (not best or d < best) then best, bk, bc = d, k, c end
+  end
+  return bk, bc, best, x, y, z
 end
+FB.spot_said = {}
 function FB.spot_info(account)
   local n = 0
   for _ in pairs(FB.spots_get()) do n = n + 1 end
   local info = { total = n }
-  local p = online[tostring(account)]
-  local key, c = FB.spot_for(FB.world_ref, p and p.entity)
-  if key then info.key, info.x, info.y, info.z = key, math.floor(c[1] + 0.5), math.floor(c[2] + 0.5), math.floor(c[3] + 0.5) end
+  local p = online[tostring(account)] or online[account]
+  local key, c, d, x, y, z = FB.spot_for(FB.world_ref, p and p.entity)
+  if key then
+    info.key, info.x, info.y, info.z = key, math.floor(c[1] + 0.5), math.floor(c[2] + 0.5), math.floor(c[3] + 0.5)
+    info.dist = math.floor(d + 0.5)
+  end
+  -- (0.15.442) logged when what this player's panel says changes (or their 8 m square changes), for debugging
+  local said = string.format("%s|%s|%s", tostring(key), tostring(info.dist), x and (math.floor(x / 8) .. "," .. math.floor(z / 8)) or "?")
+  if FB.spot_said[tostring(account)] ~= said then
+    FB.spot_said[tostring(account)] = said
+    emf.log(string.format("experimental: free build: panel spot for %s (entity %s at %s): %s",
+      tostring(account), tostring(p and p.entity), x and string.format("%.1f %.1f %.1f", x, y, z) or "no position",
+      key and string.format("%d %d %d, %d m", info.x, info.y, info.z, info.dist) or "none within " .. FB.SPOT_NEAR .. " m"))
+  end
   return info
 end
 function FB.forget_spot(world, entity)
@@ -2635,14 +2656,14 @@ local function panel_rows(world)
     if sp then
       rows[#rows + 1] = { dim = true, text = string.format("Remembered Free build spots: %d", sp.total or 0),
         tooltip = "Places where someone built with Free build. Each is a 32 m square of the world with a building area over it (48 m wide and high), so what was built there stays through restarts like inside an altar's area." }
-      if sp.key then
-        rows[#rows + 1] = { dim = true, text = string.format("You stand in the spot at %d, %d (height %d)", sp.x, sp.z, sp.y) }
+      if sp.key then  -- (0.15.442) the nearest spot within 64 m, with how far its centre is
+        rows[#rows + 1] = { dim = true, text = string.format("Nearest spot: %d, %d (height %d), centre %d m away", sp.x, sp.z, sp.y, sp.dist or 0) }
         if admin then
           rows[#rows + 1] = { button = "fbforget", text = "Forget this spot",
             tooltip = string.format("Forgets the remembered spot at %d, %d. What was built in it is temporary again: the game removes it at the next restart or after about 30 minutes. Its border shows while your building tool is out.", sp.x, sp.z) }
         end
       else
-        rows[#rows + 1] = { dim = true, text = "No remembered spot where you stand." }
+        rows[#rows + 1] = { dim = true, text = "No remembered spot within 64 m of you." }
       end
     end
   end

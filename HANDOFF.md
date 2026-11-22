@@ -1246,6 +1246,14 @@ the map, memory issues, etc"; asked how; "it just has to be clear what spot im i
 (Lua): Building shows "Remembered Free build spots: N", "You stand in the spot at X, Z (height Y)" or "No remembered
 spot where you stand", and for admins (core/admins) a "Forget this spot" button (op forget_spot; FB.spot_for: own
 32 m cell, else the nearest spot whose 48 m area holds the player). Admin-only: my assumption (as the world options).
+10:32 owner: "im literally standing right next to the block I put down" (panel said no spot), 10:34 "I walked to the
+other side of the block. it still says in not in the right area. this is a flaw on your part. it needs to work", 10:36
+"theres no button to press?". Cause (log): the panel's view had no position for the player ("entity 1 at no
+position"): FB.world_ref, the world kept from the last step, gives no position inside a message handler. 0.15.442
+(Lua): handle() sets FB.world_ref to the message's own world (then 10:37:43 "at 5789.8 817.9 5388.0: 5776 816 5392,
+14 m"); the panel shows the nearest spot within 64 m across (48 m up/down) with the centre's distance ("Nearest spot:
+X, Z (height Y), centre N m away"); Forget acts on it. Logged: panel spot changes, "no position for", every Free build
+placement (also inside a known spot, with the block's position). My first explanation (outside the box) was wrong.
 
 ## How to build and publish a version
 

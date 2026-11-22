@@ -1,3 +1,6 @@
+0.15.442 Nov 22, 2026
+- Free build: Experimental > Building now shows your nearest remembered spot within 64 m and how far its centre is, instead of only the spot whose area you stand in. "Forget this spot" forgets that nearest spot.
+
 0.15.441 Nov 22, 2026
 - Free build: Experimental > Building shows how many spots are remembered and the one you stand in; admins can forget it ("Forget this spot"). What was built there is temporary again.
 
