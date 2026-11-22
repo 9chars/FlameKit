@@ -90,7 +90,7 @@ local TIPS = {
 -- free_build_server.txt, a player's own game free_build_client.txt (both in a game that hosts).
 local FB = { SECTION = { freebuild = "Building" }, STEPS = 30, written = {}, steps = 0 }
 -- (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that"; 20:21 "Building, admins only"): Bigger
--- altar areas, one switch for the whole world (every altar's area is shared; the server decides what is kept), only
+-- altar areas, one switch for the whole world (every altar's area is shared; the server decides what is kept; 0.15.423: on by default), only
 -- FlameKit admins (core/admins.lua) may change it. Kept in experimental_world.json ({ bigaltars = true }); FlameKit
 -- Native (build_anywhere.cpp) reads the factor from altar_size_server.txt (the server) / altar_size_client.txt (a
 -- player's own game: the server's answer). 1.5x: the size tested on the local server (2x lost blocks in the outer ring
@@ -103,7 +103,7 @@ function FB.world_on()
     local ok, w = pcall(kit.store.load, "experimental_world", {})
     FB.world = (ok and type(w) == "table") and w or {}
   end
-  return FB.world.bigaltars == true
+  return FB.world.bigaltars ~= false  -- (0.15.423, owner 20:43 "can you default it on then?") on unless an admin switched it off
 end
 function FB.write_text(name, text)
   if FB.written[name] == text then return end
@@ -1518,7 +1518,7 @@ local function handle(world, account, entity, msg, from)
       return v
     end
     FB.world_on()
-    FB.world.bigaltars = msg.on == true or nil
+    if msg.on == true then FB.world.bigaltars = nil else FB.world.bigaltars = false end  -- (0.15.423) only "off" is kept
     kit.store.save("experimental_world", FB.world)
     emf.log(string.format("experimental: player %s switched bigger altar areas %s", tostring(entity), msg.on == true and "on" or "off"))
     local name = require("core.players").name(world, entity, "a player")
@@ -2505,7 +2505,7 @@ local function panel_rows(world)
     local on, admin = v.bigaltars == true, v.admin == true or hosting(world)
     rows[#rows + 1] = { button = "bigaltars", text = (on and "On    " or "Off   ") .. "Bigger altar areas (1.5x)" .. (admin and "" or " (admins only)"),
       selected = on, disabled = (not admin) or nil,
-      tooltip = "Every flame altar's building area is 1.5 times as wide, high and deep; an altar's level still sets its size (40 m becomes 60 m, 160 m becomes 240 m). For the whole server: everyone's altars. What you build in the bigger area is kept like anything inside an altar's area. Players need this FlameKit version in their own game to see and use the bigger area. Only FlameKit admins can switch it; everyone on the server is told." }
+      tooltip = "Every flame altar's building area is 1.5 times as wide, high and deep; an altar's level still sets its size (40 m becomes 60 m, 160 m becomes 240 m). For the whole server: everyone's altars. What you build in the bigger area is kept like anything inside an altar's area. Players need this FlameKit version in their own game to see and use the bigger area. On unless an admin switches it off. Only FlameKit admins can switch it; everyone on the server is told." }
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
   -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B

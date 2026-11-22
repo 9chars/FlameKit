@@ -1099,6 +1099,9 @@ reads the factor (1..kMaxFactor 1.5), off by default.
 Restart 20:24 loaded the world with the switch OFF (default): the 80-120 m test blocks may have been reset (told the
 owner; should have set experimental_world.json bigaltars=true first). 20:27 owner: "is free build setting admin only
 also?" -> no, per player; 20:32 owner: "it can be by player for now".
+20:38 owner: "so that option has to be on when the server comes up"; 20:43 "can you default it on then?" -> 0.15.423:
+on unless an admin switched it off (experimental_world.json keeps only bigaltars=false); the DLL reads the factor at
+load (before the world) too; no altar_size_server.txt yet = 1.5 on a server, a player's game = 1 until the server says.
 
 ## How to build and publish a version
 

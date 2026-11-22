@@ -94,9 +94,10 @@ bool free_for(std::set<uint32_t>& list, uint32_t id) {
     return list.count(id) != 0;
 }
 
-void read_factor(const wchar_t* name, const char* side) {
-    float f = 1.0f;
+void read_factor(const wchar_t* name, const char* side, float missing = 1.0f) {
+    float f = missing;  // (0.15.423) no file yet: the server's default is on (kMaxFactor), a player's game waits for the server
     if (FILE* file = _wfopen(lua_file(name).c_str(), L"rb")) {
+        f = 1.0f;
         float v = 1.0f;
         if (std::fscanf(file, "%f", &v) == 1 && v >= 1.0f && v <= kMaxFactor) f = v;
         std::fclose(file);
@@ -179,6 +180,10 @@ bool fk_build_anywhere_load(bool dedicated) {
         EMF_LOG(kMod, "free build: EMF has no hook_program: off");
         return false;
     }
+    // (0.15.423, owner 20:38 "so that option has to be on when the server comes up") the factor is read now, before
+    // the world loads (the game decides what to keep then), not only at the first world step
+    if (dedicated) read_factor(L"altar_size_server.txt", "server, at start", kMaxFactor);
+    else read_factor(L"altar_size_client.txt", "this game, at start");
     bool c = false;
     if (!dedicated) c = a->hook_program("client_cursor", nullptr, client_post, nullptr);
     const bool s = a->hook_program("server_cursor_no_prediction", nullptr, server_post, nullptr);
@@ -192,7 +197,7 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (w.is_server()) {
             if (steps_server++ % 60 == 0) {
                 read_list(L"free_build_server.txt", g_free_server, "server");
-                read_factor(L"altar_size_server.txt", "server");
+                read_factor(L"altar_size_server.txt", "server", kMaxFactor);
             }
         } else if (w.is_client()) {
             if (steps_client++ % 60 == 0) {
