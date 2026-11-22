@@ -1,3 +1,6 @@
+0.15.440 Nov 22, 2026
+- Test: Free build remembers where you built (32 m squares) and keeps a building area there from the moment the server starts, so what you built there may stay through restarts.
+
 0.15.439 Nov 22, 2026
 - Test (test server only): Free build's moving building area borrows an altar's base, to see whether the game then keeps what is built in it.
 

@@ -2174,6 +2174,69 @@ local function pvp(world)
   end
 end
 
+-- (0.15.440, owner 2026-11-22 09:50 "restart, if it fails we'll try to make it remember those areas"; 10:00 the
+-- borrowed base id kept nothing either) Free build's remembered spots: every piece a player with Free build on places
+-- (the server's BuildingPlaceEvent: position, ownerId) marks its 32 m grid cell (the same grid as the moving area). The
+-- cells are kept in free_build_spots.json (kit.store) and handed to FlameKit Native in free_build_spots.txt ("x y z" of
+-- each cell's centre in m, one a line), which adds a build zone over each remembered cell from the moment the server
+-- starts, before the world loads: the save and the load should then treat them like altar areas. At most
+-- FB.SPOTS_MAX cells. Nothing is forgotten yet (a piece torn down leaves its cell).
+FB.SPOT_STEP, FB.SPOTS_MAX = 32, 2000
+function FB.spots_get()
+  if FB.spots == nil then
+    local ok, t = pcall(kit.store.load, "free_build_spots", {})
+    FB.spots = (ok and type(t) == "table") and t or {}
+  end
+  return FB.spots
+end
+function FB.spots_write()
+  local lines, n = {}, 0
+  for _, c in pairs(FB.spots_get()) do
+    n = n + 1
+    lines[n] = string.format("%.1f %.1f %.1f", c[1], c[2], c[3])
+  end
+  table.sort(lines)
+  local text = table.concat(lines, "\n")
+  if FB.written.spots == text then return n end
+  local f = io.open(emf.dir .. "\\free_build_spots.txt", "w")
+  if not f then return n end
+  f:write(text, n > 0 and "\n" or "")
+  f:close()
+  FB.written.spots = text
+  return n
+end
+function FB.on_place(world, e)
+  local owner = tonumber((pcall(function() return e.ownerId end) and e.ownerId) or 0) or 0
+  local account
+  for a, p in pairs(online) do
+    if p.entity == owner then account = a break end
+  end
+  if not account or not is_on(account, "freebuild") then return end
+  local x, y, z
+  pcall(function() local q = e.position x, y, z = tonumber(q.x), tonumber(q.y), tonumber(q.z) end)
+  if not (x and y and z) then
+    local okp, px, py, pz = pcall(world.position, world, owner)
+    if okp then x, y, z = px, py, pz end
+  end
+  if not (x and y and z) then return end
+  local st = FB.SPOT_STEP
+  local cx, cy, cz = math.floor(x / st), math.floor(y / st), math.floor(z / st)
+  local key = cx .. "," .. cy .. "," .. cz
+  local spots = FB.spots_get()
+  if spots[key] then return end
+  local n = 0
+  for _ in pairs(spots) do n = n + 1 end
+  if n >= FB.SPOTS_MAX then
+    emf.log("experimental: free build: remembered spots full (" .. n .. "), not kept: " .. key)
+    return
+  end
+  spots[key] = { cx * st + st / 2, cy * st + st / 2, cz * st + st / 2 }
+  pcall(kit.store.save, "free_build_spots", spots)
+  local total = FB.spots_write()
+  emf.log(string.format("experimental: free build: a spot remembered at %.0f %.0f %.0f (placed by %d at %.1f %.1f %.1f; %d spot(s))",
+    spots[key][1], spots[key][2], spots[key][3], owner, x, y, z, total))
+end
+
 -- (0.15.415) the server's list for FlameKit Native: online players with Free build on. (0.15.432: defined here,
 -- after `online` and `is_on`; above them both are nil.) (0.15.438: the building tool signal of 0.15.431-0.15.437 taken out.)
 function FB.server_list()
@@ -2880,6 +2943,11 @@ end
 
 function F.setup(k)
   kit = k
+  do  -- (0.15.440) Free build's remembered spots (the server world: events.on's default)
+    local okr = require("core.game_events").on("BuildingPlaceEvent", function(world, e) pcall(FB.on_place, world, e) end)
+    if not okr then emf.log("experimental: free build: BuildingPlaceEvent cannot be heard") end
+    pcall(FB.spots_write)
+  end
   -- A console test for PvP (server console or emf\commands.txt, output in emf_core.log), so it can be tried without a
   -- second player at the keyboard: "flamekit.pvptest <player entity>" switches PvP on for that player, makes them
   -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;

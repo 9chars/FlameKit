@@ -27,6 +27,7 @@
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
 #include <windows.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
@@ -88,6 +89,35 @@ bool free_for(std::set<uint32_t>& list, uint32_t id) {
     return list.count(id) != 0;
 }
 
+// (0.15.440) Free build's remembered spots: the centres (m) of the 32 m grid cells where pieces were placed with Free
+// build (features/experimental.lua writes free_build_spots.txt). The server adds a build zone over each, every step,
+// from its start: what was built there should be kept like inside an altar's area.
+constexpr double kSpotHalf = 16.0 + 8.0;  // m each way: the 32 m cell and 8 m more (pieces can stick out of their cell)
+std::vector<std::array<int64_t, 3>> g_spots;  // under g_mx
+std::string g_spots_text;
+
+void read_spots(const char* side) {
+    std::string text;
+    if (FILE* f = _wfopen(lua_file(L"free_build_spots.txt").c_str(), L"rb")) {
+        char buf[4096];
+        size_t n;
+        while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+        std::fclose(f);
+    }
+    std::lock_guard<std::mutex> lk(g_mx);
+    if (text == g_spots_text) return;
+    g_spots_text = text;
+    g_spots.clear();
+    const char* p = text.c_str();
+    double x, y, z;
+    int used = 0;
+    while (std::sscanf(p, "%lf %lf %lf%n", &x, &y, &z, &used) == 3) {
+        g_spots.push_back({int64_t(x * 4294967296.0), int64_t(y * 4294967296.0), int64_t(z * 4294967296.0)});
+        p += used;
+    }
+    EMF_LOG(kMod, "free build (%s): %zu remembered spot(s)", side, g_spots.size());
+}
+
 void read_factor(const wchar_t* name, const char* side, float missing = 1.0f) {
     float f = missing;  // (0.15.423) no file yet: the server's default is on (kMaxFactor), a player's game waits for the server
     if (FILE* file = _wfopen(lua_file(name).c_str(), L"rb")) {
@@ -107,19 +137,25 @@ std::atomic<int> g_zone_said{0};
 
 constexpr double kPlayerHalf = 40.0;  // m each way the box always covers around the player
 constexpr double kGridStep = 32.0;    // m: the box moves only when the player crosses a grid line
-constexpr bool kBoxUsesAltarBase = true;  // (0.15.439 TEST) the box borrows an altar's base id
+constexpr bool kBoxUsesAltarBase = false;  // (0.15.439 TEST, kept nothing: 10:00 "blocks are gone as we assumed"; off 0.15.440)
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 std::atomic<int> g_box_said{0};
 
 void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32_t altar_entity) {
+    // once per rebuild of the zone list: a new world step (on_tick) or (0.15.440) the altar that came first in the
+    // last rebuild coming again (while the world loads, before any on_tick, the list is rebuilt too: the remembered
+    // spots must be in it then)
+    struct Pass { uint64_t step = ~0ull; uint32_t first = 0; };
     static std::mutex mx;
-    static std::unordered_map<void*, uint64_t> last;
+    static std::unordered_map<void*, Pass> last;
     const uint64_t now = g_steps.load();
     {
         std::lock_guard<std::mutex> lk(mx);
-        auto it = last.find(bzs);
-        if (it != last.end() && it->second == now) return;
-        last[bzs] = now;
+        Pass& p = last[bzs];
+        const bool fresh = p.step != now || (p.first != 0 && p.first == altar_entity);
+        if (!fresh) return;
+        p.step = now;
+        p.first = altar_entity;
     }
     emf::World ws = emf::server_world(), wc = emf::client_world();
     emf::World w;
@@ -128,8 +164,21 @@ void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32
     if (ws && ws.singleton("BuildZoneSystem") == bzs) {
         w = ws;
         side = "server";
-        std::lock_guard<std::mutex> lk(g_mx);
-        ids.assign(g_free_server.begin(), g_free_server.end());
+        std::vector<std::array<int64_t, 3>> spots;
+        {
+            std::lock_guard<std::mutex> lk(g_mx);
+            ids.assign(g_free_server.begin(), g_free_server.end());
+            spots = g_spots;
+        }
+        const int64_t sh = int64_t(kSpotHalf * 4294967296.0);
+        for (const auto& c : spots) {  // (0.15.440) the remembered spots
+            int64_t b[6] = {c[0] - sh, c[1] - sh, c[2] - sh, c[0] + sh, c[1] + sh, c[2] + sh};
+            uint8_t no_base[16] = {};
+            g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
+        }
+        static std::atomic<int> spots_said{0};
+        if (!spots.empty() && spots_said.fetch_add(1) == 0)
+            EMF_LOG(kMod, "free build (server): %zu remembered spot zone(s) %.0f m wide in the zone list", spots.size(), kSpotHalf * 2);
     } else if (wc && wc.singleton("BuildZoneSystem") == bzs) {
         w = wc;
         side = "this game";
@@ -206,6 +255,7 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
 // called by flamekit_native's emf_mod_load in every process (a dedicated server, a player's game)
 bool fk_build_anywhere_load(bool dedicated) {
     // (0.15.423) the factor is read now, before the world loads (the game decides what to keep then)
+    if (dedicated) read_spots("server, at start");  // (0.15.440) before the world loads
     if (dedicated) read_factor(L"altar_size_server.txt", "server, at start", kMaxFactor);
     else read_factor(L"altar_size_client.txt", "this game, at start");
     const bool al = emf::hook_pattern("flamekit: build zone (bigger altar areas)", "48 83 EC 78 8B 84 24 A8 00 00 00 4C",
@@ -218,6 +268,7 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (w.is_server()) {
             if (steps_server++ % 15 == 0) {
                 read_list(L"free_build_server.txt", g_free_server, "server");
+                read_spots("server");
                 read_factor(L"altar_size_server.txt", "server", kMaxFactor);
             }
         } else if (w.is_client()) {

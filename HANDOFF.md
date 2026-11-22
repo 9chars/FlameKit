@@ -1228,6 +1228,13 @@ the player box at save time keeps Free build pieces.
 09:43 owner: "we can try that for testing, but ideally that would not be a long term fix or solution. does the game mark
 existing blocks from structures outside of bases some how? or just uses the flame alter to know what areas to save?"
 -> 0.15.439 TEST: the player box gets the base id of the altar zone being added (kBoxUsesAltarBase).
+09:49 owner: "if the free build flame border keeps moving.. it doesn't sounds like it wouldn't keep a permanent record of
+that spot either.. not sure what about this test makes you think it would work." (fair: low odds). 09:50 "restart, if it
+fails we'll try to make it remember those areas". Restart 09:51; **10:00 "blocks are gone as we assumed"**. 0.15.440:
+remembered spots: experimental.lua listens to BuildingPlaceEvent (server; position, ownerId), a Free build player's
+piece marks its 32 m cell (store free_build_spots.json, file free_build_spots.txt "x y z" centres, max 2000);
+build_anywhere.cpp reads the file at load (before the world) and every 15 steps, adds a 48 m zone per cell on the
+server every step (empty base id). kBoxUsesAltarBase off.
 
 ## How to build and publish a version
 
