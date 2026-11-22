@@ -1568,6 +1568,11 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
 1. **#2 Release roll-out** (0.15.124 built 2026-11-14: `dist`, `release\FlameKit-0.15.124.zip`, `-server-mod.zip`): the owner updates the G-Portal server (SERVER-README.txt) and the two players (install.cmd: it removes 0.14.2's `flamekit_map`, else two overlays and two minimaps). Still to see: a real game installed from the package, and the first update from `dist` (the next release). A 0.14.2 player on a new server keeps the junk list, experimental and far players (same channels lf/exp/map at version 1) and gets nothing on the new channels; FlameKit has no `side: both`, so EMF's mod check never kicks over the version.
 2. **Boss challenge / arena mode** (owner, 2026-11-14): turn the duelist into a game mode: a boss challenge (pick a level and a place, a duelist appears for you or the party to beat) or an arena with waves of duelists, each wave stronger than the last. Measured: level 50 duelist = 6692 health, a fair fight for a level 50 player; level 75 = 20760 health, beat the owner (needed Invincible Mode). Starts from `flamekit.duelist <player> [level]` and `set_level` in experimental.lua (Level.dataStorage + DynamicEnemyScaling.nextUpdateTime = 0). Tomorrow.
 3. **#7 Controller support for the pointer key:** a controller cannot move the mouse pointer; needs pointer emulation first. Later.
+4. **Free build: empty remembered spots forget themselves** (owner 2026-11-22 16:08 "yeah add that on the list for later"):
+   a spot whose building pieces are all gone is forgotten by itself. Needs research first: no "piece removed" event is
+   known (only BuildingPlaceEvent), so the server would look every so often for building pieces inside each spot's
+   48 m box, which needs a way to tell building pieces among the world's entities. Until then: "Forget this spot" /
+   "Forget all spots" (admins).
 
 ## Things learned the hard way
 
