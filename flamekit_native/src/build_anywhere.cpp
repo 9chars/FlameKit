@@ -19,6 +19,29 @@
 // server). addZone(bzs, u8 list, u8 flag, u8 ownerKind, WorldAABB* {min xyz, max xyz int64, 2^32 per m}, u32 entity,
 // u8 wasAbandoned, BaseId*) (called in add_buildzones_server, server exe 0x1400ee750; signature in both exes).
 //
+// WHAT WE FOUND ABOUT THE GAME (build 1287369; addresses are the exes' own, image base 0x140000000; for anyone who
+// wants to reuse this, e.g. in EMF):
+//  - The build zone list (BuildZoneSystem, an ECS singleton) decides where building is allowed. Its entries come from
+//    BuildZoneSystem_addZone (signature "48 83 EC 78 8B 84 24 A8 00 00 00 4C"; client 0x140e6f2e0, server
+//    0x140916310), called by add_buildzones_server/_client with list 0, owner kind 0 for every flame altar. The list
+//    is rebuilt over and over (once per world step while we watched), so a zone added from this hook stays only as
+//    long as it is added again on every rebuild.
+//  - Every change of the list is logged by the server ("[ecs] Build zones changed") and sends every player a
+//    BuildingZones message (about 1.1 KB). A zone that moves a little every step floods the network: keep added zones
+//    still (here: a 32 m grid).
+//  - The hammer's "Needs a Flame Altar nearby" is a NegativeFeedback sequence command (type 0x3771274d, in
+//    actor_client_play 0x1402653b0). The cursor's flag words (ClientCursor / ServerCursor primaryFlags,
+//    secondaryFlags) carry "outside a building area" bits (1 and 3), but clearing them is not enough: away from an
+//    altar the placement is still refused. Only a zone in the list makes building work there.
+//  - Saving: the save's base zones are the list-0 zones at save time (server fn 0x140932a30, 0x48-byte entries);
+//    terraforming is saved per chunk. Outside those zones the game resets terrain and buildings after about 30 minutes
+//    or at a restart. A zone that is in the list from the server's start (before the world loads) keeps what is built
+//    in it through restarts; a zone only added later (here: the moving player box) does not. Villagers stay anyway.
+//  - The game draws a building area's border only while the building tool (or the pickaxe; not the axe) is selected.
+//  - BuildingPlaceEvent (server, 72 bytes): the placed piece's position (float3) and ownerId (the player's entity).
+//  - Writing an altar's TriggerShape does not change its build zone. Bigger altar zones: 1.5x kept everything, 2x lost
+//    the outer blocks after a restart, 4x froze the server's world step.
+//
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
 #include <windows.h>
 
