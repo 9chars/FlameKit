@@ -1085,6 +1085,9 @@ some are missing, so something odd is definitely happening" ("fairly close to th
 the game's limit is 16 (Flame level 11, whole world), PlayerBasesSystemServer has 16 base slots (EMF notes): above 16
 not advised; reaching 16 at a lower Flame level maybe (not looked at). Restart 19:30 (1.5x blocks placed 80-120 m);
 19:34 owner: "the test was good. I'd like to try 2x again and run some more tests" -> 0.15.420 kAltarFactor 2.
+Restart 19:42 (2x test blocks placed); 19:49 owner: "it definitely fails at 2x" (blocks in the outer ring lost at a
+restart). So far: 1.5x keeps everything (one restart), 2x loses some, 4x froze. Why: not known (the keep/reset rule is
+elsewhere than the build zones, not found).
 
 ## How to build and publish a version
 
