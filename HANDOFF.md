@@ -1096,6 +1096,9 @@ sets its size: 40 -> 60 m, 160 -> 240 m; the world's Flame level only sets how m
 "bigaltars" under Building (disabled "(admins only)" for others; v.admin in the server's answer), world switch in
 experimental_world.json, files altar_size_server.txt / altar_size_client.txt ("1.5" or "1"); build_anywhere.cpp
 reads the factor (1..kMaxFactor 1.5), off by default.
+Restart 20:24 loaded the world with the switch OFF (default): the 80-120 m test blocks may have been reset (told the
+owner; should have set experimental_world.json bigaltars=true first). 20:27 owner: "is free build setting admin only
+also?" -> no, per player; 20:32 owner: "it can be by player for now".
 
 ## How to build and publish a version
 
