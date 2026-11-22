@@ -37,6 +37,7 @@ local steps = 0
 local pending = {}  -- puts waiting for a new chest: { at, chest, item, n, got, opts, x, y, z, done, again, tries }
 local loaded = false
 
+-- The file the loot chests are kept in (beside the Lua part).
 local function path() return emf.dir .. "\\" .. FILE end
 
 -- (0.15.165, owner: "those chests took damage during the fight ... set not to take damage") an EMF hit rule per chest
@@ -44,6 +45,7 @@ local function path() return emf.dir .. "\\" .. FILE end
 -- test monsters use some), so at most GUARD_MAX chests are protected at once; the rule goes with the chest.
 local GUARD_MAX = 24
 local guarded = 0
+-- Gives chest `id` an EMF hit rule that cancels every hit on it (at most GUARD_MAX chests).
 local function guard(id)
   local c = chests[id]
   if not c or c.rule or guarded >= GUARD_MAX then return end
@@ -51,10 +53,12 @@ local function guard(id)
   if ok and r then c.rule, guarded = r, guarded + 1
   else emf.log("loot chest: no hit rule for chest " .. tostring(id) .. " (" .. tostring(r) .. "): it can be damaged") end
 end
+-- Takes a chest's hit rule away.
 local function unguard(c)
   if c and c.rule then pcall(emf.hit_rule_remove, c.rule) c.rule, guarded = nil, guarded - 1 end
 end
 
+-- Writes the loot chests (id, place, filled, age, glow) to the file, with this server run's session.
 local function save()
   local f = io.open(path(), "w")
   if not f then return end
@@ -66,6 +70,7 @@ local function save()
   f:close()
 end
 
+-- Reads the loot chests back after a reload of the Lua part (only those of this server run).
 local function load(world)
   loaded = true
   local f = io.open(path(), "r")
@@ -91,6 +96,7 @@ local function load(world)
   if n > 0 then emf.log(string.format("loot chest: %d chest(s) known again after a reload", n)) end
 end
 
+-- An item id from an id or an item name.
 local function item_id(item)
   if type(item) == "string" then
     local ok, id = pcall(emf.item, item)
@@ -99,6 +105,7 @@ local function item_id(item)
   return item
 end
 
+-- Spawns a loot chest (M.CHEST) at x, y, z, guarded and with its glow; the chest's id, or nil (refused or too many).
 local function spawn_chest(world, x, y, z)
   if count >= M.MAX_CHESTS then return nil end
   local ok, id = pcall(emf.spawn, world, M.CHEST, x, y, z)
@@ -118,6 +125,7 @@ end
 -- the first of rings of spots around the loot's place (1.5 m, then 3, 4.5, 6 m out, 8 spots each) that is at least
 -- APART m from every chest FlameKit knows. FlameKit knows only its own chests, not what players built there.
 local APART = 2.5
+-- A spot near x, z at least APART m from every other loot chest (rings 1.5 m apart); 7.5 m away when all are taken.
 local function free_spot(x, z)
   for r = 1, 4 do
     local dist = 1.5 * r
@@ -134,6 +142,7 @@ local function free_spot(x, z)
   return x + 7.5, z  -- every spot taken: beyond the last ring
 end
 
+-- The loot chest to put loot in near x, y, z: the nearest one that is not full within NEAR_M, else a new one.
 local function chest_for(world, x, y, z)
   local best, bd = nil, M.NEAR_M * M.NEAR_M
   for id, c in pairs(chests) do
@@ -202,6 +211,7 @@ end
 -- took items into it, or items were seen in it); one that never got items 30 s after it was put there goes too.
 -- Whether a removed chest is really gone is checked 2 s later and logged. Call from a feature's server tick.
 local removed = {}  -- chest id -> os.time() it was destroyed
+-- Every server step: puts waiting loot in; every 120 steps takes chests away that are gone, emptied, never filled within 30 s, or KEEP_S after their last item.
 function M.tick(world, bag)
   steps = steps + 1
   if not loaded then pcall(load, world) end

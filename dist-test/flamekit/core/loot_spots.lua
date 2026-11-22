@@ -25,6 +25,7 @@ local SLACK_NS = 5e8  -- half a second: a container spawned in the death's own s
 
 local wanted = {}  -- death id -> { x, z, t (death time, ns), fn(container ids) }
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   if ok then return v end
@@ -42,6 +43,7 @@ local function is_loot_container(world, id)
     and (get(world, "Inventory", id) or get(world, "InventorySetup", id))
 end
 
+-- When entity `id` was spawned (SpawnTime), or nil.
 local function spawn_time(world, id)
   local st = get(world, "SpawnTime", id)
   local v = st and st.spawnTime

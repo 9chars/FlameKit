@@ -21,6 +21,7 @@ function put_away_for(world, id, h)
     tostring(id), tostring(h.go_away), tostring(h.player)))
 end
 companions_core = require("core.companions")  -- the minimap's companion dots
+-- Every server step: the roster window, saves, pets, chests, prompts, the drives of every follower and the fights.
 function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()

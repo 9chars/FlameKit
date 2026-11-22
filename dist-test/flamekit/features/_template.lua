@@ -31,6 +31,7 @@ function F.panel(world)
   }
 end
 
+-- A button of its tab was clicked (`key` as in F.panel's rows).
 function F.click(world, key, right_click)
   if key == "hello" then kit.note("Hello from My Feature") end
 end

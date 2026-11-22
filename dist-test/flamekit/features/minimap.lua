@@ -48,12 +48,14 @@ for _, g in ipairs(GROUPS) do
   for _, f in ipairs(g[3]) do FILTERS[#FILTERS + 1] = f end
 end
 
+-- The marker kinds hidden on the minimap (setting map_hide), as a set.
 local function hidden_set()
   local set = {}
   for name in tostring(kit.setting("map_hide", "-")):gmatch("[%w]+") do set[name] = true end
   return set
 end
 
+-- Saves the hidden marker kinds to the setting map_hide ("-" for none).
 local function save_hidden(set)
   local names = {}
   for _, f in ipairs(FILTERS) do
@@ -66,6 +68,7 @@ end
 -- (0.15.196, owner) the smallest size (160) is gone and the names moved down one: 220 is Small now
 local SIZES = { { 220, "Small" }, { 300, "Medium" }, { 380, "Large" }, { 480, "Extra Large" } }  -- Medium is the default
 
+-- Whether the minimap switch `key` is on (with its default).
 local function on(key)
   for _, s in ipairs(SWITCHES) do
     if s[1] == key then return kit.setting(key, s[3] ~= false) == true end
@@ -139,6 +142,7 @@ function F.tick(world)
   end
 end
 
+-- Opens the map channel (the server sends each game where the far players are).
 function F.setup(k)
   kit = k
   players.setup(k)
@@ -152,6 +156,7 @@ end
 
 local ZOOM_STEPS = 7  -- the setting map_zoom: 0 closest .. 6 farthest
 
+-- The Minimap tab: shape, size, zoom, what is shown, and the marker kinds.
 function F.panel(world)
   local rows = {}
   -- (0.15.139, owner) the Location section is gone: Show/Hide and "Reset place" are in the Windows tab; the shape
@@ -209,6 +214,7 @@ function F.panel(world)
   return rows
 end
 
+-- A click in the Minimap tab: settings rows, reset place, zoom, size, switches and marker kinds.
 function F.click(world, key)
   if key:sub(1, 4) == "set:" then return require("features.settings").click(world, key:sub(5)) end  -- a settings row
   if key == "reset" then

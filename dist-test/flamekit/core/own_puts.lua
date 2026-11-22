@@ -10,14 +10,17 @@ local puts = {}
 local KEEP_S = 10
 local list = {}  -- { player, item, left, at }
 
+-- The clock in seconds.
 local function now() return os.time() end
 
+-- Notes that FlameKit is about to put `count` of `item` into `player`'s bag (kept KEEP_S).
 function puts.note(player, item, count)
   player, item, count = tonumber(player), tonumber(item), math.floor(tonumber(count) or 0)
   if not (player and item) or count <= 0 then return end
   list[#list + 1] = { player = player, item = item, left = count, at = now() }
 end
 
+-- True when a pickup of `item` by `player` is one of FlameKit's own puts (and forgets that much of it).
 function puts.claim(player, item, count)
   player, item, count = tonumber(player), tonumber(item), math.floor(tonumber(count) or 0)
   local t, keep, hit = now(), {}, false

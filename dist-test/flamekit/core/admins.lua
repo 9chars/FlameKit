@@ -10,6 +10,7 @@ local M = {}
 local OWNER_ACCOUNT = "0x485890b753e75ad1"  -- the server owner, the first admin (as in 04_roster.lua)
 local list, read_at = nil, -1
 
+-- The admin accounts from npc_admins.json (the owner's alone when it is missing), read again at most every 10 s.
 local function accounts()
   local now = os.time()
   if not list or now - read_at >= 10 then

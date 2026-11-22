@@ -50,15 +50,18 @@ local last_rows = nil   -- the rows part as last written (a change makes a new g
 local last_tabs = nil   -- ui_tabs.dat as last written
 local tabs_now = true   -- write ui_tabs.dat on the next step (a view or a click changed it)
 
+-- Keeps kit and the Auto Junk List's game half (the list view's data).
 function F.setup(k)
   kit = k
   junk_list = require("features.loot_filter.client")
 end
 
+-- Text on one line (line breaks become spaces).
 local function one_line(text)
   return (tostring(text or ""):gsub("[\r\n]", " "))
 end
 
+-- Writes ui_list.dat: the Auto Junk List's view (its options, the bag's items, the junk list) for FlameKit Native.
 local function write_list(world)
   local in_bag, junk, opts = junk_list.ui_lists(world)
   if not in_bag then return end
@@ -71,6 +74,7 @@ local function write_list(world)
   opt("b:lf_show_all", kit.setting("lf_show_all", false), "Show All Bag Items: " .. settings.value_text("lf_show_all"), "lf_show_all")
   opt("k:lf_dump_key:c", settings.capturing() == "lf_dump_key", "Set Dump Key: " .. settings.value_text("lf_dump_key"), "lf_dump_key")
   local items = kit.items
+  -- One item tile's line: kind (B bag, J junk), item id, count, names, rarity, level, type.
   local function tile(kind, e)
     local t = items.tip(e.item, e.debug_name)
     return table.concat({ kind, string.format("%x", e.item or 0), tostring(e.count or 0), e.debug_name, tostring(t.rarity), t.level,
@@ -95,6 +99,7 @@ local function write_list(world)
     tostring(opts.auto), opts.action)
 end
 
+-- Text for one field of ui_tabs.dat (no tabs; line breaks as \n).
 local function clean(text)
   return (tostring(text or ""):gsub("[\t\r]", " "):gsub("\n", "\\n"))
 end
@@ -107,6 +112,7 @@ local function tab_features()  -- the features with a tab, switched on
   return list
 end
 
+-- The loaded feature with id `id`.
 local function feature(id)
   for _, f in ipairs(kit.features) do
     if f.id == id then return f end
@@ -151,6 +157,7 @@ local function rows_lines(rows)
   return table.concat(body, "\n"), map
 end
 
+-- Writes ui_tabs.dat: the tabs and the rows of the tab shown now, for FlameKit Native.
 local function write_tabs(world)
   local lines = {}
   for _, f in ipairs(tab_features()) do lines[#lines + 1] = "tab\t" .. f.id .. "\t" .. clean(f.title) end
@@ -187,6 +194,7 @@ end
 -- "gen <generation>", the "r" lines (as in ui_tabs.dat), then "end". Written when they change (looked at every 10
 -- steps, and at once after a click); a click comes back as "exp <generation>/<button number>".
 local exp_gen, exp_keys, last_exp, exp_now = 0, {}, nil, true
+-- Writes ui_exp.dat: the Experimental window's rows, when they changed.
 local function write_exp(world)
   local f = feature("experimental")
   local rows = f and kit.enabled(f) and f.window_rows and kit.call(f, "window_rows", world)
@@ -214,6 +222,7 @@ end
 -- F.roster_click(world, key, text). The DLL shows and hides it when ui_roster_toggle.request appears (written by the
 -- feature's button).
 local ros_gen, ros_keys, last_ros, ros_now = 0, {}, nil, true
+-- Writes ui_roster.dat: the Companion Roster window's rows, when they changed.
 local function write_ros(world)
   local f = feature("npc_wheel_probe")
   local rows = f and kit.enabled(f) and f.roster_rows and kit.call(f, "roster_rows", world)
@@ -235,10 +244,12 @@ local function write_ros(world)
   kit.debug("debug", "native ui: ui_roster.dat: %d row(s), generation %d", #rows, ros_gen)
 end
 
+-- Text from hex digits (what a player typed, sent by FlameKit Native).
 local function unhex(h)
   return (tostring(h or ""):gsub("%x%x", function(c) return string.char(tonumber(c, 16)) end))
 end
 
+-- One click or typed value from FlameKit's window: hands it to the feature it belongs to.
 local function act(world, what, arg)
   kit.debug("info", "native ui: click from FlameKit's window: %s %s", tostring(what), tostring(arg))
   if what == "junk" or what == "keep" then
@@ -308,6 +319,7 @@ local function act(world, what, arg)
   end
 end
 
+-- Reads ui_actions.txt (FlameKit Native's clicks, numbered) and acts on the new ones.
 local function read_actions(world)
   local f = io.open(emf.dir .. "\\ui_actions.txt", "r")
   local text = f and f:read("a") or ""
@@ -327,6 +339,7 @@ local function read_actions(world)
   if first or highest > done then done = highest end
 end
 
+-- Every step of the player's game: reads the clicks, and writes the list, tabs, Experimental and roster files in turn (each every 10 steps, or at once when asked).
 function F.client_tick(world)
   steps = steps + 1
   if steps % 3 == 0 then read_actions(world) end

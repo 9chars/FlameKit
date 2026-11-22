@@ -31,12 +31,14 @@ local BUFFS = {
 
 local wanted = {}  -- player entity id -> how many test players
 
+-- Player `id` wants `n` test players (0 to MAX); the number kept.
 function T.set(id, n)
   n = math.max(0, math.min(T.MAX, math.floor(tonumber(n) or 0)))
   wanted[id] = n > 0 and n or nil
   return n
 end
 
+-- How many test players player `id` wants.
 function T.count(id)
   return wanted[id] or 0
 end

@@ -18,6 +18,7 @@ near_monsters = {}   -- player entity -> { monster ids within FIGHT_RANGE } (the
 scan_logged = -3600  -- the first scan is logged too
 clock_ok = pcall(function() return os.clock() end)
 
+-- Companion `cid`'s fight mode ("Passive" when he has none).
 function fight_mode(cid)
   local r = name_of[cid] and find(name_of[cid])
   return r and r.fight or "Passive"
@@ -63,6 +64,7 @@ function describe(world, id)
   return table.concat(out, ", ")
 end
 
+-- Whether monster `id` is still there with health left.
 function monster_alive(world, id)
   if not world:position(id) then return false end
   local ok, hp = pcall(function() return world:get("NetworkHealth", id).health end)
@@ -227,6 +229,7 @@ function fight_watch(world)
         end)
         return ok and v or "none"
       end
+      -- Whether he has component `cname`.
       local function has(cname) local ok, v = pcall(world.get, world, cname, cid) return ok and v ~= nil end
       log(string.format("fight %s: his defence: DamageSusceptibility [%s]; DamageMod [%s]; Armor %s; ArmorPoints %s; Level [%s]; health max %s",
         tostring(name_of[cid] or cid), arr("DamageSusceptibility", 19), arr("DamageMod", 4), has("Armor") and arr("Armor", 8) or "none",
@@ -292,6 +295,7 @@ FAST = 3
 -- forward move is kept), as soon as the attack has started
 HIGH = 0.5
 
+-- How fast entity `m` moves (m/s, 0 when it cannot be read).
 function speed_of(world, m)
   local v = 0
   pcall(function() local w = world:get("Velocity", m).velocity v = math.sqrt(w.x * w.x + w.y * w.y + w.z * w.z) end)
@@ -314,6 +318,7 @@ SKIP_TICKS = 600  -- (owner 17:31 "drop it down to like 10 seconds?": 10 s, was 
 -- candidate again at once (a hit on him or the player already did that)
 F.SKIP_NEAR = 6
 
+-- The monsters companion `cid` may attack by his mode (those that hit him or his player, then the near ones), within FIGHT_RANGE, nearest first; skipped ones only once they come near.
 function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
   local list, seen = {}, {}
   local skip = h.fight_skip or {}
@@ -331,6 +336,7 @@ function fight_candidates(world, cid, h, mode, px, py, pz, nx, ny, nz)
       log(string.format("fight %s: %s is no longer skipped: it hit %s again", tostring(name_of[cid] or cid), tostring(m), "him or the player"))
     end
   end
+  -- Adds monster m (alive, in range, not skipped, once).
   local function add(m, why)
     if seen[m] or skip[m] then return end
     local mx, my, mz = world:position(m)

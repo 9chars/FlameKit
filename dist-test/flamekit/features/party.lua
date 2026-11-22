@@ -75,16 +75,19 @@ local function buff_lines(world, list)
   return out
 end
 
+-- A whole number for the party file (-1 when there is none).
 local function num(v)
   v = tonumber(v)
   if not v or v ~= v then return -1 end
   return math.floor(v + 0.5)
 end
 
+-- Text without control characters (a line of the party file stays one line).
 local function clean(text)
   return (tostring(text or ""):gsub("[%c]", " "))
 end
 
+-- Writes ui_party.dat for FlameKit Native when it changed.
 local function write(text)
   if text == written then return end
   local f = io.open(emf.dir .. "\\ui_party.dat", "w")
@@ -130,6 +133,7 @@ function F.tick(world)
     local ok, account = pcall(world.account, world, id)
     if ok and account then
       local okh, hp, hp_max = pcall(emf.health, world, id)
+      -- An attribute of this player (emf.attribute), or nil.
       local function attr(name)
         local oka, v = pcall(emf.attribute, world, id, name)
         return oka and v or nil
@@ -186,6 +190,7 @@ local function ask_test(world, n)
   kit.debug("info", "party: asked the server for %d test player(s)%s", n, ok and "" or " (could not be sent)")
 end
 
+-- Whether the server has FlameKit's party channel (asked through emf.net.peer).
 local function server_has_it()
   local ok, version = pcall(emf.net.peer, nil, 0, ASK)
   return ok and (version or 0) ~= 0
@@ -215,6 +220,7 @@ function F.set_test(world, n)
   if n then ask_test(world, n) end
 end
 
+-- The player's game: asks for test players again while they are on, and writes your own line when no list came from the server.
 function F.client_tick(world)
   client_steps = client_steps + 1
   if test_wanted > 0 and client_steps - test_sent_at >= 600 and not hosting(world) then ask_test(world, test_wanted) end  -- the server may have restarted
@@ -229,6 +235,7 @@ function F.client_tick(world)
   write("source local\n" .. line .. "\n" .. (#mine > 0 and (table.concat(mine, "\n") .. "\n") or "") .. "end\n")
 end
 
+-- Opens the party channel (the server sends each game the party list) and the test players' ask channel.
 function F.setup(k)
   kit = k
   local ok = emf.net.channel(CHANNEL, {

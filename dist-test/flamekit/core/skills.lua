@@ -9,6 +9,7 @@ local M = {
   broken = false,
 }
 
+-- An integer from any game value (a number, a userdata or a table with value/id).
 local function num(v)
   if type(v) == "table" then v = v.value or v.id or v[1] end
   return math.tointeger(tonumber(tostring(v))) or 0

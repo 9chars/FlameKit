@@ -77,6 +77,7 @@ function inv.prompt(world, id, open)
   pcall(emf.offer_remove, world, id)
   inv.want[id] = { verb = open and inv.CLOSE_VERB or "Talk", at = world:tick() + 2, tries = 0 }
 end
+-- Offers the E prompt on the companions that wait for one, once the game takes it (at most 50 tries each).
 function inv.want_tick(world)
   local t = world:tick()
   for id, w in pairs(inv.want) do
@@ -127,6 +128,7 @@ function inv.gear_list(world, chest)
   return out
 end
 
+-- Puts the saved upgrade levels (unlocked perks) back on the gear in a companion's chest.
 function inv.apply_unlocked(world, name, c)
   local gear = inv.gear_list(world, c.chest)
   for _, f in ipairs(c.fix or {}) do
@@ -175,6 +177,7 @@ function inv.list(world, chest)
   return out
 end
 
+-- A text that is the same for two equal item lists (order does not matter).
 function inv.sig(list)
   local parts = {}
   for _, e in ipairs(list or {}) do parts[#parts + 1] = table.concat({ e.item, e.count, e.level or "", e.rarity or "", e.unlocked or "" }, ":") end
@@ -182,6 +185,7 @@ function inv.sig(list)
   return table.concat(parts, ",")
 end
 
+-- How many items a list holds.
 function inv.count(list) local n = 0 for _, e in ipairs(list or {}) do n = n + (e.count or 0) end return n end
 
 -- his record from the open chest (plus what did not fit into it); false when the chest could not be read
@@ -230,6 +234,7 @@ inv.open_chest = function(world, player, npc, rr)
     key = rr.name:gsub("%s", "_") }
 end
 
+-- FlameKit Native's ground answers (chest_ground.answer): picks the chest's place (ground near his feet, else the lowest, else his height) and opens the chest there.
 function inv.ground_tick(world)
   local text
   local f = emf.dir and io.open(emf.dir .. "\\chest_ground.answer", "r")
@@ -266,6 +271,7 @@ function inv.ground_tick(world)
   end
 end
 
+-- Spawns companion rr's chest at cx, y, cz (with his name label) and starts filling it from his record (the chest is his inventory while it is open).
 function inv.open_at(world, player, npc, rr, cx, y, cz)
   local px, _, pz = world:position(player)
   -- (18:54) an empty label at the spawn: the C++ part writes his name's key (labels.txt, inv.write_labels)
@@ -321,6 +327,7 @@ function inv.close(world, r, why, by)  -- by: the player who closed it (the noti
   return true
 end
 
+-- The wheel's Close Chest: closes companion rr's chest (his items back into his record).
 inv.close_chest = function(world, player, npc, rr)
   if rr then inv.close(world, rr, "the player", player) end
 end

@@ -31,6 +31,7 @@ local CHANNEL = "travel"
 local HIDE_AFTER, LONGEST = 318, 3600  -- ticks (60 a second): 5.3 s, 60 s
 local state = {}  -- player entity -> { ver, cnt, req_t, hiding, hid_t, tp, unready }
 
+-- This game: hides FlameKit's UI (kit.travelling) or shows it again.
 local function set_here(on)
   if kit.travelling ~= on then
     kit.travelling = on
@@ -38,6 +39,7 @@ local function set_here(on)
   end
 end
 
+-- Tells player `pid`'s game to hide or show FlameKit's UI (set at once for the host's own player).
 local function send(world, pid, on)
   local me = emf.local_player()
   if me and me ~= 0 and pid == me then
@@ -47,6 +49,7 @@ local function send(world, pid, on)
   end
 end
 
+-- Player `pid`'s travel request version, teleport count and "ready for gameplay" flag (nil where one cannot be read).
 local function read(world, pid)
   local okv, ver = pcall(function() return world:get("PlayerInput", pid).fromClient.teleportAction.versionData end)
   local okc, cnt = pcall(function() return world:get("TeleportCount", pid).counter end)
@@ -54,6 +57,7 @@ local function read(world, pid)
   return okv and tonumber(ver) or nil, okc and tonumber(cnt) or nil, okr and ready
 end
 
+-- Every server step: watches every player's travel request, teleport and ready flag, and hides or shows their UI.
 function F.tick(world)
   if not world:is_server() then return end
   local t = world:tick()
@@ -103,6 +107,7 @@ function F.tick(world)
   end
 end
 
+-- Opens the travel channel (the server tells each game when to hide its UI).
 function F.setup(k)
   kit = k
   kit.travelling = false

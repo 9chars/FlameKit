@@ -26,6 +26,7 @@ local said = {}     -- base position key -> true once logged
 local clock_ok, clock = pcall(function() return os.clock end)
 if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = nil end
 
+-- Every server step: goes on with the background walk over the world's entities that finds the flame altars.
 function M.tick(world)
   if M.broken or not world:is_server() then return end
   local ok, err = pcall(function()

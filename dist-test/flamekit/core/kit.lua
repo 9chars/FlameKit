@@ -50,6 +50,7 @@ function kit.newer(a, b)
   return false
 end
 
+-- Writes a line to EMF's log (emf_core.log).
 function kit.log(...)
   emf.log(...)
 end
@@ -57,6 +58,7 @@ end
 -- The debug level, from debug.txt in the mod's folder (FlameKit's DLL reads the same file; Ctrl+Shift+F12 in the game
 -- changes it): "off", "normal" (also when the file is missing) or "full". Read again every 2 seconds (fresh: now).
 local level_name, level_checked = "normal", -10
+-- The debug level now ("off", "normal", "full"); `fresh` reads debug.txt at once.
 function kit.debug_level(fresh)
   local now = os.time()
   if fresh or now - level_checked >= 2 then
@@ -115,6 +117,7 @@ end
 local TAB_MOST = { battle = 1000, loot = 300 }
 local tabs = { battle = { list = {}, n = 0, dirty = false }, loot = { list = {}, n = 0, dirty = false } }
 local tab_steps = 0
+-- Adds a line to one of FlameKit's message tabs (`tab`), keeping only its newest TAB_MOST[tab] lines.
 function kit.note_tab(tab, text, colour)
   local t = tabs[tab]
   if not t then return end
@@ -129,6 +132,7 @@ function kit.note_tab(tab, text, colour)
   t.dirty = true
 end
 
+-- Writes the message tabs that changed to ui_<tab>.dat for FlameKit Native (4 times a second at most).
 local function write_tabs()
   tab_steps = tab_steps + 1
   if tab_steps % 15 ~= 0 then return end  -- (every 15 steps of your own world: 4 times a second)
@@ -195,6 +199,7 @@ local function expire_notices()
   end
 end
 
+-- Writes the notices (the lines that stay until they are taken away) to ui_notices.dat for FlameKit Native, when they changed.
 local function write_notices()
   if not notices_dirty then return end
   local list = {}
@@ -214,6 +219,7 @@ local function write_notices()
   kit.debug("info", "notices: %d on screen", #list)
 end
 
+-- Writes the message feed to ui_messages.dat for FlameKit Native, when it changed (players' lines marked "p").
 local function write_messages()
   if not messages_dirty then return end
   local lines = {}
@@ -260,6 +266,7 @@ end
 -- low bits are most likely the two building cursors (primary, secondary). The cursor's position (0.15.59) is no
 -- signal: it stays where it was when build mode ends, and FlameKit stayed hidden.
 local build_was = nil
+-- Whether the local player is in build mode (ClientPlayerInput mask), logged when it changes; false where it cannot be read.
 local function in_build_mode(world)
   local me = emf.local_player()
   if not me or me == 0 then return false end
@@ -281,6 +288,7 @@ end
 -- FlameKit answers, then the server's version when it is known; "not supported" only after 20 s without an answer (a
 -- joining game needs a few seconds for it); an older FlameKit on the server once per version it reports.
 local conn = { session = nil, state = nil, steps = 0, older = nil, told = nil }
+-- Tells the player which FlameKit version the server runs (and when it is updated), the server's note, and that the server has no FlameKit when none answers within 1200 steps.
 local function server_messages(world, connected)
   local okS, session = pcall(emf.session)
   if conn.session ~= session then conn = { session = session, state = nil, steps = 0, older = nil, told = nil } end
@@ -329,6 +337,7 @@ local function update_message()
   end
 end
 
+-- Every step of the player's own world: writes the feed, the tabs, the notices and the HUD label for FlameKit Native.
 local function hud_tick(world)
   write_messages()
   write_tabs()  -- (0.15.377)
@@ -368,12 +377,14 @@ local function read_manifest()
   if type(data.authors) == "table" and type(data.authors[1]) == "string" then kit.author = data.authors[1] end
 end
 
+-- Whether feature `f` runs: not stopped by an error and not switched off by its setting.
 function kit.enabled(f)
   if f.broken then return false end
   if f.enabled_setting and emf.setting(f.enabled_setting) == false then return false end
   return true
 end
 
+-- Stops feature `f` after an error in `where`: logged and told to the player; the rest of FlameKit goes on.
 local function fail(f, where, err)
   f.broken = tostring(err)
   kit.debug("error", "feature %s stopped in %s: %s", f.id, where, f.broken)
@@ -402,6 +413,7 @@ function kit.call(f, method, ...)
   return a, b
 end
 
+-- Calls `method` of every feature (through kit.call: skipped when off, errors caught).
 local function each(method, ...)
   for _, f in ipairs(kit.features) do kit.call(f, method, ...) end
 end

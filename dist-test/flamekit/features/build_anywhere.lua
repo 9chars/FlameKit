@@ -14,16 +14,19 @@ local LOG, LOG_MAX = true, 200   -- changes logged per minute at most
 local said, steps = 0, 0
 local last = {}                  -- "<side>:<id>" -> "<primary>/<secondary>"
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   return ok and v or nil
 end
 
+-- Field `k` of a game value, or nil when it cannot be read.
 local function field(v, k)
   local ok, x = pcall(function() return v[k] end)
   return ok and x or nil
 end
 
+-- A flag word as hex with the numbers of the bits that are set ("0x0000000B [0,1,3]").
 local function bits(n)
   n = math.floor(tonumber(n) or 0)
   local on = {}
@@ -31,6 +34,7 @@ local function bits(n)
   return string.format("0x%08X [%s]", n, table.concat(on, ","))
 end
 
+-- Logs cursor component `comp` of entity `id` (its two flag words and the entity's position) when the flags changed.
 local function look(world, side, comp, id)
   local c = get(world, comp, id)
   if not c then return end
@@ -49,6 +53,7 @@ end
 -- the server's own view of the building tool, logged when it changes: NetworkCursor.currentBuildingItemId and
 -- .cursorEntityId, ServerCursor.cursorEntityId and the building item.
 local tool_last = {}
+-- A game value as text (an id's value or a hash, else tostring).
 local function val(v)
   if type(v) == "userdata" or type(v) == "table" then
     local okv, x = pcall(function() return v.value end)
@@ -58,6 +63,7 @@ local function val(v)
   end
   return tostring(v)
 end
+-- Logs what the server knows of player `id`'s building tool (NetworkCursor, ServerCursor) when it changed.
 local function look_tool(world, id)
   local parts = {}
   local nc = get(world, "NetworkCursor", id)
@@ -101,6 +107,7 @@ function F.client_tick(world)  -- the player's own game
   if me and me ~= 0 then look(world, "client", "ClientCursor", me) end
 end
 
+-- Says in the log that the debug log is on.
 function F.setup(k)
   kit = k
   if LOG then emf.log("build anywhere: Free build debug log on (cursor flags, building tool; nothing in the game changes)") end

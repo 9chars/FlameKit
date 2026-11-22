@@ -90,6 +90,7 @@ function blockers(world, id, player, nx, ny, nz, fx, fz)
           local d = math.sqrt((x - nx) ^ 2 + (z - nz) ^ 2)
           if d < BLOCK_R then
             local kind
+            -- Whether this entity has component `c`.
             local function has(c) local ok, v = pcall(world.get, world, c, e) return ok and v ~= nil end
             if has("Animal") then kind = "animal"
             elseif has("ActiveNpcState") then kind = "npc"
@@ -258,6 +259,7 @@ function drive_waterlog(s)
   local world, id, h, t = s.world, s.id, s.h, s.t
   local px, py, pz, nx, ny, nz = s.px, s.py, s.pz, s.nx, s.ny, s.nz
   if t % 60 == 0 then
+    -- A value read for the log ("err" when it cannot be read).
     local function rd(f) local ok, v = pcall(f) if ok then return v end return "err" end
     local hw = rd(function() return world:get("DynamicLocomotion", id).currentWaterState end)
     local pwr = rd(function() return world:get("DynamicLocomotion", h.player).currentWaterState end)
@@ -272,6 +274,7 @@ function drive_waterlog(s)
           tonumber(r.m_value.groundDistance) or -1)
       end)
       local st = rd(function() return world:get("DynamicLocomotion", id).state end)
+      -- The heading (degrees, 0 = +z) of a direction x, z.
       local function ang(x, z) return (math.deg(math.atan(x, z)) + 360) % 360 end
       local mv = rd(function()
         local v = world:get("Velocity", id).velocity
@@ -964,10 +967,12 @@ function drive_steer(s)
           local q = world:get("CurrentTransform", h.player).transform.orientation
           yaw = math.atan(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y))
         end)
+        -- Place i of SLOTS around the player, turned with the way he faces.
         local function point(i)
           local p = SLOTS[i]
           return px + math.cos(yaw) * p[1] + math.sin(yaw) * p[2], pz - math.sin(yaw) * p[1] + math.cos(yaw) * p[2]
         end
+        -- Whether x, z is at least SLOT_GAP from every follower before this one.
         local function free(x, z)
           for j = 1, k do
             local ox, _, oz = world:position(mine[j])

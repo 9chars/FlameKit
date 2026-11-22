@@ -34,6 +34,7 @@ function log(s)
   end
   emf.log("companions: " .. s)
 end
+-- A short notice (5 s) in player `player`'s Notices window.
 function say(world, player, text, colour)
   pcall(function() require("features.chat").notice_to(world, player, text, colour or "#8cd2ff", 5) end)
 end
@@ -57,11 +58,13 @@ function F.set_debug(on)
   emf.log("companions: companion debug log " .. (F.debug and "on" or "off"))
 end
 F.notice_pref = {}
+-- Whether player `player` switched the "can't follow" notices on.
 function F.follow_notices(world, player)
   local ok, acc = pcall(world.account, world, player)
   return ok and acc and F.notice_pref[acc] == true or false
 end
 
+-- Shows status notice `tag` in the player's Notices window until it is cleared (text nil clears it).
 function status(world, player, tag, text, colour)
   if not player then return end
   local msg = text and { op = "status", tag = tag, text = text, colour = colour } or { op = "status", tag = tag, clear = true }

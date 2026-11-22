@@ -4,6 +4,7 @@
 
 local store = {}
 
+-- The file of store `name`: <name>.json in the mod's folder.
 local function path(name)
   return emf.dir .. "\\" .. name .. ".json"
 end
@@ -29,6 +30,7 @@ function store.load(name, default)
   return value
 end
 
+-- Saves `value` as <name>.json; false (and logged) when it cannot be written.
 function store.save(name, value)
   local text, err = emf.json.encode(value)
   if not text then

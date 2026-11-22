@@ -3,6 +3,7 @@
 -- feature's data (HANDOFF rule 0b). Shared core code: it uses no feature.
 local M = {}
 M.SCALE = 0.999
+-- Whether entity `id` is one of FlameKit's test monsters (its ScaleComponent is SCALE).
 function M.is(world, id)
   local ok, sc = pcall(world.get, world, "ScaleComponent", id)
   return ok and sc ~= nil and sc.uniformScale ~= nil and math.abs(sc.uniformScale - M.SCALE) < 0.0003

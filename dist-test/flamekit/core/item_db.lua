@@ -1297,6 +1297,7 @@ db.COSMETICS = {
 -- The gear tier for a monster level (the game's item tiers and the levels they cover; the game also caps an item's
 -- level by its tier: a T7 piece is never below 45, seen 2026-11-15).
 local TIER_MAX_LEVEL = { 6, 14, 22, 29, 36, 42 }  -- T1 up to level 6, T2 up to 14, ... T7 above 42
+-- The gear tier (1-7) that a monster or item level falls in (TIER_MAX_LEVEL).
 function db.tier_for_level(level)
   level = tonumber(level) or 1
   for t, top in ipairs(TIER_MAX_LEVEL) do
@@ -1348,6 +1349,7 @@ function db.pick(kind, level, random)
   return nil
 end
 
+-- A random cosmetic item's debug name.
 function db.pick_cosmetic(random)
   random = random or math.random
   return db.COSMETICS[random(#db.COSMETICS)]

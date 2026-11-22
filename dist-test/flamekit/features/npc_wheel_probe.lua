@@ -7,12 +7,14 @@ local F = { id = "npc_wheel_probe", title = "NPC Wheel Probe" }
 
 local CHANNEL = "npcwheel"
 
+-- A log line of this feature.
 local function log(s) emf.log("[flamekit] npc wheel: " .. s) end
 
 local kit  -- set in F.setup
 
 local admin = false  -- (0.15.359, owner 2026-11-20 17:46) the server says whether this player is an admin ({op = "admin"})
 
+-- A message from the server: admin or not, a status notice (shown until taken back), or "open the wheel" (the pick is sent back).
 local function on_message(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
   if okd and type(m) == "table" and m.op == "admin" then
@@ -60,12 +62,14 @@ end
 local ROSTER = "roster"
 local ros = { list = nil, players = {}, result = nil, ok = true, confirm = {}, asked = nil }
 
+-- Sends message `m` to the server on the roster channel; true when sent.
 local function roster_send(m)
   local oks, sent = pcall(emf.net.send, ROSTER, emf.json.encode(m))
   if not (oks and sent) then log("roster: not sent: " .. tostring(sent)) end
   return oks and sent
 end
 
+-- A roster message from the server: the list, a refusal (not an admin) or the result of an action.
 local function on_roster(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
   if not (okd and type(m) == "table") then return end
@@ -79,11 +83,13 @@ local function on_roster(world, from, data)
   end
 end
 
+-- The pet or monster kind (core/pets.lua, core/monsters.lua) with template `guid`.
 local function kind_of(guid)
   for _, m in ipairs(require("core.pets")) do if m[3] == guid then return m end end  -- (0.15.313) the Pets section
   for _, m in ipairs(require("core.monsters")) do if m[3] == guid then return m end end
 end
 
+-- The name of the player with account `acc` in the roster's player list.
 local function player_name(acc)
   for _, p in ipairs(ros.players) do if p.a == acc then return p.n end end
   return acc or "nobody"
@@ -174,6 +180,7 @@ function F.roster_rows(world)
   return rows
 end
 
+-- A click in the Companion Roster window ("ros:<what>:<name>:<arg>"): delete (two clicks within 5 s) or rename, sent to the server.
 function F.roster_click(world, key, typed)
   local what, name, arg = tostring(key):match("^ros:(%a+):([^:]*):?(.*)$")
   if not what then return end
@@ -193,11 +200,13 @@ function F.roster_click(world, key, typed)
   roster_send({ op = "do", what = what, name = name, arg = arg ~= "" and arg or nil })
 end
 
+-- Asks the server to call this player's companions to him.
 local function send_call(why)
   local oks, sent = pcall(emf.net.send, CHANNEL, emf.json.encode({ op = "call" }))
   log("call sent (" .. why .. "): " .. tostring(oks and sent))
 end
 
+-- A click in its tab: call the companions, or open the Companion Roster window (admins only).
 function F.click(world, key)
   if key == "npc:call" then send_call("button") end
   if key == "npc:roster" and not admin then log("roster: not an admin") return end  -- (0.15.359) admins only
@@ -213,6 +222,7 @@ end
 -- (0.15.349, owner 16:20) the server sends the companion "can't follow" notices only to players who switched them on
 -- (Experimental tab, Debug: core/companion_notices): the choice goes to it now and then and at once when it changes
 local prefs_sent, prefs_at = nil, -1e9
+-- The player's game: sends the follow-notices setting to the server when it changes, and every 30 s.
 function F.client_tick(world)
   local on = require("core.companion_notices").on()
   local t = world:tick()
@@ -225,6 +235,7 @@ function F.client_tick(world)
   end
 end
 
+-- Registers this game's ends of the companion channels (core/companion_net).
 function F.setup(k)
   kit = k
   -- (0.15.368) the channels are core/companion_net's: features/companions sets the server end of the same two

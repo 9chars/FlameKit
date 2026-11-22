@@ -24,6 +24,7 @@ local server_version = nil  -- what the server half answered (this session), nil
 local server_min_game = nil  -- (0.15.138) the oldest game the server works with, nil: not said (an older server)
 
 local session_seen = nil
+-- The player's game: asks the server for its FlameKit version 2 s after the world is there, then once a minute.
 function F.client_tick(world)
   local okS, session = pcall(emf.session)
   if session ~= session_seen then  -- another game session (maybe another server): its version is asked again
@@ -55,6 +56,7 @@ local function server_note(world)
   return nil
 end
 
+-- Opens the version channel: the server answers with its version, the player's game keeps it (kit.server_version, kit.server_note).
 function F.setup(k)
   kit = k
   kit.server_note = server_note
