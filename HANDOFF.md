@@ -1111,6 +1111,7 @@ sig good, commit 0642456), DLL a98a4fa6 (the 0.15.423 build). G-Portal 20:56: 14
 flamekit_native.dll + its mod.json uploaded (outbox md5 checked against the local server). The fetched G-Portal logs:
 emf_core.log ends 20:54:36 and enshrouded_server.log ends "Close Log file" (the G-Portal server was shut down at about
 20:54, before the upload; who/why not known). It loads 0.15.423 (DLL + Lua) at its next start; fetch the logs then.
+21:01 owner: "I stopped g-portal yes".
 
 ## How to build and publish a version
 
