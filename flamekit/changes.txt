@@ -1,3 +1,6 @@
+0.15.412 Nov 21, 2026
+- Logging for the build hammer: what the game's placement check reports inside and outside a flame altar's area (a first step toward building anywhere). Nothing in the game changes yet.
+
 0.15.411 Nov 21, 2026
 - Logging for a full bag when mining with a pickaxe: what the game does with the mined items when there is no room.
 

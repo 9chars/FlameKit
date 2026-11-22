@@ -23,6 +23,7 @@ kit.start({
   "features.loot_drop",       -- (0.15.142) a killed monster's loot; since 0.15.376 by the killer's Auto Loot setting
   "features.loose_loot",      -- (0.15.389, 0.15.390) loose drops of what a tool breaks or a kill leaves, by the player's Auto Loot setting
   "features.chest_overflow",  -- (0.15.410) what a full bag refuses from a loot chest goes to the companions
+  "features.build_anywhere",  -- (0.15.412) the build hammer's "Needs a Flame Altar nearby" check (step 1: logging)
   "features.travel_hide",     -- (0.15.281) FlameKit's UI hides during a fast travel (the server tells the game when)
   "features.npc_wheel_probe",  -- the companion system, the player's end: the wheel, the Companion Roster window (2026-11-17)
   "features.msg_tabs",         -- (0.15.377) the Messages window's Battle and Loot tabs (the server's half and the channel)
