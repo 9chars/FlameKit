@@ -1613,6 +1613,9 @@ an empty free_build_client: his game ran with normal altar areas for 74 s; fixed
 left alone), files put back by hand 17:22:52. The tab says "Asking the server..." until he rejoins.
 17:19 owner: #5 #7 #8 "go ahead"; #9 not understood; "alter area rule for admins" -> "make this a setting and put it into
 the "Building" tab"; "Hide all of FlameKit in build mode" not understood; #4: nothing without a test.
+17:26 owner: "my mod it saying "FlameKit not supported by server!"": caused by building.lua's F.connected (peer of the new
+channel "build" is 0 until a rejoin, and kit.connected answers false when any feature says false). Removed F.connected
+(live 17:27:08). Nothing was wrong with the server or the connection.
 
 ## Things learned the hard way
 

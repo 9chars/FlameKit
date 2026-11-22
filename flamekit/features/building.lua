@@ -426,10 +426,9 @@ function F.click(world, key)
   end
 end
 
--- Whether this game can use the tab: it hosts the world, or the server has the Building feature.
-function F.connected(world)
-  return kit.is_host() or peer() ~= 0
-end
+-- (No F.connected: kit.connected says "FlameKit not supported by server!" when any feature answers false, and this
+-- tab's channel only works after a rejoin when it is new (0.15.452, 17:26: the message came for that reason). The tab
+-- itself says when the server does not answer.)
 
 -- The channel (the server's and the players' ends), the building pieces (remembered spots) and the files at the start.
 function F.setup(k)
