@@ -1266,6 +1266,15 @@ test and the owner's restart yes): build_anywhere.cpp keeps each zone list's alt
 the last rebuild; no player box while the player stands in one (logged on change: "is inside/outside an altar area");
 the server writes them to altar_areas_server.txt every 15 steps when changed; FB.on_place skips a piece inside one
 ("in an altar area: no spot"). add_player_boxes now runs with Free build off too (starts each rebuild's altar list).
+**11:28:19 local server CRASH (WATCH)** on 0.15.442, owner idle away from the spots since ~10:52 (C forgotten 10:42).
+Dump crash_dumps/enshrouded_server_20261122_172819: c0000005 read at 0x2, world thread, enshrouded_server.exe
+0x140907875 (fn 0x140907690: a 16-bit slot lookup 0x1408acf00 returned null). Region 0x140907xxx-0x14090bxxx is the
+game's WATER FLOW code ("[water] Out of memory trying to update water flow", water replication); the caller chain runs
+from fn 0x1407c32cc ("[Server][Water] Player with invalid handle found."). No FlameKit frame on the stack. Nov 17 dump
+was elsewhere (0x140a295bf). Link to FlameKit unproven (guess: the forgotten spot C's reset, or water "of a base" vs our
+zones without base ids). Save 11:28:14 backed up to save_backups/2026-11-22_1128_crash (md5 a499fa97...). 11:32 owner
+"restart the game and find out why it crashed": restarted both on 0.15.442 (11:33:36). The owner's game had shown
+"Timeout for peer"; I first wrongly told him the server was still up.
 
 ## How to build and publish a version
 
