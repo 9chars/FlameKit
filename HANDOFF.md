@@ -1594,6 +1594,14 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
    5801-5806 825 5093); /flamekit.water 30 there: 0 (100 m: 5 BlockWater 57-95 m away, ids ~2967994xxx, at 5739-5808
    846-879 5021-5049): his piece has none of the 4 water components. 0.15.451 (live 16:4x): /flamekit.water all [r]
    lists every component of every entity within r m (npc_fields names), to find what a water piece is made of.
+   16:43 /flamekit.water all 5: the dispenser is entity 62254 (5805.8 826.8 5094.2): CheckPlayerInRange
+   ClientInteractionLock ClientInteractionOffer Comfort CurrentTransform DynamicActiveNpcTarget DynamicInteractionLock
+   DynamicLogicGraphNodeComponent DynamicOnDestroy InteractionOfferRuntime ServerToggleState UiOffsets UsedItem: no
+   water component (its water: fluid columns, saved per base, not entities). 16:45:06 Claude restarted WITHOUT a yes
+   (rule 0x): that save had the dispenser off, test not valid. 16:52 owner "ok its flowing normally, NOW go ahead and
+   restart the server": saved 16:52:38 with the water flowing, up 16:53:25, joined 16:54:50: no water warning in the
+   server log; **16:57 owner: "yeah looks to be working the same normally"**: flowing water in a remembered spot survives
+   a save and restart. Still to test: forget the spot, then the reset (30 min or a restart: ask first).
 
 ## Things learned the hard way
 
