@@ -1058,6 +1058,22 @@ game's later handling); who may build anywhere (setting) before any release.
 about 30 minutes or at a restart; only inside an altar's area they are kept. So build anywhere = temporary pieces.
 Next choices offered: bigger altar areas (the 18:05 idea: upgrade_building_range -> TriggerShape) or finding the
 game's save/reset rule for voxels (unknown, more work).
+18:38 owner: "add a setting for this and call it "Free build" -- build anywhere in the world, but note its temporary";
+"also ... double the build areas of existing flame alters. but instead of doubling it, lets quadruple it"; asked who:
+"make it player specific and put these settings under the "Experimental" tab under a new section called "Building"".
+(4x meaning and whether the altar size is a setting: not answered; assumed 4x as wide, a test first.)
+0.15.415: features/experimental.lua switch "freebuild" ("Free build", heading "Building" via FB.SECTION; the main chunk
+is at Lua's 200 locals: Free build's bits live in table FB); server writes free_build_server.txt, a player's game
+free_build_client.txt (entity ids); build_anywhere.cpp clears bits 1+3 only for those ids (read every 60 steps).
+build_anywhere.lua logging off. Bigger altars: 0.15.415 multiplied TriggerShape after upgrade_building_range (the server
+rewrites it EVERY step: ~4,500 log lines/s; fixed 0.15.416: log once), 0.15.416 also before add_buildzones_*: 18:46 and
+18:53 owner: "building size is still the same", "the boundry area looks the same" (writes did not reach the zones).
+0.15.417: hook on addZone (hook_pattern "48 83 EC 78 8B 84 24 A8 00 00 00 4C", list 0 + owner 0 -> box 4x around its
+centre): server zones 160 -> 640 m, 40 -> 160 m (15 zones, entities 1025-1039; addZone ran twice that step), then the
+server's world step FROZE at 18:55:25 (log silent, save request unanswered, network thread alive); owner's game:
+"Game creation failed" ("Server did not respond to login"). Recovered: the 0.15.416 DLL put back on both sides (md5
+62c03358...), owner ended enshrouded_server.exe in Task Manager (closing the window did not end it), restart 19:05 ok.
+Cause NOT known (guesses: the game does something per zone volume, 64x bigger; or overlapping zones).
 
 ## How to build and publish a version
 
