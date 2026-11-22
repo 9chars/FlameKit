@@ -1241,6 +1241,11 @@ restart". Restart 10:19 (saved 10:18:59): "(server, at start): 3 remembered spot
 spot zones in the list 10:19:42.698. **10:22 owner: "it worked.. all 3 spots are there"**: Free build pieces survive a
 restart with the remembered spots. Not tested yet: the 30-minute reset; forgetting spots; the tooltip still says
 "temporary".
+10:24 owner: "we definitely need a way to remove the remember spots incase we have issues or theres too many of them on
+the map, memory issues, etc"; asked how; "it just has to be clear what spot im in that I'd be clearing out". 0.15.441
+(Lua): Building shows "Remembered Free build spots: N", "You stand in the spot at X, Z (height Y)" or "No remembered
+spot where you stand", and for admins (core/admins) a "Forget this spot" button (op forget_spot; FB.spot_for: own
+32 m cell, else the nearest spot whose 48 m area holds the player). Admin-only: my assumption (as the world options).
 
 ## How to build and publish a version
 

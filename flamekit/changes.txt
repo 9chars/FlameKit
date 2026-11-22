@@ -1,3 +1,6 @@
+0.15.441 Nov 22, 2026
+- Free build: Experimental > Building shows how many spots are remembered and the one you stand in; admins can forget it ("Forget this spot"). What was built there is temporary again.
+
 0.15.440 Nov 22, 2026
 - Test: Free build remembers where you built (32 m squares) and keeps a building area there from the moment the server starts, so what you built there may stay through restarts.
 

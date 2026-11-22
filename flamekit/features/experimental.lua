@@ -572,7 +572,8 @@ local function view(account)
               sbj_divebase = glide.sbj(account, "divebase"),
               sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
               damage_pvp = wants(account, "pvp") or nil,
-              bigaltars = FB.world_on() or nil }  -- (0.15.422) the world's switch
+              bigaltars = FB.world_on() or nil,  -- (0.15.422) the world's switch
+              spot = FB.spot_info(account) }  -- (0.15.441) Free build's remembered spot where this player stands
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -1510,6 +1511,20 @@ local function handle(world, account, entity, msg, from)
     end
     return view(account)
   end
+  if msg.op == "forget_spot" then  -- (0.15.441) Free build: forget the remembered spot where this admin stands
+    local v
+    if not FB.admins.is(account, from) then
+      v = view(account)
+      v.note = "Only FlameKit admins can forget Free build spots."
+      return v
+    end
+    local c = FB.forget_spot(world, entity)
+    v = view(account)
+    v.admin = true
+    v.note = c and string.format("Forgot the spot at %.0f, %.0f. What was built there is temporary again.", c[1], c[3])
+      or "There is no remembered spot where you stand."
+    return v
+  end
   if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
     local v
     if not FB.admins.is(account, from) then
@@ -2237,6 +2252,45 @@ function FB.on_place(world, e)
     spots[key][1], spots[key][2], spots[key][3], owner, x, y, z, total))
 end
 
+-- (0.15.441, owner 10:24 "we definitely need a way to remove the remember spots incase we have issues or theres too
+-- many of them", 10:2x "it just has to be clear what spot im in that I'd be clearing out") the spot where a player
+-- stands: their own 32 m cell if it is remembered, else the nearest remembered spot whose 48 m area holds them.
+function FB.spot_for(world, entity)
+  if not world or not entity then return nil end
+  local okp, x, y, z = pcall(world.position, world, entity)
+  if not okp or not x then return nil end
+  local st, spots = FB.SPOT_STEP, FB.spots_get()
+  local key = math.floor(x / st) .. "," .. math.floor(y / st) .. "," .. math.floor(z / st)
+  if spots[key] then return key, spots[key] end
+  local best, bk, bc = nil, nil, nil
+  for k, c in pairs(spots) do
+    local dx, dy, dz = math.abs(x - c[1]), math.abs(y - c[2]), math.abs(z - c[3])
+    if dx <= 24 and dy <= 24 and dz <= 24 then
+      local d = dx * dx + dy * dy + dz * dz
+      if not best or d < best then best, bk, bc = d, k, c end
+    end
+  end
+  return bk, bc
+end
+function FB.spot_info(account)
+  local n = 0
+  for _ in pairs(FB.spots_get()) do n = n + 1 end
+  local info = { total = n }
+  local p = online[tostring(account)]
+  local key, c = FB.spot_for(FB.world_ref, p and p.entity)
+  if key then info.key, info.x, info.y, info.z = key, math.floor(c[1] + 0.5), math.floor(c[2] + 0.5), math.floor(c[3] + 0.5) end
+  return info
+end
+function FB.forget_spot(world, entity)
+  local key, c = FB.spot_for(world, entity)
+  if not key then return nil end
+  FB.spots_get()[key] = nil
+  pcall(kit.store.save, "free_build_spots", FB.spots)
+  local total = FB.spots_write()
+  emf.log(string.format("experimental: free build: player %s forgot the spot at %.0f %.0f %.0f (%d left)", tostring(entity), c[1], c[2], c[3], total))
+  return c
+end
+
 -- (0.15.415) the server's list for FlameKit Native: online players with Free build on. (0.15.432: defined here,
 -- after `online` and `is_on`; above them both are nil.) (0.15.438: the building tool signal of 0.15.431-0.15.437 taken out.)
 function FB.server_list()
@@ -2260,6 +2314,7 @@ function F.tick(world)
   local account, player = me(world)
   if account then seen(account, player) end
   apply()
+  if world:is_server() then FB.world_ref = world end  -- (0.15.441) for FB.spot_info (view has no world)
   if world:is_server() and fx_steps % FB.STEPS == 0 then  -- (0.15.415) Free build: who, for FlameKit Native
     pcall(FB.server_list)
     pcall(FB.write_text, "altar_size_server.txt", FB.world_on() and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
@@ -2575,6 +2630,21 @@ local function panel_rows(world)
     rows[#rows + 1] = { button = "bigaltars", text = (on and "On    " or "Off   ") .. "Bigger altar areas (1.5x)" .. (admin and "" or " (admins only)"),
       selected = on, disabled = (not admin) or nil,
       tooltip = "Every flame altar's building area is 1.5 times as wide, high and deep; an altar's level still sets its size (40 m becomes 60 m, 160 m becomes 240 m). For the whole server: everyone's altars. What you build in the bigger area is kept like anything inside an altar's area. Players need this FlameKit version in their own game to see and use the bigger area. On unless an admin switches it off. Only FlameKit admins can switch it; everyone on the server is told." }
+    -- (0.15.441) Free build's remembered spots: how many, the one where you stand, and (admins) forget it
+    local sp = v.spot
+    if sp then
+      rows[#rows + 1] = { dim = true, text = string.format("Remembered Free build spots: %d", sp.total or 0),
+        tooltip = "Places where someone built with Free build. Each is a 32 m square of the world with a building area over it (48 m wide and high), so what was built there stays through restarts like inside an altar's area." }
+      if sp.key then
+        rows[#rows + 1] = { dim = true, text = string.format("You stand in the spot at %d, %d (height %d)", sp.x, sp.z, sp.y) }
+        if admin then
+          rows[#rows + 1] = { button = "fbforget", text = "Forget this spot",
+            tooltip = string.format("Forgets the remembered spot at %d, %d. What was built in it is temporary again: the game removes it at the next restart or after about 30 minutes. Its border shows while your building tool is out.", sp.x, sp.z) }
+        end
+      else
+        rows[#rows + 1] = { dim = true, text = "No remembered spot where you stand." }
+      end
+    end
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
   -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B
@@ -2912,6 +2982,17 @@ function F.click(world, key)
     elseif shown then
       shown.glide_speed = f  -- at once on screen; the server's answer follows
       ask({ op = "set", key = "glide_speed", value = f })
+    end
+    return
+  end
+  if key == "fbforget" then  -- (0.15.441) Free build: forget the spot where I stand (the server checks the admin)
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "forget_spot" }, { is_local = true }).note
+    elseif shown then
+      ask({ op = "forget_spot" })
     end
     return
   end
