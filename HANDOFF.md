@@ -1197,6 +1197,9 @@ Restart 08:39; 08:53 owner: "it says Needs Flame Alter nearby error still". Log 
 and box, then the DLL said "away" (it evaluated the tool only for players in its list, and the client list was empty
 until the tool was out: a circle), "away" sent, list nobody. 0.15.435: the tool is evaluated every step for the local
 player, outside the list.
+Restart 08:54; 08:57 owner: "It still says "Needs a Flame Alter nearby"". Log: he was in build mode 08:57:07-17 (cursor
+flags moving) but the DLL's tool state never went "out" (displayCursor not seen at the time addZone runs, or addZone
+not running there). The tool gating (0.15.429-0.15.435) is not working; the always-on box (0.15.428) worked.
 
 ## How to build and publish a version
 
