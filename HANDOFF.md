@@ -1167,6 +1167,9 @@ grid line. Not known yet: what a saved zone with an empty base id does at load; 
 08:10 owner: "#1 not really a solution -- #2 do the grid fix #3 my guess s there's a finite amount of memory it allocates
 for the bases and when the base exceeds it, it just start dropping objects, just a complete guess not based on any
 data..." (his guess, kept as a guess). 0.15.428: the player box on a 32 m grid (cell centre), half width 40 + 16 m.
+Restart 08:12 (his game sat 3 min in the menu again: WATCH); "Build zones changed" 2 times after the join. 08:19 owner:
+"it looks like it draws that grid regardless if I'm in build more or not" -> 0.15.429: the box only while the building
+tool is out (client ClientPlayerInput.data.mask & 3, server PlayerInput.fromClient.mask & 3).
 
 ## How to build and publish a version
 
