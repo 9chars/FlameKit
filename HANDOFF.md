@@ -1150,6 +1150,7 @@ not", "we know they reset during reboots..". **07:53 owner (far from altars, Fre
 cursor flag clearing still needed with the zone (clean-up test); the 30-minute reset (not tested; stopping it: not
 looked at); release.
 07:55 owner: "yeah lets see the minimum amount of changes we need to make this work" -> 0.15.427: cursor hooks off (kClearCursorFlags false; debug tool kept), only the player zone.
+Restart 07:56; zone around player 1 from 07:58:43 on both sides; **08:00 owner (far from altars): "it works"** with only the player zone.
 
 ## How to build and publish a version
 
