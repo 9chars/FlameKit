@@ -1573,6 +1573,13 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
    known (only BuildingPlaceEvent), so the server would look every so often for building pieces inside each spot's
    48 m box, which needs a way to tell building pieces among the world's entities. Until then: "Forget this spot" /
    "Forget all spots" (admins).
+5. **Free build and water** (owner 2026-11-22 16:25-16:26): the old Free build (0.15.413-0.15.425, still on G-Portal as
+   0.15.423) left pieces in no building area: their water broke ("BlockWater Entity not found", gone after the owner
+   removed the pieces 16:03-16:14, clean rejoin 16:23). Open: does the new one break water? Test planned: a water piece in
+   a remembered spot, restart (warnings? water works?), then forget the spot and let it reset. Owner: "if this is a
+   confirmed problem, we'll need to block the use of water in these areas OR make the areas friendly with the game so
+   water works in them". Known risks: forgetting a spot with water pieces, the 100-spot cap, a missed BuildingPlaceEvent,
+   spot zones without a base id (water is saved per base).
 
 ## Things learned the hard way
 
