@@ -1074,6 +1074,9 @@ server's world step FROZE at 18:55:25 (log silent, save request unanswered, netw
 "Game creation failed" ("Server did not respond to login"). Recovered: the 0.15.416 DLL put back on both sides (md5
 62c03358...), owner ended enshrouded_server.exe in Task Manager (closing the window did not end it), restart 19:05 ok.
 Cause NOT known (guesses: the game does something per zone volume, 64x bigger; or overlapping zones).
+19:08 owner: "try it 2x I guess" -> 0.15.418 kAltarFactor 2 (+ log of the first 3 addZone returns): restart 19:09 ok,
+no freeze; zones 160 -> 320 m, 40 -> 80 m on the server and in his game. 19:12 owner: "that seemed to have worked".
+Next: restart test whether pieces in the new ring are kept.
 
 ## How to build and publish a version
 
