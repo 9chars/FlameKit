@@ -26,6 +26,7 @@
 //
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
 // (0.15.417) the first 20 bigger zones are logged (the game rebuilds the zones every step).
+// (0.15.418) 2x: 4x froze the server's world step right after the zones (18:55:25; cause not known).
 #include <windows.h>
 
 #include <atomic>
@@ -44,7 +45,7 @@ namespace gen = emf::gen;
 namespace {
 constexpr const char* kMod = "flamekit build";
 constexpr uint32_t kOutsideZone = 0x8 | 0x2;  // bit 3 "needs a flame altar", bit 1 "needs building area"
-constexpr float kAltarFactor = 4.0f;
+constexpr float kAltarFactor = 2.0f;  // (0.15.418, owner 19:08 "try it 2x I guess": 4x froze the server, 0.15.417)
 
 
 std::atomic<bool> g_free_on{true}, g_altar_on{true};
@@ -145,7 +146,10 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
             EMF_LOG(kMod, "bigger altar areas: zone of %u: %.0f x %.0f x %.0f m -> %.0f x %.0f x %.0f m", entity,
                     double(box[3] - box[0]) / 4294967296.0, double(box[4] - box[1]) / 4294967296.0, double(box[5] - box[2]) / 4294967296.0,
                     double(big[3] - big[0]) / 4294967296.0, double(big[4] - big[1]) / 4294967296.0, double(big[5] - big[2]) / 4294967296.0);
-        return g_add_zone(bzs, list, flag, owner, big, entity, abandoned, base_id);
+        const uint64_t r = g_add_zone(bzs, list, flag, owner, big, entity, abandoned, base_id);
+        static std::atomic<int> back{0};
+        if (back.fetch_add(1) < 3) EMF_LOG(kMod, "bigger altar areas: addZone returned for %u", entity);  // (0.15.418) where a freeze is
+        return r;
     }
     return g_add_zone(bzs, list, flag, owner, box, entity, abandoned, base_id);
 }

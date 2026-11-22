@@ -1,3 +1,6 @@
+0.15.418 Nov 21, 2026
+- The bigger altar areas test: twice as wide instead of four times (four times froze the test server).
+
 0.15.417 Nov 21, 2026
 - The bigger altar areas test, second try: the building areas themselves are made four times as wide (test server only).
 
