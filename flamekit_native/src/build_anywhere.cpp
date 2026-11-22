@@ -1,32 +1,30 @@
-// build_anywhere.cpp: Free build (0.15.415) and the bigger altar areas test (0.15.415).
+// build_anywhere.cpp: Free build and Bigger altar areas (both through the game's build zone list).
 //
-// FREE BUILD (owner 2026-11-21 18:12 "lets try to change the may I build here check"; 18:38 "add a setting for this
-// and call it "Free build" -- build anywhere in the world, but note its temporary", "make it player specific and put
-// these settings under the "Experimental" tab under a new section called "Building"").
-// Learned (0.15.412-0.15.414 on the local server): the cursor's flag words say why the hammer refuses. Bit 3 (0x8) =
-// "Needs a Flame Altar nearby", bit 1 (0x2) = "needs building area": ClientCursor.primaryFlags / .secondaryFlags in
-// the player's own game, ServerCursor.primaryFlags on the server (the server's secondaryFlags have bits 1, 2, 3 on
-// INSIDE an altar's area: a different meaning, left alone). The game's cursor programs work them out each step:
-// client_cursor (the player's game) and server_cursor_no_prediction (the server). A hook after each (EMF hook_program,
-// post) switches both bits off for the players Free build is on for, and placing works (18:31 "that worked", with the
-// materials in the bag: outside an altar's area the hammer uses only the bag). What is built outside an altar's area
-// is gone after a restart (18:36: the game's own rule).
+// FREE BUILD (owner 2026-11-21 18:38 "add a setting for this and call it "Free build" -- build anywhere in the world,
+// but note its temporary"; per player, Experimental tab > Building). How it works (0.15.426, owner 2026-11-22 08:00
+// "it works", 09:07 "its working exactly as it should"): every step, right after the game puts the first altar zone of
+// the step into its build zone list (BuildZoneSystem_addZone, hooked below), a zone box around each player Free build
+// is on for is added to the same list, in the server and in that player's own game. Every check that asks the list
+// ("Needs a Flame Altar nearby" far from altars, "needs building area") then sees a build zone. The box sits on a
+// kGridStep grid (0.15.428: a box that followed the player smoothly made the server send every player the whole zone
+// list each step: 4,678 times in a minute). The game draws its border only while the building tool is selected.
 // Who: features/experimental.lua writes the entity ids, one a line, into free_build_server.txt (the server) and
-// free_build_client.txt (the player's own game) beside FlameKit's Lua part; read again every 60 steps.
+// free_build_client.txt (the player's own game) beside FlameKit's Lua part; read every 15 steps.
+// What did not work and was taken out (0.15.438, owner 09:17 "clean up all the old free build stuff that didn't work
+// ... keep all the logging"): switching off the cursor's "outside" bits after client_cursor / server_cursor_no_prediction
+// (0.15.413-0.15.425: enough only near an altar, ~90 m); showing the box only while the building tool is out
+// (0.15.429-0.15.435: no reliable signal; the input mask is dead, displayCursor flickers and is not seen at addZone).
+// The save keeps terrain inside the list's zones at save time (0x140932a30, called by the ServerSaveGame save): what is
+// built with Free build is still gone after a restart or the game's 30-minute reset (not solved).
 //
-// BIGGER ALTAR AREAS (test, owner 18:05 "adjust the build area of the flames alters", 18:38 "instead of doubling it,
-// lets quadruple it"). 0.15.415/416 changed the altars' TriggerShape (after upgrade_building_range, before
-// add_buildzones_*): the log showed the writes, but 18:46 / 18:53 owner: "the boundry area looks the same" (the game's
-// programs evidently read another copy). 0.15.417 instead: the game's BuildZoneSystem_addZone (the one function that
-// puts every build zone box into the list, server and player's game; EMF's engine notes 3.5, signature found in both
-// exes) is hooked; a base zone (list 0, owner kind 0: what add_buildzones_server/_client pass for each altar) gets a
-// box kAltarFactor times as wide, tall and deep around the same centre. (0.15.422) the world's option (below).
+// BIGGER ALTAR AREAS (owner 2026-11-21 18:05 / 18:38; the world's option, admins only, on by default 0.15.423): a base
+// zone (list 0, owner kind 0: what add_buildzones_server/_client pass for each altar) gets a box g_factor times as wide,
+// high and deep around the same centre. 1.5x kept every block through restarts (0.15.419/421), 2x lost outer blocks
+// (0.15.418/420), 4x froze the server (0.15.417). The altars' TriggerShape (0.15.415/416) did not reach the zones.
 // addZone(bzs, u8 list, u8 flag, u8 ownerKind, WorldAABB* {min xyz, max xyz int64, 2^32 per m}, u32 entity,
-// u8 wasAbandoned, BaseId*) (the call in add_buildzones_server, server exe 0x1400ee750).
+// u8 wasAbandoned, BaseId*) (the call in add_buildzones_server, server exe 0x1400ee750; signature in both exes).
 //
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
-// (0.15.417) the first 20 bigger zones are logged (the game rebuilds the zones every step).
-// (0.15.418) 2x: 4x froze the server's world step right after the zones (18:55:25; cause not known).
 #include <windows.h>
 
 #include <atomic>
@@ -45,30 +43,12 @@ namespace gen = emf::gen;
 
 namespace {
 constexpr const char* kMod = "flamekit build";
-// (0.15.425, owner 2026-11-22 07:41 "same error. I feel like we did not have it fully figured out the other day": far
-// from every altar (here ~560 m) the hammer still says "Needs a Flame Altar nearby" with bits 1 and 3 off; bit 10
-// (0x400) came on in both cursors as he tried to place (07:31:00); the 2026-11-21 success was ~90 m from an altar.
-// Guess, not checked: bit 10 = too far from any altar. Switched off too, and the raw words (before any change) are
-// logged when they change, so the next test shows every bit the game sets.)
-constexpr uint32_t kOutsideZone = 0x8 | 0x2 | 0x400;  // bit 3 "needs a flame altar", bit 1 "needs building area", bit 10 (0.15.425)
-std::atomic<int> g_raw_said{0};
-void log_raw(const char* side, uint32_t id, uint32_t p, uint32_t s, uint64_t& last) {  // (0.15.425) changes only, 400 at most
-    const uint64_t v = (uint64_t(p) << 32) | s;
-    if (v == last) return;
-    last = v;
-    if (g_raw_said.fetch_add(1) < 400) EMF_LOG(kMod, "free build: %s cursor of %u before the change: primary 0x%08X, secondary 0x%08X", side, id, p, s);
-}
-// (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that", 20:21 admins only) the factor comes from
-// FlameKit's Lua part: altar_size_server.txt (the server) / altar_size_client.txt (a player's own game), "1" = off.
-// Tested: 1.5x kept every block through restarts (0.15.419/421); 2x lost outer blocks at restarts (0.15.418/420); 4x
-// froze the server (0.15.417). Values above kMaxFactor are not used.
+// (0.15.422) the altar factor comes from FlameKit's Lua part: altar_size_server.txt (the server) /
+// altar_size_client.txt (a player's own game), "1" = off. Values above kMaxFactor are not used.
 constexpr float kMaxFactor = 1.5f;
 std::atomic<float> g_factor{1.0f};
-
-
 std::atomic<bool> g_free_on{true}, g_altar_on{true};
-std::atomic<uint64_t> g_client_cleared{0}, g_server_cleared{0}, g_altars{0};
-std::atomic<int> g_said{0};
+std::atomic<uint64_t> g_altars{0}, g_boxes{0};
 
 // the players Free build is on for, per side (read from the files on the world's own tick thread)
 std::mutex g_mx;
@@ -119,61 +99,13 @@ void read_factor(const wchar_t* name, const char* side, float missing = 1.0f) {
     if (old != f) EMF_LOG(kMod, "bigger altar areas (%s): %s", side, f > 1.001f ? (f > 1.49f ? "on, 1.5x" : "on") : "off");
 }
 
-void client_post(void*, void*) {
-    if (!g_free_on.load()) return;
-    const uint32_t me = emf::local_player();
-    if (!me || !free_for(g_free_client, me)) return;
-    emf::World w = emf::client_world();
-    if (!w) return;
-    auto* c = w.get<gen::ecs::ClientCursor>(me);
-    if (!c) return;
-    static uint64_t last_raw = ~0ull;
-    log_raw("this game's", me, c->primaryFlags, c->secondaryFlags, last_raw);
-    if ((c->primaryFlags | c->secondaryFlags) & kOutsideZone) {
-        c->primaryFlags &= ~kOutsideZone;
-        c->secondaryFlags &= ~kOutsideZone;
-        if (g_client_cleared.fetch_add(1) == 0) EMF_LOG(kMod, "free build: the hammer's altar check is off in this game for %u", me);
-    }
-}
-
-void server_post(void*, void*) {
-    if (!g_free_on.load()) return;
-    std::vector<uint32_t> ids;
-    {
-        std::lock_guard<std::mutex> lk(g_mx);
-        ids.assign(g_free_server.begin(), g_free_server.end());
-    }
-    if (ids.empty()) return;
-    emf::World w = emf::server_world();
-    if (!w) return;
-    for (uint32_t id : ids) {
-        auto* c = w.get<gen::ecs::ServerCursor>(id);
-        if (!c) continue;
-        static uint64_t last_raw[65];
-        static bool init = false;
-        if (!init) { for (auto& x : last_raw) x = ~0ull; init = true; }
-        log_raw("the server's", id, c->primaryFlags, c->secondaryFlags, last_raw[id <= 64 ? id : 0]);
-        if (c->primaryFlags & kOutsideZone) {
-            c->primaryFlags &= ~kOutsideZone;
-            if (g_server_cleared.fetch_add(1) == 0 || g_said.fetch_add(1) < 3)
-                EMF_LOG(kMod, "free build: the server's altar check is off for %u", id);
-        }
-    }
-}
-
 using AddZoneFn = uint64_t (*)(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                                uint8_t abandoned, void* base_id);
 AddZoneFn g_add_zone = nullptr;
 std::atomic<int> g_zone_said{0};
 
-// (0.15.426, owner 2026-11-22 07:48 "if im closer to a base it works outside the base... we need to dig deeper ... we
-// need to make this mode work"): far from every altar the hammer's "Needs a Flame Altar nearby" does not come from the
-// cursor words (0.15.425 raw log). It is a NegativeFeedback command (type 0x3771274d) of the hammer's action sequence in
-// actor_client_play, so the sequence itself tests something about altars/zones. Test: a build zone box around each
-// player Free build is on for (kPlayerHalf each way), added to the game's own zone list right after the game adds the
-// first altar zone of a step: then every check that asks the zone list sees "inside a build zone". The box is given no
-// altar entity and an empty base id. Logged once per world.
-constexpr double kPlayerHalf = 40.0;  // m each way: a box 80 m wide, high and deep around the player
+constexpr double kPlayerHalf = 40.0;  // m each way the box always covers around the player
+constexpr double kGridStep = 32.0;    // m: the box moves only when the player crosses a grid line
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 std::atomic<int> g_box_said{0};
 
@@ -200,32 +132,6 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         w = wc;
         side = "this game";
         const uint32_t me = emf::local_player();
-        // (0.15.434, owner 08:37 "Needs a flame Alter nearby" again on 0.15.433: the Lua part read displayCursor false
-        // all the time (it reads after the step), so the server never got "tool out". This hook sees it (0.15.430 log),
-        // but it flickers: the tool counts as out while displayCursor was seen within 60 steps; the state goes to the Lua
-        // part in free_build_tool.txt ("1"/"0"), which tells the server.) (0.15.435, owner 08:53 still the error: 0.15.434
-        // looked at the tool only while Free build's list had the player, and the list waited for the tool: a circle.
-        // The tool is now looked at every step for the local player.)
-        int out = 1;
-        if (me) {
-            auto* cur = wc.get<gen::ecs::ClientCursor>(me);
-            static uint64_t last_seen = 0;
-            static int last_out = -1;
-            if (cur && cur->displayCursor) last_seen = now ? now : 1;
-            out = !cur ? 1 : (last_seen != 0 && now - last_seen < 60) ? 1 : 0;
-            if (out != last_out) {
-                last_out = out;
-                EMF_LOG(kMod, "free build (this game): the building tool is %s", !cur ? "not readable (counted as out)" : out ? "out" : "away");
-                if (FILE* f = _wfopen(lua_file(L"free_build_tool.txt").c_str(), L"wb")) {
-                    std::fputs(out ? "1\n" : "0\n", f);
-                    std::fclose(f);
-                }
-            }
-        }
-        // (0.15.437, owner 08:58 "this needs to work.. it was working before"): the tool signal above is not reliable, so
-        // the box no longer waits for it (as in 0.15.428, which worked); the signal is still logged while a better one is
-        // looked for.
-        (void)out;
         if (me && free_for(g_free_client, me)) ids.push_back(me);
     } else {
         static std::atomic<int> said{0};
@@ -234,12 +140,6 @@ void add_player_boxes(void* bzs, uint8_t flag) {
                     ws ? ws.singleton("BuildZoneSystem") : nullptr, wc ? wc.singleton("BuildZoneSystem") : nullptr);
         return;
     }
-    // (0.15.428, owner 08:10 "do the grid fix"): a box that followed the player smoothly changed the zone list every
-    // step while moving, and the server then logged "Build zones changed" and sent every player the whole list
-    // (BuildingZones, 1,135 B) each time: 4,678 times in one minute. The box now sits on a kGridStep grid (the centre of
-    // the player's grid cell) and is kGridStep/2 bigger each way, so it still covers kPlayerHalf around the player and
-    // changes only when the player crosses a grid line.
-    constexpr double kGridStep = 32.0;
     const int64_t step = int64_t(kGridStep * 4294967296.0);
     const int64_t half = int64_t((kPlayerHalf + kGridStep / 2) * 4294967296.0);
     auto cell_mid = [step](int64_t v) {
@@ -248,12 +148,6 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         return q * step + step / 2;
     };
     for (uint32_t id : ids) {
-        // (0.15.429, owner 08:19 "it looks like it draws that grid regardless if I'm in build more or not") the box only
-        // while the building tool is out. (0.15.430, owner 08:23 "its giving me the needs flame alter nearby error again"):
-        // 0.15.429 read the input mask's two low bits (kit.lua in_build_mode, measured 0.15.62); they never came on any
-        // more (kit.lua logged "build mode: off" and never "on" while he built), so no box was made. Now: in the player's
-        // game, ClientCursor.displayCursor (logged when it changes, to check it); on the server the box is always there
-        // while Free build is on (the server draws nothing; on a 32 m grid it changes rarely).
         auto* ct = w.get<gen::ecs::CurrentTransform>(id);
         if (!ct) continue;
         const auto& p = ct->transform.position;
@@ -261,6 +155,7 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
         uint8_t no_base[16] = {};
         g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
+        g_boxes.fetch_add(1);
         if (g_box_said.fetch_add(1) < 4)
             EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
                     (kPlayerHalf + kGridStep / 2) * 2, id, double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0,
@@ -270,16 +165,16 @@ void add_player_boxes(void* bzs, uint8_t flag) {
 
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
-    if (g_free_on.load() && box && list == 0 && owner == 0) add_player_boxes(bzs, flag);  // (0.15.426)
-    const float kAltarFactor = g_factor.load();
-    if (g_altar_on.load() && kAltarFactor > 1.001f && box && list == 0 && owner == 0) {
+    if (g_free_on.load() && box && list == 0 && owner == 0) add_player_boxes(bzs, flag);
+    const float factor = g_factor.load();
+    if (g_altar_on.load() && factor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];
         for (int i = 0; i < 3; ++i) {
             const int64_t lo = box[i], hi = box[3 + i];
             const int64_t mid = lo / 2 + hi / 2;
             const int64_t half = hi / 2 - lo / 2;
-            big[i] = mid - int64_t(double(half) * kAltarFactor);
-            big[3 + i] = mid + int64_t(double(half) * kAltarFactor);
+            big[i] = mid - int64_t(double(half) * factor);
+            big[3 + i] = mid + int64_t(double(half) * factor);
         }
         g_altars.fetch_add(1);
         if (g_zone_said.fetch_add(1) < 20)
@@ -297,32 +192,15 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
 
 // called by flamekit_native's emf_mod_load in every process (a dedicated server, a player's game)
 bool fk_build_anywhere_load(bool dedicated) {
-    auto* a = emf::api();
-    if (!a || !a->hook_program) {
-        EMF_LOG(kMod, "free build: EMF has no hook_program: off");
-        return false;
-    }
-    // (0.15.423, owner 20:38 "so that option has to be on when the server comes up") the factor is read now, before
-    // the world loads (the game decides what to keep then), not only at the first world step
+    // (0.15.423) the factor is read now, before the world loads (the game decides what to keep then)
     if (dedicated) read_factor(L"altar_size_server.txt", "server, at start", kMaxFactor);
     else read_factor(L"altar_size_client.txt", "this game, at start");
-    // (0.15.427, owner 07:55 "lets see the minimum amount of changes we need to make this work"): with the player's
-    // build zone (0.15.426) the cursor words should come out right by themselves; the cursor hooks (bits 1, 3, 10 off)
-    // are a debug tool now, switched off here, not removed.
-    constexpr bool kClearCursorFlags = false;
-    bool c = false, s = false;
-    if (kClearCursorFlags) {
-        if (!dedicated) c = a->hook_program("client_cursor", nullptr, client_post, nullptr);
-        s = a->hook_program("server_cursor_no_prediction", nullptr, server_post, nullptr);
-    }
     const bool al = emf::hook_pattern("flamekit: build zone (bigger altar areas)", "48 83 EC 78 8B 84 24 A8 00 00 00 4C",
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
-    EMF_LOG(kMod, "free build: hook after client_cursor %s, after server_cursor_no_prediction %s; bigger altar areas (up to x%.1f, the world's option): hook on addZone %s",
-            !kClearCursorFlags ? "(off)" : dedicated ? "(not here)" : (c ? "installed" : "NOT installed"),
-            !kClearCursorFlags ? "(off)" : s ? "installed" : "NOT installed", kMaxFactor,
+    EMF_LOG(kMod, "free build and bigger altar areas (up to x%.1f, the world's option): hook on addZone %s", kMaxFactor,
             al ? "installed" : "NOT installed");
-    emf::on_tick([](emf::World w) {  // the lists of players, every 15 steps of each world (0.15.431: was 60; the tool out/away must show quickly)
-        g_steps.fetch_add(1);  // (0.15.426) the player boxes: once per step
+    emf::on_tick([](emf::World w) {  // the lists of players and the factor, every 15 steps of each world
+        g_steps.fetch_add(1);  // the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
         if (w.is_server()) {
             if (steps_server++ % 15 == 0) {
@@ -352,9 +230,9 @@ bool fk_build_anywhere_load(bool dedicated) {
             ns = g_free_server.size();
             nc = g_free_client.size();
         }
-        EMF_REPLY("free build %s (server list %zu, this game %zu; cleared: server %llu, this game %llu); bigger altar areas %s (%llu zone(s) made bigger)",
-                  g_free_on.load() ? "on" : "off", ns, nc, (unsigned long long)g_server_cleared.load(),
-                  (unsigned long long)g_client_cleared.load(), g_altar_on.load() ? "on" : "off", (unsigned long long)g_altars.load());
+        EMF_REPLY("free build %s (server list %zu, this game %zu; %llu player box(es) added); bigger altar areas %s (%llu zone(s) made bigger)",
+                  g_free_on.load() ? "on" : "off", ns, nc, (unsigned long long)g_boxes.load(), g_altar_on.load() ? "on" : "off",
+                  (unsigned long long)g_altars.load());
     });
     return al;
 }

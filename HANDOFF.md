@@ -1206,6 +1206,15 @@ Restart 09:00; 09:03 owner: "this seems to work fine, what were you trying to to
 unasked tool gating after his 08:19 remark). Server log: NetworkCursor/ServerCursor currentBuildingItemId + cursor go to
 0 at moments (likely tool away; not confirmed). **09:07 owner: "the grid disappear as soon as I move off the tool in
 the toolbar, so from a functionality stand point, its working exactly as it should already"** -> no tool gating needed.
+09:09-09:10 explained the leftover "tool" messages (on change + every 10 s while out; 7 in 9 min; unused since
+0.15.437). 09:12 owner: a game villager placed out in the wild shows location "Base 1" (asked where it comes from).
+**09:17 owner: "the NPC is a built in game villager. I would try to find out where "Base 1" comes from and see if we can
+apply our own base label such as "Base Free Build"... I recommend you clean up all the old free build stuff that didn't
+work, get rid of the 10 second messages and any other left over junk not required for free build mode to work... keep
+all the logging per usual"**. 0.15.438: build_anywhere.cpp rewritten without the cursor hooks (bits 1/3/10, raw flag
+log) and the tool signal (free_build_tool.txt); experimental.lua without op "tool", FB.tool, the tool sends; hosting
+back to a normal local. Kept: the player box on the grid, the altar factor, all their logs, build_anywhere.lua's
+cursor + tool-signal logging. Next: "Base 1".
 
 ## How to build and publish a version
 

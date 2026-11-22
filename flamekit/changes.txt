@@ -1,3 +1,6 @@
+0.15.438 Nov 22, 2026
+- Free build: clean-up. The parts that did not work are taken out (changing the build hammer's checks, the building tool signal and its messages to the server). Free build works as before; the logging stays.
+
 0.15.437 Nov 22, 2026
 - Free build works again far from altars: the moving building area is on whenever Free build is on (as in 0.15.428); its border shows while Free build is on.
 

@@ -89,13 +89,6 @@ local TIPS = {
 -- file beside the Lua part (one entity id a line; rewritten only when it changes): the server writes
 -- free_build_server.txt, a player's own game free_build_client.txt (both in a game that hosts).
 local FB = { SECTION = { freebuild = "Building" }, STEPS = 30, written = {}, steps = 0 }
--- (0.15.431, owner 08:28 "I see the border drawn with the tool away": the border a player's game draws comes from the
--- server's zones, so the server's Free build box must also be there only while the building tool is out). The
--- player's game reads its own ClientCursor.displayCursor (0.15.430 log: it turns "shown" with the tool out) and tells
--- the server (op "tool", on a change and every 10 s); the server's list for FlameKit Native holds only players with
--- Free build on AND the tool out (FB.tool[account]), written at once on a change.
-FB.tool = {}            -- server: account -> true while that player's building tool is out
-FB.tool_sent, FB.tool_steps = nil, 0  -- player's game: what was last told, steps since
 -- (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that"; 20:21 "Building, admins only"): Bigger
 -- altar areas, one switch for the whole world (every altar's area is shared; the server decides what is kept; 0.15.423: on by default), only
 -- FlameKit admins (core/admins.lua) may change it. Kept in experimental_world.json ({ bigaltars = true }); FlameKit
@@ -1517,14 +1510,6 @@ local function handle(world, account, entity, msg, from)
     end
     return view(account)
   end
-  if msg.op == "tool" then  -- (0.15.431) Free build: the player's building tool out or away (no answer)
-    local on = msg.on == true or nil
-    if FB.tool[account] ~= on then
-      FB.tool[account] = on
-      pcall(FB.server_list)
-    end
-    return nil
-  end
   if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
     local v
     if not FB.admins.is(account, from) then
@@ -2189,12 +2174,12 @@ local function pvp(world)
   end
 end
 
--- (0.15.415; 0.15.431 only with the building tool out) the server's file for FlameKit Native. (0.15.432: defined here,
--- after `online` and `is_on`; 0.15.431 had it above them, where both were nil, so it never ran: pcall hid the error.)
+-- (0.15.415) the server's list for FlameKit Native: online players with Free build on. (0.15.432: defined here,
+-- after `online` and `is_on`; above them both are nil.) (0.15.438: the building tool signal of 0.15.431-0.15.437 taken out.)
 function FB.server_list()
   local ids = {}
   for account, p in pairs(online) do
-    if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end  -- (0.15.437) no longer waits for the tool signal (not reliable): as 0.15.428
+    if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end
   end
   FB.write("server", ids)
 end
@@ -2346,36 +2331,8 @@ local function ask(msg)
 end
 
 local my_view  -- (0.15.415) defined below, used by F.client_tick
-local hosting  -- (0.15.431) defined below, used by F.client_tick
 function F.client_tick(world)
   FB.steps = FB.steps + 1
-  if FB.steps % 6 == 0 then  -- (0.15.431) Free build: tell the server whether my building tool is out
-    local me_id = emf.local_player()
-    -- (0.15.434) the tool state from FlameKit Native (free_build_tool.txt: it sees the building cursor during the
-    -- step; this Lua part, after the step, read displayCursor false all the time in 0.15.433)
-    local raw
-    local okc, shown = pcall(function()
-      local f = io.open(emf.dir .. "\\free_build_tool.txt", "r")
-      if not f then return false end
-      raw = f:read("*l")
-      f:close()
-      return raw == "1"
-    end)
-    local okv, v = pcall(my_view, world)
-    local tool = okc and shown == true and okv and v and v.freebuild == true or false
-    FB.tool_steps = FB.tool_steps + 6
-    if tool ~= FB.tool_sent or (tool and FB.tool_steps >= 600) then
-      FB.tool_sent, FB.tool_steps = tool, 0
-      emf.log(string.format("experimental: free build: building tool %s, told the server (FlameKit Native says %s, read %s)",
-        tool and "out" or "away", tostring(raw), okc and "ok" or tostring(shown)))  -- (0.15.433) debug
-      if hosting(world) then
-        local account, player = me(world)
-        if account then pcall(handle, world, account, player, { op = "tool", on = tool }) end
-      else
-        ask({ op = "tool", on = tool })
-      end
-    end
-  end
   if FB.steps % FB.STEPS == 0 then  -- (0.15.415) Free build: is it on for me (the server's answer), for FlameKit Native
     local okv, v = pcall(my_view, world)
     local me_id = emf.local_player()
@@ -2437,7 +2394,7 @@ function F.connected(world)
   return kit.is_host() or peer() ~= 0
 end
 
-hosting = function(world)
+local function hosting(world)
   return kit.is_host() or world:is_server()
 end
 
