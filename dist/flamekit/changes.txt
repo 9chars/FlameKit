@@ -1,3 +1,86 @@
+0.15.423 Nov 21, 2026
+- Bigger altar areas is on by default (an admin can switch it off), and is in place from the moment the server starts.
+
+0.15.422 Nov 21, 2026
+- Bigger altar areas (Experimental tab, Building section): every flame altar's building area 1.5 times as wide, high and deep, for the whole server. Only FlameKit admins can switch it; everyone is told. Off unless an admin switches it on. What you build in the bigger area is kept like anything inside an altar's area.
+
+0.15.421 Nov 21, 2026
+- The bigger altar areas test: back to one and a half times as wide (twice as wide loses blocks at a restart), for a test through several restarts.
+
+0.15.420 Nov 21, 2026
+- The bigger altar areas test: twice as wide again, for more tests (one and a half times kept every block through a restart).
+
+0.15.419 Nov 21, 2026
+- The bigger altar areas test: one and a half times as wide (at twice as wide some blocks in the outer ring were gone after a restart).
+
+0.15.418 Nov 21, 2026
+- The bigger altar areas test: twice as wide instead of four times (four times froze the test server).
+
+0.15.417 Nov 21, 2026
+- The bigger altar areas test, second try: the building areas themselves are made four times as wide (test server only).
+
+0.15.416 Nov 21, 2026
+- The bigger altar areas test no longer fills the server log (one line per altar), and makes the altar bigger again right before the game works out the building areas.
+
+0.15.415 Nov 21, 2026
+- Free build (Experimental tab, new Building section): build anywhere in the world, not only inside a flame altar's area. Per player. What you build outside an altar's area is temporary: the game removes it after about 30 minutes or when the server restarts. Out there the hammer uses only the materials in your bag.
+- Test (test server only): flame altar build areas four times as wide.
+- The build hammer logging is off again.
+
+0.15.414 Nov 21, 2026
+- Test: build anywhere, second try: also the "needs building area" check (FlameKit Native; test server and the owner's game only).
+
+0.15.413 Nov 21, 2026
+- Test: build anywhere. The build hammer no longer says "Needs a Flame Altar nearby" (FlameKit Native; on the test server and the owner's game only).
+
+0.15.412 Nov 21, 2026
+- Logging for the build hammer: what the game's placement check reports inside and outside a flame altar's area (a first step toward building anywhere). Nothing in the game changes yet.
+
+0.15.411 Nov 21, 2026
+- Logging for a full bag when mining with a pickaxe: what the game does with the mined items when there is no room.
+
+0.15.410 Nov 21, 2026
+- Chest Overflow: what you try to take out of a loot chest while your bag is full goes into your companions' bags instead (your main companion first), with a Loot tab line. What fits nowhere stays in the chest. Only loot chests and loot piles in the world, never storage chests; only with Auto Loot on "main bag" or "companion bag".
+
+0.15.409 Nov 21, 2026
+- Logging for a full bag: what the game does with chopped items when there is no room, and the chest logging in the player's own game on again.
+
+0.15.408 Nov 21, 2026
+- The chest logging on the server switched off (testing whether it made a chest look empty). Server only.
+
+0.15.407 Nov 21, 2026
+- Debug: flamekit.lootnear shows a random-loot chest's loot state. Server only: no game change.
+
+0.15.406 Nov 21, 2026
+- The chest logging in the player's own game switched off again (testing whether it made a chest look empty).
+
+0.15.405 Nov 21, 2026
+- Logging (in the player's own game too): what the game reports when you move an item out of a chest.
+
+0.15.404 Nov 21, 2026
+- Logging: what the game reports when you move an item out of a chest (for taking items into a companion when your bag is full). Server only: no game change (needs a server restart).
+
+0.15.403 Nov 21, 2026
+- Messages window: the lines in regular (not bold) letters, and a text size for each tab (Settings tab, Messages: Chat, Battle and Loot tab text size).
+
+0.15.402 Nov 21, 2026
+- Messages window: shorter lines. Loot: "Midevil: Legendary Runes x2 > Midevil's bag (Shroud Soldier 45)"; Battle: "Midevil hit Shroud Soldier(45) for 2629 (weak spot, KILLED)". Server only: no game change.
+
+0.15.401 Nov 21, 2026
+- Loot tab: every line says whose bag the item went into ("> into Midevil's bag", "> into Poop Eater's bag", "> picked up into Midevil's bag"). Server only: no game change.
+
+0.15.400 Nov 21, 2026
+- (0.15.399 continued) the DLL hands the new items and loot piles over in a small file (loot_news.txt) that FlameKit reads only in the seconds after a kill or a chop. Needs a server restart.
+
+0.15.399 Nov 21, 2026
+- Auto Loot without scanning the world: FlameKit's DLL now reports every new item on the ground and every new loot pile the moment the game makes it, and the Lua part takes what belongs to a kill or a chopped tree straight from that (the world is no longer searched over and over). Needs a server restart.
+
+0.15.398 Nov 21, 2026
+- Logging: what FlameKit's scans of the world for loot cost, once a minute. Server only: no game change.
+
+0.15.397 Nov 21, 2026
+- Battle tab: someone healing themselves reads "Midevil heals themselves for 18" (was "Midevil heals Midevil"). Server only: no game change.
+
 0.15.396 Nov 21, 2026
 - Release (Development and Stable): everything since 0.15.374 (the lines below), including Auto Loot, the Messages window's Battle and Loot tabs and a repair of damaged FlameKit installs (every file that differs from the release is downloaded again).
 

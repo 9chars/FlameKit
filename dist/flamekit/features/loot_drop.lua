@@ -361,9 +361,63 @@ body_again = function(world, r)
   elseif okh and res == "gone" then pcall(from_spot, world, d) end
 end
 
+-- (0.15.404, owner 16:06 "I'm trying to loot something from a chest and its saying my back pack is full instead of
+-- pulling it into one of my companions chests... anyway to hook into that and move it over?") logging first: each
+-- TransferItemToInventoryEvent (a player moving an item between inventories), and a second later whether the item is
+-- still in the slot it came from (a full bag refused it). The first XFER_MAX of a run. Debug tool: kept, can be off.
+local XFER_LOG, XFER_MAX = true, 30
+local XFER_CLIENT = false  -- (0.15.406) the client-side listening: off (see F.setup); (0.15.409) on again: the empty chest (16:19-17:01) was not it; (0.15.410) off: features/chest_overflow.lua listens
+local XFER_SERVER = false  -- (0.15.408) the server-side listening: off (see F.setup)
+local xfer = { said = 0, later = {} }
+local function slot_text(v)
+  if type(v) ~= "table" and type(v) ~= "userdata" then return tostring(v) end
+  local ok, t = pcall(function() return string.format("%s/%s", tostring(v.entityId), tostring(v.slotIndex)) end)
+  return ok and t or tostring(v)
+end
+local function on_transfer(world, e)
+  if not XFER_LOG or xfer.said >= XFER_MAX then return end
+  xfer.said = xfer.said + 1
+  local f = {}
+  for _, k in ipairs({ "playerEntityId", "targetInventoryId", "sourceInventoryId", "type", "flags", "amount" }) do
+    local ok, v = pcall(function() return e[k] end)
+    f[#f + 1] = k .. "=" .. tostring(ok and v or "?")
+  end
+  local okt, ts = pcall(function() return e.targetSlotId end)
+  local oks, ss = pcall(function() return e.sourceSlotId end)
+  f[#f + 1] = "targetSlot=" .. (okt and slot_text(ts) or "?")
+  f[#f + 1] = "sourceSlot=" .. (oks and slot_text(ss) or "?")
+  emf.log("loot drop: transfer: " .. table.concat(f, " "))
+  local function field(v, k)
+    local ok, x = pcall(function() return v[k] end)
+    return ok and tonumber(x) or nil
+  end
+  local src = oks and ss ~= nil and field(ss, "entityId") or nil
+  local idx = oks and ss ~= nil and field(ss, "slotIndex") or nil
+  local before = {}
+  if src then for _, st in ipairs(bag.entity_stacks(world, src)) do before[#before + 1] = st end end
+  xfer.later[#xfer.later + 1] = { at = steps + 60, src = src, idx = idx, n = #before, say = xfer.said }
+end
+local function transfer_tick(world)
+  if #xfer.later == 0 then return end
+  local keep = {}
+  for _, l in ipairs(xfer.later) do
+    if steps < l.at then keep[#keep + 1] = l
+    elseif l.src then
+      local stacks = bag.entity_stacks(world, l.src)
+      local here = {}
+      for i, st in ipairs(stacks) do if i <= 6 then here[#here + 1] = tostring(st.item) .. " x" .. tostring(st.count) .. " @" .. tostring(st.slot >> 32) end end
+      emf.log(string.format("loot drop: transfer %d a second later: source %d has %d stack(s) (%d before): %s", l.say, l.src, #stacks, l.n,
+        table.concat(here, ", ")))
+    end
+  end
+  xfer.later = keep
+end
+
 function F.tick(world)
   steps = steps + 1
+  pcall(require("core.loot_news").tick, world, #queue > 0 or #retry > 0)  -- (0.15.399) loot piles: news while a death waits
   pcall(spots.tick, world)
+  pcall(transfer_tick, world)  -- (0.15.404) the transfer logging
   pcall(pull_tick, world)  -- (0.15.178) bodies and spots opened into a receiving chest
   if #fx_shown > 0 then  -- (0.15.180) preview effects go after 10 s
     local keep = {}
@@ -453,6 +507,23 @@ end
 function F.setup(k)
   kit = k
   prefs.setup()
+  -- (0.15.404) logging; (0.15.408, owner 16:57: the chest still empty with the old DLL and no listening in his game)
+  -- switched off to test whether the server's listening is what empties chests in the player's view (debug tool kept)
+  if XFER_SERVER then require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer")) end
+  -- (0.15.405, owner 16:16 "sure") the same in the player's own game (the server never heard of a refused take, 16:15),
+  -- and the game's "item could not be used" event there. (0.15.406, owner 16:44: a chest opened empty in his game
+  -- right after this came in, 16:19, while the server still had its items: switched off to test that; debug tool kept)
+  if XFER_CLIENT then
+  require("core.game_events").on("TransferItemToInventoryEvent", kit.guard(F, on_transfer, "a transfer (client)"), "client")
+  require("core.game_events").on("UiItemTriggerFailedEvent", kit.guard(F, function(world, e)
+    if xfer.said >= XFER_MAX then return end
+    xfer.said = xfer.said + 1
+    local okp, pl = pcall(function() return e.playerEntityId end)
+    local oks, sl = pcall(function() return e.itemSlotId end)
+    emf.log(string.format("loot drop: item trigger failed: player %s slot %s", tostring(okp and pl or "?"), oks and slot_text(sl) or "?"))
+  end, "a failed item trigger"), "client")
+  end
+  require("core.loot_news").setup()  -- (0.15.399) the DLL's new containers: core/loot_spots.lua answers from them
   local okh, hooked = pcall(emf.on_hit, kit.guard(F, on_hit, "a hit"))
   if not (okh and hooked ~= false) then emf.log("loot drop: emf.on_hit is not there: no killer is known, every monster keeps its loot (the game's own way)") end
   local ok = pcall(emf.on_event, "EntityDiedEvent", kit.guard(F, died, "a death"), "server")
@@ -516,6 +587,14 @@ function F.setup(k)
               items[#items + 1] = string.format("%s x%s", tostring(st.item), tostring(st.count))
             end
             if pick then items[#items + 1] = string.format("pickup %s x%s", tostring(pick.itemId), tostring(pick.pickupAmount)) end
+            -- (0.15.407, owner 16:53 a random-loot chest shows empty in his game while it holds items here) its loot state
+            local function fld(c, k) local okf, v = pcall(function() local x = get(world, c, id) return x and x[k] end) return okf and v end
+            if get(world, "RandomLoot", id) then
+              items[#items + 1] = string.format("[RandomLoot disabled %s, lock isEmpty %s, emptyState isEmpty %s, version %s, players %s]",
+                tostring(fld("RandomLoot", "disableRandomLoot")), tostring(fld("RandomLootLock", "isEmpty")),
+                tostring(fld("InventoryEmptyState", "isEmpty")), tostring(fld("RandomLootContainer", "spawnedLootVersion")),
+                tostring(fld("RandomLootPlayerScale", "playerCount")))
+            end
             emf.log(string.format("lootnear: %s at %.1f m (%.1f up): %s | %s", tostring(id), math.sqrt((x - px) ^ 2 + (z - pz) ^ 2),
               y - py, table.concat(flags, " "), table.concat(items, ", ")))
           end

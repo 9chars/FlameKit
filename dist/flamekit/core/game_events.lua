@@ -8,23 +8,26 @@ local events = {}
 local listeners = {}   -- name -> { fn, ... }
 local registered = {}  -- name -> what emf.on_event said
 
-function events.on(name, fn)
-  local list = listeners[name]
+-- (0.15.405) `where`: "server" (default) or "client" (the player's own game's world)
+function events.on(name, fn, where)
+  where = where or "server"
+  local key = where .. ":" .. name
+  local list = listeners[key]
   if not list then
     list = {}
-    listeners[name] = list
+    listeners[key] = list
   end
   list[#list + 1] = fn
-  if registered[name] == nil then
+  if registered[key] == nil then
     local ok, res = pcall(emf.on_event, name, function(world, e)
       for _, f in ipairs(list) do
         local okf, err = pcall(f, world, e)
         if not okf then emf.log("events: " .. name .. ": " .. tostring(err)) end
       end
-    end, "server")
-    registered[name] = ok and res ~= false
+    end, where)
+    registered[key] = ok and res ~= false
   end
-  return registered[name]
+  return registered[key]
 end
 
 return events

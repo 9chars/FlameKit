@@ -11,18 +11,19 @@
 -- so taking a neighbour's puts monster loot on the ground too, which is what Loot Drop is for. (Noting the spots there
 -- at the death, as Loot Magnet does without a clock, takes a Lua walk of several steps: the new spot would already be
 -- there and be taken for an old one.)
--- The world is walked in parts of PER_STEP entities a step (EMF's 250 ms rule), one walk for all deaths waiting.
+-- (0.15.399, owner 15:05 "replace all that scanning with the DLL") no walk of the world any more: the candidates are
+-- the containers FlameKit's DLL reported new (core/loot_news.lua) within RADIUS m of the death in the last SINCE_TICKS.
 -- Shared core code (HANDOFF rule 0b): any feature may use it; it uses no feature.
 
 local M = {}
 local ground = require("core.ground_loot")  -- (0.15.172) its loot marks look like loot spots: never taken
+local news = require("core.loot_news")     -- (0.15.399) the new containers, from the DLL
 
 M.RADIUS = 4
-local PER_STEP = 3000
+local SINCE_TICKS = 60 * 20  -- (0.15.399) a container reported new up to 20 s before the question counts
 local SLACK_NS = 5e8  -- half a second: a container spawned in the death's own step counts
 
 local wanted = {}  -- death id -> { x, z, t (death time, ns), fn(container ids) }
-local walk = nil   -- { list, i, found = { death id -> { container ids } } }
 
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
@@ -55,45 +56,31 @@ function M.death_time(e)
   return tonumber(t)
 end
 
--- Asks for the loot spots of death `id` at x, z (died at time `t`, ns); `fn(world, ids)` runs once the next walk is
--- done (ids may be empty). Without a time (0 or nil) every loot spot within RADIUS m counts.
+-- Asks for the loot spots of death `id` at x, z (died at time `t`, ns); `fn(world, ids)` runs at the next step
+-- (ids may be empty). Without a time (0 or nil) every loot spot within RADIUS m counts.
 function M.find(id, x, z, t, fn)
   if not (x and z) then return false end
   wanted[id] = { x = x, z = z, t = (t and t > 0) and t or nil, fn = fn }
   return true
 end
 
+-- (0.15.399) each step: every question waiting is answered from the DLL's new containers (no walk)
 function M.tick(world)
-  if not walk then
-    if not next(wanted) then return end
-    local ok, list = pcall(world.entities, world)
-    if not ok or type(list) ~= "table" then return end
-    walk = { list = list, i = 1, found = {}, asked = wanted }
-    wanted = {}
-  end
-  local stop = math.min(#walk.list, walk.i + PER_STEP - 1)
-  for k = walk.i, stop do
-    local id = walk.list[k]
-    if get(world, "InteractionOfferRuntime", id) and not ground.is_mark(id) then  -- most entities: one look
-      local okp, x, _, z = pcall(world.position, world, id)
-      if okp and x then
-        for did, w in pairs(walk.asked) do
-          if (x - w.x) ^ 2 + (z - w.z) ^ 2 <= M.RADIUS * M.RADIUS and is_loot_container(world, id) then
-            local st = w.t and spawn_time(world, id)
-            if (not w.t) or (st and st >= w.t - SLACK_NS) then
-              walk.found[did] = walk.found[did] or {}
-              table.insert(walk.found[did], id)
-            end
-          end
-        end
+  if not next(wanted) then return end
+  news.tick(world, true, true)  -- the newest news first
+  local asked = wanted
+  wanted = {}
+  local okt, now = pcall(world.tick, world)
+  now = okt and tonumber(now) or 0
+  for did, w in pairs(asked) do
+    local found = {}
+    for _, id in ipairs(news.containers(w.x, w.z, M.RADIUS, now - SINCE_TICKS)) do
+      if not ground.is_mark(id) and is_loot_container(world, id) then
+        local st = w.t and spawn_time(world, id)
+        if (not w.t) or (st and st >= w.t - SLACK_NS) then found[#found + 1] = id end
       end
     end
-  end
-  walk.i = stop + 1
-  if walk.i > #walk.list then
-    local done = walk
-    walk = nil
-    for did, w in pairs(done.asked) do pcall(w.fn, world, done.found[did] or {}) end
+    pcall(w.fn, world, found)
   end
 end
 

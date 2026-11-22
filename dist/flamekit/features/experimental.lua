@@ -39,6 +39,11 @@ local SWITCHES = {
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
   { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
   { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
+  -- (0.15.415, owner 2026-11-21 18:38 "add a setting for this and call it "Free build" -- build anywhere in the world,
+  -- but note its temporary"; "make it player specific and put these settings under the "Experimental" tab under a new
+  -- section called "Building""): FlameKit Native (build_anywhere.cpp) lets the build hammer work outside every flame
+  -- altar's area for the players listed in free_build_server.txt (the server) / free_build_client.txt (his own game)
+  { "freebuild", "Free build", nil, "Free build" },
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -77,7 +82,49 @@ local TIPS = {
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
   fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
+  freebuild = "Build anywhere in the world, not only inside a flame altar's area. Outside an altar's area it is temporary: the game removes what you built there after about 30 minutes or when the server restarts. Out there the hammer uses only the materials in your bag. Needs FlameKit on the server too. Off while you are in PvP. Everyone on the server is told when you switch it.",
 }
+-- (0.15.415) Free build's bits in one table (the main chunk is at Lua's 200 locals): SECTION = switches shown under
+-- their own heading in the tab, not in the list at the top; write = the players it is on for, to FlameKit Native in a
+-- file beside the Lua part (one entity id a line; rewritten only when it changes): the server writes
+-- free_build_server.txt, a player's own game free_build_client.txt (both in a game that hosts).
+local FB = { SECTION = { freebuild = "Building" }, STEPS = 30, written = {}, steps = 0 }
+-- (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that"; 20:21 "Building, admins only"): Bigger
+-- altar areas, one switch for the whole world (every altar's area is shared; the server decides what is kept; 0.15.423: on by default), only
+-- FlameKit admins (core/admins.lua) may change it. Kept in experimental_world.json ({ bigaltars = true }); FlameKit
+-- Native (build_anywhere.cpp) reads the factor from altar_size_server.txt (the server) / altar_size_client.txt (a
+-- player's own game: the server's answer). 1.5x: the size tested on the local server (2x lost blocks in the outer ring
+-- at restarts, 4x froze the server).
+FB.ALTAR_FACTOR = "1.5"
+FB.admins = require("core.admins")
+FB.world = nil  -- the world switch, loaded once
+function FB.world_on()
+  if FB.world == nil then
+    local ok, w = pcall(kit.store.load, "experimental_world", {})
+    FB.world = (ok and type(w) == "table") and w or {}
+  end
+  return FB.world.bigaltars ~= false  -- (0.15.423, owner 20:43 "can you default it on then?") on unless an admin switched it off
+end
+function FB.write_text(name, text)
+  if FB.written[name] == text then return end
+  local f = io.open(emf.dir .. "\\" .. name, "w")
+  if not f then return end
+  f:write(text, "\n")
+  f:close()
+  FB.written[name] = text
+  emf.log("experimental: bigger altar areas: " .. name .. " now " .. text)
+end
+function FB.write(which, ids)
+  table.sort(ids)
+  local text = table.concat(ids, "\n")
+  if FB.written[which] == text then return end
+  local f = io.open(emf.dir .. "\\free_build_" .. which .. ".txt", "w")
+  if not f then return end
+  f:write(text, text ~= "" and "\n" or "")
+  f:close()
+  FB.written[which] = text
+  emf.log("experimental: free build: " .. which .. " list now " .. (text ~= "" and text:gsub("\n", " ") or "(nobody)"))
+end
 
 -- ---- the host's half ----
 
@@ -524,7 +571,8 @@ local function view(account)
               sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
               sbj_divebase = glide.sbj(account, "divebase"),
               sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
-              damage_pvp = wants(account, "pvp") or nil }
+              damage_pvp = wants(account, "pvp") or nil,
+              bigaltars = FB.world_on() or nil }  -- (0.15.422) the world's switch
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -1344,7 +1392,7 @@ body_of = function(account)
 end
 
 -- A word from a player about their own switches. Returns the view to send back.
-local function handle(world, account, entity, msg)
+local function handle(world, account, entity, msg, from)
   load_saved()
   account = tostring(account)
   seen(account, entity)
@@ -1461,6 +1509,24 @@ local function handle(world, account, entity, msg)
       emf.log(string.format("experimental: player %s set the glider speed to %s", tostring(entity), glide.label(f)))
     end
     return view(account)
+  end
+  if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
+    local v
+    if not FB.admins.is(account, from) then
+      v = view(account)
+      v.note = "Only FlameKit admins can switch Bigger altar areas."
+      return v
+    end
+    FB.world_on()
+    if msg.on == true then FB.world.bigaltars = nil else FB.world.bigaltars = false end  -- (0.15.423) only "off" is kept
+    kit.store.save("experimental_world", FB.world)
+    emf.log(string.format("experimental: player %s switched bigger altar areas %s", tostring(entity), msg.on == true and "on" or "off"))
+    local name = require("core.players").name(world, entity, "a player")
+    pcall(require("features.chat").announce, world, string.format("%s turned %s bigger altar areas.", name, msg.on == true and "ON" or "OFF"),
+      nil, { colour = "#ff9632", seconds = 10 })
+    v = view(account)
+    v.admin = true
+    return v
   end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
@@ -2121,6 +2187,14 @@ function F.tick(world)
   local account, player = me(world)
   if account then seen(account, player) end
   apply()
+  if world:is_server() and fx_steps % FB.STEPS == 0 then  -- (0.15.415) Free build: who, for FlameKit Native
+    local ids = {}
+    for account, p in pairs(online) do
+      if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end
+    end
+    pcall(FB.write, "server", ids)
+    pcall(FB.write_text, "altar_size_server.txt", FB.world_on() and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
+  end
   keep_timer_full(world)
   keep_stamina_full(world)
   if account and online[account] then online[account].kit = true end  -- the host's own game has FlameKit
@@ -2250,7 +2324,16 @@ local function ask(msg)
   return ok and sent == true
 end
 
+local my_view  -- (0.15.415) defined below, used by F.client_tick
 function F.client_tick(world)
+  FB.steps = FB.steps + 1
+  if FB.steps % FB.STEPS == 0 then  -- (0.15.415) Free build: is it on for me (the server's answer), for FlameKit Native
+    local okv, v = pcall(my_view, world)
+    local me_id = emf.local_player()
+    local on = okv and v and v.freebuild == true and not v.freebuild_pvp and me_id and me_id ~= 0
+    pcall(FB.write, "client", on and { tostring(me_id) } or {})
+    pcall(FB.write_text, "altar_size_client.txt", (okv and v and v.bigaltars == true) and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
+  end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
@@ -2369,7 +2452,7 @@ local function debug_rows(world, rows)
   return rows
 end
 
-local function my_view(world)
+my_view = function(world)
   if hosting(world) then
     load_saved()
     local account = me(world)
@@ -2395,8 +2478,7 @@ local function panel_rows(world)
     return debug_rows(world, rows)
   end
   rows[#rows + 1] = { separator = true }
-  for _, s in ipairs(SWITCHES) do
-    if s[1] ~= "pvp" then
+  local function switch_row(s)
       local on = v[s[1]] == true
       local text = (on and "On    " or "Off   ") .. s[2]
       if v[s[1] .. "_pvp"] then
@@ -2406,7 +2488,24 @@ local function panel_rows(world)
         if v[s[1] .. "_dead"] then text = text .. " (not working on this game version)" end
         rows[#rows + 1] = { button = "sw:" .. s[1], text = text, selected = on, tooltip = TIPS[s[1]] }
       end
+  end
+  for _, s in ipairs(SWITCHES) do
+    if s[1] ~= "pvp" and not FB.SECTION[s[1]] then switch_row(s) end
+  end
+  do  -- (0.15.415) the sections: "Building" (Free build)
+    local done = {}
+    for _, s in ipairs(SWITCHES) do
+      local sec = FB.SECTION[s[1]]
+      if sec then
+        if not done[sec] then done[sec] = true rows[#rows + 1] = { heading = sec } end
+        switch_row(s)
+      end
     end
+    -- (0.15.422) the world's Bigger altar areas, under Building: everyone sees it, only admins can switch it
+    local on, admin = v.bigaltars == true, v.admin == true or hosting(world)
+    rows[#rows + 1] = { button = "bigaltars", text = (on and "On    " or "Off   ") .. "Bigger altar areas (1.5x)" .. (admin and "" or " (admins only)"),
+      selected = on, disabled = (not admin) or nil,
+      tooltip = "Every flame altar's building area is 1.5 times as wide, high and deep; an altar's level still sets its size (40 m becomes 60 m, 160 m becomes 240 m). For the whole server: everyone's altars. What you build in the bigger area is kept like anything inside an altar's area. Players need this FlameKit version in their own game to see and use the bigger area. On unless an admin switches it off. Only FlameKit admins can switch it; everyone on the server is told." }
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
   -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B
@@ -2747,6 +2846,17 @@ function F.click(world, key)
     end
     return
   end
+  if key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas (the server checks the admin)
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "set", key = "bigaltars", on = not FB.world_on() }, { is_local = true }).note
+    elseif shown then
+      ask({ op = "set", key = "bigaltars", on = not (shown.bigaltars == true) })
+    end
+    return
+  end
   if key:sub(1, 3) ~= "sw:" then return end
   local name = key:sub(4)
   if hosting(world) then
@@ -3072,8 +3182,9 @@ function F.setup(k)
     on_server = kit.guard(F, function(world, from, data)
       local msg = emf.json.decode(data)
       if type(msg) ~= "table" or not from or not from.player or from.player == 0 then return end
-      local v = handle(world, from.account, from.player, msg)
+      local v = handle(world, from.account, from.player, msg, from)
       if not v then return end
+      v.admin = FB.admins.is(from.account, from) or nil  -- (0.15.422) may switch the world's options
       pcall(emf.net.send_to, world, from.player, CHANNEL, emf.json.encode(v))
     end, "a message from a player"),
     on_player = kit.guard(F, function(world, from, data)
