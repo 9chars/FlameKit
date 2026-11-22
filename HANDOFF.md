@@ -1053,6 +1053,11 @@ around each player through addZone (server exe: addZone 0x140916310, add_buildzo
 rcx BuildZoneSystem, edx 0 list, r8d 0, r9d 0, [rsp+20] &WorldAABB {min xyz, max xyz int64, 2^32 per m}, [rsp+28] u32
 entity, [rsp+30] u8 wasAbandoned, [rsp+38] &baseId (16 B)). OPEN: whether pieces built outside stay (restart, the
 game's later handling); who may build anywhere (setting) before any release.
+18:33 owner: "lets test it further and reboot and see if its still there"; restart 18:34 (saved 18:34:11); 18:36 owner:
+"its gone on reboot". The game's own rule (Flame Altar wiki, Steam threads): changes outside an altar's area reset after
+about 30 minutes or at a restart; only inside an altar's area they are kept. So build anywhere = temporary pieces.
+Next choices offered: bigger altar areas (the 18:05 idea: upgrade_building_range -> TriggerShape) or finding the
+game's save/reset rule for voxels (unknown, more work).
 
 ## How to build and publish a version
 
