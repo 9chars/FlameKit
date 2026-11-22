@@ -1131,6 +1131,12 @@ Owner switched Bigger altar areas off (07:37), restart 07:38 (owner: "this is th
 error is a UiNegativeFeedbackEvent from actor_client_play (the action sequence, client). 0.15.425: bit 10 cleared too
 (guess: too far from any altar; it came on in both cursors at 07:31:00 as he placed) + raw flag words logged before
 the change.
+07:42 owner: "one of the players said they got it randomly working, but didnt say what he did". Restart 07:43; 07:46
+owner: "same error". Raw words far from altars (5740 5210, Bigger altar areas off): his game 0x3 / 0x2 / 0x103 (bits
+0, 1, 8; never 3 or 10), the server 0xF/0xE and 0x1/0x0. So with bit 1 off the cursor shows nothing more, and the
+error still comes: the "Needs a Flame Altar nearby" check far away is NOT in the cursor words (it is in the client's
+action sequence, actor_client_play -> UiNegativeFeedbackEvent; which condition: not known). Near an altar (~90 m,
+2026-11-21 18:31) clearing bits 1+3 was enough.
 
 ## How to build and publish a version
 
