@@ -1337,6 +1337,19 @@ spot is within 64 m / there are no spots / not an admin ("(admins only)" after t
 **14:07 owner: "yes backup the LOCAL current world now"** (before swapping the local map for a new one): save asked
 through save_now.request (saved 14:07:28), copied to save_backups/2026-11-22_1407_before_map_swap (world0.ksd md5
 a9d2eced4d454509e4b821532837726c, plus the game's backup folder, all md5 equal). G-Portal not touched.
+14:10 owner stopped the local server himself (the helper has no stop-only request: "stop" ends the helper, "server" =
+stop + start, and it also starts the client); 14:16 new map in place (savegame\world0.ksd 20.9 MB; old map and its
+backups moved to savegame\old). 14:17 owner "yeah start the server up and watch the log": started 14:17:20, world
+loaded 14:18:03, 16 altar areas, 0 spots, roster 2 NPCs (from the new map's save), owner in 14:19:37. New at his join:
+"Could not find Entity for UniqueId '701ad7cc'" and twice "[Water] BlockWater Entity not found: Outside of Simulation
+area" (not in the run before). 14:21 owner: this map had water problems, a player switched many water pieces off.
+**14:23 owner (standing instruction): "keep a full log of that along with any crash dumps if it happens again, we may
+need to send it to the developers so can fix the problem. if it happens again, try to determine the source of the
+crash".** Done for the 11:28 crash: crash_reports\2026-11-22_1128_water_flow\ (README.txt with the analysis, the dump,
+the server log of that run, the 11:28:14 world save). On a new crash: BEFORE any restart copy emf_core.log of the server
+(EMF overwrites it at every start), logs\enshrouded_server.log, the new crash_dumps folder and the client's
+enshrouded.log into crash_reports\<date>_<what>\, then analyse the dump (stack walk, function region strings, compare
+with 0x140907875) and add the README.
 
 ## How to build and publish a version
 
