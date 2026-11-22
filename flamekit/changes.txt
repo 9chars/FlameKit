@@ -1,3 +1,6 @@
+0.15.428 Nov 22, 2026
+- Free build: the moving building area moves in 32 m steps, so the server no longer sends every player the building areas each moment you move.
+
 0.15.427 Nov 22, 2026
 - Test: Free build with only the moving building area (the build hammer's checks are no longer changed).
 

@@ -1164,6 +1164,9 @@ macro chunk position", "Invalid chunk position"). "[server_save] Create/Clear Ch
 BuildingZones message (1,135 B, "[ecss] message BuildingZones is big") EVERY step while the player moves (4,678 in
 one minute): network + log load. Fix offered: snap the box to a grid so it changes only when the player crosses a
 grid line. Not known yet: what a saved zone with an empty base id does at load; why 2x lost outer blocks.
+08:10 owner: "#1 not really a solution -- #2 do the grid fix #3 my guess s there's a finite amount of memory it allocates
+for the bases and when the base exceeds it, it just start dropping objects, just a complete guess not based on any
+data..." (his guess, kept as a guess). 0.15.428: the player box on a 32 m grid (cell centre), half width 40 + 16 m.
 
 ## How to build and publish a version
 

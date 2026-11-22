@@ -208,17 +208,31 @@ void add_player_boxes(void* bzs, uint8_t flag) {
                     ws ? ws.singleton("BuildZoneSystem") : nullptr, wc ? wc.singleton("BuildZoneSystem") : nullptr);
         return;
     }
-    const int64_t half = int64_t(kPlayerHalf * 4294967296.0);
+    // (0.15.428, owner 08:10 "do the grid fix"): a box that followed the player smoothly changed the zone list every
+    // step while moving, and the server then logged "Build zones changed" and sent every player the whole list
+    // (BuildingZones, 1,135 B) each time: 4,678 times in one minute. The box now sits on a kGridStep grid (the centre of
+    // the player's grid cell) and is kGridStep/2 bigger each way, so it still covers kPlayerHalf around the player and
+    // changes only when the player crosses a grid line.
+    constexpr double kGridStep = 32.0;
+    const int64_t step = int64_t(kGridStep * 4294967296.0);
+    const int64_t half = int64_t((kPlayerHalf + kGridStep / 2) * 4294967296.0);
+    auto cell_mid = [step](int64_t v) {
+        int64_t q = v / step;
+        if (v % step < 0) --q;  // floor for negative values
+        return q * step + step / 2;
+    };
     for (uint32_t id : ids) {
         auto* ct = w.get<gen::ecs::CurrentTransform>(id);
         if (!ct) continue;
         const auto& p = ct->transform.position;
-        int64_t b[6] = {p.x - half, p.y - half, p.z - half, p.x + half, p.y + half, p.z + half};
+        const int64_t cx = cell_mid(p.x), cy = cell_mid(p.y), cz = cell_mid(p.z);
+        int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
         uint8_t no_base[16] = {};
         g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
         if (g_box_said.fetch_add(1) < 4)
-            EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f", side, kPlayerHalf * 2, id,
-                    double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0);
+            EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
+                    (kPlayerHalf + kGridStep / 2) * 2, id, double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0,
+                    double(cx) / 4294967296.0, double(cy) / 4294967296.0, double(cz) / 4294967296.0);
     }
 }
 
