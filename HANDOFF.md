@@ -1254,6 +1254,11 @@ position"): FB.world_ref, the world kept from the last step, gives no position i
 14 m"); the panel shows the nearest spot within 64 m across (48 m up/down) with the centre's distance ("Nearest spot:
 X, Z (height Y), centre N m away"); Forget acts on it. Logged: panel spot changes, "no position for", every Free build
 placement (also inside a known spot, with the block's position). My first explanation (outside the box) was wrong.
+10:42:54 "Forget this spot" forgot C (2 left; owner 10:52 "the button worked"). 10:52 owner zones out to test the 30-min
+reset (C should reset, A and B stay). **11:04 owner decision: "the free build mode should not work while inside a flame
+alter base".** My reading, asked to confirm: (1) no remembered spot for pieces placed in an altar area, (2) no player
+Free build box while standing in one. Plan: DLL writes altar boxes per rebuild to a file; Lua skips spots inside; DLL
+skips the player box inside. DLL change: restart after the reset test.
 
 ## How to build and publish a version
 
