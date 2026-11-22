@@ -1102,6 +1102,9 @@ also?" -> no, per player; 20:32 owner: "it can be by player for now".
 20:38 owner: "so that option has to be on when the server comes up"; 20:43 "can you default it on then?" -> 0.15.423:
 on unless an admin switched it off (experimental_world.json keeps only bigaltars=false); the DLL reads the factor at
 load (before the world) too; no altar_size_server.txt yet = 1.5 on a server, a player's game = 1 until the server says.
+Installed 20:44 (the Lua reload switched it on in the running game), restart 20:45: "bigger altar areas (server, at
+start): on, 1.5x", "(this game, at start): on, 1.5x". His game took ~4.5 min to join (log silent at the start: WATCH).
+20:51 owner: "it looks like its on".
 
 ## How to build and publish a version
 
