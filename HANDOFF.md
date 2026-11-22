@@ -1202,6 +1202,10 @@ flags moving) but the DLL's tool state never went "out" (displayCursor not seen 
 not running there). The tool gating (0.15.429-0.15.435) is not working; the always-on box (0.15.428) worked.
 08:58 asked: back to 0.15.428 or keep digging; owner: "Keep digging". 0.15.436 (Lua, server): log changes of NetworkCursor currentBuildingItemId/cursorEntityId/serverFlags and ServerCursor cursorEntityId/currentBuildingItemInstance.itemId per player.
 08:58 owner: "this needs to work.. it was working before. you're taking too long to find a solution" -> 0.15.437: both boxes on whenever Free build is on (0.15.428 behaviour), tool signal only logged; 0.15.436 server tool-signal logging kept to find a reliable signal.
+Restart 09:00; 09:03 owner: "this seems to work fine, what were you trying to to before when it broke?" (answered: the
+unasked tool gating after his 08:19 remark). Server log: NetworkCursor/ServerCursor currentBuildingItemId + cursor go to
+0 at moments (likely tool away; not confirmed). **09:07 owner: "the grid disappear as soon as I move off the tool in
+the toolbar, so from a functionality stand point, its working exactly as it should already"** -> no tool gating needed.
 
 ## How to build and publish a version
 
