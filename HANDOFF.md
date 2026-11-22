@@ -1275,6 +1275,9 @@ was elsewhere (0x140a295bf). Link to FlameKit unproven (guess: the forgotten spo
 zones without base ids). Save 11:28:14 backed up to save_backups/2026-11-22_1128_crash (md5 a499fa97...). 11:32 owner
 "restart the game and find out why it crashed": restarted both on 0.15.442 (11:33:36). The owner's game had shown
 "Timeout for peer"; I first wrongly told him the server was still up.
+11:39 owner: "there has been some really sketchy problems with water on the map, so that doesn't surprise me".
+**11:41 owner: "it looks like it kept A and B and C is gone"** after the 11:33 restart: Forget this spot works across a
+restart. Not seen: whether C reset within ~30 min while running (the crash came first).
 
 ## How to build and publish a version
 
