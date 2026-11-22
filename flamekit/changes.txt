@@ -1,3 +1,6 @@
+0.15.443 Nov 22, 2026
+- Free build works only outside flame altar areas. Inside an altar's area the game's own building rules apply, and pieces you place there don't become remembered spots. Needs this version in your own game too.
+
 0.15.442 Nov 22, 2026
 - Free build: Experimental > Building now shows your nearest remembered spot within 64 m and how far its centre is, instead of only the spot whose area you stand in. "Forget this spot" forgets that nearest spot.
 

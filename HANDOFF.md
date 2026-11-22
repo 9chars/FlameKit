@@ -1259,6 +1259,13 @@ reset (C should reset, A and B stay). **11:04 owner decision: "the free build mo
 alter base".** My reading, asked to confirm: (1) no remembered spot for pieces placed in an altar area, (2) no player
 Free build box while standing in one. Plan: DLL writes altar boxes per rebuild to a file; Lua skips spots inside; DLL
 skips the player box inside. DLL change: restart after the reset test.
+11:06 owner: "yeah A of course.. if you're inside a flame alter area from the game I want the games default behaviors
+to work. free build mode should only happen and work when you're outside of the flame alters boundries" (both 1 and 2).
+0.15.443 (DLL + Lua), built 11:09 (DLL md5 be27ee0101c1d22c5213c2e4c1edef16), NOT installed yet (waits for the reset
+test and the owner's restart yes): build_anywhere.cpp keeps each zone list's altar boxes (as added, after the 1.5x) from
+the last rebuild; no player box while the player stands in one (logged on change: "is inside/outside an altar area");
+the server writes them to altar_areas_server.txt every 15 steps when changed; FB.on_place skips a piece inside one
+("in an altar area: no spot"). add_player_boxes now runs with Free build off too (starts each rebuild's altar list).
 
 ## How to build and publish a version
 

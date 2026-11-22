@@ -2237,6 +2237,22 @@ function FB.on_place(world, e)
     if okp then x, y, z = px, py, pz end
   end
   if not (x and y and z) then return end
+  -- (0.15.443, owner 11:06 "free build mode should only happen and work when you're outside of the flame alters
+  -- boundries") a piece in an altar's area is the game's own: no spot. FlameKit Native writes the server's altar areas
+  -- (min xyz, max xyz in m, one a line) to altar_areas_server.txt.
+  local fa = io.open(emf.dir .. "\\altar_areas_server.txt", "r")
+  if fa then
+    for line in fa:lines() do
+      local a = {}
+      for v in line:gmatch("%-?[%d%.]+") do a[#a + 1] = tonumber(v) end
+      if #a == 6 and x >= a[1] and x <= a[4] and y >= a[2] and y <= a[5] and z >= a[3] and z <= a[6] then
+        fa:close()
+        emf.log(string.format("experimental: free build: placed by %d at %.1f %.1f %.1f, in an altar area: no spot", owner, x, y, z))
+        return
+      end
+    end
+    fa:close()
+  end
   local st = FB.SPOT_STEP
   local cx, cy, cz = math.floor(x / st), math.floor(y / st), math.floor(z / st)
   local key = cx .. "," .. cy .. "," .. cz

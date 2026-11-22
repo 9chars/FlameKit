@@ -141,6 +141,54 @@ constexpr bool kBoxUsesAltarBase = false;  // (0.15.439 TEST, kept nothing: 10:0
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 std::atomic<int> g_box_said{0};
 
+// (0.15.443, owner 11:04 "the free build mode should not work while inside a flame alter base", 11:06 "if you're
+// inside a flame alter area from the game I want the games default behaviors to work. free build mode should only
+// happen and work when you're outside of the flame alters boundries") the altar areas of each zone list as the game
+// adds them (after the bigger altar areas), kept from the last full rebuild: no player box while the player stands in
+// one, and the server's are written to altar_areas_server.txt for the Lua (no remembered spot for a piece in one).
+using Box = std::array<int64_t, 6>;
+struct Altars { std::vector<Box> cur, last; };
+std::mutex g_altar_mx;
+std::unordered_map<void*, Altars> g_altar_boxes;  // under g_altar_mx
+void altar_add(void* bzs, const int64_t* b) {
+    std::lock_guard<std::mutex> lk(g_altar_mx);
+    g_altar_boxes[bzs].cur.push_back({b[0], b[1], b[2], b[3], b[4], b[5]});
+}
+void altar_new_pass(void* bzs) {  // a new rebuild: what was gathered is the list now
+    std::lock_guard<std::mutex> lk(g_altar_mx);
+    Altars& a = g_altar_boxes[bzs];
+    a.last.swap(a.cur);
+    a.cur.clear();
+}
+std::vector<Box> altar_last(void* bzs) {
+    std::lock_guard<std::mutex> lk(g_altar_mx);
+    auto it = g_altar_boxes.find(bzs);
+    return it == g_altar_boxes.end() ? std::vector<Box>{} : it->second.last;
+}
+bool in_box(const Box& b, int64_t x, int64_t y, int64_t z) {
+    return x >= b[0] && x <= b[3] && y >= b[1] && y <= b[4] && z >= b[2] && z <= b[5];
+}
+std::string g_altars_text;  // what altar_areas_server.txt holds (the tick thread only)
+void write_altar_areas(void* bzs) {
+    std::string text;
+    char line[160];
+    for (const Box& b : altar_last(bzs)) {
+        std::snprintf(line, sizeof line, "%.1f %.1f %.1f %.1f %.1f %.1f\n", double(b[0]) / 4294967296.0, double(b[1]) / 4294967296.0,
+                      double(b[2]) / 4294967296.0, double(b[3]) / 4294967296.0, double(b[4]) / 4294967296.0, double(b[5]) / 4294967296.0);
+        text += line;
+    }
+    if (text == g_altars_text) return;
+    if (FILE* f = _wfopen(lua_file(L"altar_areas_server.txt").c_str(), L"wb")) {
+        std::fwrite(text.data(), 1, text.size(), f);
+        std::fclose(f);
+        const bool first = g_altars_text.empty();
+        g_altars_text = text;
+        size_t n = 0;
+        for (char c : text) n += c == '\n';
+        EMF_LOG(kMod, "free build (server): %zu altar area(s) written for the Lua%s", n, first ? " (first time)" : "");
+    }
+}
+
 void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32_t altar_entity) {
     // once per rebuild of the zone list: a new world step (on_tick) or (0.15.440) the altar that came first in the
     // last rebuild coming again (while the world loads, before any on_tick, the list is rebuilt too: the remembered
@@ -157,6 +205,9 @@ void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32
         p.step = now;
         p.first = altar_entity;
     }
+    altar_new_pass(bzs);  // (0.15.443)
+    if (!g_free_on.load()) return;  // fkbuild free off: the altar list only
+    const std::vector<Box> altars = altar_last(bzs);
     emf::World ws = emf::server_world(), wc = emf::client_world();
     emf::World w;
     std::vector<uint32_t> ids;
@@ -202,6 +253,22 @@ void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32
         auto* ct = w.get<gen::ecs::CurrentTransform>(id);
         if (!ct) continue;
         const auto& p = ct->transform.position;
+        bool inside = false;  // (0.15.443) in an altar's area: the game's own rules, no Free build box
+        for (const Box& a : altars) if (in_box(a, p.x, p.y, p.z)) { inside = true; break; }
+        {
+            static std::mutex said_mx;
+            static std::unordered_map<uint64_t, bool> said;  // (world side, player) -> inside, logged on change
+            std::lock_guard<std::mutex> lk(said_mx);
+            const uint64_t k = (uint64_t(w.is_server() ? 1 : 0) << 32) | id;
+            auto it = said.find(k);
+            if (it == said.end() || it->second != inside) {
+                said[k] = inside;
+                EMF_LOG(kMod, "free build (%s): player %u at %.1f %.1f %.1f is %s an altar area (%zu known)%s", side, id,
+                        double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0, inside ? "inside" : "outside",
+                        altars.size(), inside ? ": no Free build box" : "");
+            }
+        }
+        if (inside) continue;
         const int64_t cx = cell_mid(p.x), cy = cell_mid(p.y), cz = cell_mid(p.z);
         int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
         // (0.15.439 TEST, owner 09:43 "we can try that for testing, but ideally that would not be a long term fix"):
@@ -227,7 +294,8 @@ void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32
 
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
-    if (g_free_on.load() && box && list == 0 && owner == 0) add_player_boxes(bzs, flag, base_id, entity);
+    // (0.15.443) called with Free build off too: it starts each rebuild's altar list (then adds no boxes)
+    if (box && list == 0 && owner == 0) add_player_boxes(bzs, flag, base_id, entity);
     const float factor = g_factor.load();
     if (g_altar_on.load() && factor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];
@@ -243,11 +311,13 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
             EMF_LOG(kMod, "bigger altar areas: zone of %u: %.0f x %.0f x %.0f m -> %.0f x %.0f x %.0f m", entity,
                     double(box[3] - box[0]) / 4294967296.0, double(box[4] - box[1]) / 4294967296.0, double(box[5] - box[2]) / 4294967296.0,
                     double(big[3] - big[0]) / 4294967296.0, double(big[4] - big[1]) / 4294967296.0, double(big[5] - big[2]) / 4294967296.0);
+        altar_add(bzs, big);  // (0.15.443)
         const uint64_t r = g_add_zone(bzs, list, flag, owner, big, entity, abandoned, base_id);
         static std::atomic<int> back{0};
         if (back.fetch_add(1) < 3) EMF_LOG(kMod, "bigger altar areas: addZone returned for %u", entity);  // (0.15.418) where a freeze is
         return r;
     }
+    if (box && list == 0 && owner == 0) altar_add(bzs, box);  // (0.15.443)
     return g_add_zone(bzs, list, flag, owner, box, entity, abandoned, base_id);
 }
 }  // namespace
@@ -270,6 +340,7 @@ bool fk_build_anywhere_load(bool dedicated) {
                 read_list(L"free_build_server.txt", g_free_server, "server");
                 read_spots("server");
                 read_factor(L"altar_size_server.txt", "server", kMaxFactor);
+                if (void* bzs = w.singleton("BuildZoneSystem")) write_altar_areas(bzs);  // (0.15.443)
             }
         } else if (w.is_client()) {
             if (steps_client++ % 15 == 0) {
