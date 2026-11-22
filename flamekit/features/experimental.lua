@@ -1559,6 +1559,20 @@ local function handle(world, account, entity, msg, from)
       or "There is no remembered spot within 64 m of you."
     return v
   end
+  if msg.op == "forget_all_spots" then  -- (0.15.447) Free build: forget every remembered spot at once (admins only)
+    local v
+    if not FB.admins.is(account, from) then
+      v = view(account)
+      v.note = "Only FlameKit admins can forget Free build spots."
+      return v
+    end
+    local n = FB.forget_all_spots(entity)
+    v = view(account)
+    v.admin = true
+    v.note = n > 0 and string.format("Forgot all %d remembered spot(s). What was built there is temporary again.", n)
+      or "There are no remembered spots."
+    return v
+  end
   if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
     local v
     if not FB.admins.is(account, from) then
@@ -2377,6 +2391,17 @@ function FB.spot_info(account)
   return info
 end
 -- Forgets the remembered spot nearest the player (what was built there is temporary again); its centre, or nil.
+-- (0.15.447, owner 13:51 "there should be an admin only button that removes all remembered free build spots from the
+-- map all at once") forgets every remembered spot; how many there were. What was built in them is temporary again.
+function FB.forget_all_spots(entity)
+  local n = 0
+  for _ in pairs(FB.spots_get()) do n = n + 1 end
+  FB.spots = {}
+  pcall(kit.store.save, "free_build_spots", FB.spots)
+  FB.spots_write()
+  emf.log(string.format("experimental: free build: player %s forgot all %d remembered spot(s)", tostring(entity), n))
+  return n
+end
 function FB.forget_spot(world, entity)
   local key, c = FB.spot_for(world, entity)
   if not key then return nil end
@@ -2752,6 +2777,13 @@ local function panel_rows(world)
       else
         rows[#rows + 1] = { dim = true, text = "No remembered spot within 64 m of you." }
       end
+      -- (0.15.447) every spot at once, admins only; a second click within 5 s does it
+      if admin and (sp.total or 0) > 0 then
+        local asked = FB.all_asked and os.time() - FB.all_asked <= 5
+        rows[#rows + 1] = { button = "fbforgetall", selected = asked or nil,
+          text = asked and string.format("Click again to forget all %d spots", sp.total) or string.format("Forget all spots (%d)", sp.total),
+          tooltip = "Forgets every remembered Free build spot on the map at once. What was built in them is temporary again: the game removes it at the next restart or after about 30 minutes. Click twice within 5 seconds." }
+      end
     end
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
@@ -3094,6 +3126,22 @@ function F.click(world, key)
     elseif shown then
       shown.glide_speed = f  -- at once on screen; the server's answer follows
       ask({ op = "set", key = "glide_speed", value = f })
+    end
+    return
+  end
+  if key == "fbforgetall" then  -- (0.15.447) Free build: forget every spot; the second click within 5 s does it
+    if not (FB.all_asked and os.time() - FB.all_asked <= 5) then
+      FB.all_asked = os.time()
+      return
+    end
+    FB.all_asked = nil
+    if hosting(world) then
+      local account, player = me(world)
+      if not account then return end
+      load_saved()
+      note = handle(world, account, player, { op = "forget_all_spots" }, { is_local = true }).note
+    elseif shown then
+      ask({ op = "forget_all_spots" })
     end
     return
   end

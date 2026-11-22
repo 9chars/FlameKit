@@ -1,3 +1,6 @@
+0.15.447 Nov 22, 2026
+- Free build: admins can forget every remembered spot at once ("Forget all spots" in Experimental > Building; click twice within 5 seconds). What was built in them is temporary again.
+
 0.15.446 Nov 22, 2026
 - Source documentation: every file and function of FlameKit now says what it does, for anyone reading the code. Nothing changes in the game.
 

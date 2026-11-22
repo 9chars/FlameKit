@@ -1322,6 +1322,12 @@ against git before and after). How to check again: tools/comments_only.sh <ref> 
 **13:33 owner: "yes push to development"**: Development (dist-test) 0.15.446 made with the tested DLL 766ec8b2 (the
 0.15.445 build running on the server and client: the 13:29 build of the commented source is the same code, not
 shipped), signed (check_sig good), committed and pushed. Stable and G-Portal stay on 0.15.423.
+13:46 owner asked what a map swap does: told him the remembered spots live in emf\mods\flamekit (free_build_spots.json/
+.txt), not in the save, so they stay as empty building areas on a new map; roster and junk lists go with the save.
+**13:51 owner: "there should be an admin only button that removes all remembered free build spots from the map all at
+once".** 0.15.447 (Lua, live 13:5x): Building section, admins only, "Forget all spots (N)", shown while there are spots;
+a second click within 5 s does it (my choice: the same two-click guard as the roster's delete; told the owner);
+op forget_all_spots -> FB.forget_all_spots (store and file emptied, logged "forgot all N remembered spot(s)").
 
 ## How to build and publish a version
 
