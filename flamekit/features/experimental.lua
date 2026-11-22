@@ -39,6 +39,11 @@ local SWITCHES = {
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
   { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
   { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
+  -- (0.15.415, owner 2026-11-21 18:38 "add a setting for this and call it "Free build" -- build anywhere in the world,
+  -- but note its temporary"; "make it player specific and put these settings under the "Experimental" tab under a new
+  -- section called "Building""): FlameKit Native (build_anywhere.cpp) lets the build hammer work outside every flame
+  -- altar's area for the players listed in free_build_server.txt (the server) / free_build_client.txt (his own game)
+  { "freebuild", "Free build", nil, "Free build" },
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -77,7 +82,24 @@ local TIPS = {
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
   fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
+  freebuild = "Build anywhere in the world, not only inside a flame altar's area. Outside an altar's area it is temporary: the game removes what you built there after about 30 minutes or when the server restarts. Out there the hammer uses only the materials in your bag. Needs FlameKit on the server too. Off while you are in PvP. Everyone on the server is told when you switch it.",
 }
+-- (0.15.415) Free build's bits in one table (the main chunk is at Lua's 200 locals): SECTION = switches shown under
+-- their own heading in the tab, not in the list at the top; write = the players it is on for, to FlameKit Native in a
+-- file beside the Lua part (one entity id a line; rewritten only when it changes): the server writes
+-- free_build_server.txt, a player's own game free_build_client.txt (both in a game that hosts).
+local FB = { SECTION = { freebuild = "Building" }, STEPS = 30, written = {}, steps = 0 }
+function FB.write(which, ids)
+  table.sort(ids)
+  local text = table.concat(ids, "\n")
+  if FB.written[which] == text then return end
+  local f = io.open(emf.dir .. "\\free_build_" .. which .. ".txt", "w")
+  if not f then return end
+  f:write(text, text ~= "" and "\n" or "")
+  f:close()
+  FB.written[which] = text
+  emf.log("experimental: free build: " .. which .. " list now " .. (text ~= "" and text:gsub("\n", " ") or "(nobody)"))
+end
 
 -- ---- the host's half ----
 
@@ -2121,6 +2143,13 @@ function F.tick(world)
   local account, player = me(world)
   if account then seen(account, player) end
   apply()
+  if world:is_server() and fx_steps % FB.STEPS == 0 then  -- (0.15.415) Free build: who, for FlameKit Native
+    local ids = {}
+    for account, p in pairs(online) do
+      if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end
+    end
+    pcall(FB.write, "server", ids)
+  end
   keep_timer_full(world)
   keep_stamina_full(world)
   if account and online[account] then online[account].kit = true end  -- the host's own game has FlameKit
@@ -2250,7 +2279,15 @@ local function ask(msg)
   return ok and sent == true
 end
 
+local my_view  -- (0.15.415) defined below, used by F.client_tick
 function F.client_tick(world)
+  FB.steps = FB.steps + 1
+  if FB.steps % FB.STEPS == 0 then  -- (0.15.415) Free build: is it on for me (the server's answer), for FlameKit Native
+    local okv, v = pcall(my_view, world)
+    local me_id = emf.local_player()
+    local on = okv and v and v.freebuild == true and not v.freebuild_pvp and me_id and me_id ~= 0
+    pcall(FB.write, "client", on and { tostring(me_id) } or {})
+  end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
@@ -2369,7 +2406,7 @@ local function debug_rows(world, rows)
   return rows
 end
 
-local function my_view(world)
+my_view = function(world)
   if hosting(world) then
     load_saved()
     local account = me(world)
@@ -2395,8 +2432,7 @@ local function panel_rows(world)
     return debug_rows(world, rows)
   end
   rows[#rows + 1] = { separator = true }
-  for _, s in ipairs(SWITCHES) do
-    if s[1] ~= "pvp" then
+  local function switch_row(s)
       local on = v[s[1]] == true
       local text = (on and "On    " or "Off   ") .. s[2]
       if v[s[1] .. "_pvp"] then
@@ -2405,6 +2441,18 @@ local function panel_rows(world)
       else
         if v[s[1] .. "_dead"] then text = text .. " (not working on this game version)" end
         rows[#rows + 1] = { button = "sw:" .. s[1], text = text, selected = on, tooltip = TIPS[s[1]] }
+      end
+  end
+  for _, s in ipairs(SWITCHES) do
+    if s[1] ~= "pvp" and not FB.SECTION[s[1]] then switch_row(s) end
+  end
+  do  -- (0.15.415) the sections: "Building" (Free build)
+    local done = {}
+    for _, s in ipairs(SWITCHES) do
+      local sec = FB.SECTION[s[1]]
+      if sec then
+        if not done[sec] then done[sec] = true rows[#rows + 1] = { heading = sec } end
+        switch_row(s)
       end
     end
   end

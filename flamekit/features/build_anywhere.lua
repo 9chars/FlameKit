@@ -15,7 +15,7 @@ local players = require("core.players")
 local F = { id = "build_anywhere", title = "Build Anywhere" }
 local kit
 
-local LOG, LOG_MAX = true, 200   -- changes logged per minute at most
+local LOG, LOG_MAX = false, 200  -- changes logged per minute at most (0.15.415: off; the bits are known, see build_anywhere.cpp)
 local said, steps = 0, 0
 local last = {}                  -- "<side>:<id>" -> "<primary>/<secondary>"
 
