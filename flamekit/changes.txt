@@ -1,3 +1,6 @@
+0.15.426 Nov 22, 2026
+- Test: Free build far from every flame altar: a building area moves with each player who has Free build on.
+
 0.15.425 Nov 22, 2026
 - Test: Free build far from every flame altar (a third check of the build hammer switched off), with logging.
 

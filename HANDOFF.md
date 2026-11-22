@@ -1137,6 +1137,13 @@ owner: "same error". Raw words far from altars (5740 5210, Bigger altar areas of
 error still comes: the "Needs a Flame Altar nearby" check far away is NOT in the cursor words (it is in the client's
 action sequence, actor_client_play -> UiNegativeFeedbackEvent; which condition: not known). Near an altar (~90 m,
 2026-11-21 18:31) clearing bits 1+3 was enough.
+07:48 owner: "I tested that again and you're right if im closer to a base it works outside the base... we need to dig
+deeper very very deep so deep you end up in china. we need to make this mode work". RE: actor_client_play (client exe fn
+0x1402653b0) dispatches sequence commands by type hash; type 0x3771274d sends UiNegativeFeedbackEvent (hash 0x23ceedf3)
+with the command's loca Guid: the message is DATA in the hammer's action sequence, the condition before it is not
+found yet. 0.15.426 test: in the addZone detour, once per world step (g_steps from on_tick) and per BuildZoneSystem
+(matched with World::singleton("BuildZoneSystem")), a zone box 80 m wide around each Free build player (server: the
+list; client: the local player), entity 0, empty base id.
 
 ## How to build and publish a version
 

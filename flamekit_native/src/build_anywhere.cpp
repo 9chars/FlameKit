@@ -35,6 +35,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "emf/generated/components.hpp"
@@ -165,8 +166,65 @@ using AddZoneFn = uint64_t (*)(void* bzs, uint8_t list, uint8_t flag, uint8_t ow
 AddZoneFn g_add_zone = nullptr;
 std::atomic<int> g_zone_said{0};
 
+// (0.15.426, owner 2026-11-22 07:48 "if im closer to a base it works outside the base... we need to dig deeper ... we
+// need to make this mode work"): far from every altar the hammer's "Needs a Flame Altar nearby" does not come from the
+// cursor words (0.15.425 raw log). It is a NegativeFeedback command (type 0x3771274d) of the hammer's action sequence in
+// actor_client_play, so the sequence itself tests something about altars/zones. Test: a build zone box around each
+// player Free build is on for (kPlayerHalf each way), added to the game's own zone list right after the game adds the
+// first altar zone of a step: then every check that asks the zone list sees "inside a build zone". The box is given no
+// altar entity and an empty base id. Logged once per world.
+constexpr double kPlayerHalf = 40.0;  // m each way: a box 80 m wide, high and deep around the player
+std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
+std::atomic<int> g_box_said{0};
+
+void add_player_boxes(void* bzs, uint8_t flag) {
+    static std::mutex mx;
+    static std::unordered_map<void*, uint64_t> last;
+    const uint64_t now = g_steps.load();
+    {
+        std::lock_guard<std::mutex> lk(mx);
+        auto it = last.find(bzs);
+        if (it != last.end() && it->second == now) return;
+        last[bzs] = now;
+    }
+    emf::World ws = emf::server_world(), wc = emf::client_world();
+    emf::World w;
+    std::vector<uint32_t> ids;
+    const char* side = "";
+    if (ws && ws.singleton("BuildZoneSystem") == bzs) {
+        w = ws;
+        side = "server";
+        std::lock_guard<std::mutex> lk(g_mx);
+        ids.assign(g_free_server.begin(), g_free_server.end());
+    } else if (wc && wc.singleton("BuildZoneSystem") == bzs) {
+        w = wc;
+        side = "this game";
+        const uint32_t me = emf::local_player();
+        if (me && free_for(g_free_client, me)) ids.push_back(me);
+    } else {
+        static std::atomic<int> said{0};
+        if (said.fetch_add(1) == 0)
+            EMF_LOG(kMod, "free build: the zone list %p is neither world's BuildZoneSystem (server %p, this game %p): no player boxes", bzs,
+                    ws ? ws.singleton("BuildZoneSystem") : nullptr, wc ? wc.singleton("BuildZoneSystem") : nullptr);
+        return;
+    }
+    const int64_t half = int64_t(kPlayerHalf * 4294967296.0);
+    for (uint32_t id : ids) {
+        auto* ct = w.get<gen::ecs::CurrentTransform>(id);
+        if (!ct) continue;
+        const auto& p = ct->transform.position;
+        int64_t b[6] = {p.x - half, p.y - half, p.z - half, p.x + half, p.y + half, p.z + half};
+        uint8_t no_base[16] = {};
+        g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
+        if (g_box_said.fetch_add(1) < 4)
+            EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f", side, kPlayerHalf * 2, id,
+                    double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0);
+    }
+}
+
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
+    if (g_free_on.load() && box && list == 0 && owner == 0) add_player_boxes(bzs, flag);  // (0.15.426)
     const float kAltarFactor = g_factor.load();
     if (g_altar_on.load() && kAltarFactor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];
@@ -211,6 +269,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             dedicated ? "(not here)" : (c ? "installed" : "NOT installed"), s ? "installed" : "NOT installed", kMaxFactor,
             al ? "installed" : "NOT installed");
     emf::on_tick([](emf::World w) {  // the lists of players, every 60 steps of each world
+        g_steps.fetch_add(1);  // (0.15.426) the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
         if (w.is_server()) {
             if (steps_server++ % 60 == 0) {
