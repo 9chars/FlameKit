@@ -2200,6 +2200,7 @@ end
 -- starts, before the world loads: the save and the load should then treat them like altar areas. At most
 -- FB.SPOTS_MAX cells. Nothing is forgotten yet (a piece torn down leaves its cell).
 FB.SPOT_STEP, FB.SPOTS_MAX = 32, 2000
+FB.SPOT_EDGE = 2  -- (0.15.444) m kept free inside a spot's area edge for the piece itself
 function FB.spots_get()
   if FB.spots == nil then
     local ok, t = pcall(kit.store.load, "free_build_spots", {})
@@ -2257,9 +2258,19 @@ function FB.on_place(world, e)
   local cx, cy, cz = math.floor(x / st), math.floor(y / st), math.floor(z / st)
   local key = cx .. "," .. cy .. "," .. cz
   local spots = FB.spots_get()
-  if spots[key] then  -- (0.15.442) logged too, for debugging where blocks land
+  local inside = spots[key]
+  -- (0.15.444, owner 11:57 "there shouldn't be 4 locations... the blocks I placed were all very close to each other,
+  -- should be all within the same spot") a piece already inside a remembered spot's area (48 m, less FB.SPOT_EDGE m
+  -- for the piece's own size) makes no new spot, even when it is over a 32 m grid line
+  if not inside then
+    local lim = 24 - FB.SPOT_EDGE
+    for _, c in pairs(spots) do
+      if math.abs(x - c[1]) <= lim and math.abs(y - c[2]) <= lim and math.abs(z - c[3]) <= lim then inside = c break end
+    end
+  end
+  if inside then  -- (0.15.442) logged too, for debugging where blocks land
     emf.log(string.format("experimental: free build: placed by %d at %.1f %.1f %.1f, in the remembered spot %.0f %.0f %.0f",
-      owner, x, y, z, spots[key][1], spots[key][2], spots[key][3]))
+      owner, x, y, z, inside[1], inside[2], inside[3]))
     return
   end
   local n = 0

@@ -1278,6 +1278,12 @@ zones without base ids). Save 11:28:14 backed up to save_backups/2026-11-22_1128
 11:39 owner: "there has been some really sketchy problems with water on the map, so that doesn't surprise me".
 **11:41 owner: "it looks like it kept A and B and C is gone"** after the 11:33 restart: Forget this spot works across a
 restart. Not seen: whether C reset within ~30 min while running (the crash came first).
+11:43 owner "yeah go ahead I guess": 0.15.443 installed (DLL be27ee01 server + client), restarted 11:43-11:44; 15
+altar areas written 11:44:20; inside/outside logged (11:55). 11:54 owner rebuilt C (spot 5776 816 5392 again); a block
+at 5795.0 818.0 5371.5 made a 4th spot 5808 816 5360 (next 32 m cell). **11:57 owner: "there shouldn't be 4
+locations... the blocks I placed were all very close to each other, should be all within the same spot".** 0.15.444
+(Lua, hot-reloaded 11:57:52): a piece inside any spot's area (|d| <= 24 - FB.SPOT_EDGE 2 m) makes no new spot. The 4th
+spot 5808 816 5360 is still there (asked the owner).
 
 ## How to build and publish a version
 
