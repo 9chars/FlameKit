@@ -1,3 +1,6 @@
+0.15.424 Nov 22, 2026
+- Logging for the build hammer again, to find why Free build gave errors on the server.
+
 0.15.423 Nov 21, 2026
 - Bigger altar areas is on by default (an admin can switch it off), and is in place from the moment the server starts.
 

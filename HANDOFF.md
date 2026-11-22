@@ -1115,6 +1115,13 @@ emf_core.log ends 20:54:36 and enshrouded_server.log ends "Close Log file" (the 
 21:03 owner: "server is coming up now". G-Portal log (fetched ~21:05): 21:02:51 loot news hooks installed, "bigger altar
 areas (server, at start): on, 1.5x", free build + addZone hooks installed, "on a dedicated server: only the companion
 part runs (loaded)", 19 feature(s) loaded; world loaded 21:03:19; zones 40 -> 60 m, 160 -> 240 m; no error lines.
+**Owner 2026-11-22 07:23 "would you be able to check the free build mode and see if anything broke with it? we had
+problems getting it work on the server after we expanded the base size"**; asked; "I think we were getting errors and it
+wasn't letting us build". G-Portal log: SuperB (2) switched freebuild on 21:44:50, Midevil (1) 21:45:23; "the server's
+altar check is off for 2" 21:44:51 (that log is capped: nothing for 1); both left 21:46, rejoined 21:47/21:49, more
+leaves/joins. Owner's game log: "the hammer's altar check is off in this game for 1" 21:45:44 and 21:47:55. Facts only;
+cause not known. 0.15.424: build_anywhere.lua's cursor flag logging on again (Lua, local server + his game) to
+reproduce on the local server (bigger altar areas on there too).
 
 ## How to build and publish a version
 

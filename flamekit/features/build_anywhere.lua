@@ -15,7 +15,7 @@ local players = require("core.players")
 local F = { id = "build_anywhere", title = "Build Anywhere" }
 local kit
 
-local LOG, LOG_MAX = false, 200  -- changes logged per minute at most (0.15.415: off; the bits are known, see build_anywhere.cpp)
+local LOG, LOG_MAX = true, 200   -- changes logged per minute at most (0.15.415: off; 0.15.424 on again: owner 2026-11-22 07:23 Free build "getting errors and it wasn't letting us build" on G-Portal with the bigger altar areas)
 local said, steps = 0, 0
 local last = {}                  -- "<side>:<id>" -> "<primary>/<secondary>"
 
