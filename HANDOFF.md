@@ -1170,6 +1170,7 @@ data..." (his guess, kept as a guess). 0.15.428: the player box on a 32 m grid (
 Restart 08:12 (his game sat 3 min in the menu again: WATCH); "Build zones changed" 2 times after the join. 08:19 owner:
 "it looks like it draws that grid regardless if I'm in build more or not" -> 0.15.429: the box only while the building
 tool is out (client ClientPlayerInput.data.mask & 3, server PlayerInput.fromClient.mask & 3).
+08:20 owner: the game sat at the menu because he was away from the PC: the slow joins are not a problem (WATCH closed). Restart 08:20 (0.15.429), joined 08:22:52; no box while the tool is put away (no zone line).
 
 ## How to build and publish a version
 
