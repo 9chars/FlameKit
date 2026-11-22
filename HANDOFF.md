@@ -1296,6 +1296,9 @@ building rules apply. ..." (my wording, offered 12:12, owner said change it); bu
 experimental.lua / build_anywhere.lua updated. Logging all kept (build_anywhere.lua cursor flags + tool signals, all
 "free build" lines). DLL built 12:18 (766ec8b23e802c683a6b7620bdbf2a5e), copied into server and client (running
 ones renamed .old_443): takes effect at the next restart; Lua reloaded live 12:19:37.
+30-min reset test: 12:24:42 owner forgot C (2 left), 12:25:07 he was at 3695 1217 (far away); no restart, no crash.
+**13:05 owner: "it looks like it worked. everything at spot C is gone and cleaned up"**: a forgotten spot resets with
+the game's ~30-minute reset while the server runs. (A and B not checked in this test.)
 
 ## How to build and publish a version
 
