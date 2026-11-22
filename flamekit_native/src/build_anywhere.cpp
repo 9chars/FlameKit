@@ -200,7 +200,29 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         w = wc;
         side = "this game";
         const uint32_t me = emf::local_player();
-        if (me && free_for(g_free_client, me)) ids.push_back(me);
+        // (0.15.434, owner 08:37 "Needs a flame Alter nearby" again on 0.15.433: the Lua part read displayCursor false
+        // all the time (it reads after the step), so the server never got "tool out". This hook sees it (0.15.430 log),
+        // but it flickers: the tool counts as out while displayCursor was seen within 60 steps; the state goes to the Lua
+        // part in free_build_tool.txt ("1"/"0"), which tells the server.) (0.15.435, owner 08:53 still the error: 0.15.434
+        // looked at the tool only while Free build's list had the player, and the list waited for the tool: a circle.
+        // The tool is now looked at every step for the local player.)
+        int out = 1;
+        if (me) {
+            auto* cur = wc.get<gen::ecs::ClientCursor>(me);
+            static uint64_t last_seen = 0;
+            static int last_out = -1;
+            if (cur && cur->displayCursor) last_seen = now ? now : 1;
+            out = !cur ? 1 : (last_seen != 0 && now - last_seen < 60) ? 1 : 0;
+            if (out != last_out) {
+                last_out = out;
+                EMF_LOG(kMod, "free build (this game): the building tool is %s", !cur ? "not readable (counted as out)" : out ? "out" : "away");
+                if (FILE* f = _wfopen(lua_file(L"free_build_tool.txt").c_str(), L"wb")) {
+                    std::fputs(out ? "1\n" : "0\n", f);
+                    std::fclose(f);
+                }
+            }
+        }
+        if (me && out && free_for(g_free_client, me)) ids.push_back(me);
     } else {
         static std::atomic<int> said{0};
         if (said.fetch_add(1) == 0)
@@ -228,26 +250,6 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         // more (kit.lua logged "build mode: off" and never "on" while he built), so no box was made. Now: in the player's
         // game, ClientCursor.displayCursor (logged when it changes, to check it); on the server the box is always there
         // while Free build is on (the server draws nothing; on a 32 m grid it changes rarely).
-        if (!w.is_server()) {
-            // (0.15.434, owner 08:37 "Needs a flame Alter nearby" again on 0.15.433: the Lua part read displayCursor
-            // false all the time (it reads after the step), so the server never got "tool out". This hook sees it
-            // (0.15.430 log), but it flickers: the tool counts as out while displayCursor was seen within 60 steps, and
-            // the state goes to the Lua part in free_build_tool.txt ("1"/"0"), which tells the server.)
-            auto* cur = w.get<gen::ecs::ClientCursor>(id);
-            static uint64_t last_seen = 0;
-            static int last_out = -1;
-            if (cur && cur->displayCursor) last_seen = now ? now : 1;
-            const int out = !cur ? 1 : (last_seen != 0 && now - last_seen < 60) ? 1 : 0;
-            if (out != last_out) {
-                last_out = out;
-                EMF_LOG(kMod, "free build (this game): the building tool is %s", !cur ? "not readable (counted as out)" : out ? "out" : "away");
-                if (FILE* f = _wfopen(lua_file(L"free_build_tool.txt").c_str(), L"wb")) {
-                    std::fputs(out ? "1\n" : "0\n", f);
-                    std::fclose(f);
-                }
-            }
-            if (!out) continue;
-        }
         auto* ct = w.get<gen::ecs::CurrentTransform>(id);
         if (!ct) continue;
         const auto& p = ct->transform.position;

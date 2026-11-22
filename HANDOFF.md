@@ -1193,6 +1193,10 @@ spot with the tool out" but the server list stayed "nobody" after 08:34:25 (the 
 sent only "away" (displayCursor false: Lua reads after the step; the DLL in addZone sees it). 0.15.434: the DLL's
 client branch keeps the tool "out" while displayCursor was seen within 60 steps, logs changes and writes
 free_build_tool.txt ("1"/"0"); the Lua part reads that file and tells the server.
+Restart 08:39; 08:53 owner: "it says Needs Flame Alter nearby error still". Log 08:49:33: tool out sent, server list 1
+and box, then the DLL said "away" (it evaluated the tool only for players in its list, and the client list was empty
+until the tool was out: a circle), "away" sent, list nobody. 0.15.435: the tool is evaluated every step for the local
+player, outside the list.
 
 ## How to build and publish a version
 
