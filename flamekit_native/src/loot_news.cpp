@@ -61,6 +61,7 @@ std::wstring news_file(const wchar_t* name) {
     return s + L"\\flamekit\\" + name;
 }
 
+// Writes the newest kMostKept entries to loot_news.txt (a temporary file moved over it); false when it could not be written.
 bool write_news() {
     static const std::wstring file = news_file(L"loot_news.txt"), tmp = news_file(L"loot_news.tmp");
     std::string out;

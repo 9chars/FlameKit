@@ -1311,6 +1311,14 @@ code properly documented as we've done a lot".** Asked; answers: workarounds go 
 functions": every file a clear header (what, how, which game/EMF parts), every function a one-line purpose; existing
 comments and version/owner notes kept, unclear ones fixed; no code changes. Standing rule from now: new code gets the
 same (header + function purpose), and every new EMF workaround gets an entry in that section.
+13:15 owner: "don't break any of the source code putting the comments in". Done 13:16-13:31 as 0.15.446: notes/
+EMF_REQUESTS.md "Workarounds FlameKit uses" (19 entries); a one-line purpose above every function that had none
+(Lua core/, features/, companions/, experimental.lua; C++ flamekit_native.cpp, companions_server.cpp,
+build_anywhere.cpp, web_update.hpp, fk_log.hpp, item_icons.hpp, loot_news.cpp). Comments only, checked mechanically
+against 31c94b0 (before the pass): Lua token streams without comments identical (a tokenizer, /tmp/luatok.py), C++
+identical after the preprocessor strips comments (gcc -fpreprocessed); Lua tests ALL PASSED, syntax ok, DLL built OK
+13:29 (not installed: same code). Lua and mod.json installed live 13:31 (server, client, work folder; md5 checked
+against git before and after). How to check again: for each changed file compare the comment-free code with git's.
 
 ## How to build and publish a version
 

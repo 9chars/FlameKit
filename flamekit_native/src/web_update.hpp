@@ -38,12 +38,14 @@
 
 namespace web_update {
 
+// FNV-1a (32-bit) of the bytes: the hash update.txt lists for each file.
 inline uint32_t fnv(const std::vector<uint8_t>& data) {
     uint32_t h = 2166136261u;
     for (uint8_t b : data) h = (h ^ b) * 16777619u;
     return h;
 }
 
+// Reads a whole file (shared, so a file in use can be read); false when it cannot be opened.
 inline bool read_file(const std::wstring& path, std::vector<uint8_t>& out) {
     out.clear();
     FILE* f = _wfsopen(path.c_str(), L"rb", _SH_DENYNO);
@@ -54,6 +56,7 @@ inline bool read_file(const std::wstring& path, std::vector<uint8_t>& out) {
     return true;
 }
 
+// Writes a file through a temporary one (<path>.upd) moved over it, so it is never half written; false when it failed.
 inline bool write_file(const std::wstring& path, const std::vector<uint8_t>& data) {
     const std::wstring tmp = path + L".upd";
     FILE* f = _wfsopen(tmp.c_str(), L"wb", _SH_DENYNO);
@@ -73,6 +76,7 @@ inline void make_folders(const std::wstring& root, const std::wstring& path) {
         if (path[i] == L'\\') CreateDirectoryW(path.substr(0, i).c_str(), nullptr);
 }
 
+// A path with / turned into \.
 inline std::wstring backslashes(std::wstring p) {
     for (wchar_t& c : p)
         if (c == L'/') c = L'\\';
@@ -92,6 +96,7 @@ inline std::string version_of(const std::wstring& mod_json) {
     return s.substr(open + 1, close - open - 1);
 }
 
+// Whether version a ("0.15.8") is newer than version b.
 inline bool newer(const std::string& a, const std::string& b) {
     unsigned x[4] = {}, y[4] = {};
     if (sscanf(a.c_str(), "%u.%u.%u.%u", &x[0], &x[1], &x[2], &x[3]) < 1) return false;
@@ -157,6 +162,7 @@ inline bool signed_by_release_key(const std::vector<uint8_t>& data, std::string 
 // Why the last fetch on this thread failed (for the log).
 inline thread_local std::string g_fetch_error;
 
+// Downloads https://<host><path> (WinHTTP) into `out`, counting the bytes in `got`; false (and g_fetch_error) when it failed.
 inline bool fetch(const std::wstring& path, std::vector<uint8_t>& out, std::atomic<uint64_t>* got, const wchar_t* host = L"raw.githubusercontent.com") {
     out.clear();
     bool ok = false;
@@ -354,11 +360,13 @@ struct Updater {
     std::string last_seen;  // the version and commit of the last check (a repeated "up to date" is a detail)
     bool asked = false;     // this check was asked for with the button
 
+    // Writes update_status.txt ("<kind>|<text>") for the lower left corner, when it changed.
     void status(const std::string& text) {
         if (text == last_status) return;
         last_status = text;
         write_file(mods + L"flamekit\\update_status.txt", std::vector<uint8_t>(text.begin(), text.end()));
     }
+    // A line for FlameKit's log.
     void say(const std::string& text, int level = 0) {
         if (log) log(level, text.c_str());
     }
@@ -529,6 +537,7 @@ struct Updater {
 
     bool waiting_for_restart = false;
 
+    // The updater thread: waits 15 s after the start, then checks every minute (and at once when the player asks).
     void run() {
         DeleteFileW((mods + L"flamekit_native\\flamekit_native.dll.old").c_str());  // the DLL an update replaced, now unused
         status("");

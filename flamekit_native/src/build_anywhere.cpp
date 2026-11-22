@@ -86,6 +86,7 @@ std::wstring lua_file(const wchar_t* name) {  // <this DLL's folder>\..\flamekit
     return s + L"\\flamekit\\" + name;
 }
 
+// Reads a list of entity ids (one a line) from the Lua part's file `name` into `out`; logged when it changed.
 void read_list(const wchar_t* name, std::set<uint32_t>& out, const char* side) {
     std::set<uint32_t> ids;
     if (FILE* f = _wfopen(lua_file(name).c_str(), L"rb")) {
@@ -102,6 +103,7 @@ void read_list(const wchar_t* name, std::set<uint32_t>& out, const char* side) {
     }
 }
 
+// Whether Free build is on for entity `id` in `list`.
 bool free_for(std::set<uint32_t>& list, uint32_t id) {
     std::lock_guard<std::mutex> lk(g_mx);
     return list.count(id) != 0;
@@ -114,6 +116,7 @@ constexpr double kSpotHalf = 16.0 + 8.0;  // m each way: the 32 m cell and 8 m m
 std::vector<std::array<int64_t, 3>> g_spots;  // under g_mx
 std::string g_spots_text;
 
+// Reads free_build_spots.txt ("x y z" in m per line) into g_spots (2^32 per m); logged when it changed.
 void read_spots(const char* side) {
     std::string text;
     if (FILE* f = _wfopen(lua_file(L"free_build_spots.txt").c_str(), L"rb")) {
@@ -136,6 +139,7 @@ void read_spots(const char* side) {
     EMF_LOG(kMod, "free build (%s): %zu remembered spot(s)", side, g_spots.size());
 }
 
+// Reads the bigger altar factor from file `name` (1 to kMaxFactor; `missing` when there is no file) into g_factor; logged when it changed.
 void read_factor(const wchar_t* name, const char* side, float missing = 1.0f) {
     float f = missing;  // (0.15.423) no file yet: the server's default is on (kMaxFactor), a player's game waits for the server
     if (FILE* file = _wfopen(lua_file(name).c_str(), L"rb")) {
@@ -177,15 +181,18 @@ void altar_new_pass(void* bzs) {  // a new rebuild: what was gathered is the lis
     a.last.swap(a.cur);
     a.cur.clear();
 }
+// A copy of zone list `bzs`'s altar areas from its last full rebuild.
 std::vector<Box> altar_last(void* bzs) {
     std::lock_guard<std::mutex> lk(g_altar_mx);
     auto it = g_altar_boxes.find(bzs);
     return it == g_altar_boxes.end() ? std::vector<Box>{} : it->second.last;
 }
+// Whether x, y, z (2^32 per m) lies in box b.
 bool in_box(const Box& b, int64_t x, int64_t y, int64_t z) {
     return x >= b[0] && x <= b[3] && y >= b[1] && y <= b[4] && z >= b[2] && z <= b[5];
 }
 std::string g_altars_text;  // what altar_areas_server.txt holds (the tick thread only)
+// Writes zone list `bzs`'s altar areas to altar_areas_server.txt for the Lua (min xyz, max xyz in m per line), when they changed.
 void write_altar_areas(void* bzs) {
     std::string text;
     char line[160];

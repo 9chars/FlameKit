@@ -31,6 +31,7 @@ enum Mode { kOff = 0, kNormal = 1, kFull = 2 };
 
 inline std::atomic<int> g_mode{kNormal};
 
+// Whether a line of `level` goes into the log at the debug level now (errors and warnings always).
 inline bool on(Level level) {
     const int mode = g_mode.load();
     return level <= kWarn || (level == kInfo && mode >= kNormal) || (level == kDebug && mode >= kFull);
@@ -50,6 +51,7 @@ struct Log {
 };
 inline Log g_log;
 
+// The local date and time to the millisecond, for the start of a line.
 inline std::string stamp() {
     SYSTEMTIME t;
     GetLocalTime(&t);
@@ -59,6 +61,7 @@ inline std::string stamp() {
     return s;
 }
 
+// Writes one line (stamp, thread, level, text; the Windows user name replaced by <user>) to this session's log file.
 inline void put(Level level, const std::string& text) {
     static const char* kNames[] = {"ERROR", "WARN ", "INFO ", "DEBUG"};
     char head[96];
@@ -94,6 +97,7 @@ inline void put(Level level, const std::string& text) {
     }
 }
 
+// A printf-style line at `level` (at most 2047 characters).
 inline void write(Level level, const char* fmt, ...) {
     char buf[2048];
     va_list args;

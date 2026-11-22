@@ -64,6 +64,7 @@ static const PointerKeyName kPointerKeyNames[] = {
     {VK_LSHIFT, "LeftShift"},   {VK_RSHIFT, "RightShift"},   {VK_LCONTROL, "LeftCtrl"}, {VK_RCONTROL, "RightCtrl"},
     {VK_LMENU, "LeftAlt"},      {VK_RMENU, "RightAlt"},
 };
+// The name written in the settings for pointer-mode key `vk` (FlameKit's own names first, then EMF's).
 inline std::string pointer_key_name(uint32_t vk) {
     for (const auto& k : kPointerKeyNames)
         if (k.vk == vk) return k.name;
@@ -71,6 +72,7 @@ inline std::string pointer_key_name(uint32_t vk) {
     if (name.rfind("key ", 0) == 0) name = name.substr(4);  // "key 0xba": written "0xba"
     return name;
 }
+// The pointer-mode key from its setting text (the old choices too; Right Alt when it is empty or unknown).
 inline uint32_t pointer_key_vk(const std::string& text) {
     if (text == "right_alt" || text.empty()) return VK_RMENU;  // the old choices (0.15.189 and before)
     if (text == "right_ctrl") return VK_RCONTROL;
@@ -130,11 +132,13 @@ int letter_px(const Settings& s, int n) {
     return s.big_text ? px : std::min(px, 21);
 }
 
+// A copy of the settings as last read.
 Settings settings() {
     std::lock_guard<std::mutex> l(g_settings_lock);
     return g_settings;
 }
 
+// Reads FlameKit's settings from EMF (minimap, keys, window) into g_settings.
 void read_settings() {
     Settings s;
     s.show = emf::setting_bool(kKit, "map_show", true);
@@ -328,6 +332,7 @@ constexpr const char* kFilter[] = {
 };
 static_assert(sizeof(kFilter) / sizeof(kFilter[0]) == sizeof(kStyles) / sizeof(kStyles[0]), "one filter name per style");
 
+// Which marker kinds are hidden on the minimap (setting map_hide).
 void read_filters(Settings& s) {
     const std::string hide = "," + emf::setting_text(kKit, "map_hide", "") + ",";
     for (int i = 0; i < kStyleCount && i < 64; ++i)
@@ -557,6 +562,7 @@ std::wstring key_label(uint32_t vk) {
     return std::wstring(n.begin(), n.end());
 }
 
+// Every step of the player's world: the minimap and window keys, and what the overlay needs from the world (position, facing, markers, items).
 void on_world_tick(emf::World w) {
     if (!w.is_client()) return;
     const Settings s = settings();
@@ -920,11 +926,13 @@ struct MapData {
     bool ok = false;
     std::string note;                            // how opening went, for the log
 
+    // A little-endian 32-bit number at `at`.
     static uint32_t u32(const std::vector<uint8_t>& d, size_t at) {
         return static_cast<uint32_t>(d[at]) | (static_cast<uint32_t>(d[at + 1]) << 8) |
                (static_cast<uint32_t>(d[at + 2]) << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
     }
 
+    // Reads `bytes` at offset `at` of the open data file; false when it cannot.
     bool read_at(int64_t at, void* into, size_t bytes) {
         return dat && _fseeki64(dat, at, SEEK_SET) == 0 && fread(into, 1, bytes, dat) == bytes;
     }
@@ -951,6 +959,7 @@ struct MapData {
         }
     }
 
+    // Reads and unpacks one relief tile (BC4) of the map; false when it cannot be read.
     bool load_tile(int tx, int ty, std::vector<uint8_t>& into) {
         std::vector<uint8_t> packed(kReliefBytes);
         if (!read_at(where[tx][ty], packed.data(), packed.size())) return false;
@@ -1154,6 +1163,7 @@ struct MapData {
                 }
     }
 
+    // The base map's height at cell bx, by (clamped to the map).
     float base_at(int bx, int by) const {
         bx = std::clamp(bx, 0, kBase - 1);
         by = std::clamp(by, 0, kBase - 1);
@@ -1206,6 +1216,7 @@ constexpr unsigned char kGradient[151][3] = {
     {160, 156, 135}, {162, 158, 137}, {164, 161, 140}, {166, 163, 142}, {167, 164, 144}, {168, 165, 146}, {168, 166, 148}, {168, 167, 149},
     {169, 168, 150}, {168, 167, 151}, {169, 168, 153}, {169, 169, 153}, {169, 169, 154}, {170, 170, 155}, {169, 169, 156}};
 
+// The ground's colour at height h (the game map's gradient).
 void ground_colour(float h, float& r, float& g, float& b) {
     const float at = std::clamp(kGradientAt0 + h * kGradientStep, 0.0f, 149.999f);
     const int i = static_cast<int>(at);
@@ -1380,6 +1391,7 @@ struct Loca {
     uint32_t rows = 0, first = 0;
     std::atomic<bool> ready{false};
 
+    // A little-endian 32-bit number at p.
     static uint32_t u32(const uint8_t* p) {
         return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) |
                (static_cast<uint32_t>(p[3]) << 24);
@@ -1417,6 +1429,7 @@ struct Loca {
 
     bool name(uint32_t id, std::string& out) const { return ready.load() && find(blob, first, rows, id, out); }
 
+    // Reads the game's English texts (place names) from its data files; `note` says what happened.
     void load(const std::wstring& game_dir, std::string& note) {
         constexpr uint32_t kKnown[4] = {1733004u, 3191761838u, 3367547340u, 3724958107u};  // En_Us in build 1287369
         constexpr uint32_t kFlameAltarTag = 4125307802u;  // FNV-1a of 29417954-ce46-4f07-8f0c-60eb804fab28
@@ -1488,6 +1501,7 @@ struct Loca {
     }
 };
 Loca g_loca;
+// The game's name of place `id`, without its text marks; false when there is none.
 bool place_name(uint32_t id, std::string& out) {
     std::string raw;
     if (!g_loca.name(id, raw)) return false;
@@ -1617,6 +1631,7 @@ struct TextPainter {
     int font_px = 0;
     int weight = FW_SEMIBOLD;  // set before the first ready()
 
+    // Makes the painter's drawing surface and font of `px` pixels (once); false when Windows refused.
     bool ready(HDC screen, int px) {
         if (!dc) {
             dc = CreateCompatibleDC(screen);
@@ -1713,6 +1728,7 @@ struct TextPainter {
             }
     }
 
+    // Draws `text` at x, y in colour r, g, b (with an outline and anti-aliasing) onto canvas c.
     void draw(Canvas& c, int x, int y, const std::wstring& text, float r, float g, float b, float alpha = 1.0f) {
         const int wide = std::min(width(text), kW - 2), tall = std::min(kH, font_px + font_px / 2 + 2);
         for (int row = 0; row < tall; ++row) std::fill(bits + row * kW, bits + row * kW + wide + 2, 0u);
@@ -1731,6 +1747,7 @@ struct TextPainter {
     }
 };
 
+// UTF-8 to UTF-16 (Windows' wide text).
 std::wstring widen(const std::string& utf8) {
     if (utf8.empty()) return {};
     const int n = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.size()), nullptr, 0);
@@ -1784,6 +1801,7 @@ struct PlayerStyle {
     int shape;  // 0 circle, 1 square, 2 diamond, 3 triangle up, 4 triangle down, 5 star
     uint8_t r, g, b;
 };
+// A player's symbol and colour on the minimap and in the lists, from his name (the same for everyone).
 PlayerStyle player_style(const std::string& name) {
     uint32_t h = 2166136261u;
     for (unsigned char c : name) h = (h ^ c) * 16777619u;
@@ -2219,6 +2237,7 @@ struct FindGame {
     long long best_area;
 };
 
+// EnumWindows callback: the game's main window (visible, not owned, of the game's process, the biggest).
 BOOL CALLBACK find_game_window(HWND h, LPARAM lp) {
     auto* f = reinterpret_cast<FindGame*>(lp);
     DWORD pid = 0;
@@ -2298,6 +2317,7 @@ struct Layer {
     RECT rect{};
     Canvas canvas;
     std::vector<uint32_t> pixels;
+    // Gives the layer's canvas the size w x h (cleared).
     void resize(int w, int h) {
         if (canvas.w == w && canvas.h == h && canvas.px) return;
         pixels.assign(static_cast<size_t>(w) * h, 0u);
@@ -2306,6 +2326,7 @@ struct Layer {
         canvas.px = pixels.data();
         changed = true;
     }
+    // Moves the layer to x, y on the screen (marked changed when it moved).
     void place(int x, int y) {
         const RECT r{x, y, x + canvas.w, y + canvas.h};
         if (!EqualRect(&r, &rect)) {
@@ -2319,6 +2340,7 @@ HDC g_screen = nullptr;  // the screen's DC, for the text painters (UI thread)
 std::wstring g_flamekit_dir;  // ...\emf\mods\flamekit\ (ends with a backslash)
 std::wstring g_game_dir;      // the game's folder (ends with a backslash)
 
+// The folder of the running exe (the game's folder), with a trailing backslash.
 std::wstring game_dir_of_process() {
     wchar_t exe[MAX_PATH];
     const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
@@ -2389,6 +2411,7 @@ struct MinimapLayer : Layer {
     // timing, for the log at full
     uint64_t draws = 0, draw_us = 0, draw_max_us = 0, timing_at = 0;
 
+    // Reads the map, the marker icons and the place names from the game's data files (once, on the UI thread).
     void load() {
         loaded = true;
         const uint64_t began = GetTickCount64();
@@ -2650,6 +2673,7 @@ struct LayoutEntry {
 struct Layout {
     std::unordered_map<std::string, LayoutEntry> entries;
     bool loaded = false;
+    // Reads the windows' places and sizes from ui_layout.txt.
     void load() {
         loaded = true;
         if (FILE* fp = _wfsopen((g_flamekit_dir + L"ui_layout.txt").c_str(), L"rb", _SH_DENYNO)) {
@@ -2663,6 +2687,7 @@ struct Layout {
         }
         FK_LOG(fklog::kInfo, "pinned: layout read: %d window(s)", static_cast<int>(entries.size()));
     }
+    // Writes the windows' places and sizes to ui_layout.txt.
     void save() {
         std::string text;
         for (const auto& [id, e] : entries) {
@@ -2679,6 +2704,7 @@ struct Layout {
         ok = ok && MoveFileExW(tmp.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
         if (!ok) FK_LOG(fklog::kError, "pinned: ui_layout.txt could not be written (error %lu)", GetLastError());
     }
+    // The layout entry of window `id` (read from the file the first time).
     LayoutEntry& get(const std::string& id) {
         if (!loaded) load();
         return entries[id];
@@ -2755,11 +2781,13 @@ struct PinnedLayer : Layer {
     virtual void draw_title_extra(int left, int width) {}
     virtual bool title_click(int x, int y) { return false; }
 
+    // Fills a rectangle with colour r, g, b at opacity a.
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
             for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
     }
 
+    // Draws the pinned window: its frame and title bar, then its content (sized by its layout entry and content).
     void draw_all() {
         if (!fonts) {
             fonts = true;
@@ -2870,6 +2898,7 @@ struct PinnedLayer : Layer {
         place(x, y);
     }
 
+    // A drag ended: the window's new place and width are saved.
     void end_drag() {
         drag = kNone;
         LayoutEntry& e = lay();
@@ -3086,6 +3115,7 @@ struct PartyLayer : PinnedLayer {
         return changed;
     }
 
+    // Reads ui_party.dat (the party list from the Lua part) when it changed; true when it did.
     bool read_list() {
         const std::wstring file = g_flamekit_dir + L"ui_party.dat";
         const uint64_t st = file_stamp(file);
@@ -3240,6 +3270,7 @@ struct PartyLayer : PinnedLayer {
             timer.draw_hollow(canvas, tx, ty, t, 0, 0, 0);
         }
     }
+    // The "+N" badge for buffs that do not fit.
     void more_badge(int x, int y, int n, bool over) {
         const float v = over ? 95.0f : 70.0f;
         box(x + 1, y, x + kBadge - 1, y + kBadge, 30, 32, 38, 0.95f);
@@ -3461,6 +3492,7 @@ struct MessagesLayer : PinnedLayer {
         return n;
     }
 
+    // Reads one message feed file (Messages, Battle, Loot) when it changed; true when it did.
     bool read_file(Feed& fd, uint64_t now, bool chat) {
         const std::wstring file = g_flamekit_dir + fd.file;
         const uint64_t st = file_stamp(file);
@@ -3662,6 +3694,7 @@ struct BoardLayer : PinnedLayer {
     }
     uint32_t hotkey() const override { return settings().board_vk; }
 
+    // Reads ui_board.dat (the PvP Leaderboard) when it changed; true when it did.
     bool read_file() {
         const std::wstring file = g_flamekit_dir + L"ui_board.dat";
         const uint64_t st = file_stamp(file);
@@ -3790,6 +3823,7 @@ struct NoticeLayer : PinnedLayer {
     bool was_pointer_out = false;
     static constexpr int kLine = 21, kBar = 4, kX = 16;
 
+    // The Notices window: no title bar, hidden in menus, grows with its notices, top centre.
     NoticeLayer() : PinnedLayer("notices", L"Notices", 640) {
         headless = true;
         kHead = 0;
@@ -3801,6 +3835,7 @@ struct NoticeLayer : PinnedLayer {
 
     bool active(const Frame& f) override { return f.in_world && !notes.empty() && !(hide_in_menus && f.in_menu); }
 
+    // The notices to show: those in the file that the player has not closed (a closed one may come back when it is new).
     void rebuild(uint64_t) {
         std::vector<Note> list;
         for (const Note& n : from_file)
@@ -3814,6 +3849,7 @@ struct NoticeLayer : PinnedLayer {
         notes = std::move(list);
     }
 
+    // Reads ui_notices.dat when it changed; true when it did.
     bool read_file() {
         const std::wstring file = g_flamekit_dir + L"ui_notices.dat";
         const uint64_t st = file_stamp(file);
@@ -3991,6 +4027,7 @@ struct Readme {
     bool have_text = false;
     int wrapped_w = -1;
 
+    // Downloads the README from the repository in the background (once at a time).
     static void fetch() {
         {
             std::lock_guard<std::mutex> l(g_readme.lock);
@@ -4010,6 +4047,7 @@ struct Readme {
         }).detach();
     }
 
+    // Text without markdown's ** and ` marks.
     static std::wstring strip(std::wstring t) {
         for (const wchar_t* cut : {L"**", L"`"}) {
             for (size_t at; (at = t.find(cut)) != std::wstring::npos;) t.erase(at, std::wcslen(cut));
@@ -4017,6 +4055,7 @@ struct Readme {
         return t;
     }
 
+    // Turns the README's markdown into lines (headings marked), for the About tab.
     void take_text(const std::string& md) {
         source.clear();
         size_t at = 0;
@@ -4058,6 +4097,7 @@ struct Readme {
         wrapped_w = -1;
     }
 
+    // Wraps the README's lines to `width` pixels (again only when the width changed).
     void wrap(TextPainter& text, TextPainter& head, int width) {
         if (wrapped_w == width) return;
         wrapped_w = width;
@@ -4411,6 +4451,7 @@ struct WindowLayer : Layer {
 
     size_t pages(size_t n, int rows) const { return std::max<size_t>(1, (n + kCols * rows - 1) / (kCols * rows)); }
 
+    // An item's icon (read from the game's data and kept), or nullptr when it has none or is not known yet.
     const std::vector<uint8_t>* picture(uint32_t id) {
         if (id == 0) return nullptr;
         const auto have = pictures.find(id);
@@ -4443,10 +4484,12 @@ struct WindowLayer : Layer {
         return kept.empty() ? nullptr : &kept;
     }
 
+    // Fills a rectangle with colour r, g, b at opacity a.
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
             for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
     }
+    // A frame `t` pixels thick.
     void frame_box(int x0, int y0, int x1, int y1, int t, float r, float g, float b) {
         box(x0, y0, x1, y0 + t, r, g, b, 1.0f);
         box(x0, y1 - t, x1, y1, r, g, b, 1.0f);
@@ -4468,6 +4511,7 @@ struct WindowLayer : Layer {
         text.draw(canvas, x + (w - text.width(label)) / 2, y + 5, label, tr, tg, tb);
         hits.push_back({r, kind, index, row && !row->tip.empty() ? &row->tip : nullptr});
     }
+    // Draws one item tile: its icon, count, hover frame and the marks for items being moved.
     void tile(const Entry& e, int x, int y, Kind kind, size_t index) {
         if (const std::vector<uint8_t>* pic = picture(e.id)) canvas.picture(pic->data(), kIcon, x + kIcon * 0.5f, y + kIcon * 0.5f, 1.0f);
         else box(x, y, x + kIcon, y + kIcon, 70, 70, 76, 1.0f);
@@ -4690,6 +4734,7 @@ struct WindowLayer : Layer {
         box(0, kViewBottom, kW, kH, 18, 18, 22, 0.94f);
     }
 
+    // Scrolls the tab's rows to `to` (within what there is).
     void scroll_to(int to) {
         const int v = std::clamp(to, 0, max_scroll);
         if (v != rows_scroll) {
@@ -4776,6 +4821,7 @@ struct WindowLayer : Layer {
         capture_win = -1;
     }
 
+    // The Windows tab: every pinned window with Show/Hide and Reset place, and the key settings.
     void draw_windows() {
         int y = kTop + 14;
         text.draw(canvas, kPad, y, L"Pinned windows", 255, 210, 122);
@@ -4945,6 +4991,7 @@ struct WindowLayer : Layer {
         kViewBottom = kH - kPad;
     }
 
+    // Draws FlameKit's window: the tabs, then the shown tab's content.
     void draw() {
         if (!fonts) {
             fonts = true;
@@ -5066,6 +5113,7 @@ struct WindowLayer : Layer {
         changed = true;
     }
 
+    // Closes FlameKit's window (anything waiting for a key or being moved is dropped); `why` for the log.
     void close(const char* why) {
         stop_capture();  // (0.15.112) a key setting of the Windows tab waiting for a key: not any more
         open = close_asked = drop_open = false;
@@ -5202,6 +5250,7 @@ struct WindowLayer : Layer {
         place(std::clamp(x, 0, std::max(0, f.gw - kW)), std::clamp(y, 0, std::max(0, f.gh - kH)));
     }
 
+    // A drag of FlameKit's window ended: its place and size are saved.
     void end_win_drag() {
         win_drag = kStill;
         LayoutEntry& e = g_layout.get("window");
@@ -5534,6 +5583,7 @@ struct ExperimentalLayer : PinnedLayer {
     }
 
     bool wants_keys() const override { return visible && edit_row >= 0; }
+    // Closes the text box being edited.
     void stop_edit(const char* how) {
         if (edit_row < 0) return;
         edit_row = -1;
@@ -5575,6 +5625,7 @@ struct ExperimentalLayer : PinnedLayer {
     }
     void lost_front() override { stop_edit("another window took the front"); }
 
+    // A row text from the file: \n escapes back into line breaks.
     static std::wstring unescape(const std::string& s) {
         std::wstring w = widen(s);
         std::wstring out;
@@ -5588,6 +5639,7 @@ struct ExperimentalLayer : PinnedLayer {
         }
         return out;
     }
+    // A colour "rrggbb" into r, g, b; false when it is not one.
     static bool colour(const std::string& c, uint8_t& r, uint8_t& g, uint8_t& b) {
         if (c.size() != 6) return false;
         const unsigned long rgb = std::strtoul(c.c_str(), nullptr, 16);
@@ -5595,6 +5647,7 @@ struct ExperimentalLayer : PinnedLayer {
         return true;
     }
 
+    // Reads this window's rows file (ui_exp.dat or ui_roster.dat) when it changed; true when it did.
     bool read_file() {
         const std::wstring file = g_flamekit_dir + file_name;
         const uint64_t st = file_stamp(file);
@@ -5696,18 +5749,21 @@ struct ExperimentalLayer : PinnedLayer {
         return again;
     }
 
+    // Wraps text to `width` pixels.
     std::vector<std::wstring> wrap_text(const std::wstring& t, int width) {
         std::vector<std::wstring> out = wrap_words(text, t, width);
         if (out.size() > 1 && out.back().empty()) out.pop_back();  // a text ending in "\n": no empty line after it (as before)
         return out;
     }
 
+    // The width of a drop-down list for row r.
     int list_width(const Row& r, int width) {
         int widest = text.width(r.text);
         for (const Opt& o : r.list) widest = std::max(widest, text.width(o.label) + (o.heading ? 0 : 12));
         return std::min(width - 16, std::max(200, widest + 44));
     }
 
+    // Places the rows (buttons, labels, drop-downs, text boxes) for `width` pixels; again only when the width changed.
     void lay_out(int width) {
         if (laid_w == width) return;
         laid_w = width;
@@ -5981,6 +6037,7 @@ struct ChangeLogDialog : Layer {
     std::wstring status = L"Nothing is written down about this version.";
     static constexpr int kHead = 32, kLine = 20;
 
+    // Fills a rectangle with colour r, g, b at opacity a.
     void fill(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
             for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
@@ -6031,6 +6088,7 @@ struct ChangeLogDialog : Layer {
         wrapped_w = -1;
     }
 
+    // Wraps the change log's lines to `width` pixels (again only when the width changed).
     void wrap(int width) {
         if (wrapped_w == width) return;
         wrapped_w = width;
@@ -6046,6 +6104,7 @@ struct ChangeLogDialog : Layer {
         }
     }
 
+    // Draws the Change Log window: its title, the text and its scroll bar.
     void draw() {
         if (!fonts) {
             fonts = true;
@@ -6131,6 +6190,7 @@ struct ChangeLogDialog : Layer {
         place(std::max(0, (f.gw - w) / 2), std::max(0, (f.gh - h) / 2));
     }
 
+    // Closes the Change Log window.
     void close(const char* how) {
         open = false;
         FK_LOG(fklog::kInfo, "change log: closed (%s)", how);
@@ -6204,11 +6264,13 @@ struct UpdateDialog : Layer {
     bool restarting = false;
     static constexpr int kW = 440, kH = 176, kHead = 32;
 
+    // Fills a rectangle with colour r, g, b at opacity a.
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
         for (int y = y0; y < y1; ++y)
             for (int x = x0; x < x1; ++x) canvas.blend(x, y, r, g, b, a);
     }
 
+    // Reads update_status.txt (what the updater is doing), every second (every 0.25 s after the Check for updates button).
     void read_status(uint64_t now) {
         const bool asked = now < g_update_ask_until.load();  // the Check for updates button: show it again
         next_read = now + (asked ? 250 : 1000);
@@ -6231,6 +6293,7 @@ struct UpdateDialog : Layer {
         FK_LOG(fklog::kInfo, "update dialog: shown for v%s%s", ver.c_str(), asked ? " (Check for updates)" : "");
     }
 
+    // Draws the update window: what was downloaded and that it takes effect at the next start.
     void draw() {
         if (!fonts) {
             fonts = true;
@@ -6283,6 +6346,7 @@ struct UpdateDialog : Layer {
         place(std::max(0, (f.gw - kW) / 2), std::max(0, (f.gh - kH) / 2));
     }
 
+    // Closes the update window.
     void close(const char* how) {
         open = false;
         FK_LOG(fklog::kInfo, "update dialog: closed (%s)", how);
@@ -6467,6 +6531,7 @@ struct HudLayer : Layer {
     bool in_world = false, hud_file = false, drawn_in_world = false;  // hud_file: ui_hud.dat was there (its label line says whether the label is on)
     std::wstring version;                     // the Lua part's version, for the label before a world (0.15.88)
 
+    // Every 0.2 s: the requests from the Lua part (open the log folder, ...), the HUD label, build mode and the other files the HUD shows.
     void read_files(uint64_t now) {
         next_read = now + 200;  // 0.15.59: build mode should hide the windows quickly (was 500)
         {  // (0.15.106) the Debug section's "Open log folder" button (features/experimental.lua): Explorer on the logs
@@ -6574,6 +6639,7 @@ struct Compositor {
     std::vector<RECT> was_rect;
     std::vector<bool> was_visible;
 
+    // Grows rectangle `into` to take in r too.
     static void unite(RECT& into, const RECT& r) {
         if (IsRectEmpty(&r)) return;
         if (IsRectEmpty(&into)) into = r;
@@ -6625,16 +6691,19 @@ struct Compositor {
         return dirty;
     }
 
+    // Whether any layer is shown.
     bool any_visible() const {
         for (const Layer* l : layers)
             if (l->shown()) return true;
         return false;
     }
+    // The top shown layer that wants the keyboard, or nullptr.
     Layer* keys_layer() const {
         for (auto it = layers.rbegin(); it != layers.rend(); ++it)
             if ((*it)->shown() && (*it)->wants_keys()) return *it;
         return nullptr;
     }
+    // Whether any shown layer wants the mouse.
     bool any_mouse() const {
         for (const Layer* l : layers)
             if (l->shown() && l->wants_mouse()) return true;
@@ -6664,6 +6733,7 @@ struct WindowPresenter {
     POINT at{};
     bool shown = false, interactive = false, topmost = false;
 
+    // Gives the overlay's bitmap the size nw x nh; false when it already had it.
     bool resize(int nw, int nh) {
         if (nw == w && nh == h && bits) return false;
         if (bitmap) {
@@ -6723,6 +6793,7 @@ struct WindowPresenter {
         }
     }
 
+    // Lets clicks through to the game, or takes the mouse (and the keyboard) for FlameKit's windows.
     void set_interactive(bool mouse, bool keys) {
         const bool want = mouse || keys;
         LONG_PTR ex = GetWindowLongPtrW(win, GWL_EXSTYLE);
@@ -6764,6 +6835,7 @@ struct WindowPresenter {
         topmost = ours_front;
     }
 
+    // Shows or hides the overlay window (never taking the focus).
     void show(bool on) {
         if (on == shown) return;
         shown = on;
@@ -6778,6 +6850,7 @@ Layer* g_mouse_capture = nullptr;  // the layer that got the button press: it ge
 Layer* g_mouse_over = nullptr;     // the layer under the pointer, for mouse_left
 std::atomic<bool> g_reorder{true}; // the front window changed: put the overlay in order now
 
+// The overlay window's messages: the mouse goes to FlameKit's layers, the game's pointer is used, the keys go to the layer that wants them.
 LRESULT CALLBACK overlay_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_MOUSEACTIVATE:
@@ -6861,6 +6934,7 @@ LRESULT CALLBACK overlay_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
+// Windows' front-window event: the overlay is put in order again.
 void CALLBACK on_foreground(HWINEVENTHOOK, DWORD, HWND h, LONG, LONG, DWORD, DWORD) {
     g_reorder = true;
     FK_LOG(fklog::kInfo, "windows: front window: %s", window_info(h).c_str());
@@ -6882,6 +6956,7 @@ struct Watchdog {
         return false;
     }
 
+    // What is wrong with the overlay (not shown, below the game's window, not over its client area), or empty.
     std::string problem(HWND win, HWND game, const POINT& origin, int gw, int gh) {
         std::string p;
         if (!IsWindowVisible(win)) p += "not shown; ";
@@ -6898,6 +6973,7 @@ struct Watchdog {
         return p;
     }
 
+    // 4 times a second: checks the overlay and repairs it; a summary line every minute.
     void tick(const Frame& f, bool should_show) {
         if (f.now < next) return;
         next = f.now + 250;
@@ -7236,6 +7312,7 @@ std::string read_text(const std::wstring& path, size_t max = 4096) {
     return out;
 }
 
+// The version in a mod.json, or "?".
 std::string version_in(const std::wstring& mod_json) {
     const std::string text = read_text(mod_json, 16384);
     const size_t at = text.find("\"version\"");
@@ -7244,6 +7321,7 @@ std::string version_in(const std::wstring& mod_json) {
     return q2 == std::string::npos ? "?" : text.substr(q1 + 1, q2 - q1 - 1);
 }
 
+// EnumDisplayMonitors callback: logs one screen.
 BOOL CALLBACK log_monitor(HMONITOR m, HDC, LPRECT, LPARAM) {
     MONITORINFOEXW mi{};
     mi.cbSize = sizeof(mi);
@@ -7253,6 +7331,7 @@ BOOL CALLBACK log_monitor(HMONITOR m, HDC, LPRECT, LPARAM) {
     return TRUE;
 }
 
+// The start lines of the log: versions, build, debug level, update channel, Windows, screens.
 void log_start_info() {
     FK_LOG(fklog::kInfo, "start: FlameKit Native %s (FlameKit Lua part %s), built %s %s with MSVC %d; debug level %s; update channel %s",
            version_in(g_game_dir + L"emf\\mods\\flamekit_native\\mod.json").c_str(), version_in(g_flamekit_dir + L"mod.json").c_str(), __DATE__,
@@ -7281,6 +7360,7 @@ void log_start_info() {
            (static_cast<unsigned long long>(info.nFileSizeHigh) << 32) | info.nFileSizeLow, t.wYear, t.wMonth, t.wDay);
 }
 
+// The monitor thread: the debug level, EMF's log copied into FlameKit's, and resource use, all the time.
 void monitor_body() {
     log_start_info();
     const std::wstring emf_log = g_game_dir + L"emf\\emf_core.log";
@@ -7351,6 +7431,7 @@ void monitor_body() {
 }
 void monitor_thread() { fklog::guarded("monitor", monitor_body); }
 
+// The updater thread (web_update.hpp).
 void updater_body() {
     web_update::Updater updater;
     updater.mods = g_game_dir + L"emf\\mods\\";

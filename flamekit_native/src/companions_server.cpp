@@ -137,6 +137,7 @@ std::map<uint32_t, FightStep> g_fight;
 void fight_step(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::DynamicEnemy01BehaviorState* st,
                 emf::gen::ecs::ActorInput* ai, const WorldTransform* tr);
 
+// Starts the attack sequences the Lua part asked for (on the world thread, inside the drive hook).
 void write_bites(emf::World w) {
     std::vector<std::pair<uint32_t, uint32_t>> todo;
     {
@@ -188,6 +189,7 @@ int ray_cast_guarded(RayCastFn fn, void* ctx, void* col, void* vox, const float*
     }
 }
 
+// Answers the ground questions (chest places): the game's own ray cast down from each spot, written to chest_ground.answer.
 void do_ground(emf::World w, void* ctx) {
     std::vector<GroundAsk> todo;
     { std::lock_guard<std::mutex> lk(g_ground_mx); if (g_ground.empty()) return; todo.swap(g_ground); }
@@ -223,6 +225,7 @@ struct WalkAsk { float p[3]; int tries; int layer; int player; };
 std::mutex g_walk_mx;
 std::vector<WalkAsk> g_walk;
 
+// Calls the game's walkable-spot search, guarded (a fault returns -1 instead of ending the game); 1 found, 0 not.
 int walk_search_guarded(WalkSearchFn fn, void* ctx, void* pg, const float* pos, float* res, int layer, int player, int* used) {
     __try {
         alignas(16) uint8_t out[0x40] = {};
@@ -236,6 +239,7 @@ int walk_search_guarded(WalkSearchFn fn, void* ctx, void* pg, const float* pos, 
     }
 }
 
+// Test (fkcomp.walk): asks the game's walkable-spot search for each waiting spot and logs the answer.
 void do_walk(emf::World w, void* ctx, void* pg_in = nullptr) {
     std::vector<WalkAsk> todo;
     { std::lock_guard<std::mutex> lk(g_walk_mx); if (g_walk.empty()) return; todo.swap(g_walk); }
@@ -551,6 +555,7 @@ void pet_boost(void*, void*) {
         g_boost_last_v.store(hs);
     }
 }
+// Logs how many pet speed boosts were given, at most every 5 s and only when the count changed.
 void boost_report(emf::World w) {
     static uint64_t at = 0, seen = 0;
     const uint64_t now = GetTickCount64();
@@ -569,6 +574,7 @@ void pet_offers_post(void*, void*) { pet_offers(3); }
 void pet_offers_taming(void*, void*) { pet_offers(1); }
 void pet_offers_attempt(void*, void*) { pet_offers(2); }
 
+// After the game's steering_locomotion program: the waiting attacks, jumps and ground questions, then the movement of every driven companion and pet.
 void drive_post(void* ctx, void*) {
     emf::World w = emf::server_world();
     if (!w) return;
@@ -741,6 +747,7 @@ void fight_step(emf::World w, void* ctx, uint32_t id, emf::gen::ecs::DynamicEnem
     }
 }
 
+// Every 30 steps: finds the driven companions (game AI off, a movement target set by the Lua part) and the driven pets (faction 11 animals with a drive line in pet_drive.txt).
 void drive_scan(emf::World w) {
     if (!w.is_server()) return;
     const uint32_t t = w.tick();
@@ -796,6 +803,7 @@ std::map<std::string, uint64_t> g_names_done;  // world thread only
 int64_t g_names_tick = -1000;
 FILETIME g_names_seen{};
 
+// FNV-1a (64-bit) of a text: the game's own key for a string.
 uint64_t fnv1a64(const std::string& s) {
     uint64_t h = 0xcbf29ce484222325ull;
     for (unsigned char c : s) { h ^= c; h *= 0x100000001b3ull; }
@@ -823,6 +831,7 @@ int name_known(void* sys, uint64_t key) {
     }
 }
 
+// Puts a text into the game's custom string table, guarded (-1 on a fault); its key in *key.
 int set_string_guarded(SetStringFn fn, void* sys, const char* p, uint64_t n, uint64_t* key) {
     __try {
         alignas(16) uint8_t out[0x20] = {};
@@ -837,6 +846,7 @@ int set_string_guarded(SetStringFn fn, void* sys, const char* p, uint64_t n, uin
 
 std::wstring flamekit_file(const wchar_t* name);
 std::wstring names_file() { return flamekit_file(L"custom_names.txt"); }
+// The path of file `name` beside FlameKit's Lua part (emf\mods\flamekit).
 std::wstring flamekit_file(const wchar_t* name) {
     HMODULE me = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -901,6 +911,7 @@ void labels_tick(emf::World w) {
     }
 }
 
+// Every 30 steps: checks that every registered name is still in the server's string table (registered again when it went), and registers new names from custom_names.txt when the file changed.
 void names_tick(emf::World w) {
     const int64_t t = (int64_t)w.tick();
     if (t - g_names_tick < 30) return;

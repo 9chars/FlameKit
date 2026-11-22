@@ -48,12 +48,14 @@ struct ItemIcons {
     std::vector<uint8_t> unpacked;  // the chunk unpacked last
     int unpacked_index = -1;
 
+    // A little-endian 32-bit number at p.
     static uint32_t u32(const uint8_t* p) {
         uint32_t v;
         std::memcpy(&v, p, 4);
         return v;
     }
 
+    // Reads enshrouded.kfc (once): where every resource record and content chunk is; `note` says why when it fails.
     void load() {
         if (tried) return;
         tried = true;
@@ -232,6 +234,7 @@ struct ItemIcons {
     std::unordered_map<uint32_t, std::vector<uint8_t>> buff_icon_guid;  // buff type id -> its icon's GUID (16 bytes)
     int buff_types = 0;  // in the registry (0: not read)
 
+    // Reads the buff registry (once): every buff type's icon GUID.
     void load_buffs() {
         if (buffs_tried) return;
         buffs_tried = true;
