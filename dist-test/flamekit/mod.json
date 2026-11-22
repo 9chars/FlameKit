@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.396",
+  "version": "0.15.423",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -380,6 +380,42 @@
       "live": true,
       "group": "Messages",
       "help": "The Loot tab of the Messages window: what Auto Loot gave other players near you too. Off: only your own loot."
+    },
+    {
+      "key": "msg_size_chat",
+      "type": "slider",
+      "min": 9,
+      "max": 28,
+      "step": 1,
+      "default": 13,
+      "label": "Chat tab text size",
+      "live": true,
+      "group": "Messages",
+      "help": "The height of the letters in the Messages window's Chat tab, in pixels (13: as before)."
+    },
+    {
+      "key": "msg_size_battle",
+      "type": "slider",
+      "min": 9,
+      "max": 28,
+      "step": 1,
+      "default": 13,
+      "label": "Battle tab text size",
+      "live": true,
+      "group": "Messages",
+      "help": "The height of the letters in the Messages window's Battle tab, in pixels (13: as before)."
+    },
+    {
+      "key": "msg_size_loot",
+      "type": "slider",
+      "min": 9,
+      "max": 28,
+      "step": 1,
+      "default": 13,
+      "label": "Loot tab text size",
+      "live": true,
+      "group": "Messages",
+      "help": "The height of the letters in the Messages window's Loot tab, in pixels (13: as before)."
     }
   ]
 }

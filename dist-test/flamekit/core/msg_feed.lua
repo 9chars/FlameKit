@@ -137,7 +137,13 @@ end
 -- a line: "<colour hex> <text>"
 local OUT, IN, HEAL = "ffb060", "ff6a5a", "5ad25a"
 
-local SELF_LOG, self_logged = 10, 0  -- (0.15.395) self heals logged whole
+local SELF_LOG, self_logged = 0, 0  -- (0.15.395) self heals logged whole; (0.15.397) off: the owner says they are valid
+-- (0.15.397, owner 14:44 "the self heal is valid.. can you just make the log say "Midevil heals themselves for 18"
+-- whenever you see a character healing themselves?") who is healed: "themselves" when it is the healer
+local function heal_target(world, healer, target)
+  if (tonumber(healer) or 0) ~= 0 and tonumber(healer) == tonumber(target) then return "themselves" end
+  return name_of(world, target)
+end
 function feed.hit(world, hit)
   if not (hit and battle_wanted(world)) then return end
   local a, t = tonumber(hit.attacker) or 0, tonumber(hit.target) or 0
@@ -181,10 +187,11 @@ function feed.hit(world, hit)
     emf.log("feed: self heal " .. table.concat(f, " "))
   end
   if hit.healing or amount < 0 then
-    text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), name_of(world, t), math.abs(amount))
+    text = string.format("%s %s heals %s for %d", HEAL, name_of(world, a), heal_target(world, a, t), math.abs(amount))
   else
     -- (0.15.381, owner 12:03 "what does "Fogger (lvl 45) > Midevil: 85" even mean?") spelled out
-    text = string.format("%s %s hit %s for %d damage%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
+    -- (0.15.402, owner 15:39 "shorten them if you can") no " damage"
+    text = string.format("%s %s hit %s for %d%s", pt and not pa and IN or OUT, name_of(world, a), name_of(world, t), math.floor(amount + 0.5),
       #flags > 0 and (" (" .. table.concat(flags, ", ") .. ")") or "")
   end
   local okp, x, _, z = pcall(world.position, world, t)
@@ -199,7 +206,7 @@ function feed.heal(world, healer, target, amount)
   if owner then owners[owner] = true end
   if pt then owners[pt] = true end
   if not next(owners) then return end
-  local text = string.format("%s %s heals %s for %d", HEAL, name_of(world, healer), name_of(world, target), math.floor((tonumber(amount) or 0) + 0.5))
+  local text = string.format("%s %s heals %s for %d", HEAL, name_of(world, healer), heal_target(world, healer, target), math.floor((tonumber(amount) or 0) + 0.5))
   local okp, x, _, z = pcall(world.position, world, target)
   for _, pid in ipairs(recipients(world, "battle", owners, okp and x or nil, okp and z or nil)) do queue(pid, "battle", text) end
 end
@@ -208,16 +215,22 @@ end
 -- "L <colour>|<player name>|<item id>|<count>|<level>|<rarity>|<where>" (where: bag, companion name, ground, junk drop/delete)
 function feed.loot(world, r)
   if not (r and r.player) then return end
+  -- (0.15.401, owner 15:26 "it needs to say whos bag its going into") "Midevil's bag", "Poop Eater's bag"
+  -- (0.15.402, owner 15:39 "shorten them if you can, but don't remove the player name in front of them") the source
+  -- goes after the bag in brackets, sent inside `where` (the players' games write " from <source>" before the ">" when
+  -- the last field has text: it stays empty): "Midevil: Legendary Runes x2 > Midevil's bag (Shroud Soldier 45)"
   local where = {}
+  local function part(n, text) return text .. ((n ~= r.count) and (" " .. n) or "") end
   if r.junk then where[#where + 1] = "junk " .. r.junk
   else
-    if (r.bag or 0) > 0 then where[#where + 1] = "bag" .. ((r.bag ~= r.count) and (" " .. r.bag) or "") end
-    if (r.companion or 0) > 0 then where[#where + 1] = (r.companion_name or "companion") .. ((r.companion ~= r.count) and (" " .. r.companion) or "") end
-    if (r.ground or 0) > 0 then where[#where + 1] = "ground" .. ((r.ground ~= r.count) and (" " .. r.ground) or "") end
+    if (r.bag or 0) > 0 then where[#where + 1] = part(r.bag, name_of(world, r.player) .. "'s bag") end
+    if (r.companion or 0) > 0 then where[#where + 1] = part(r.companion, (r.companion_name or "a companion") .. "'s bag") end
+    if (r.ground or 0) > 0 then where[#where + 1] = part(r.ground, "ground") end
   end
-  local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|%s", r.junk and "a0a0a0" or "8cd2ff", (name_of(world, r.player):gsub("|", "/")),
-    tonumber(r.item) or 0, tonumber(r.count) or 0, tonumber(r.level) or 0, tonumber(r.rarity) or 0, table.concat(where, ", "),
-    ((r.from or ""):gsub("|", "/")))
+  local src = (r.from or ""):gsub("%((%d+)%)$", " %1")
+  local text = table.concat(where, ", ") .. (src ~= "" and (" (" .. src .. ")") or "")
+  local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", r.junk and "a0a0a0" or "8cd2ff", (name_of(world, r.player):gsub("|", "/")),
+    tonumber(r.item) or 0, tonumber(r.count) or 0, tonumber(r.level) or 0, tonumber(r.rarity) or 0, (text:gsub("|", "/")))
   local x, z = r.x, r.z
   for _, pid in ipairs(recipients(world, "loot", { [r.player] = true }, x, z)) do queue(pid, "loot", line) end
 end
@@ -245,7 +258,7 @@ function feed.pickup(world, e)
   -- into the bag (a pickaxe, test monster runes); FlameKit's own Auto Loot puts come the same way and have their line
   if from == 0 and own_puts.claim(by, item, count) then return end
   local line = string.format("L|%s|%s|%d|%d|%d|%d|%s|", "c8e6ff", (name_of(world, by):gsub("|", "/")), item, count,
-    0, 0, from == 0 and "into bag" or "picked up")  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
+    0, 0, (name_of(world, by):gsub("|", "/")) .. "'s bag" .. (from == 0 and "" or " (picked up)"))  -- (0.15.401/402) whose bag  -- (0.15.386) the event has no level or quality (reading e.itemLevel was an error that stopped the feature)
   local okp, x, _, z = pcall(world.position, world, by)
   for _, pid in ipairs(recipients(world, "loot", { [by] = true }, okp and x or nil, okp and z or nil)) do queue(pid, "loot", line) end
 end
