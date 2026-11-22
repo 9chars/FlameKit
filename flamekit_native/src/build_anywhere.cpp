@@ -44,7 +44,19 @@ namespace gen = emf::gen;
 
 namespace {
 constexpr const char* kMod = "flamekit build";
-constexpr uint32_t kOutsideZone = 0x8 | 0x2;  // bit 3 "needs a flame altar", bit 1 "needs building area"
+// (0.15.425, owner 2026-11-22 07:41 "same error. I feel like we did not have it fully figured out the other day": far
+// from every altar (here ~560 m) the hammer still says "Needs a Flame Altar nearby" with bits 1 and 3 off; bit 10
+// (0x400) came on in both cursors as he tried to place (07:31:00); the 2026-11-21 success was ~90 m from an altar.
+// Guess, not checked: bit 10 = too far from any altar. Switched off too, and the raw words (before any change) are
+// logged when they change, so the next test shows every bit the game sets.)
+constexpr uint32_t kOutsideZone = 0x8 | 0x2 | 0x400;  // bit 3 "needs a flame altar", bit 1 "needs building area", bit 10 (0.15.425)
+std::atomic<int> g_raw_said{0};
+void log_raw(const char* side, uint32_t id, uint32_t p, uint32_t s, uint64_t& last) {  // (0.15.425) changes only, 400 at most
+    const uint64_t v = (uint64_t(p) << 32) | s;
+    if (v == last) return;
+    last = v;
+    if (g_raw_said.fetch_add(1) < 400) EMF_LOG(kMod, "free build: %s cursor of %u before the change: primary 0x%08X, secondary 0x%08X", side, id, p, s);
+}
 // (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that", 20:21 admins only) the factor comes from
 // FlameKit's Lua part: altar_size_server.txt (the server) / altar_size_client.txt (a player's own game), "1" = off.
 // Tested: 1.5x kept every block through restarts (0.15.419/421); 2x lost outer blocks at restarts (0.15.418/420); 4x
@@ -114,6 +126,8 @@ void client_post(void*, void*) {
     if (!w) return;
     auto* c = w.get<gen::ecs::ClientCursor>(me);
     if (!c) return;
+    static uint64_t last_raw = ~0ull;
+    log_raw("this game's", me, c->primaryFlags, c->secondaryFlags, last_raw);
     if ((c->primaryFlags | c->secondaryFlags) & kOutsideZone) {
         c->primaryFlags &= ~kOutsideZone;
         c->secondaryFlags &= ~kOutsideZone;
@@ -134,6 +148,10 @@ void server_post(void*, void*) {
     for (uint32_t id : ids) {
         auto* c = w.get<gen::ecs::ServerCursor>(id);
         if (!c) continue;
+        static uint64_t last_raw[65];
+        static bool init = false;
+        if (!init) { for (auto& x : last_raw) x = ~0ull; init = true; }
+        log_raw("the server's", id, c->primaryFlags, c->secondaryFlags, last_raw[id <= 64 ? id : 0]);
         if (c->primaryFlags & kOutsideZone) {
             c->primaryFlags &= ~kOutsideZone;
             if (g_server_cleared.fetch_add(1) == 0 || g_said.fetch_add(1) < 3)

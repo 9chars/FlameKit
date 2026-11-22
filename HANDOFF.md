@@ -1122,6 +1122,15 @@ altar check is off for 2" 21:44:51 (that log is capped: nothing for 1); both lef
 leaves/joins. Owner's game log: "the hammer's altar check is off in this game for 1" 21:45:44 and 21:47:55. Facts only;
 cause not known. 0.15.424: build_anywhere.lua's cursor flag logging on again (Lua, local server + his game) to
 reproduce on the local server (bigger altar areas on there too).
+Local 07:30: Free build on ~560 m from altars (5740 5210): owner "still getting the error" ("needs a flame alter near
+by"), "not sure why you dont believe me" (I had read the post-clear flags as clean: the Lua log shows flags AFTER the
+DLL's change). Material in the bag: yes. 07:35 fkbuild altar off on the server only (the client refuses console
+commands on someone else's server): mixed sizes, "it wont let me even go into build mode"; altar on again 07:36.
+Owner switched Bigger altar areas off (07:37), restart 07:38 (owner: "this is the test server nothing was built"):
+07:41 "same error. I feel like we did not have it fully figured out the other day". So not the bigger areas. The
+error is a UiNegativeFeedbackEvent from actor_client_play (the action sequence, client). 0.15.425: bit 10 cleared too
+(guess: too far from any altar; it came on in both cursors at 07:31:00 as he placed) + raw flag words logged before
+the change.
 
 ## How to build and publish a version
 
