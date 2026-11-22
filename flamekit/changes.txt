@@ -1,3 +1,6 @@
+0.15.436 Nov 22, 2026
+- Logging: what the server knows about a player's building tool (for Free build).
+
 0.15.435 Nov 22, 2026
 - Free build: fixed 0.15.434 (the building tool was only looked at while the moving area was already on).
 

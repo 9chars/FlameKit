@@ -1200,6 +1200,7 @@ player, outside the list.
 Restart 08:54; 08:57 owner: "It still says "Needs a Flame Alter nearby"". Log: he was in build mode 08:57:07-17 (cursor
 flags moving) but the DLL's tool state never went "out" (displayCursor not seen at the time addZone runs, or addZone
 not running there). The tool gating (0.15.429-0.15.435) is not working; the always-on box (0.15.428) worked.
+08:58 asked: back to 0.15.428 or keep digging; owner: "Keep digging". 0.15.436 (Lua, server): log changes of NetworkCursor currentBuildingItemId/cursorEntityId/serverFlags and ServerCursor cursorEntityId/currentBuildingItemInstance.itemId per player.
 
 ## How to build and publish a version
 

@@ -51,11 +51,51 @@ local function look(world, side, comp, id)
     bits(p), bits(s), x or 0, y or 0, z or 0))
 end
 
+-- (0.15.436, owner 2026-11-22 08:57 "Keep digging" for a reliable "building tool out" signal: the cursor's
+-- displayCursor was not seen at addZone time) the server's own view of the building tool, logged when it changes:
+-- NetworkCursor.currentBuildingItemId and .cursorEntityId, ServerCursor.cursorEntityId and the building item.
+local tool_last = {}
+local function val(v)
+  if type(v) == "userdata" or type(v) == "table" then
+    local okv, x = pcall(function() return v.value end)
+    if okv and x ~= nil then return tostring(x) end
+    local okh, h = pcall(function() return v.hash end)
+    if okh and h ~= nil then return tostring(h) end
+  end
+  return tostring(v)
+end
+local function look_tool(world, id)
+  local parts = {}
+  local nc = get(world, "NetworkCursor", id)
+  if nc then
+    parts[#parts + 1] = "net item " .. val(field(nc, "currentBuildingItemId"))
+    parts[#parts + 1] = "net cursor " .. val(field(nc, "cursorEntityId"))
+    parts[#parts + 1] = "net flags " .. val(field(nc, "serverFlags"))
+  else
+    parts[#parts + 1] = "no NetworkCursor"
+  end
+  local sc = get(world, "ServerCursor", id)
+  if sc then
+    parts[#parts + 1] = "server cursor " .. val(field(sc, "cursorEntityId"))
+    local ci = field(sc, "currentBuildingItemInstance")
+    parts[#parts + 1] = "server item " .. (ci and val(field(ci, "itemId")) or "nil")
+  end
+  local line = table.concat(parts, ", ")
+  if tool_last[id] == line then return end
+  tool_last[id] = line
+  if said >= LOG_MAX then return end
+  said = said + 1
+  emf.log(string.format("build anywhere: tool signals of %d: %s", id, line))
+end
+
 function F.tick(world)  -- the server
   steps = steps + 1
   if steps % 3600 == 0 then said = 0 end
   if not LOG or steps % 2 ~= 0 then return end
-  for _, id in ipairs(players.ids(world)) do look(world, "server", "ServerCursor", id) end
+  for _, id in ipairs(players.ids(world)) do
+    look(world, "server", "ServerCursor", id)
+    pcall(look_tool, world, id)
+  end
 end
 
 local csteps = 0
