@@ -12,6 +12,7 @@ local online = {}       -- entity id -> true, from EMF's events
 local events = nil      -- true: EMF's events are there; false: the old way
 local kit
 
+-- Listens for players joining and leaving (EMF's player events), once.
 function M.setup(k)
   if events ~= nil then return end  -- party.lua and minimap.lua both ask; once is enough
   kit = k

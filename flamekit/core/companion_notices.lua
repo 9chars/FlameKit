@@ -8,6 +8,7 @@ local store = require("core.store")
 local M = {}
 local cache
 
+-- Whether the companion notices are on (saved in companion_notices.json, cached).
 function M.on()
   if cache == nil then
     local saved = store.load("companion_notices", {})
@@ -16,6 +17,7 @@ function M.on()
   return cache
 end
 
+-- Switches the companion notices on or off and saves it.
 function M.set(on)
   cache = on and true or false
   store.save("companion_notices", { on = cache })

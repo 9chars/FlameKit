@@ -29,6 +29,7 @@ function route.set_owner(fn) hooks.owner = fn end
 function route.set_companion(fn) hooks.companion = fn end
 function route.set_report(fn) hooks.report = fn end
 
+-- Whether entity `id` is a player (has PlayerState).
 local function is_player(world, id)
   local ok, v = pcall(world.get, world, "PlayerState", id)
   return ok and v ~= nil
@@ -47,8 +48,10 @@ function route.player_of(world, attacker)
 end
 
 local tally = { items = 0, bag = 0, companion = 0, ground = 0, junk_drop = 0, junk_delete = 0 }
+-- The counts since the last call (items, where they went), and starts counting again (for the log).
 function route.tally() local t = tally tally = { items = 0, bag = 0, companion = 0, ground = 0, junk_drop = 0, junk_delete = 0 } return t end
 
+-- Puts `count` of `item` on the ground at x, y, z (marked and sparkling); how many were put down.
 local function to_ground(world, item, count, level, rarity, x, y, z)
   if count <= 0 then return 0 end
   local made, pid = ground.drop(world, item, count, x, y, z, level, rarity, 2.5)
@@ -56,6 +59,7 @@ local function to_ground(world, item, count, level, rarity, x, y, z)
   return made
 end
 
+-- Hands report `r` (where one item went) to the registered report function.
 local function report(world, r)
   if hooks.report then pcall(hooks.report, world, r) end
 end
@@ -89,12 +93,14 @@ function route.deliver(world, player, account, choice, item, count, level, rarit
     end
   end
   local left = count
+  -- Tries the killer's companions' bags with what is left.
   local function companions()
     if left <= 0 or not hooks.companion then return end
     local okc, n, who = pcall(hooks.companion, world, player, account, item, left, level, rarity)
     n = okc and math.floor(tonumber(n) or 0) or 0
     if n > 0 then r.companion = r.companion + n left = left - n tally.companion = tally.companion + 1 r.companion_name = who end
   end
+  -- What is still left goes on the ground (or back into the body with no_ground, or when the ground refuses it); then the report.
   local function finish(w)
     if left > 0 and opts.no_ground then
       if back then back(w, left) end
@@ -109,6 +115,7 @@ function route.deliver(world, player, account, choice, item, count, level, rarit
     end
     report(w, r)
   end
+  -- Puts what is left into the killer's bag (emf.put, with level and rarity), then calls after(world).
   local function bag_then(after)
     if left <= 0 or not player then after(world) return end
     own_puts.note(player, item, left)  -- (0.15.388) the game reports it as a pickup from 0: the Loot tab has this line already

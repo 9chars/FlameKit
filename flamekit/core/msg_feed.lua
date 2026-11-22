@@ -42,14 +42,17 @@ local monster_print = require("core.monster_print")
 local FACTION_NAME = { [1] = "Monster", [2] = "Fogger", [3] = "Vukah", [4] = "Scavenger", [5] = "Animal", [6] = "Beast",
   [9] = "Monster", [10] = "Skeleton", [12] = "Farm animal", [13] = "Cyclops", [14] = "Drak", [15] = "Ancient" }
 
+-- Registers fn(world, id) -> a name for a companion (features/companions), used by name_of.
 function feed.set_namer(fn) namer = fn end
 local name_of  -- below
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   return ok and v or nil
 end
 
+-- Whether entity `id` is a player (has PlayerState).
 local function is_player(world, id) return id and id ~= 0 and get(world, "PlayerState", id) ~= nil end
 
 -- A short name for anyone in a fight: a player's character name, a companion's own name, else the monster's kind and level.
@@ -77,6 +80,7 @@ name_of = function(world, id)
   return name
 end
 
+-- The account of player entity `player`, or nil.
 local function account_of(world, player)
   local ok, a = pcall(world.account, world, player)
   return ok and a or nil
@@ -115,6 +119,7 @@ local function recipients(world, tab, owners, x, z)
   return list
 end
 
+-- Queues a line for player `pid`'s Battle or Loot tab (sent by feed.tick).
 local function queue(pid, tab, line)
   local o = out[pid]
   if not o then o = { battle = {}, loot = {} } out[pid] = o end
@@ -144,6 +149,7 @@ local function heal_target(world, healer, target)
   if (tonumber(healer) or 0) ~= 0 and tonumber(healer) == tonumber(target) then return "themselves" end
   return name_of(world, target)
 end
+-- A hit: a Battle tab line for the players on either side of it (players, companions and pets; hits between monsters, on objects or with no attacker are left out).
 function feed.hit(world, hit)
   if not (hit and battle_wanted(world)) then return end
   local a, t = tonumber(hit.attacker) or 0, tonumber(hit.target) or 0
@@ -198,6 +204,7 @@ function feed.hit(world, hit)
   for _, pid in ipairs(recipients(world, "battle", owners, okp and x or nil, okp and z or nil)) do queue(pid, "battle", text) end
 end
 
+-- A heal: a Battle tab line for the players whose companion healed or who were healed.
 function feed.heal(world, healer, target, amount)
   if not battle_wanted(world) then return end
   local owner = route.player_of(world, healer)
@@ -220,6 +227,7 @@ function feed.loot(world, r)
   -- goes after the bag in brackets, sent inside `where` (the players' games write " from <source>" before the ">" when
   -- the last field has text: it stays empty): "Midevil: Legendary Runes x2 > Midevil's bag (Shroud Soldier 45)"
   local where = {}
+  -- A place's text, with the count when only part of the stack went there.
   local function part(n, text) return text .. ((n ~= r.count) and (" " .. n) or "") end
   if r.junk then where[#where + 1] = "junk " .. r.junk
   else
@@ -239,6 +247,7 @@ end
 -- settings") a pickup by hand: the game's PickupEvent (from a body, a chest, the ground; anything with a source
 -- entity: crafting and FlameKit's own puts come from entity 0 and are left out). The event has the item and how many.
 local pickups_logged = {}  -- "from" / "none" -> lines logged
+-- A PickupEvent: a Loot tab line for the player who picked it up (FlameKit's own puts into a bag are left out: core/own_puts.lua).
 function feed.pickup(world, e)
   if type(e) ~= "table" then return end
   local by, from, item, count = tonumber(e.pickedUpByEntityId) or 0, tonumber(e.pickedUpFromEntityId) or 0,
@@ -295,6 +304,7 @@ local function receive(m)
   end
 end
 
+-- Opens the feed's net channel to the players' games (once); true when it is open.
 function feed.setup(k)
   kit = kit or k
   if registered ~= nil then return registered end

@@ -53,6 +53,7 @@ local M = {
 }
 
 local IN_AIR, ON_GROUND, GLIDING = 2, 0, 4
+-- A number from any game value (the game's 64-bit numbers come as userdata).
 local function n(v) return tonumber(tostring(v)) end
 
 -- the jump button: the input the player's game sends (dedicated server and joined players); the host's own player
@@ -95,6 +96,7 @@ local function facing(world, entity)
   return fx / len, fz / len
 end
 
+-- A free slot (1-4) of the Impulse component at time `now`, not `used`; slot 4 (or 3) when none is free.
 local function free_slot(imp, now, used)
   for k = 1, 4 do
     if k ~= used and imp.impulses[k].endTime <= now then return k end
@@ -102,6 +104,7 @@ local function free_slot(imp, now, used)
   return used == 4 and 3 or 4
 end
 
+-- Fills an Impulse slot: push x, y, z from `now` for `seconds`.
 local function put(slot, x, y, z, now, seconds, kind)
   slot.impulse.x, slot.impulse.y, slot.impulse.z = x, y, z
   slot.type, slot.startTime, slot.endTime, slot.keepAliveMask = kind or 0, now, now + math.floor(seconds * 1e9), M.KEEP

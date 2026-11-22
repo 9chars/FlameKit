@@ -18,6 +18,63 @@ Things FlameKit cannot do because EMF (0.6.6) does not offer them. Kept by Ninec
    no call says so (EMF's own HUD lines are hidden then; a mod's overlay cannot find out). Wanted: a call such as
    `overlay_open()` (C API and Lua), or an event when the console opens and closes.
 
+## Workarounds FlameKit uses
+
+(owner 2026-11-22 13:14 "I want to keep track of all changes that we needed to make to work around things EMF could not
+do") Every place where FlameKit does something itself, or reaches into the game directly, because EMF (0.6.6) has no
+call for it. Each entry: what EMF lacks, what FlameKit does instead, where. Collected from the source on 2026-11-22;
+every new workaround gets an entry here. Game addresses are for game build 1287369.
+
+1. **Pictures that stay on screen.** EMF draws text lines and windows only. FlameKit draws all of its UI (minimap,
+   tabs, item details, roster, labels) in a layered window of its own over the game's window, which lets clicks through
+   and never takes the keyboard. `flamekit_native/src/flamekit_native.cpp` (header).
+2. **More than 128 pictures.** EMF keeps at most 128 and never frees one. FlameKit reads item and buff icons straight
+   from the game's data files (enshrouded.kfc, kfc_resources, the .dat files; zstd and BC7 decoders) and draws them
+   itself. `flamekit_native/src/item_icons.hpp`.
+3. **Taking the mouse while a key is held.** FlameKit's pointer mode (Right Alt) uses its own overlay window.
+   `flamekit_native/src/flamekit_native.cpp`.
+4. **A channel between a native (C++) mod and a Lua mod** (request 8 below). The DLL and the Lua part talk through
+   small files in `emf\mods\flamekit`, polled: the UI (`ui_*.dat`, `ui_actions.txt`, `ui_layout.txt`, `*.request`),
+   loot news (`loot_news.txt`), Free build (`free_build_server.txt`, `free_build_client.txt`, `free_build_spots.txt`,
+   `altar_size_server.txt`, `altar_size_client.txt`, `altar_areas_server.txt`), companions (`labels.txt`,
+   `pet_drive.txt`, `custom_names.txt`, `companion_debug.txt`, `chest_ground.request`), the updater
+   (`update_status.txt`). `features/native_ui.lua`, `flamekit_native.cpp`, `build_anywhere.cpp`,
+   `companions_server.cpp`, `loot_news.cpp`.
+5. **4-byte events to Lua.** EMF delivers no 4-byte event to Lua's `emf.on_event` ("the queue layout of 4-byte events
+   is not known yet"). New loose items and containers are reported through `loot_news.txt` instead.
+   `flamekit_native/src/loot_news.cpp`, `core/loot_news.lua`.
+6. **Build zones (where building is allowed).** No EMF call adds, removes or lists build zones. FlameKit hooks the
+   game's `BuildZoneSystem_addZone` by byte pattern (Free build, remembered spots, Bigger altar areas, the list of
+   altar areas). `flamekit_native/src/build_anywhere.cpp` (its header has what we found).
+7. **Air (oxygen).** `emf.attribute` has no name for air. Invincible Mode writes the player's Oxygen component
+   directly (`dataStorage[1]` air now, `[2]` maximum, `DynamicOxygenState.accumulatedValue`). `features/experimental.lua`.
+8. **Game values with no EMF call** (glider speed, the updraft burst, climbing with the glider, keeping stamina, mana
+   and the shroud timer full, the fall height, monster threat tables for PvP). FlameKit writes the game's components
+   directly; each is wrapped so that a game update that moves a field only switches that one thing off (logged
+   "cannot ... on this game version"). `features/experimental.lua`, `core/leap.lua`, `core/dive.lua`,
+   `core/fall_guard.lua`.
+9. **Reading the player's input in some game versions.** When the game's own input component cannot be read, the
+   player's game sends the S and Space keys to the server for the glider (`input_broken`). `features/experimental.lua`.
+10. **Finding entities by component.** EMF has only `world:entities()` (about 37,000 on the production server). The
+    flame altars (bases) are found by a background walk, a slice per server step. `core/bases.lua`. Loot no longer
+    needs a walk: item 5.
+11. **An entity's template (what kind of monster it is).** EMF cannot say. FlameKit fingerprints the template halves
+    of a few components (`world:template`) and maps them to names. `core/monster_print.lua`, `core/monster_names.lua`.
+12. **Giving an item with its quality and level.** `emf.give` knows only the item type. FlameKit spawns the game's
+    pickup template with a PickupItem (item, level, rarity, amount). `core/ground_loot.lua`.
+13. **A creature spawned a moment ago.** EMF refuses it (it reads as dead until the game sets its health), so FlameKit
+    waits a while before it moves a spawned monster to the ground. `features/experimental.lua` (ground_q).
+14. **Text widths.** EMF gives none, so chip widths are estimated from the text's length. `features/loot_filter/client.lua`.
+15. **The loading screen of a fast travel.** No event says when it starts or ends; the server watches the player's
+    travel request and the game's "ready for gameplay" flag. `features/travel_hide.lua`.
+16. **Moving companions and pets.** No EMF call drives an NPC. FlameKit hooks the game's programs (EMF
+    `hook_program`: `steering_locomotion`, `interaction_offer`, `interaction_taming`, `interaction_attempt`,
+    `locomotion_execution`) and sets the movement itself. `flamekit_native/src/companions_server.cpp`.
+17. **Updating a mod.** EMF has no updater. FlameKit updates itself from its GitHub repository, from signed lists
+    (ECDSA P-256), and installs at the next game start. `flamekit_native/src/web_update.hpp`.
+18. **The game clock in nanoseconds.** Derived from `world:tick() * 1e9 / 60` (candidate below).
+19. **Reloading a native mod.** Every C++ change needs a restart of the game and the server (candidate below).
+
 ## No longer needed (FlameKit draws its own UI since 0.15.26 and its own icons since 0.15.13)
 
 - 1. A bigger, game-styled pointer for EMF windows: FlameKit's window uses the game's own pointer (look_for_game_cursor).
