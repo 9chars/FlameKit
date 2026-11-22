@@ -1,3 +1,6 @@
+0.15.413 Nov 21, 2026
+- Test: build anywhere. The build hammer no longer says "Needs a Flame Altar nearby" (FlameKit Native; on the test server and the owner's game only).
+
 0.15.412 Nov 21, 2026
 - Logging for the build hammer: what the game's placement check reports inside and outside a flame altar's area (a first step toward building anywhere). Nothing in the game changes yet.
 
