@@ -1081,6 +1081,10 @@ Next: restart test whether pieces in the new ring are kept.
 more reboot test.... some of them might be a bit different looking..."; restart 19:18; 19:21 "some blocks are there, but
 some are missing, so something odd is definitely happening" ("fairly close to the edge": which edge not answered).
 19:22 owner: "instead of 2x lets do 1x bigger?" -> asked; "1.5" -> 0.15.419 kAltarFactor 1.5.
+19:25 owner: "the other option, would be to increase the number of flame alters we can have" "or addition to": told:
+the game's limit is 16 (Flame level 11, whole world), PlayerBasesSystemServer has 16 base slots (EMF notes): above 16
+not advised; reaching 16 at a lower Flame level maybe (not looked at). Restart 19:30 (1.5x blocks placed 80-120 m);
+19:34 owner: "the test was good. I'd like to try 2x again and run some more tests" -> 0.15.420 kAltarFactor 2.
 
 ## How to build and publish a version
 

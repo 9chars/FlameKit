@@ -45,7 +45,7 @@ namespace gen = emf::gen;
 namespace {
 constexpr const char* kMod = "flamekit build";
 constexpr uint32_t kOutsideZone = 0x8 | 0x2;  // bit 3 "needs a flame altar", bit 1 "needs building area"
-constexpr float kAltarFactor = 1.5f;  // (0.15.419, owner 19:22 "1.5": at 2x (0.15.418) some blocks in the outer ring were gone after a restart; 4x froze the server, 0.15.417)
+constexpr float kAltarFactor = 2.0f;  // (0.15.420, owner 19:34 "the test was good. I'd like to try 2x again and run some more tests": 1.5x kept every block, 0.15.419; at 2x (0.15.418) some outer blocks were gone after restarts; 4x froze the server, 0.15.417)
 
 
 std::atomic<bool> g_free_on{true}, g_altar_on{true};
