@@ -1235,6 +1235,12 @@ remembered spots: experimental.lua listens to BuildingPlaceEvent (server; positi
 piece marks its 32 m cell (store free_build_spots.json, file free_build_spots.txt "x y z" centres, max 2000);
 build_anywhere.cpp reads the file at load (before the world) and every 15 steps, adds a 48 m zone per cell on the
 server every step (empty base id). kBoxUsesAltarBase off.
+Restart 10:03 (0.15.440). 10:12 owner asked how the spots work (answered: 32 m grid cells, a 48 m zone each). 10:13-
+10:14 three spots remembered (A 5776 5232, B 5808 5104, C 5776 5392); 10:18 owner: "yeah I spaced them out well..
+restart". Restart 10:19 (saved 10:18:59): "(server, at start): 3 remembered spot(s)" 10:19:03, world loaded 10:19:42.144,
+spot zones in the list 10:19:42.698. **10:22 owner: "it worked.. all 3 spots are there"**: Free build pieces survive a
+restart with the remembered spots. Not tested yet: the 30-minute reset; forgetting spots; the tooltip still says
+"temporary".
 
 ## How to build and publish a version
 
