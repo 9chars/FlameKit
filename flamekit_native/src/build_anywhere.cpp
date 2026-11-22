@@ -20,6 +20,7 @@
 // remembering what it wrote so a value is never multiplied twice. On for everyone while testing (local server only).
 //
 // Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
+// (0.15.416) an altar's change is logged once per altar and world (the server rewrites the range every step).
 #include <windows.h>
 
 #include <atomic>
@@ -157,9 +158,12 @@ void altar_post(void* raw, void*) {
         t->rangeX *= kAltarFactor;
         t->rangeY *= kAltarFactor;
         t->rangeZ *= kAltarFactor;
+        const bool first = g_altar_written.find(key) == g_altar_written.end();
         g_altar_written[key] = t->rangeX;
         g_altars.fetch_add(1);
-        EMF_LOG(kMod, "bigger altar areas (%s world): altar %u from %.0f x %.0f to %.0f x %.0f m (half widths)",
+        // (0.15.416) the game writes the range again every step on the server (0.15.415: ~4,500 log lines a second):
+        // logged only the first time per altar and world
+        if (first) EMF_LOG(kMod, "bigger altar areas (%s world): altar %u from %.0f x %.0f to %.0f x %.0f m (half widths)",
                 kind == 0 ? "server" : "client", *idp, x0, z0, t->rangeX, t->rangeZ);
     }
 }
@@ -190,8 +194,14 @@ bool fk_build_anywhere_load(bool dedicated) {
     });
     emf::add_command("fkbuild", " stats | free on|off | altar on|off: Free build and the bigger altar areas (debug)",
                      [](emf::World, const std::vector<std::string>& args) {
-        if (args.size() >= 2 && args[0] == "free") g_free_on = args[1] == "on";
-        if (args.size() >= 2 && args[0] == "altar") g_altar_on = args[1] == "on";
+        std::string all;  // (0.15.416) the words however EMF splits them
+        for (const auto& x : args) all += " " + x;
+        all += " ";
+        if (all.find(" free on ") != std::string::npos) g_free_on = true;
+        if (all.find(" free off ") != std::string::npos) g_free_on = false;
+        if (all.find(" altar on ") != std::string::npos) g_altar_on = true;
+        if (all.find(" altar off ") != std::string::npos) g_altar_on = false;
+        EMF_LOG(kMod, "fkbuild:%s", all.c_str());
         size_t ns = 0, nc = 0;
         {
             std::lock_guard<std::mutex> lk(g_mx);
