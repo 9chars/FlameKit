@@ -60,6 +60,16 @@ words why (e.g. "Restart: none: EMF reloaded the server's Lua by itself"). Owner
 while to read all your shit to figure out if I need to restart or not ... I have to keep telling and asking you this."
 No exceptions, also for small changes, probes and test copies.
 
+## Rule 0x: CORE DIRECTIVE, ASK before every restart (owner, 2026-11-22 16:45-16:47)
+
+2026-11-22 16:45:06 Claude restarted the local server and game during the owner's water test after "its been running
+this whole time and acting normally", which was NOT a restart request: the test was ruined. Owner: "you restarted the
+server when I was fucking with it still", "don't fucking do that shit", "at no time did I fucking say yes restart it",
+"at least ASK me first". Rule: before ANY restart (server, client, both, a helper request that restarts), ask the
+owner in a yes/no question and wait. Restart only on his explicit yes to that question in his next message. A report
+("done", "it's ready", "it's running", "acting normally") is never a yes. No exception, also not for test steps Claude
+announced earlier.
+
 ## Rule 0p: CORE DIRECTIVE, the owner picks the next action (owner, 2026-11-16 13:14)
 
 Always let the owner pick the next action before rolling out any test or any change to the mod. After each result,
