@@ -30,6 +30,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <set>
 #include <string>
@@ -106,10 +107,11 @@ std::atomic<int> g_zone_said{0};
 
 constexpr double kPlayerHalf = 40.0;  // m each way the box always covers around the player
 constexpr double kGridStep = 32.0;    // m: the box moves only when the player crosses a grid line
+constexpr bool kBoxUsesAltarBase = true;  // (0.15.439 TEST) the box borrows an altar's base id
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 std::atomic<int> g_box_said{0};
 
-void add_player_boxes(void* bzs, uint8_t flag) {
+void add_player_boxes(void* bzs, uint8_t flag, const void* altar_base_id, uint32_t altar_entity) {
     static std::mutex mx;
     static std::unordered_map<void*, uint64_t> last;
     const uint64_t now = g_steps.load();
@@ -153,8 +155,19 @@ void add_player_boxes(void* bzs, uint8_t flag) {
         const auto& p = ct->transform.position;
         const int64_t cx = cell_mid(p.x), cy = cell_mid(p.y), cz = cell_mid(p.z);
         int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
-        uint8_t no_base[16] = {};
-        g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
+        // (0.15.439 TEST, owner 09:43 "we can try that for testing, but ideally that would not be a long term fix"):
+        // the box gets the base id of the altar zone the game is adding right now (the first of the step), so the game
+        // may count it as part of that altar's base: does the save then keep what is built in it? (0.15.426-0.15.438:
+        // an empty base id; 09:40 A/B test: nothing kept.)
+        uint8_t base[16] = {};
+        if (kBoxUsesAltarBase && altar_base_id) std::memcpy(base, altar_base_id, 16);
+        g_add_zone(bzs, 0, flag, 0, b, 0, 0, base);
+        static std::atomic<int> base_said{0};
+        if (kBoxUsesAltarBase && base_said.fetch_add(1) < 2) {
+            char hex[33] = {};
+            for (int i = 0; i < 16; ++i) std::snprintf(hex + i * 2, 3, "%02x", base[i]);
+            EMF_LOG(kMod, "free build (%s): the box of player %u uses the base id %s (of altar %u's zone)", side, id, hex, altar_entity);
+        }
         g_boxes.fetch_add(1);
         if (g_box_said.fetch_add(1) < 4)
             EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
@@ -165,7 +178,7 @@ void add_player_boxes(void* bzs, uint8_t flag) {
 
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
-    if (g_free_on.load() && box && list == 0 && owner == 0) add_player_boxes(bzs, flag);
+    if (g_free_on.load() && box && list == 0 && owner == 0) add_player_boxes(bzs, flag, base_id, entity);
     const float factor = g_factor.load();
     if (g_altar_on.load() && factor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];

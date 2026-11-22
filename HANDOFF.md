@@ -1225,6 +1225,9 @@ not survive restarts". Test: spot A near the villager (owner walked away), spot 
 the restart 09:37 (saved 09:37:47). 09:37 owner: with the pickaxe out the border comes back, with the axe not (noted,
 no action). **09:40 owner: "the NPC is still there but objects from both A and B are gone"**: neither the villager nor
 the player box at save time keeps Free build pieces.
+09:43 owner: "we can try that for testing, but ideally that would not be a long term fix or solution. does the game mark
+existing blocks from structures outside of bases some how? or just uses the flame alter to know what areas to save?"
+-> 0.15.439 TEST: the player box gets the base id of the altar zone being added (kBoxUsesAltarBase).
 
 ## How to build and publish a version
 
