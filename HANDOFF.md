@@ -1215,6 +1215,11 @@ all the logging per usual"**. 0.15.438: build_anywhere.cpp rewritten without the
 log) and the tool signal (free_build_tool.txt); experimental.lua without op "tool", FB.tool, the tool sends; hosting
 back to a normal local. Kept: the player box on the grid, the altar factor, all their logs, build_anywhere.lua's
 cursor + tool-signal logging. Next: "Base 1".
+Restart 09:20 (0.15.438). **09:26 owner: "the NPC came back in the same spot named "Base 1" I confirmed I could still build
+normally, the border disappears when I move off the tool. everything appears to be working still".** RE so far: base
+names: ui_base_name (client, 0x201) reads ClientBaseIdComponent + CustomPlayerString and writes PlayerBasesSystemClient;
+the "Base N" text is not in the exe (loca data). Guess (not checked): the Free build box went into the save as a base
+zone (empty base id) and came back at load as an unnamed base ("Base 1"), so the villager's spot is inside a base now.
 
 ## How to build and publish a version
 
