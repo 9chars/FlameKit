@@ -1,3 +1,6 @@
+0.15.452 Nov 22, 2026
+- New Building tab: Free build, Bigger altar areas and the remembered spots moved here from the Experimental tab. Your Free build setting carries over.
+
 0.15.451 Nov 22, 2026
 - Debug: /flamekit.water all [radius] lists every entity within a few metres of you with every component it has, to find what a water piece is made of.
 

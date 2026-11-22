@@ -1604,6 +1604,15 @@ When a restart is due (or might help), offer it as buttons, never ask the owner 
    a save and restart. Still to test: forget the spot, then the reset (30 min or a restart: ask first).
    16:58:29 owner forgot the spot (0 left), no error; 16:58:51 he zoned to 7501 1064 4825 (about 1,700 m away, in an
    altar area). The game's ~30-minute reset of the dispenser's place is expected from about 17:28.
+17:16 owner "#10 make it its own feature": 0.15.452 features/building.lua (the Building tab: Free build switch,
+Bigger altar areas, remembered spots, forget buttons; channel "build"; saved switches building.json, copied once from
+experimental.json; PvP through the new core/pvp_state.lua, set by experimental.lua's apply), all Free build code taken
+out of experimental.lua; tests: notes/tests/building_test.lua (20 checks) + run.lua (channel "build" allowed). Live
+17:21:36. MISTAKE: the player's game had no answer yet (a new channel needs a rejoin) and wrote altar_size_client "1" and
+an empty free_build_client: his game ran with normal altar areas for 74 s; fixed in the same version (no answer = files
+left alone), files put back by hand 17:22:52. The tab says "Asking the server..." until he rejoins.
+17:19 owner: #5 #7 #8 "go ahead"; #9 not understood; "alter area rule for admins" -> "make this a setting and put it into
+the "Building" tab"; "Hide all of FlameKit in build mode" not understood; #4: nothing without a test.
 
 ## Things learned the hard way
 

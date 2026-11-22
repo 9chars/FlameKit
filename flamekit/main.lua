@@ -13,6 +13,7 @@ kit.start({
   "features.loot_filter",
   "features.minimap",
   "features.experimental",  -- its Debug section has the party's test players
+  "features.building",      -- (0.15.452) the Building tab: Free build, Bigger altar areas, remembered spots
   "features.settings",
   "features.party",         -- no tab of its own
   "features.native_ui",
