@@ -1334,6 +1334,9 @@ the tooltip. 0.15.448 (Lua, live 13:59:42): "Forget this spot" and "Forget all s
 spot is within 64 m / there are no spots / not an admin ("(admins only)" after the text, as Bigger altar areas).
 14:01 owner "looks good". 14:04:20 Forget all spots tested by the owner: "player 1 forgot all 2 remembered spot(s)", DLL
 "0 remembered spot(s)" 14:04:20.461, free_build_spots.json {} and .txt empty. The local server has no spots now.
+**14:07 owner: "yes backup the LOCAL current world now"** (before swapping the local map for a new one): save asked
+through save_now.request (saved 14:07:28), copied to save_backups/2026-11-22_1407_before_map_swap (world0.ksd md5
+a9d2eced4d454509e4b821532837726c, plus the game's backup folder, all md5 equal). G-Portal not touched.
 
 ## How to build and publish a version
 
