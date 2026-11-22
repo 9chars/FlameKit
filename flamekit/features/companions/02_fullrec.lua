@@ -15,6 +15,7 @@ function fr_val(v)
   end
   return tostring(v)
 end
+-- The value at `path` ("a.b.c"; "#" at the end: an array's length and first 8 values) of component `c`, as text.
 function fr_read(c, path)
   local arr = path:sub(-1) == "#"
   if arr then path = path:sub(1, -2) end
@@ -27,15 +28,18 @@ function fr_read(c, path)
   end
   return fr_val(v)
 end
+-- Writes a line to a recording's file.
 function fr_write(r, text)
   if not r.file then return end
   r.file:write(text, "\n")
 end
+-- A line's stamp: the world's step and the clock.
 function fr_stamp(world) return string.format("t=%d %s", world:tick(), os.date and os.date("%H:%M:%S") or "") end
 function fullrec_event(world, id, text)  -- called from every part of the probe below
   local r = fullrecs[id]
   if r then fr_write(r, fr_stamp(world) .. " EVENT " .. text) end
 end
+-- Starts recording entity `id` for `secs` seconds into its own file (the components it has, then a full snapshot).
 function fullrec_start(world, id, secs)
   if fullrecs[id] and fullrecs[id].file then pcall(function() fullrecs[id].file:close() end) end
   local f = io.open(emf.dir .. "\\fullrec_" .. tostring(id) .. "_" .. (os.date and os.date("%H%M%S") or tostring(world:tick())) .. ".txt", "w")  -- one file per recording
@@ -50,6 +54,7 @@ function fullrec_start(world, id, secs)
   fr_write(r, string.format("%s START entity %s, %d components: %s", fr_stamp(world), tostring(id), #comps, table.concat(comps, ", ")))
   log(string.format("fullrec %s: %d components, to a new fullrec_%s_<time>.txt for %d s", tostring(id), #comps, tostring(id), secs))
 end
+-- One recording step: writes the fields that changed (and components that went).
 function fullrec_step(world, id, r)
   local out, changed = {}, 0
   for _, name in ipairs(r.comps) do

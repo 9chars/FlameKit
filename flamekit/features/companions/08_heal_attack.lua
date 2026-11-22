@@ -37,6 +37,7 @@ HEAL_FX = {
 heal_fx_shown = {}
 SHOUT_TICKS = 90                                    -- the shout plays this long before his next attack
 
+-- Healing mode, every drive step: heals the player, the other companions or himself when they are hurt and he has the mana (with the sparkle and the Wolf Shout).
 drive_heal = function(s)
   local world, id, h, t, a = s.world, s.id, s.h, s.t, s.a
   local name = tostring(name_of[id] or id)
@@ -131,6 +132,7 @@ drive_heal = function(s)
     (okh and res) and "" or " (could not add health: " .. tostring(res) .. ")"))
 end
 
+-- The fight, every drive step: picks a target by his mode, goes to it and runs the attack sequence; true while he fights (the follow drive waits).
 drive_fight = function(s)
   local world, id, h, a, t = s.world, s.id, s.h, s.a, s.t
   local cd = a.combatData
@@ -140,9 +142,11 @@ drive_fight = function(s)
     h.fight_init = true
     pcall(function() cd.selectedAttackIndex = 255 end)
   end
+  -- Clears his game target.
   local function clear_target()
     pcall(function() if cd.lastTargetId ~= 0 then cd.lastTargetId = 0 end end)
   end
+  -- Ends the attack sequence (logged) and clears his target.
   local function the_end(why)
     if h.atk then log(string.format("fight %s: the attack sequence ends: %s", name, why)) end
     h.atk = nil
@@ -173,8 +177,10 @@ drive_fight = function(s)
     log(string.format("fight %s: the attack sequence starts (%s%s): %d candidate(s), the nearest %s at %.1f m", name, mode,
       A.wide and ", something attacked: he fights like Aggressive until it ends" or "", #list, tostring(list[1].id), list[1].d))
   end
+  -- He stands where he is this step.
   local function hold_still() hold_at(a, nx, ny, nz) return true end
   local smode = (A.wide and mode == "Defensive") and "Aggressive" or mode
+  -- Starts the target choice over (a new candidate list).
   local function repick(why)
     A.phase, A.target, A.list, A.i, A.tries, A.t, A.checking, A.atk = "pick", nil, nil, 1, 1, t, nil, nil
     A.best_d, A.prog_t, A.stall_said = nil, nil, nil
