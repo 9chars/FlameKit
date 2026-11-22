@@ -1628,6 +1628,14 @@ Free build needs no altar at all. DLL installed on server and client (running on
 next restart. The Lua (building.lua, changes.txt, mod.json in claude_scratch\v453) is NOT installed yet on purpose: the
 old DLL treats a briefly missing file as empty; it goes in together with the restart. Tests all passed (host, joined,
 building 26 checks). Waiting for the owner's yes to restart (rule 0x).
+17:47 owner (water test part 2 result): "it looks like it cleared the building block from our test, but the water object
+is still there and flowing, so I did not remove that water object". FACT: after the forgotten spot's reset the block is
+gone, the water dispenser is still there and its water flows; no water warning in the server log yet (server up since
+16:53). GUESS: the game's reset only puts back blocks, not placed objects; a dispenser left outside any building area is
+the same state the old Free build left behind (the earlier water warnings came at the server's start, when it loads the
+world). Plan offered: leave the dispenser, restart (needed anyway for 0.15.453), watch the start-up log for the water
+warnings. If they come back: forgetting a spot with water in it must be handled (refuse/warn, or remove the water
+objects too, or no water pieces in Free build spots). Owner decides.
 
 ## Things learned the hard way
 
