@@ -1042,6 +1042,17 @@ Loaded by EMF's reload (no restart). 18:16-18:18 test at the altar 6298.8 5187.2
 ClientCursor primary+secondary and ServerCursor primary exactly when the player was >= 80 m out (3 crossings: 18:17:10,
 18:17:38, 18:17:58), off back inside (the player's position, not the cursor's). Server bit 12 often with it. Bit 0, 5, 8,
 11 come and go inside too. Likely: bit 3 = outside every build zone.
+0.15.413 DLL (src/build_anywhere.cpp, owner "yes" 18:19; save copied to <work folder>\save_backups\world0_before_v413_1821.ksd):
+hook_program post on client_cursor (player's game) and server_cursor_no_prediction (server) clears bit 3. 18:24 owner:
+"it lets me pull out the hammer but it gives me "needs building area"": bit 1 stayed on outside. 0.15.414: bits 1 and 3,
+client primary+secondary, server primary only (server secondary has bits 1,2,3 on inside: other meaning). 18:29 owner:
+no error, but the block would not go down outside; 18:30 "it did let me put a block outside the flame edge, but I was
+inside the flame boundry"; 18:31 with the building materials in his bag, outside the area: "that worked". So outside an
+altar's area the hammer takes materials only from the bag (the game's own rule). Not built (was ready): a build zone
+around each player through addZone (server exe: addZone 0x140916310, add_buildzones_server fn 0x1400ee2f0; call:
+rcx BuildZoneSystem, edx 0 list, r8d 0, r9d 0, [rsp+20] &WorldAABB {min xyz, max xyz int64, 2^32 per m}, [rsp+28] u32
+entity, [rsp+30] u8 wasAbandoned, [rsp+38] &baseId (16 B)). OPEN: whether pieces built outside stay (restart, the
+game's later handling); who may build anywhere (setting) before any release.
 
 ## How to build and publish a version
 
