@@ -1332,6 +1332,8 @@ op forget_all_spots -> FB.forget_all_spots (store and file emptied, logged "forg
 thing".** Standing UI rule from now: buttons are never hidden, they are shown greyed out (disabled) with the reason in
 the tooltip. 0.15.448 (Lua, live 13:59:42): "Forget this spot" and "Forget all spots (N)" always shown; disabled when no
 spot is within 64 m / there are no spots / not an admin ("(admins only)" after the text, as Bigger altar areas).
+14:01 owner "looks good". 14:04:20 Forget all spots tested by the owner: "player 1 forgot all 2 remembered spot(s)", DLL
+"0 remembered spot(s)" 14:04:20.461, free_build_spots.json {} and .txt empty. The local server has no spots now.
 
 ## How to build and publish a version
 
