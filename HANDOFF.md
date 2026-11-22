@@ -1369,6 +1369,13 @@ copied before any restart: crash_reports\2026-11-22_1516_crash (dump, server/cli
 README). G-Portal's own dump of 2026-11-20 04:26 UTC (production_stable_logs\crash_dumps) is the same crash at the same
 instruction with only emf_core.dll loaded (no flamekit_native, no building-area changes then): a game bug in the water
 flow code, not FlameKit's. Copied into the report. Not restarted yet (asked).
+15:24 owner "yes start it up, i'll use the new free build system to remove the pieces": started 15:24:55. 15:47 owner:
+"Needs building area" in wisp mode: his body (6000 1016 4679) stayed inside the other player's 1.5x altar area, so no
+Free build box (rule of 11:06); offered: rule not for admins (15:58 "you might have to, I'm trying something first").
+16:03 he removed the pieces (5 remembered spots made while climbing, around 5840-5872 4816), no water source seen.
+16:04 owner "go ahead": 0.15.450 features/water_debug.lua, /flamekit.water [radius] (admins, chat or console): the
+entities with BlockWater/WaterDispenser/WaterDrain/WaterEffector within radius into the server log, sliced scan
+(2000 entities a step), the count to the player's Notices (chat channel "n" message). Live 16:05:41; not run yet.
 
 ## How to build and publish a version
 

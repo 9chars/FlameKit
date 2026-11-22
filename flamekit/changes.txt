@@ -1,3 +1,6 @@
+0.15.450 Nov 22, 2026
+- Debug: /flamekit.water [radius] (admins) lists the water pieces the game knows near you into the server's log, to find water left over from removed pieces. Nothing in the world changes.
+
 0.15.449 Nov 22, 2026
 - Free build: at most 100 remembered spots for now (was 2000). When the limit is reached, a player who builds a new spot is told that it is not kept.
 

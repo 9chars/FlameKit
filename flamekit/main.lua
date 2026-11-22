@@ -27,6 +27,7 @@ kit.start({
   "features.travel_hide",     -- (0.15.281) FlameKit's UI hides during a fast travel (the server tells the game when)
   "features.npc_wheel_probe",  -- the companion system, the player's end: the wheel, the Companion Roster window (2026-11-17)
   "features.msg_tabs",         -- (0.15.377) the Messages window's Battle and Loot tabs (the server's half and the channel)
+  "features.water_debug",      -- (0.15.450) /flamekit.water [radius]: the water entities near you into the server's log (admins)
   "features.companions",       -- the companion system, the server end (0.15.362; in the release since 0.15.368, owner
                                -- 2026-11-20 19:05). Both share their channels through core/companion_net
   -- "features.my_next_feature",
