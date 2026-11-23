@@ -1913,6 +1913,14 @@ Restart 23:26 (spot loaded from start): still slow 25 ms at 5800 5099 -> NOT the
 removed, spawn point still active: still ~20 ms. => Since the spawn point was activated, the moving Free build area
 slows the server wherever the player is (best reading; the why is unproven). Owner 23:34: "whole lot of tests soooo
 few answers". Next: 0.15.466 (16 m, speed log with threads) at 5800 5100 with the spawn point active.
+**23:41-00:18 (0.15.466, spawn point active, at 5800 5100):** 16 m 23:41-23:43 normal; 112 m (test file) from 23:43:04:
+normal ~2 min, then SLOW from ~23:45:30 (21.8 ms; 'keen GameServer' world step thread 89% of a core vs 50% normal, all
+task threads normal, ECS work down, entity count flat: the extra work is on the game's main server thread, outside
+ECS; this is why G-Portal's total CPU barely moves). Back to 16 m 23:46: still slow; tool away 23:49:48 (no area):
+still slow until ~23:52:40, then normal (owner still standing in remembered spot 5808 5104 -> not the spot). So the
+slowdown starts ~2 min after a big area is on and ends ~3 min after it is gone. **16 m for 11 minutes
+00:07:34-00:18:24 with the spawn point active: 0 SLOW minutes, 16.7 ms every minute.** Owner 00:04: "this all sounds
+like bullshit to me". Not proven why the game's main thread works harder for a big no-base zone.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
