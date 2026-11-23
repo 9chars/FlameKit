@@ -1813,6 +1813,16 @@ plus Remove-OldFlameKit), install.cmd, uninstall.*, emf_common.ps1, make_package
 is the old one now): over the 0.15.124 test install: exit 0, all 108 game files equal the package, the player's
 junk_list.json and ui_layout.txt kept, emf_core 0.6.19, FlameKit 0.15.462. Rebuild the zip from dist + emf-dist at the
 Stable release (same content).
+20:36 owner joined (game started 20:32:49): no "net_to_server refused" line at all, welcome 20:36:14, the junk list
+synced, Free build on. **20:38 owner: "do it yes" (Stable + the package + the G-Portal upload).** Stable: dist = 0.15.462
+(update.txt byte-equal to dist-test's, so the same update.sig; sig good; every path one the 0.15.423 updater takes),
+emf-dist = emf-dist-test (EMF 0.6.19, sig good): commit 896faf3, pushed 20:39. Package: rebuilt from dist + emf-dist =
+the install-tested release\FlameKit-0.15.462.zip (same content). G-Portal: outbox = the 63 files changed since 0.15.423
+(61 Lua/txt/json + flamekit_native.dll + its mod.json; none removed since), md5 = the local server's installed 0.15.462.
+Upload 20:40:31 FAILED at the first file, the DLL: FTP "(451) Local error in processing": the running G-Portal server
+holds flamekit_native.dll. Nothing was uploaded (all 63 still in the outbox). On Nov 21 the server happened to be shut
+down before the upload. => G-Portal must be STOPPED for the upload (owner, G-Portal panel), then upload, then start.
+(Correction: the outbox at 19:35 held only empty folders, not files.)
 
 ## Things learned the hard way
 
