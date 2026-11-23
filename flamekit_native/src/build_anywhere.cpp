@@ -51,10 +51,19 @@
 // clear_buildzones_client; EMF hook_program), so Free build no longer needs a flame altar on the map; the old way (from
 // the first altar's addZone) is the fallback when those hooks cannot be set (fkbuild clear off switches to it).
 //
-// Console: fkbuild stats | free on|off | altar on|off | clear on|off (debug master switches; free and altar on at start).
+// Console: fkbuild stats | free on|off | altar on|off | clear on|off (debug master switches; free and altar on at start)
+//          | size <m>|off (0.15.466, a test on the owner's own server: the moving area's size, see read_test_size).
+//
+// (0.15.466) SERVER SPEED LOG (speed_tick): one line a minute in emf_core.log ("server speed, minute N"): the steps, the
+// average and the slowest step, the process's CPU, each Free build area that was on and the remembered spots; a minute
+// whose steps average more than kSlowMs is logged as SLOW with the threads that used the most CPU in it, each next to
+// what it uses in a normal minute. Logging only.
 #include <windows.h>
+#include <tlhelp32.h>
 
 #include <algorithm>
+#include <cstdlib>
+#include <iterator>
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -206,6 +215,8 @@ std::atomic<int> g_zone_said{0};
 // 8 m each way from the middle of the player's 4 m grid cell. It moves in 4 m steps (each move sends every player the
 // zone list again, about 1 KB).
 constexpr double kAimHalf = 8.0;   // m each way from the middle of the player's grid cell (16 m box)
+// (0.15.466, owner 22:34 "yes" to a test size) what is used: kAimHalf, unless free_build_test_size.txt says otherwise
+std::atomic<double> g_aim_half{kAimHalf};
 constexpr double kAimStep = 4.0;   // m: the box moves only when the player crosses a grid line
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 // (0.15.453, owner 17:19 "#7 go ahead") the positions of the players Free build is on for, read on each world's own
@@ -216,6 +227,10 @@ struct Pos { int64_t x, y, z; };
 std::mutex g_pos_mx;
 std::unordered_map<uint64_t, Pos> g_pos;  // (side << 32 | entity) -> position (2^32 per m), under g_pos_mx
 std::atomic<int> g_box_said{0};
+// (0.15.466) the server's Free build areas this minute, for the speed log: player -> steps with an area, where it was
+struct BoxSeen { uint32_t passes = 0; int64_t x = 0, z = 0; };
+std::mutex g_seen_mx;
+std::unordered_map<uint32_t, BoxSeen> g_seen;  // under g_seen_mx
 
 // (0.15.443, owner 11:04 "the free build mode should not work while inside a flame alter base", 11:06 "if you're
 // inside a flame alter area from the game I want the games default behaviors to work. free build mode should only
@@ -356,7 +371,8 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         return;
     }
     const int64_t step = int64_t(kAimStep * 4294967296.0);
-    const int64_t half = int64_t(kAimHalf * 4294967296.0);  // (0.15.464) around the middle of the player's grid cell
+    const double half_m = g_aim_half.load();  // (0.15.466) kAimHalf or the test size
+    const int64_t half = int64_t(half_m * 4294967296.0);  // (0.15.464) around the middle of the player's grid cell
     auto cell_mid = [step](int64_t v) {
         int64_t q = v / step;
         if (v % step < 0) --q;  // floor for negative values
@@ -403,9 +419,16 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         uint8_t no_base[16] = {};
         g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
         g_boxes.fetch_add(1);
+        if (w.is_server()) {  // (0.15.466) for the speed log
+            std::lock_guard<std::mutex> lk(g_seen_mx);
+            BoxSeen& bs = g_seen[id];
+            ++bs.passes;
+            bs.x = cx;
+            bs.z = cz;
+        }
         if (g_box_said.fetch_add(1) < 4)
             EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
-                    kAimHalf * 2, id, double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0,
+                    half_m * 2, id, double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0,
                     double(cx) / 4294967296.0, double(cy) / 4294967296.0, double(cz) / 4294967296.0);
     }
 }
@@ -497,6 +520,175 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
     if (box && list == 0 && owner == 0) altar_add(bzs, box);  // (0.15.443)
     return g_add_zone(bzs, list, flag, owner, box, entity, abandoned, base_id);
 }
+// (0.15.466, owner 22:33 "im not convinced it was just the size", 22:34 "yes" to "fkbuild size <m>") a test size for the
+// moving Free build area on the owner's own server: free_build_test_size.txt (FlameKit's folder, the server's) holds the
+// area's width in m (4 to 112); without the file (or another value) it is the normal 16 m (kAimHalf). Written by the
+// command "fkbuild size <m>" ("fkbuild size off" removes it) or by hand. Read every 15 steps; logged on change. Only
+// the server's area: the player's own game keeps 16 m (what the server does is what is being measured).
+constexpr double kTestMinM = 4.0, kTestMaxM = 112.0;
+void read_test_size() {
+    double m = 0;
+    if (FILE* f = _wfopen(lua_file(L"free_build_test_size.txt").c_str(), L"r")) {
+        if (fscanf(f, "%lf", &m) != 1) m = 0;
+        fclose(f);
+    }
+    const double half = (m >= kTestMinM && m <= kTestMaxM) ? m / 2 : kAimHalf;
+    if (half != g_aim_half.load()) {
+        g_aim_half = half;
+        if (half == kAimHalf) EMF_LOG(kMod, "free build (server): the Free build area is the normal %.0f m again (no test size)", kAimHalf * 2);
+        else EMF_LOG(kMod, "free build (server): TEST size from free_build_test_size.txt: the Free build area is %.0f m (normal %.0f m)", half * 2, kAimHalf * 2);
+    }
+}
+
+// ---- (0.15.466) the server speed log (see the header) ----
+constexpr double kSlowMs = 20.0;      // a minute whose steps average more than this is SLOW (normal: 16.7 ms, 60 a second)
+constexpr double kMinuteS = 60.0;     // one line per this many seconds
+constexpr size_t kTopThreads = 6;     // threads named in a SLOW line
+constexpr uint32_t kListEvery = 30;   // also name the busiest threads in a normal minute every this many minutes
+uint64_t ft(const FILETIME& f) { return (uint64_t(f.dwHighDateTime) << 32) | f.dwLowDateTime; }
+struct ThreadUse { uint64_t last = 0; double normal = -1; std::string name; };  // CPU (100 ns), % of a core normally
+
+// A thread's name, when the game gave it one (GetThreadDescription, Windows 10 1607 and newer; looked up at run time).
+std::string thread_name(HANDLE h) {
+    using Fn = HRESULT(WINAPI*)(HANDLE, PWSTR*);
+    static Fn fn = reinterpret_cast<Fn>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetThreadDescription"));
+    std::string out;
+    PWSTR wname = nullptr;
+    if (fn && SUCCEEDED(fn(h, &wname)) && wname) {
+        char buf[96] = {};
+        WideCharToMultiByte(CP_UTF8, 0, wname, -1, buf, sizeof(buf) - 1, nullptr, nullptr);
+        out = buf;
+        LocalFree(wname);
+    }
+    return out;
+}
+
+// The CPU time (100 ns) each thread of this process used since the last call, as (thread id, time); a thread seen for
+// the first time counts with all its time. Threads that ended are forgotten.
+std::vector<std::pair<uint32_t, uint64_t>> thread_cpu(std::unordered_map<uint32_t, ThreadUse>& use) {
+    std::vector<std::pair<uint32_t, uint64_t>> out;
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snap == INVALID_HANDLE_VALUE) return out;
+    const DWORD pid = GetCurrentProcessId();
+    std::set<uint32_t> alive;
+    THREADENTRY32 te{};
+    te.dwSize = sizeof(te);
+    if (Thread32First(snap, &te)) {
+        do {
+            if (te.th32OwnerProcessID != pid) continue;
+            HANDLE h = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, te.th32ThreadID);
+            if (!h) continue;
+            FILETIME c, e, k, u;
+            if (GetThreadTimes(h, &c, &e, &k, &u)) {
+                const uint64_t now = ft(k) + ft(u);
+                auto it = use.find(te.th32ThreadID);
+                if (it == use.end()) {
+                    ThreadUse t;
+                    t.last = now;
+                    t.name = thread_name(h);
+                    use.emplace(te.th32ThreadID, t);
+                    out.emplace_back(te.th32ThreadID, now);
+                } else {
+                    out.emplace_back(te.th32ThreadID, now >= it->second.last ? now - it->second.last : 0);
+                    it->second.last = now;
+                }
+                alive.insert(te.th32ThreadID);
+            }
+            CloseHandle(h);
+        } while (Thread32Next(snap, &te));
+    }
+    CloseHandle(snap);
+    for (auto it = use.begin(); it != use.end();) it = alive.count(it->first) ? std::next(it) : use.erase(it);
+    return out;
+}
+
+uint64_t process_cpu() {
+    FILETIME c, e, k, u;
+    return GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u) ? ft(k) + ft(u) : 0;
+}
+
+// Called on each server world step (its own thread). Counts the steps and their length; once a minute writes the line.
+void speed_tick() {
+    static LARGE_INTEGER freq{}, last{}, minute_start{};
+    static bool started = false;
+    static uint32_t steps = 0, minute = 0;
+    static double slowest = 0;
+    static uint64_t proc_last = 0;
+    static std::unordered_map<uint32_t, ThreadUse> use;
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    if (!started) {  // the first step: only the starting values (the threads' time so far is not this minute's)
+        QueryPerformanceFrequency(&freq);
+        last = minute_start = now;
+        proc_last = process_cpu();
+        thread_cpu(use);
+        started = true;
+        EMF_LOG(kMod, "server speed: logged once a minute from now (SLOW: steps averaging more than %.0f ms; normal 16.7 ms)", kSlowMs);
+        return;
+    }
+    const double ms = double(now.QuadPart - last.QuadPart) * 1000.0 / double(freq.QuadPart);
+    last = now;
+    ++steps;
+    if (ms > slowest) slowest = ms;
+    const double span = double(now.QuadPart - minute_start.QuadPart) / double(freq.QuadPart);
+    if (span < kMinuteS) return;
+    ++minute;
+    const double avg = steps ? span * 1000.0 / steps : 0;
+    const uint64_t pc = process_cpu();
+    const double cores = double(pc - proc_last) / (span * 1e7);
+    proc_last = pc;
+    std::string areas;
+    {
+        std::lock_guard<std::mutex> lk(g_seen_mx);
+        char b[160];
+        for (const auto& kv : g_seen) {
+            snprintf(b, sizeof(b), "%splayer %u: %.0f m in %u zone list rebuild(s), last at %.0f %.0f", areas.empty() ? "" : "; ",
+                     kv.first, g_aim_half.load() * 2, kv.second.passes, double(kv.second.x) / 4294967296.0, double(kv.second.z) / 4294967296.0);
+            areas += b;
+        }
+        g_seen.clear();
+    }
+    size_t spots = 0;
+    {
+        std::lock_guard<std::mutex> lk(g_mx);
+        spots = g_spots.size();
+    }
+    const bool slow = avg > kSlowMs;
+    EMF_LOG(kMod, "server speed, minute %u%s: %u steps, average %.1f ms, slowest %.0f ms, process CPU %.2f cores; Free build areas: %s; remembered spots %zu (%.0f m)",
+            minute, slow ? " SLOW" : "", steps, avg, slowest, cores, areas.empty() ? "none" : areas.c_str(), spots, g_spot_half.load() * 2);
+    // the threads: % of one core each used this minute
+    std::vector<std::pair<uint32_t, uint64_t>> t = thread_cpu(use);
+    std::sort(t.begin(), t.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+    const uint32_t world_thread = GetCurrentThreadId();
+    if (slow || minute == 1 || minute % kListEvery == 0) {
+        std::string line;
+        char b[200];
+        for (size_t i = 0; i < t.size() && i < kTopThreads; ++i) {
+            const auto it = use.find(t[i].first);
+            const double pct = double(t[i].second) * 100.0 / (span * 1e7);
+            const std::string nm = it != use.end() ? it->second.name : "";
+            const double normal = it != use.end() ? it->second.normal : -1;
+            char nb[24] = "not known yet";
+            if (normal >= 0) snprintf(nb, sizeof(nb), "%.0f%%", normal);
+            snprintf(b, sizeof(b), "%sthread %u%s%s%s%s: %.0f%% of a core (normal %s)", line.empty() ? "" : "; ", t[i].first,
+                     nm.empty() ? "" : " '", nm.c_str(), nm.empty() ? "" : "'", t[i].first == world_thread ? " (the world step)" : "", pct, nb);
+            line += b;
+        }
+        EMF_LOG(kMod, "server speed, minute %u%s: busiest threads: %s", minute, slow ? " SLOW" : "", line.empty() ? "none read" : line.c_str());
+    }
+    if (!slow && minute > 1) {  // a normal minute (not the first, while the world comes up): what each thread normally uses
+        for (const auto& x : t) {
+            auto it = use.find(x.first);
+            if (it == use.end()) continue;
+            const double pct = double(x.second) * 100.0 / (span * 1e7);
+            it->second.normal = it->second.normal < 0 ? pct : it->second.normal * 0.7 + pct * 0.3;
+        }
+    }
+    minute_start = now;
+    steps = 0;
+    slowest = 0;
+}
+
 }  // namespace
 
 // called by flamekit_native's emf_mod_load in every process (a dedicated server, a player's game)
@@ -563,9 +755,12 @@ bool fk_build_anywhere_load(bool dedicated) {
                     auto it = said.find(side_bit | id);
                     if (it == said.end() || it->second != aiming) {
                         said[side_bit | id] = aiming;
-                        EMF_LOG(kMod, "free build (%s): player %u %s", server ? "server" : "this game", id,
-                                aiming ? "has a building item selected: a 16 m Free build area around them"
-                                       : "has no building item selected: no Free build area");
+                        if (aiming)
+                            EMF_LOG(kMod, "free build (%s): player %u has a building item selected: a %.0f m Free build area around them",
+                                    server ? "server" : "this game", id, g_aim_half.load() * 2);
+                        else
+                            EMF_LOG(kMod, "free build (%s): player %u has no building item selected: no Free build area",
+                                    server ? "server" : "this game", id);
                     }
                 }
                 if (aiming) g_pos[side_bit | id] = aim;
@@ -580,7 +775,9 @@ bool fk_build_anywhere_load(bool dedicated) {
             }
         }
         if (w.is_server()) {
+            speed_tick();  // (0.15.466)
             if (steps_server++ % 15 == 0) {
+                read_test_size();  // (0.15.466)
                 read_list(L"free_build_server.txt", g_free_server, g_alt_server, "server");
                 read_spots("server");
                 read_factor(L"altar_size_server.txt", "server", kMaxFactor);
@@ -593,7 +790,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             }
         }
     });
-    emf::add_command("fkbuild", " stats | free on|off | altar on|off | clear on|off: Free build and the bigger altar areas (debug)",
+    emf::add_command("fkbuild", " stats | free on|off | altar on|off | clear on|off | size <m>|off: Free build and the bigger altar areas (debug)",
                      [](emf::World, const std::vector<std::string>& args) {
         std::string all;  // (0.15.416) the words however EMF splits them
         for (const auto& x : args) all += " " + x;
@@ -605,6 +802,26 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (all.find(" clear on ") != std::string::npos) g_clear_path = true;    // (0.15.460)
         if (all.find(" clear off ") != std::string::npos) g_clear_path = false;
         write_way();  // (0.15.461)
+        {  // (0.15.466) the test size: written to free_build_test_size.txt, read by read_test_size on the server's steps
+            const size_t at = all.find(" size ");
+            if (at != std::string::npos) {
+                const std::string v = all.substr(at + 6);
+                const std::wstring file = lua_file(L"free_build_test_size.txt");
+                const double m = atof(v.c_str());
+                if (v.rfind("off", 0) == 0 || m == kAimHalf * 2) {
+                    DeleteFileW(file.c_str());
+                    EMF_REPLY("free build test size off: the area goes back to the normal %.0f m within a second", kAimHalf * 2);
+                } else if (m >= kTestMinM && m <= kTestMaxM) {
+                    if (FILE* f = _wfopen(file.c_str(), L"w")) {
+                        fprintf(f, "%.0f\n", m);
+                        fclose(f);
+                    }
+                    EMF_REPLY("free build test size: the server's area becomes %.0f m within a second (normal %.0f m; 'fkbuild size off' to go back)", m, kAimHalf * 2);
+                } else {
+                    EMF_REPLY("free build test size: give %.0f to %.0f m, or off", kTestMinM, kTestMaxM);
+                }
+            }
+        }
         EMF_LOG(kMod, "fkbuild:%s", all.c_str());
         size_t ns = 0, nc = 0;
         {

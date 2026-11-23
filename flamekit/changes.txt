@@ -1,3 +1,6 @@
+0.15.466 Nov 22, 2026
+- Server: writes a line about its speed to the log every minute (steps, slowest step, CPU, Free build areas), and which parts of the game were busy when it ran slow. For finding what slows a server down. Nothing in the game changes.
+
 0.15.465 Nov 22, 2026
 - Free build: the building area is 16 m around you (it was 24 m), only while you have a building piece selected.
 
