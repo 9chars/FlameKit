@@ -1921,6 +1921,13 @@ still slow until ~23:52:40, then normal (owner still standing in remembered spot
 slowdown starts ~2 min after a big area is on and ends ~3 min after it is gone. **16 m for 11 minutes
 00:07:34-00:18:24 with the spawn point active: 0 SLOW minutes, 16.7 ms every minute.** Owner 00:04: "this all sounds
 like bullshit to me". Not proven why the game's main thread works harder for a big no-base zone.
+00:21 owner: "so you don't know and you want to release an update lol"; 00:22 "doesnt sound like you know how to
+identify the problem" -> "yes" to a sampler. **0.15.467 (69e4d7d, DLL md5 fcf535e7fed90e13e8eadc5ad50b8380):** with
+speed_sampler.txt "on" in the server's mods/flamekit (set on the LOCAL server only; never G-Portal), in the minute after a
+SLOW minute a thread suspends the world step thread ~1000 times a minute, walks its call chain (RtlVirtualUnwind, 16
+frames, __try), logs the top functions ("where it was", "most often in its call chain") as enshrouded_server.exe
+0x14xxxxxxx. Development dist-test + local server (.old_466). No release decided (owner questioned releasing without
+knowing the cause).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
