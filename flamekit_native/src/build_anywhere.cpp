@@ -5,7 +5,7 @@
 //  - the server only: a zone over each remembered spot (free_build_spots.txt, "x y z" in m per line, written by
 //    features/building.lua): a 48 m box, from the server's start, so what was built there is saved and kept like
 //    inside an altar's area;
-//  - (0.15.464) a 24 m box around each player Free build is on for, only while a building item is selected
+//  - (0.15.465) a 16 m box around each player Free build is on for, only while a building item is selected
 //    (free_build_server.txt / free_build_client.txt: one player a line, "<entity id>" or "<entity id> a"; read every 15
 //    steps), in the server and in that player's own game. The box sits on a kAimStep grid (a box that moved smoothly
 //    made the server resend the whole zone list every step). The positions are read on the world's own step (on_tick) and
@@ -200,10 +200,12 @@ std::atomic<int> g_zone_said{0};
 // possible", "yes" to 16 m) the area is no longer a 112 m box around the player (40 m + half a 32 m grid step each way).
 // 0.15.463 put a 16 m box around where the player aims, but on the server the construction cursor's position reads
 // 0 0 0 (the box went to the map's corner: "says I need a flame alter near by", owner 21:55). (0.15.464, owner 21:57
-// "fix it", agreed 24 m around the player) a 24 m box around the player (12 m each way: the hammer's reach), only while
-// a building item is selected (NetworkCursor.currentBuildingItemId not 0). It moves in 4 m steps (each move sends every
-// player the zone list again, about 1 KB).
-constexpr double kAimHalf = 12.0;  // m each way from the middle of the player's grid cell
+// "fix it") a box around the player, only while a building item is selected (NetworkCursor.currentBuildingItemId not
+// 0). 0.15.464 made it 24 m without asking (the owner had agreed to 16 m; 22:18 "why the fuck are you constantly
+// changing shit you say you're going to do on me?"). (0.15.465, owner 22:19 "do what we agreed to make it. 16 m") 16 m:
+// 8 m each way from the middle of the player's 4 m grid cell. It moves in 4 m steps (each move sends every player the
+// zone list again, about 1 KB).
+constexpr double kAimHalf = 8.0;   // m each way from the middle of the player's grid cell (16 m box)
 constexpr double kAimStep = 4.0;   // m: the box moves only when the player crosses a grid line
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 // (0.15.453, owner 17:19 "#7 go ahead") the positions of the players Free build is on for, read on each world's own
@@ -562,7 +564,7 @@ bool fk_build_anywhere_load(bool dedicated) {
                     if (it == said.end() || it->second != aiming) {
                         said[side_bit | id] = aiming;
                         EMF_LOG(kMod, "free build (%s): player %u %s", server ? "server" : "this game", id,
-                                aiming ? "has a building item selected: a 24 m Free build area around them"
+                                aiming ? "has a building item selected: a 16 m Free build area around them"
                                        : "has no building item selected: no Free build area");
                     }
                 }
