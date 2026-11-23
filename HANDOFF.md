@@ -1649,6 +1649,15 @@ save at 17:49:29 had no building area there, so the game did not keep it). WATER
 works and survives restarts; forgetting the spot leaves nothing broken behind. GUESS (not tested): the one way to get the
 old broken state would be a save while a Free build player's own box covers a water piece that is in no remembered spot
 (every piece placed with Free build makes a spot, so only after "Forget this spot" while standing right there). Next: #5.
+18:02 owner: a new EMF, copy in C:\enshrouded mod shit\EMF-0.6.19 (read only so far, nothing installed). Findings: C API
+v32 -> v47, the old function table is an exact prefix of the new one (no rebuild needed); Lua host 1.24 -> 1.40, none of
+the ~50 calls FlameKit uses changed (spawn/destroy/command only got additions); same game builds (1287369). New and
+useful: emf.remove_building (1.28), world:permissions (1.36, the game's admin role), emf.break_blocks (1.37, terrain
+1.40). Still missing: build zones, all open EMF_REQUESTS items. Candidate "clock in nanoseconds" is stale (ecs_time_ns
+existed in 0.6.6). EMF is MIT licensed; it has no updater of its own.
+18:08 owner asked whether FlameKit's updater updates EMF: no (web_update.hpp writes only emf\mods\flamekit and
+emf\mods\flamekit_native). **18:09 owner: "expecting players to manually install a new version is mostly
+unacceptable"** -> FlameKit's updater must also bring EMF up to the version FlameKit is tested with.
 
 ## Things learned the hard way
 
