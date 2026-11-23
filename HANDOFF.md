@@ -2097,6 +2097,12 @@ pickaxe, 4 m, 1 m holes), Medium (1.5 s, 2x, 5 m, 1 m), High (1 s, 4x, 6 m, 1.5 
 be the default IMO"), Extreme (0.5 s, 8x, 6 m, 1.5 m); cap 30 hits a second for all; with no wall toward a player, a
 building block beside the monster (4 directions). Local server reloaded 12:28 (Lua only); the game needs a restart for the
 Building damage drop-down.
+12:31 game restarted on 0.15.481. 12:36 owner: protect animals and pets + Remove per group incl. dead bodies -> **0.15.482**:
+group switch "Its monsters spare animals, pets and villagers" (spare, ON by default): a hit rule per monster {from = it,
+to = "creatures", cancel} (players not covered), made at the spawn, synced in clean_tick, removed when it dies/is
+removed/the world changes; dead monsters kept as bodies (S.dead) until Remove, which now destroys the group's alive
+monsters and its dead bodies (only that group's; only what was spawned since the server start or the last FlameKit
+reload). Local server reloaded 12:37; the game needs a restart for the switch.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
