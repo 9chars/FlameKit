@@ -1895,6 +1895,15 @@ minute 1 and every 30 min. Test size: free_build_test_size.txt in the server's m
 no file = 16 m), written by "fkbuild size <m>" / "fkbuild size off" or by Claude; server only (the player's game keeps
 16 m). Development dist-test + installed on the local server (old DLL .old_465); loads at the next server restart.
 Test plan told to the owner: at 5776 5232 (112 m gave 33 ms there at 20:07) compare 16 m and 112 m at the same spot.
+**Test 22:44-23:01 (local, 0.15.466, one player): size alone does NOT slow the server.** By the water at 5866 5142:
+16 m 2 min and 112 m 3 min (22:47:30-22:50:10) both 16.7 ms, 2.1 cores. At 5770 5222 (13 m from spot 5776 5232): 16 m
+22:55-22:57 and 112 m 22:57:53-23:01:25 both 16.7 ms, slowest 42-52 ms, 2.1-2.25 cores. Back to 16 m (file says 16).
+Owner 22:55: "this isnt where I was standing when g-portal was having issues"; but G-Portal's log (production_stable_logs
+emf_core.log, panel spot lines, his id 0x485890b753e75ad1 = entity 1) puts him at 5769-5771 5222-5227 from 21:32:47 to
+21:35:30 (the slowdown began 21:33:40; a remembered spot 5776 5232 appeared there 21:33:38). The other player (entity 2,
+0x05891a85470cffe2) was at ~5955-6075 4657-4680 21:32-21:38. Not logged where the owner was after 21:35:30. Still
+unexplained: what differed on G-Portal (two players with 112 m areas, a big world, its water problem then) and locally
+at 20:07 (older version, the 112 m box always on, on a 32 m grid).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
