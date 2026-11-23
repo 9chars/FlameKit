@@ -1,3 +1,6 @@
+0.15.482 Nov 23, 2026
+- Spawn Nodes: Its monsters spare animals, pets and villagers (on by default): a group's monsters cannot hurt anything that is not a player. Remove its monsters now also takes the group's dead bodies off the ground, and only that group's.
+
 0.15.481 Nov 23, 2026
 - Spawn Nodes: Building damage levels for raids (Low, Medium, High, Extreme; High by default): how often and how hard the monsters hit, how far they reach and how big the holes are. Monsters with no player in reach hit building blocks right beside them.
 

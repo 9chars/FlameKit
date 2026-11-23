@@ -26,7 +26,9 @@
 -- The channel "nodes": a player's game asks with {op = "get"}; the server answers {op = "state", admin, groups, nodes,
 -- status, note}; an admin's clicks send {op = ...} (below). In a game that hosts the world everything is done right here.
 -- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and "Players cannot damage placed
--- objects during its waves" (protect_tick); (0.15.479) renamed "Players cannot change bases during its waves": also the
+-- objects during its waves" (protect_tick); (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage
+-- to" and Remove "by node group ... including the dead ones on the ground") "Its monsters spare animals, pets and villagers"
+-- (a hit rule per monster: from it to "creatures", cancel) and Remove takes the group's dead bodies too; (0.15.479) renamed "Players cannot change bases during its waves": also the
 -- players near its nodes lose the game's base editing permission while it runs (raid_lock_server.txt, FlameKit Native).
 -- Uses only core modules (HANDOFF rule 0b).
 
@@ -86,7 +88,7 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m" }
-local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
   cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
@@ -112,7 +114,8 @@ end
 -- ---- the server's half ----
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
-            notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {} }
+            notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
+            dead = {}, spare_rules = {} }  -- (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -307,6 +310,12 @@ local function spawn_tick(world)
       if ok and id and id ~= 0 then
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
+        local qn = data().nodes[tostring(q.node)]
+        local qg = qn and group(qn.g)
+        if qg and qg.spare then  -- (0.15.482) it never hurts animals, pets or villagers
+          local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
+          if okr and rid then S.spare_rules[id] = rid end
+        end
         ground.add(id, x, q.y, z, yaw)
       else
         emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
@@ -316,13 +325,37 @@ local function spawn_tick(world)
 end
 
 -- Forgets monsters that died or are gone.
+-- (0.15.482) A monster that died stays known as a body (S.dead) until its group's Remove takes it away; one that is
+-- gone from the world is forgotten. Its "spare" hit rule goes when it dies. The rules follow the group's switch.
 local function clean_tick(world)
   for nid, ids in pairs(S.alive) do
+    local node = data().nodes[tostring(nid)]
+    local g = node and group(node.g)
     for id in pairs(ids) do
       local ok, cur = pcall(emf.health, world, id)
-      if not ok or not cur or cur <= 0 then ids[id] = nil end
+      if not ok or not cur or cur <= 0 then
+        ids[id] = nil
+        if ok and cur then  -- dead, the body still there
+          S.dead[nid] = S.dead[nid] or {}
+          S.dead[nid][id] = true
+        end
+        if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
+      elseif g and g.spare and not S.spare_rules[id] then
+        local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
+        if okr and rid then S.spare_rules[id] = rid end
+      elseif g and not g.spare and S.spare_rules[id] then
+        pcall(emf.hit_rule_remove, S.spare_rules[id])
+        S.spare_rules[id] = nil
+      end
     end
     if next(ids) == nil then S.alive[nid] = nil end
+  end
+  for nid, ids in pairs(S.dead) do  -- bodies the game took away
+    for id in pairs(ids) do
+      local ok, cur = pcall(emf.health, world, id)
+      if not ok or cur == nil then ids[id] = nil end
+    end
+    if next(ids) == nil then S.dead[nid] = nil end
   end
 end
 
@@ -495,9 +528,14 @@ local function status(gid)
   if not g then return "" end
   local run = S.runs[gid]
   local alive = 0
-  for _, n in ipairs(nodes_of(gid)) do alive = alive + alive_count(n.id) end
+  local bodies = 0
+  for _, n in ipairs(nodes_of(gid)) do
+    alive = alive + alive_count(n.id)
+    for _ in pairs(S.dead[n.id] or {}) do bodies = bodies + 1 end
+  end
   local a = (alive > 0 and string.format(" %d of its monsters alive.", alive) or "")
     .. ((S.broke[gid] or 0) > 0 and string.format(" Blocks they broke: %d.", S.broke[gid]) or "")
+    .. (bodies > 0 and string.format(" %d dead bod%s on the ground.", bodies, bodies == 1 and "y" or "ies") or "")
   if run then
     if run.wave == 0 then return "Running: the first wave starts now." .. a end
     return string.format("Running: wave %d of %d done, the next in %d s.", run.wave, run.waves,
@@ -587,7 +625,7 @@ local function handle(world, account, entity, msg, from)
     note(string.format("Deleted %s and its %d node(s).", g.name, n))
   elseif msg.op == "set" and g then
     local key, v = tostring(msg.key), msg.value
-    if key == "on" or key == "breaks" or key == "protect" then  -- (0.15.478) the two raid switches
+    if key == "on" or key == "breaks" or key == "protect" or key == "spare" then  -- (0.15.478) the raid switches; (0.15.482) spare
       g[key] = v == true
     elseif allowed(key, v) then
       g[key] = v
@@ -638,18 +676,23 @@ local function handle(world, account, entity, msg, from)
   elseif msg.op == "stop" and g then
     if S.runs[gid] then finish(gid) note(g.name .. " stopped (its cooldown starts now).") else note(g.name .. " is not running.") end
   elseif msg.op == "remove" and g then
-    local n = 0
+    local n, bodies = 0, 0
     for _, node in ipairs(nodes_of(gid)) do
-      for id in pairs(S.alive[node.id] or {}) do if pcall(emf.destroy, world, id) then n = n + 1 end end
+      for id in pairs(S.alive[node.id] or {}) do
+        if pcall(emf.destroy, world, id) then n = n + 1 end
+        if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
+      end
       S.alive[node.id] = nil
+      for id in pairs(S.dead[node.id] or {}) do if pcall(emf.destroy, world, id) then bodies = bodies + 1 end end  -- (0.15.482)
+      S.dead[node.id] = nil
     end
     for i = #S.queue, 1, -1 do
       local q = S.queue[i]
       local qn = d.nodes[tostring(q.node)]
       if qn and qn.g == gid then table.remove(S.queue, i) end
     end
-    emf.log(string.format("spawn nodes: player %s removed %d monster(s) of %s", who, n, g.name))
-    note(string.format("Removed %d monster(s) of %s.", n, g.name))
+    emf.log(string.format("spawn nodes: player %s removed %d monster(s) and %d dead bod(ies) of %s", who, n, bodies, g.name))
+    note(string.format("Removed %d monster(s) and %d dead bod%s of %s.", n, bodies, bodies == 1 and "y" or "ies", g.name))
   end
   return state(world, account, from)
 end
@@ -659,7 +702,8 @@ function F.tick(world)
   S.steps = S.steps + 1
   local session = emf.session()
   if session ~= S.session then  -- a new world: the monsters of the old one mean nothing
-    S.session, S.alive, S.queue, S.runs = session, {}, {}, {}
+    for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
+    S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
   end
   ground.tick(world)
   spawn_tick(world)
@@ -829,11 +873,15 @@ function F.panel(world)
     tooltip = "Starts its waves now, whatever its trigger, also during its cooldown. Nodes without a player within " .. ACTIVE_DIST .. " m skip a wave." }
   rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
   rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
-    tooltip = "Removes every monster its nodes spawned that is still alive (since the last restart)." }
+    tooltip = "Removes this group's monsters only, alive or dead (their bodies on the ground too); other groups' and the world's "
+      .. "own monsters stay. Only the ones spawned since the server last started or reloaded FlameKit." }
   choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, Random (any kind, no bosses) or Bosses (any boss: set Monsters per node to 1 for one boss).",
     FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
   choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
     .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
+  rows[#rows + 1] = { button = "spare", text = (g.spare and "On    " or "Off   ") .. "Its monsters spare animals, pets and villagers", selected = g.spare == true,
+    tooltip = "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
+      .. "safe from them (other monsters too). Players are not covered: they can still be hit." }
   rows[#rows + 1] = { button = "breaks", text = (g.breaks and "On    " or "Off   ") .. "Monsters damage buildings", selected = g.breaks == true,
     tooltip = "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "
       .. "Building damage below. Never the ground or the world's own ruins. Inside a flame altar's area what breaks stays broken. "
@@ -918,6 +966,7 @@ function F.click(world, key)
     act(world, { op = "delete_group", g = gid })
   elseif key == "on" then act(world, { op = "set", g = gid, key = "on", value = not g.on })
   elseif key == "breaks" then act(world, { op = "set", g = gid, key = "breaks", value = not g.breaks })
+  elseif key == "spare" then act(world, { op = "set", g = gid, key = "spare", value = not g.spare })
   elseif key == "protect" then act(world, { op = "set", g = gid, key = "protect", value = not g.protect })
   elseif key == "start" then act(world, { op = "start", g = gid })
   elseif key == "stop" then act(world, { op = "stop", g = gid })
