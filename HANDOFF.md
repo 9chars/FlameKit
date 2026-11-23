@@ -1881,6 +1881,9 @@ while fixing a bug. If the fix needs a different value, Claude ASKS first and wa
 while a building item is selected.** Development dist-test (sig good) + installed on the local server (old DLL
 flamekit_native.dll.old_464); the local server loads it only at its next restart (ask first). NOT on G-Portal/Stable.
 
+22:24 owner "yes" -> local server restarted 22:24-22:26. Server log 22:28:13 "a build zone 16 m wide around player 1";
+22:29 owner: placing a block outside a base works ("yes"). Steps normal (16.7 ms, max 15 ms). Next: G-Portal/Stable
+only on the owner's word (rule 0g).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
