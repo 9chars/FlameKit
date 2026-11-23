@@ -208,6 +208,19 @@ using AddZoneFn = uint64_t (*)(void* bzs, uint8_t list, uint8_t flag, uint8_t ow
 AddZoneFn g_add_zone = nullptr;
 std::atomic<int> g_zone_said{0};
 
+// (0.15.470, owner 07:30 "can you start figuring out how we can add the missing base data its looking for", 07:41
+// "lets start on that.. the problem is a 16 m area won't stay that way as a player builds it bigger") A TEST of the base
+// data on the owner's own server: free_build_test_base.txt (the server's FlameKit folder) says what FlameKit passes to
+// addZone for its moving area: "none" (or no file: entity 0, no base id, as always), "entity" (the player's own entity
+// id, no base id) or "altar" (the entity, base id and abandoned flag of the real flame altar nearest to the player, as
+// the game passes them for that altar). Read every 15 steps, logged on change; the server only. The real altars' values
+// are taken from the game's own addZone calls (the detour), the first ones logged with their base id.
+struct AltarInfo { int64_t cx = 0, cy = 0, cz = 0; uint32_t entity = 0; uint8_t abandoned = 0; uint8_t base_id[16] = {}; };
+std::mutex g_altar_info_mx;
+std::unordered_map<uint32_t, AltarInfo> g_altar_info;  // altar entity -> what the game passed (under g_altar_info_mx)
+enum class TestBase { None, Entity, Altar };
+std::atomic<int> g_test_base{int(TestBase::None)};
+
 // (0.15.463, owner 2026-11-22 21:35-21:46: G-Portal "server overloaded" while in Free build outside an altar area,
 // confirmed by switching it off and on: 48 ms steps instead of 17; "112m wide is way to fucking big", "as small as
 // possible", "yes" to 16 m) the area is no longer a 112 m box around the player (40 m + half a 32 m grid step each way).
@@ -421,7 +434,25 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         const int64_t cx = cell_mid(p.x), cy = cell_mid(p.y), cz = cell_mid(p.z);
         int64_t b[6] = {cx - half, cy - half, cz - half, cx + half, cy + half, cz + half};
         uint8_t no_base[16] = {};
-        g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
+        uint32_t z_entity = 0;  // (0.15.470) the base data test (free_build_test_base.txt): none unless asked
+        uint8_t z_abandoned = 0;
+        const TestBase tb = w.is_server() ? TestBase(g_test_base.load()) : TestBase::None;
+        if (tb == TestBase::Entity) {
+            z_entity = id;
+        } else if (tb == TestBase::Altar) {
+            std::lock_guard<std::mutex> lk(g_altar_info_mx);
+            double best = -1;
+            for (const auto& kv : g_altar_info) {
+                const double dx = double(kv.second.cx - p.x), dz = double(kv.second.cz - p.z), d2 = dx * dx + dz * dz;
+                if (best < 0 || d2 < best) {
+                    best = d2;
+                    z_entity = kv.second.entity;
+                    z_abandoned = kv.second.abandoned;
+                    memcpy(no_base, kv.second.base_id, 16);
+                }
+            }
+        }
+        g_add_zone(bzs, 0, flag, 0, b, z_entity, z_abandoned, no_base);
         g_boxes.fetch_add(1);
         if (w.is_server()) {  // (0.15.466) for the speed log
             std::lock_guard<std::mutex> lk(g_seen_mx);
@@ -489,6 +520,26 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
             probe(g_said_zone, line);
         }
     }
+    if (box && list == 0 && owner == 0 && entity != 0 && base_id) {  // (0.15.470) a real altar's values, for the base data test
+        AltarInfo ai;
+        ai.cx = box[0] / 2 + box[3] / 2;
+        ai.cy = box[1] / 2 + box[4] / 2;
+        ai.cz = box[2] / 2 + box[5] / 2;
+        ai.entity = entity;
+        ai.abandoned = abandoned;
+        memcpy(ai.base_id, base_id, 16);
+        std::lock_guard<std::mutex> lk(g_altar_info_mx);
+        const bool fresh = g_altar_info.find(entity) == g_altar_info.end();
+        g_altar_info[entity] = ai;
+        static int said = 0;
+        if (fresh && said < 20) {
+            ++said;
+            const uint8_t* g = ai.base_id;
+            EMF_LOG(kMod, "free build: altar zone of entity %u at %.0f %.0f %.0f, abandoned %u, base id %02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x-%02x%02x%02x%02x",
+                    entity, double(ai.cx) / 4294967296.0, double(ai.cy) / 4294967296.0, double(ai.cz) / 4294967296.0, abandoned,
+                    g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7], g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15]);
+        }
+    }
     if (box && list == 0 && owner == 0) {  // (0.15.460) the flag the game uses for an altar, per zone list (logged when it changes)
         std::lock_guard<std::mutex> lk(g_altar_mx);
         auto it = g_list0_flag.find(bzs);
@@ -530,6 +581,22 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
 // command "fkbuild size <m>" ("fkbuild size off" removes it) or by hand. Read every 15 steps; logged on change. Only
 // the server's area: the player's own game keeps 16 m (what the server does is what is being measured).
 constexpr double kTestMinM = 4.0, kTestMaxM = 112.0;
+void read_test_base() {  // (0.15.470) see g_test_base
+    char w[16] = {};
+    if (FILE* f = _wfopen(lua_file(L"free_build_test_base.txt").c_str(), L"r")) {
+        if (fscanf(f, "%15s", w) != 1) w[0] = 0;
+        fclose(f);
+    }
+    const TestBase tb = strcmp(w, "entity") == 0 ? TestBase::Entity : strcmp(w, "altar") == 0 ? TestBase::Altar : TestBase::None;
+    if (int(tb) != g_test_base.load()) {
+        g_test_base = int(tb);
+        EMF_LOG(kMod, "free build (server): TEST base data from free_build_test_base.txt: %s",
+                tb == TestBase::Entity ? "the player's own entity id, no base id"
+                : tb == TestBase::Altar ? "the nearest real flame altar's entity, base id and abandoned flag"
+                                        : "none (entity 0, no base id, as normal)");
+    }
+}
+
 void read_test_size() {
     double m = 0;
     if (FILE* f = _wfopen(lua_file(L"free_build_test_size.txt").c_str(), L"r")) {
@@ -1053,6 +1120,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             speed_tick();  // (0.15.466)
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
+                read_test_base();  // (0.15.470)
                 read_list(L"free_build_server.txt", g_free_server, g_alt_server, "server");
                 read_spots("server");
                 read_factor(L"altar_size_server.txt", "server", kMaxFactor);
