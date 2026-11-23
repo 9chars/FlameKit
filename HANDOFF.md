@@ -1954,6 +1954,15 @@ strings) with ids 0x10000 / 0x10001 and memory budgets 0x2600000 (38 MB) / 0x140
 DATA STORES. Their per-step update unpacks chunks (0x14083f6e0 -> 0x140845960; 0x140852ee0 -> decompressor 0x1408514b0).
 Best guess (unproven): a big no-base zone needs more chunks than the store's budget, so it unpacks, drops and unpacks
 again every step (thrashing). Test idea: count calls of 0x1408514b0 per minute at 16 m vs 112 m.
+**0.15.469 (434be50, DLL bdba3a94dcf5233ddb22e5e80d98dc87): chunk counter** (hook on the decompressor 0x1408514b0 by its 40
+first bytes, unique; dedicated + sampler on only). **Test 07:29-07:42 CONFIRMED THRASHING:** 16 m: ~1.35 M unpacks/min
+on the world thread (~690 MB); 112 m from 07:31:41: normal 2 min, then 6.7 M, then ~9.3 M/min (~4.5 GB/min, ~3,300 per
+step), SLOW; back to 16 m 07:35:20: still ~9.3 M for ~6 min, then normal on its own at ~07:41:30 (tool still out). So the
+state starts ~2 min after a big area appears and ends ~6 min after it shrinks. Owner 07:30: "can you start figuring out
+how we can add the missing base data its looking for"; 07:41: "the problem is a 16 m area won't stay that way as a
+player builds it bigger". **0.15.470 (d109916, DLL 3d4ee8684bae5d0954dc5320843ce4e2): base data test**:
+free_build_test_base.txt none|entity|altar (server only) = what our addZone passes (entity 0 + no base id / the
+player's entity / the nearest real altar's entity + base id + abandoned); real altars' values logged.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
