@@ -2072,6 +2072,22 @@ type Bosses (26 bosses); group setting "Monsters face": the nearest player (defa
 facing at Add/Move, stored as yaw), random; spawn with {yaw} (EMF Lua 1.40+, else without) and the ground move's
 teleport {yaw} (any EMF; core/spawn.lua q.add(id,x,y,z,yaw)). Local server reloaded 11:38 (22 features); the game
 needs a restart for the new drop-downs. Later list: a text box in FlameKit tabs (group names).
+11:45 owner: "are these monsters set to do base damage?" (no: vanilla monsters never break walls; EMF hit rules: placed
+objects only). 12:01 owner: monsters damaging structures as a raid option + "prevent players from damaging structures while
+the raid is active"; 12:03 "yes research both we need that setting". **0.15.478 (2c1b289)**: per-group switches "Monsters
+damage buildings" (every 3 s each monster: emf.find_wall toward the nearest player within 64 m, a building block within 4 m
+-> emf.break_blocks radius 1, damage mode = T4 pickaxe; max 8 hits per 3 s; needs EMF Lua 1.37+ on the server: G-Portal
+(EMF 0.6.6) cannot) and "protect" (a hit rule from players to objects, cancel, whole server, while a protecting group
+runs). **RESEARCH (walls/floors):** the game keeps each player's permissions as one byte: BasicPlayerInfos entry (id-1) *
+0xA0, +0 = id, **+0x9d = EMF_PERM_* mask** (server exe 1287369: getPermissions 0x140163040, isAdmin 0x140165720 = bit 0x01);
+23 callers incl. server_cursor_no_prediction (building cursor), handle_crafting_events, base_player_action. Program
+descriptors in .rdata (name ptr, len, update fn): player_building_dismantle 0x1400c4e20, player_building_blueprints
+0x1400c4410, impact_simulation 0x140197cb0. **0.15.479 (74e8607, DLL md5 c76e62a7659cf35a803d3f4f8cbc76fb): RAID LOCK**:
+spawn_nodes writes raid_lock_server.txt (players within raid_r of a running protecting group's nodes); build_anywhere.cpp
+read_raid_lock clears their EDIT BASE bit 0x04 (kept and set back when unlisted, only while the entry is still theirs);
+logged. UNTESTED: whether the game's dismantle, pickaxe and placing really check that bit. Admins are locked too (for
+the test). Switch renamed "Players cannot change bases during its waves". Local server: files in place (.old_475);
+needs a server restart (DLL) and the game restart (UI).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
