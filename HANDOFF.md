@@ -1884,6 +1884,17 @@ flamekit_native.dll.old_464); the local server loads it only at its next restart
 22:24 owner "yes" -> local server restarted 22:24-22:26. Server log 22:28:13 "a build zone 16 m wide around player 1";
 22:29 owner: placing a block outside a base works ("yes"). Steps normal (16.7 ms, max 15 ms). Next: G-Portal/Stable
 only on the owner's word (rule 0g).
+22:31 owner: check performance and find the source first ("you wanna fucking check the performance first and help
+me test it and figure out the source of the problems first?"); 22:33 "im not convinced it was just the size", asked
+for logging; 22:34 "yes" to: a speed line a minute, SLOW minutes with the busiest threads, a test size command.
+**0.15.466 (1bd80f5, DLL md5 9e0a6e75b2cdd9f22096d26f150472d4):** build_anywhere.cpp speed_tick (server world steps):
+emf_core.log "server speed, minute N[ SLOW]: steps, average, slowest, process CPU cores; Free build areas (player,
+size, zone list rebuilds, last position); remembered spots"; SLOW = average > 20 ms; then "busiest threads" (top 6,
+% of a core this minute vs its normal, thread names when the game set them, the world step thread marked), also in
+minute 1 and every 30 min. Test size: free_build_test_size.txt in the server's mods/flamekit (width in m, 4..112;
+no file = 16 m), written by "fkbuild size <m>" / "fkbuild size off" or by Claude; server only (the player's game keeps
+16 m). Development dist-test + installed on the local server (old DLL .old_465); loads at the next server restart.
+Test plan told to the owner: at 5776 5232 (112 m gave 33 ms there at 20:07) compare 16 m and 112 m at the same spot.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
