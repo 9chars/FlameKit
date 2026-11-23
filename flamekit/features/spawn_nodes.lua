@@ -116,6 +116,7 @@ local NOTICE_DIST = 300
 local PLACE_WAIT = 180         -- steps (3 s): how long the start notice waits for the asked player's place
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
 local LEFT_MIN_GAP = 5         -- s: and changed at most this often when the count changes
+local END_GRACE = 10           -- s: (0.15.500) a raid is over when none of its monsters is alive for this long
 local START_END_S = 60         -- s: (0.15.494, owner 14:35 "the beginning raid notice and the end raid notice needs to stay up
                                -- longer.. I never even saw the end raid notice") the start and end notices stay this long (was 15)
 local MISSES = 3  -- (0.15.483) a monster whose health can't be read is forgotten only after this many checks in a row
@@ -536,10 +537,10 @@ local function persist()
 end
 local function restore()
   local ok, saved = pcall(kit.store.load, "spawn_nodes_raid", nil)
-  if not ok or type(saved) ~= "table" then return end
+  if not ok or type(saved) ~= "table" then saved = {} end
   local token = nil
   pcall(function() token = emf.session_token() end)
-  if not token or saved.token ~= token then return end  -- another world run: its raids are gone
+  if not token or saved.token ~= token then saved = {} end  -- another world run: its raids are gone
   local n = 0
   for k, r in pairs(saved.raid or {}) do
     local gid = tonumber(k)
@@ -556,6 +557,17 @@ local function restore()
     local gid = tonumber(k)
     if gid and group(gid) and type(run) == "table" then
       S.runs[gid] = { wave = tonumber(run.wave) or 0, waves = tonumber(run.waves) or 1, next_at = S.steps + (tonumber(run.next_in) or 0), by = run.by }
+    end
+  end
+  for _, g in ipairs(groups()) do  -- (0.15.500) its monsters live but its raid was over or not known: a raid again
+    if not S.raid[g.id] then
+      local alive = 0
+      for _, nd in ipairs(nodes_of(g.id)) do alive = alive + alive_count(nd.id) end
+      if alive > 0 then
+        S.raid[g.id] = { place = raid_place(g.id, nil), spawned = alive }
+        S.started[g.id] = S.started[g.id] or os.time()
+        n = n + 1
+      end
     end
   end
   emf.log(string.format("spawn nodes: after the reload: %d raid(s) and %d run(s) taken back", n, (function() local c = 0 for _ in pairs(S.runs) do c = c + 1 end return c end)()))
@@ -585,12 +597,17 @@ local function raid_tick(world)
       S.raid[gid] = nil
     elseif r.ask then
       -- the start notice comes first
+    elseif not S.runs[gid] and alive == 0 and queued == 0 and not r.none_since then
+      r.none_since = os.time()  -- (0.15.500) none left: over only when it stays so for END_GRACE s (one may get up again)
+    elseif not S.runs[gid] and alive == 0 and queued == 0 and os.time() - r.none_since < END_GRACE then
+      -- waiting
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       S.started[gid] = nil
       raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, START_END_S)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
+      r.none_since = nil
       local now = os.time()
       local n = alive + queued
       if (n ~= r.left_n and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
@@ -1006,7 +1023,16 @@ local function clean_tick(world)
   for nid, ids in pairs(S.dead) do  -- bodies the game took away
     for id in pairs(ids) do
       local ok, cur = pcall(emf.health, world, id)
-      if not ok or cur == nil then ids[id] = nil end
+      if not ok or cur == nil then ids[id] = nil
+      elseif cur > 0 then
+        -- (0.15.500, owner 15:05 "it said all 41 raid monsters were defeated yet there were still a couple attacking
+        -- me?": monsters 41049, 41050 and 42749 were killed by him at 15:04:57-15:05:08, after the end at 15:04:54:
+        -- they had been counted dead) a body with health again got up (the Undead do): alive again
+        ids[id] = nil
+        S.alive[nid] = S.alive[nid] or {}
+        S.alive[nid][id] = true
+        emf.log(string.format("spawn nodes: node %s: monster %s got up again (health %s): alive again", tostring(nid), tostring(id), tostring(cur)))
+      end
     end
     if next(ids) == nil then S.dead[nid] = nil end
   end
@@ -1079,6 +1105,7 @@ local function protect_tick(world, spots)
   -- raid spawn waves") a protecting group counts while it runs AND while any monster of its nodes is still alive
   local active = {}
   for gid in pairs(S.runs) do active[gid] = true end
+  for gid in pairs(S.raid) do active[gid] = true end  -- (0.15.500) until its end notice (no gap while a replacement comes)
   for _, g in ipairs(groups()) do
     if not active[g.id] then
       for _, n in ipairs(nodes_of(g.id)) do

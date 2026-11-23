@@ -1,3 +1,7 @@
+0.15.500 Nov 23, 2026
+- Spawn Nodes: a raid monster that gets up again after it was killed (the Undead do) counts as alive again, and a raid is over only when none of its monsters is alive for 10 s: no more "all defeated" while some still attack.
+- Spawn Nodes: the raid protection no longer drops for a moment while a stuck monster is replaced.
+
 0.15.499 Nov 23, 2026
 - Spawn Nodes: Remove its monsters writes into the server's log every living creature near the group's nodes that is not one of its monsters (to find out what it leaves behind).
 
