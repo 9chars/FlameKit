@@ -1946,6 +1946,14 @@ minute (only 1 thread-naming 0x406d1388 at start) -> not repeating exceptions. S
 file-exists check on the world thread: caller unknown, game or FlameKit), ZwWaitForSingleObject 4%. Chain fragment
 0x140851d1d (56%) lies between the voxel code and the [Server][Water] flow code (0x14085f2eb..): a water link is a guess.
 Installing capstone (pip) on the PC VM to disassemble was blocked by the permission check; asked the owner.
+07:21 owner "yes" to installing capstone: pip found no package (no network in the VM); objdump (binutils, PE x86-64)
+is already in the VM: `objdump -d -M intel enshrouded_server.exe > /tmp/srv.asm` takes 1 s. Findings: the 56%/58% chain
+= 0x1407bbeb0 (the server game's step) calls 0x140851820 on the objects at game+0x1778 and +0x1780 (and 0x140851800 on
++0x1788). Those are made at 0x1407ab3ba/0x1407ab415 by 0x140834510 (next to the "Terraforming" and VoxelDataContentLoader
+strings) with ids 0x10000 / 0x10001 and memory budgets 0x2600000 (38 MB) / 0x1400000 (20 MB): the two TERRAFORMING VOXEL
+DATA STORES. Their per-step update unpacks chunks (0x14083f6e0 -> 0x140845960; 0x140852ee0 -> decompressor 0x1408514b0).
+Best guess (unproven): a big no-base zone needs more chunks than the store's budget, so it unpacks, drops and unpacks
+again every step (thrashing). Test idea: count calls of 0x1408514b0 per minute at 16 m vs 112 m.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
