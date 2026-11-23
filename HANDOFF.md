@@ -1938,6 +1938,14 @@ header: fix it to print 0x140000000 + rva). Hot (enshrouded_server.exe build 128
 terraforming chunk"), memcpy 0x140bd0b00 4%. ~half the samples are TERRAFORMING / VOXEL CHUNK data being decompressed
 on the main server thread. Best reading (not proven): inside a build zone the game keeps/loads terraforming chunk data;
 a big zone with no base makes it decompress far more chunks. Scripts: claude_scratch/v467/*.py. Test size back to 16 m.
+07:10 owner: "its probably running into an exception over and over" -> **0.15.468 (d4b3edb, DLL md5
+293ee2da6c61add146aa6ee1c3623af8): exception counter** (vectored handler, sampler on only) + sampler prints 0x140000000+rva
+and ntdll export names. Test 07:15-07:18 (112 m at 5794 5106): SLOW at once (22.1 ms); **exceptions: 0** in every slow
+minute (only 1 thread-naming 0x406d1388 at start) -> not repeating exceptions. Sampler again: 0x140845960 17%, 0x14083f6f6
+17%, 0x1408514b0 10% (terraforming chunk data), ntdll ZwWaitForMultipleObjects 7%, ZwQueryFullAttributesFile 5% (a
+file-exists check on the world thread: caller unknown, game or FlameKit), ZwWaitForSingleObject 4%. Chain fragment
+0x140851d1d (56%) lies between the voxel code and the [Server][Water] flow code (0x14085f2eb..): a water link is a guess.
+Installing capstone (pip) on the PC VM to disassemble was blocked by the permission check; asked the owner.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
