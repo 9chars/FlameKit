@@ -57,7 +57,8 @@
 // (0.15.466) SERVER SPEED LOG (speed_tick): one line a minute in emf_core.log ("server speed, minute N"): the steps, the
 // average and the slowest step, the process's CPU, each Free build area that was on and the remembered spots; a minute
 // whose steps average more than kSlowMs is logged as SLOW with the threads that used the most CPU in it, each next to
-// what it uses in a normal minute. Logging only.
+// what it uses in a normal minute. Logging only. (0.15.467) THE SAMPLER (see sampler_thread): with speed_sampler.txt "on",
+// where the world step thread is while the server runs slow.
 #include <windows.h>
 #include <tlhelp32.h>
 
@@ -73,6 +74,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <thread>
 #include <vector>
 
 #include "emf/generated/components.hpp"
@@ -607,6 +609,156 @@ uint64_t process_cpu() {
     return GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u) ? ft(k) + ft(u) : 0;
 }
 
+// ---- (0.15.467, owner 00:22 "doesnt sound like you know how to identify the problem", "yes" to a sampler) ----
+// THE SAMPLER: where the world step thread spends its time while the server runs slow. Only when the server's FlameKit
+// folder has speed_sampler.txt saying "on" (Claude sets it on the owner's own test server; never on G-Portal), and only
+// in the minute after a SLOW minute (and on while the minutes stay SLOW). About kSamplesPerMin times a minute a thread of
+// its own pauses the world step thread (SuspendThread), reads where it is and walks its call chain (RtlVirtualUnwind, up
+// to kFrames calls, guarded by __try: nothing is allocated or logged while it is paused; a few microseconds), then lets
+// it go. At the minute's end the functions it was in most (and those most often in its call chain) are logged as
+// "module 0xADDRESS" (the game's own code at its usual base 0x140000000, so the addresses match EMF's notes).
+constexpr int kFrames = 16;
+constexpr uint32_t kSamplesPerMin = 1000;
+std::atomic<bool> g_sampling{false};
+std::atomic<uint32_t> g_sample_tid{0};
+std::mutex g_sample_mx;
+std::unordered_map<uint64_t, uint32_t> g_leaf, g_chain;  // function start -> samples (under g_sample_mx)
+uint32_t g_samples = 0, g_sample_fail = 0;               // under g_sample_mx
+
+// One sample of thread `h` (paused by the caller): the start of each function in its call chain, innermost first.
+// Plain C (no objects with destructors) so __try can guard it. Returns how many were found (0: none read).
+int walk_stack(HANDLE h, uint64_t* starts) {
+    alignas(16) CONTEXT c;
+    memset(&c, 0, sizeof(c));
+    c.ContextFlags = CONTEXT_FULL;
+    if (!GetThreadContext(h, &c)) return 0;
+    int n = 0;
+    __try {
+        for (int i = 0; i < kFrames && c.Rip; ++i) {
+            DWORD64 base = 0;
+            PRUNTIME_FUNCTION f = RtlLookupFunctionEntry(c.Rip, &base, nullptr);
+            starts[n++] = f ? base + f->BeginAddress : c.Rip;
+            if (!f) {  // a leaf without unwind data: its return address is on top of the stack
+                if (c.Rsp & 7) break;
+                c.Rip = *reinterpret_cast<DWORD64*>(c.Rsp);
+                c.Rsp += 8;
+            } else {
+                PVOID handler_data = nullptr;
+                DWORD64 frame = 0;
+                RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, c.Rip, f, &c, &handler_data, &frame, nullptr);
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return n;
+}
+
+void sampler_thread() {
+    const DWORD wait_ms = 60000 / kSamplesPerMin;
+    for (;;) {
+        if (!g_sampling.load() || !g_sample_tid.load()) {
+            Sleep(250);
+            continue;
+        }
+        uint64_t starts[kFrames] = {};
+        int n = 0;
+        if (HANDLE h = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, g_sample_tid.load())) {
+            if (SuspendThread(h) != DWORD(-1)) {
+                n = walk_stack(h, starts);
+                ResumeThread(h);
+            }
+            CloseHandle(h);
+        }
+        {
+            std::lock_guard<std::mutex> lk(g_sample_mx);
+            if (n == 0) {
+                ++g_sample_fail;
+            } else {
+                ++g_samples;
+                ++g_leaf[starts[0]];
+                for (int i = 0; i < n; ++i) {  // each function once per sample
+                    bool seen = false;
+                    for (int j = 0; j < i; ++j) seen = seen || starts[j] == starts[i];
+                    if (!seen) ++g_chain[starts[i]];
+                }
+            }
+        }
+        Sleep(wait_ms);
+    }
+}
+
+// "module 0xADDRESS": the game's own code at its usual base (from its PE header), other modules as module+offset.
+std::string where(uint64_t a) {
+    HMODULE m = nullptr;
+    char buf[160];
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCWSTR>(a), &m) || !m) {
+        snprintf(buf, sizeof(buf), "0x%llx (no module)", (unsigned long long)a);
+        return buf;
+    }
+    wchar_t wpath[MAX_PATH] = {};
+    GetModuleFileNameW(m, wpath, MAX_PATH);
+    std::wstring wp(wpath);
+    wp = wp.substr(wp.find_last_of(L"\\/") + 1);
+    char name[96] = {};
+    WideCharToMultiByte(CP_UTF8, 0, wp.c_str(), -1, name, sizeof(name) - 1, nullptr, nullptr);
+    const uint64_t rva = a - uint64_t(m);
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(m);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(reinterpret_cast<const char*>(m) + dos->e_lfanew);
+    if (m == GetModuleHandleW(nullptr))
+        snprintf(buf, sizeof(buf), "%s 0x%llx", name, (unsigned long long)(nt->OptionalHeader.ImageBase + rva));
+    else
+        snprintf(buf, sizeof(buf), "%s+0x%llx", name, (unsigned long long)rva);
+    return buf;
+}
+
+std::string top_list(const std::unordered_map<uint64_t, uint32_t>& m, uint32_t total, size_t count) {
+    std::vector<std::pair<uint64_t, uint32_t>> v(m.begin(), m.end());
+    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::string out;
+    char b[200];
+    for (size_t i = 0; i < v.size() && i < count; ++i) {
+        snprintf(b, sizeof(b), "%s%s %.0f%%", out.empty() ? "" : "; ", where(v[i].first).c_str(), total ? v[i].second * 100.0 / total : 0.0);
+        out += b;
+    }
+    return out.empty() ? "none" : out;
+}
+
+// At each minute's end (world thread): the report of the minute just sampled, and whether to sample the next one.
+void sampler_minute(uint32_t minute, bool slow, uint32_t world_tid) {
+    bool on = false;
+    if (FILE* f = _wfopen(lua_file(L"speed_sampler.txt").c_str(), L"r")) {
+        char w[8] = {};
+        on = fscanf(f, "%7s", w) == 1 && strcmp(w, "on") == 0;
+        fclose(f);
+    }
+    static bool started = false, said_on = false;
+    if (on && !said_on) EMF_LOG(kMod, "server speed: the sampler is on (speed_sampler.txt): it samples the minute after a SLOW one");
+    said_on = on;
+    if (on && !started) {
+        std::thread(sampler_thread).detach();
+        started = true;
+    }
+    if (g_sampling.load()) {  // the minute just ended was sampled
+        std::unordered_map<uint64_t, uint32_t> leaf, chain;
+        uint32_t samples = 0, fail = 0;
+        {
+            std::lock_guard<std::mutex> lk(g_sample_mx);
+            leaf.swap(g_leaf);
+            chain.swap(g_chain);
+            samples = g_samples;
+            fail = g_sample_fail;
+            g_samples = g_sample_fail = 0;
+        }
+        EMF_LOG(kMod, "server speed, minute %u%s: sampler: %u samples of the world step thread (%u not read); where it was: %s", minute,
+                slow ? " SLOW" : "", samples, fail, top_list(leaf, samples, 12).c_str());
+        EMF_LOG(kMod, "server speed, minute %u%s: sampler: most often in its call chain: %s", minute, slow ? " SLOW" : "",
+                top_list(chain, samples, 20).c_str());
+    }
+    g_sample_tid = world_tid;
+    g_sampling = on && slow && minute > 1;  // the first minute is the world coming up with nobody on (always slow)
+}
+
 // Called on each server world step (its own thread). Counts the steps and their length; once a minute writes the line.
 void speed_tick() {
     static LARGE_INTEGER freq{}, last{}, minute_start{};
@@ -684,6 +836,7 @@ void speed_tick() {
             it->second.normal = it->second.normal < 0 ? pct : it->second.normal * 0.7 + pct * 0.3;
         }
     }
+    sampler_minute(minute, slow, world_thread);  // (0.15.467)
     minute_start = now;
     steps = 0;
     slowest = 0;

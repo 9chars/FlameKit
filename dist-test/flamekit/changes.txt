@@ -1,3 +1,6 @@
+0.15.467 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): a sampler that finds which part of the game keeps the server busy while it runs slow. Nothing in the game changes.
+
 0.15.466 Nov 22, 2026
 - Server: writes a line about its speed to the log every minute (steps, slowest step, CPU, Free build areas), and which parts of the game were busy when it ran slow. For finding what slows a server down. Nothing in the game changes.
 
