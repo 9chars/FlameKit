@@ -1832,6 +1832,15 @@ altar areas; 0 FlameKit errors; no new crash dump. **RELEASE 0.15.462 DONE: Stab
 G-Portal still logs at a join: "Could not find Entity for UniqueId '701ad7cc'" and twice "[Water] BlockWater Entity not
 found: Outside of Simulation area" = the water issue the owner will fix next (old Free build 0.15.413-0.15.425 pieces;
 tools now on G-Portal: /flamekit.water [radius] (admins), Building tab Forget this spot / Forget all spots).
+21:06 owner on G-Portal: switched "Free build inside altar areas" on (21:02:00, both sides "on for 1 (also in altar
+areas)") to remove the bad blocks in wisp mode, but the game said "Needs building area" there. Not explained yet
+(guesses: the blocks outside his 112 m box, or inside another player's base the game goes by that base's zone; never
+tested in another player's base). 21:25 owner: "I cleaned up the blocks manually", restarted G-Portal (21:27:18).
+21:27 owner was annoyed that a fetch seemed to be for the local server ("this on the production server genius"): the
+call was only waiting; "logs" always reads G-Portal. 21:29 logs: world loaded 21:28:10, 21 features, 0 FlameKit
+errors, two players joined (Midevil 21:29:23): NO "BlockWater Entity not found" and NO "Could not find Entity for
+UniqueId" any more. **G-Portal's water issue is gone.** Open: why "Needs building area" with the admin's "inside altar
+areas" switch on G-Portal (test it in another player's base before relying on it).
 
 ## Things learned the hard way
 
