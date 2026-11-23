@@ -2064,6 +2064,14 @@ per_wave 3, max_alive 6, cooldown 10 min, timer 10-20 min, wire 20 m, hour 20:00
 groups. Channel flamekit/nodes v1 (max 16384). Saved: spawn_nodes.json (server), spawn_nodes_client.json (Show nodes).
 Lua checked only by a block-balance script (no Lua in the container/VM). Local server reloaded it 11:14 (22 features,
 no error); a new channel needs a server restart. Development only; not tested in game yet.
+11:18 restart: server + game loaded 22 features, no error. 11:25 owner: "I can't name the groups?" (tabs have no text box;
+only the Roster window) -> "its fine for now lets not worry about that". 11:31-11:35 owner's test: Group 1, waves 5,
+node 1 at 6328 948 5187, Start now: 5 waves of 3 monsters 30 s apart ("it worked"). 11:27 owner: bosses as a type ->
+Bosses (any). 11:37 owner: control which way they face ("one of the faced away from the base") -> **0.15.477 (27f8ce4)**:
+type Bosses (26 bosses); group setting "Monsters face": the nearest player (default), the node's direction (the admin's
+facing at Add/Move, stored as yaw), random; spawn with {yaw} (EMF Lua 1.40+, else without) and the ground move's
+teleport {yaw} (any EMF; core/spawn.lua q.add(id,x,y,z,yaw)). Local server reloaded 11:38 (22 features); the game
+needs a restart for the new drop-downs. Later list: a text box in FlameKit tabs (group names).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
