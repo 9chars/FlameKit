@@ -982,7 +982,7 @@ function F.panel(world)
       .. "Stone takes about 22 top-pickaxe hits.", BREAK_LEVELS, function(l) return (BREAK_LEVEL[l] or {}).label or l end)
   end
   if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
-  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot change bases during its waves", selected = g.protect == true,
+  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot damage base structures during raid", selected = g.protect == true,  -- (0.15.484, owner 12:50: the label)
     tooltip = "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
       .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
       .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
