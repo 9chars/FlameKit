@@ -1,3 +1,6 @@
+0.15.464 Nov 22, 2026
+- Free build: the building area is 24 m around you, only while you have a building piece selected (0.15.463 put it in the wrong place on the server, so building outside altar areas did not work).
+
 0.15.463 Nov 22, 2026
 - Free build: the building area is now 16 m around where you aim with a building tool, and only there while the tool is out. It was 112 m around you all the time, and on the production server that made the server overloaded. Remembered spots stay as they are.
 
