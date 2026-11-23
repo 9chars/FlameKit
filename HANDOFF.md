@@ -1988,6 +1988,22 @@ a current zone with no old one -> 'added'; same entity but another box -> 'chang
 each matched the FIRST entity-0 zone and counted as changed every step -> the terrain stores reload those areas each
 step (bigger area = more chunks). The fix the game's way: every zone a UNIQUE owner entity that stays the same step to
 step (the moving area: the player's entity; each remembered spot: its own fixed number; safe numbers to be checked).
+08:52-09:10: remembered spots with entity 0 have the same diff problem (each but the first counts as changed every
+step; small with 2 spots). Real altar owner numbers = the altar entity's own id, given by the world in order at
+creation/load (1037, 1038... after load). Readers of entry +0x40: the diff for sure; ~57 code places read +0x40 in
+72-byte records, a few compare it with entity ids elsewhere: NOT proven that nothing else looks the owner up. Player
+ids are 1..1023 (player arrays cover that range). Owner 09:10: "if you pick a number clearly the game allocates that
+some place so it doesn't pick that same number again.. figure that out?" (OPEN: find the entity id allocator).
+**ANTIVIRUS (owner 09:10, ASAP):** a player's antivirus (likely Windows Defender) keeps removing EMF and/or Lua files,
+breaking FlameKit's UI; the owner waits for the player's screen share (Windows Security > Protection history: path
++ threat name). **0.15.472 (59852a0, DLL md5 708894ec2fc6bd2ae4e216f198e7d797): REPAIR**: web_update.hpp
+repair_missing (list version == installed: listed files that are MISSING are downloaded, checked, written in place;
+once per game; logged by name; status "ready|FlameKit restored N missing file(s): restart the game"; the update window
+says so and that an antivirus most likely removed them) and emf_update.hpp repair_missing (installed EMF == list:
+missing EMF files restored the same way, status "...missing Enshrouded Modding Framework (EMF) file(s)..."; only while
+"Keep EMF updated" is on). Files that are present but different are NOT touched. If dinput8.dll or emf_core.dll is
+removed nothing starts: needs a repair outside the game (idea: a repair.cmd that can also add a Defender exclusion).
+Development dist-test only; tests ALL PASSED; not yet tested in the game.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
