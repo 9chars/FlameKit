@@ -1,3 +1,6 @@
+0.15.460 Nov 22, 2026
+- Free build: FlameKit adds its building areas right after the game clears its list of building areas each moment, instead of together with the first flame altar. This is the step towards Free build on a map without any flame altar. If that way cannot be set up, FlameKit uses the old way.
+
 0.15.459 Nov 22, 2026
 - Free build (research, logging only): FlameKit Native logs, for the first steps after a start, when the game empties and refills its list of building areas, to find a way for Free build to work on a map without any flame altar. Nothing changes in the game.
 

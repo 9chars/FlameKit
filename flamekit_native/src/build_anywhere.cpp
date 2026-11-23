@@ -45,7 +45,11 @@
 //  - Writing an altar's TriggerShape does not change its build zone. Bigger altar zones: 1.5x kept everything, 2x lost
 //    the outer blocks after a restart, 4x froze the server's world step.
 //
-// Console: fkbuild stats | free on|off | altar on|off (debug master switches; both on at start).
+// (0.15.460, #5) FlameKit's zones go into the list right after the game empties it each step (programs clear_buildzones,
+// clear_buildzones_client; EMF hook_program), so Free build no longer needs a flame altar on the map; the old way (from
+// the first altar's addZone) is the fallback when those hooks cannot be set (fkbuild clear off switches to it).
+//
+// Console: fkbuild stats | free on|off | altar on|off | clear on|off (debug master switches; free and altar on at start).
 #include <windows.h>
 
 #include <algorithm>
@@ -260,10 +264,26 @@ void write_altar_areas(void* bzs) {
     }
 }
 
-void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
+// (0.15.460, #5) how FlameKit's zones get into the list. true (the default): right after the game empties the list
+// (EMF hook_program, post of clear_buildzones / clear_buildzones_client), once per rebuild, with or without a flame
+// altar on the map. false (fkbuild clear off, or the program hooks could not be set): the old way, from inside the
+// game's addZone call for the first altar of each rebuild (no altar on the map: no Free build).
+std::atomic<bool> g_clear_path{true};
+// (0.15.460) the flag the game passes to addZone for an altar (list 0), per zone list, learned from its calls (the
+// probe of 0.15.459 saw 0 for list 1 on both sides and 1 for list 2 in the player's game); FlameKit passes the same
+// one for its zones. Until an altar was seen (a map without one): kFlagUnknown, then 0 is used.
+constexpr int kFlagUnknown = -1;
+std::unordered_map<void*, int> g_list0_flag;  // under g_altar_mx
+int list0_flag(void* bzs) {
+    std::lock_guard<std::mutex> lk(g_altar_mx);
+    auto it = g_list0_flag.find(bzs);
+    return it == g_list0_flag.end() ? kFlagUnknown : it->second;
+}
+
+void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_clear = false) {
     // once per rebuild of the zone list: a new world step (on_tick) or (0.15.440) the altar that came first in the
     // last rebuild coming again (while the world loads, before any on_tick, the list is rebuilt too: the remembered
-    // spots must be in it then)
+    // spots must be in it then). (0.15.460) Called right after the game emptied the list (from_clear): always a new one.
     struct Pass { uint64_t step = ~0ull; uint32_t first = 0; };
     static std::mutex mx;
     static std::unordered_map<void*, Pass> last;
@@ -271,7 +291,7 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
     {
         std::lock_guard<std::mutex> lk(mx);
         Pass& p = last[bzs];
-        const bool fresh = p.step != now || (p.first != 0 && p.first == altar_entity);
+        const bool fresh = from_clear || p.step != now || (p.first != 0 && p.first == altar_entity);
         if (!fresh) return;
         p.step = now;
         p.first = altar_entity;
@@ -382,8 +402,31 @@ void probe(std::atomic<int>& said, const char* what) {
             (unsigned long long)g_steps.load(), GetCurrentThreadId());
 }
 std::atomic<int> g_said_cs{0}, g_said_cc{0}, g_said_as{0}, g_said_ac{0}, g_said_zone{0};
-void probe_clear_server(void*, void*) { probe(g_said_cs, "clear_buildzones done (server)"); }
-void probe_clear_client(void*, void*) { probe(g_said_cc, "clear_buildzones_client done (this game)"); }
+// (0.15.460, #5) right after the game emptied zone list `bzs`: FlameKit's zones go in first, with or without an altar.
+void after_clear(void* bzs, const char* side) {
+    if (!bzs || !g_clear_path.load()) return;
+    const int known = list0_flag(bzs);
+    {
+        static std::mutex mx;
+        static std::unordered_map<void*, int> said;  // zone list -> the flag last logged for it
+        std::lock_guard<std::mutex> lk(mx);
+        auto it = said.find(bzs);
+        if (it == said.end() || it->second != known) {
+            said[bzs] = known;
+            EMF_LOG(kMod, "free build (%s): FlameKit's zones go in right after the game empties its zone list %p (flag %d%s)", side, bzs,
+                    known == kFlagUnknown ? 0 : known, known == kFlagUnknown ? ": no altar seen yet, 0 used" : ", as the game's altars");
+        }
+    }
+    add_player_boxes(bzs, uint8_t(known == kFlagUnknown ? 0 : known), 0, true);
+}
+void probe_clear_server(void*, void*) {
+    probe(g_said_cs, "clear_buildzones done (server)");
+    if (emf::World ws = emf::server_world()) after_clear(ws.singleton("BuildZoneSystem"), "server");
+}
+void probe_clear_client(void*, void*) {
+    probe(g_said_cc, "clear_buildzones_client done (this game)");
+    if (emf::World wc = emf::client_world()) after_clear(wc.singleton("BuildZoneSystem"), "this game");
+}
 void probe_add_server(void*, void*) { probe(g_said_as, "add_buildzones_server starts"); }
 void probe_add_client(void*, void*) { probe(g_said_ac, "add_buildzones_client starts"); }
 
@@ -397,8 +440,17 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
             probe(g_said_zone, line);
         }
     }
-    // (0.15.443) called with Free build off too: it starts each rebuild's altar list (then adds no boxes)
-    if (box && list == 0 && owner == 0) add_player_boxes(bzs, flag, entity);
+    if (box && list == 0 && owner == 0) {  // (0.15.460) the flag the game uses for an altar, per zone list (logged when it changes)
+        std::lock_guard<std::mutex> lk(g_altar_mx);
+        auto it = g_list0_flag.find(bzs);
+        if (it == g_list0_flag.end() || it->second != flag) {
+            g_list0_flag[bzs] = flag;
+            EMF_LOG(kMod, "free build: the game adds altars to zone list %p with flag %u (entity %u)", bzs, flag, entity);
+        }
+    }
+    // (0.15.443) called with Free build off too: it starts each rebuild's altar list (then adds no boxes). (0.15.460)
+    // Only when FlameKit's zones are not added right after the list is emptied (g_clear_path).
+    if (box && list == 0 && owner == 0 && !g_clear_path.load()) add_player_boxes(bzs, flag, entity);
     const float factor = g_factor.load();
     if (g_altar_on.load() && factor > 1.001f && box && list == 0 && owner == 0) {
         int64_t big[6];
@@ -442,7 +494,12 @@ bool fk_build_anywhere_load(bool dedicated) {
         const bool d = emf::api()->hook_program("add_buildzones_client", probe_add_client, nullptr, nullptr);
         EMF_LOG(kMod, "free build probe: program hooks clear_buildzones %s, clear_buildzones_client %s, add_buildzones_server %s, add_buildzones_client %s",
                 a ? "on" : "NOT on", b ? "on" : "NOT on", c ? "on" : "NOT on", d ? "on" : "NOT on");
+        g_clear_path = a && b;  // (0.15.460) both needed, else the old way
+    } else {
+        g_clear_path = false;
     }
+    EMF_LOG(kMod, "free build: FlameKit's zones are added %s", g_clear_path.load() ? "right after the game empties its zone list (no altar needed)"
+                                                                                  : "with the first altar of each rebuild (the old way: an altar is needed)");
     emf::on_tick([](emf::World w) {  // the lists of players and the factor, every 15 steps of each world
         g_steps.fetch_add(1);  // the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
@@ -492,7 +549,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             }
         }
     });
-    emf::add_command("fkbuild", " stats | free on|off | altar on|off: Free build and the bigger altar areas (debug)",
+    emf::add_command("fkbuild", " stats | free on|off | altar on|off | clear on|off: Free build and the bigger altar areas (debug)",
                      [](emf::World, const std::vector<std::string>& args) {
         std::string all;  // (0.15.416) the words however EMF splits them
         for (const auto& x : args) all += " " + x;
@@ -501,6 +558,8 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (all.find(" free off ") != std::string::npos) g_free_on = false;
         if (all.find(" altar on ") != std::string::npos) g_altar_on = true;
         if (all.find(" altar off ") != std::string::npos) g_altar_on = false;
+        if (all.find(" clear on ") != std::string::npos) g_clear_path = true;    // (0.15.460)
+        if (all.find(" clear off ") != std::string::npos) g_clear_path = false;
         EMF_LOG(kMod, "fkbuild:%s", all.c_str());
         size_t ns = 0, nc = 0;
         {
@@ -508,8 +567,9 @@ bool fk_build_anywhere_load(bool dedicated) {
             ns = g_free_server.size();
             nc = g_free_client.size();
         }
-        EMF_REPLY("free build %s (server list %zu, this game %zu; %llu player box(es) added); bigger altar areas %s (%llu zone(s) made bigger)",
-                  g_free_on.load() ? "on" : "off", ns, nc, (unsigned long long)g_boxes.load(), g_altar_on.load() ? "on" : "off",
+        EMF_REPLY("free build %s (server list %zu, this game %zu; %llu player box(es) added; zones added %s); bigger altar areas %s (%llu zone(s) made bigger)",
+                  g_free_on.load() ? "on" : "off", ns, nc, (unsigned long long)g_boxes.load(),
+                  g_clear_path.load() ? "after the list is emptied" : "with the first altar", g_altar_on.load() ? "on" : "off",
                   (unsigned long long)g_altars.load());
     });
     return al;
