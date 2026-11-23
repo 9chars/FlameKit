@@ -474,18 +474,29 @@ end
 -- (0.15.488) A notice in player `pid`'s game (Spawn Nodes' own channel; the host's own game: directly). `tag`: a
 -- notice with the same tag is changed in place (the count of monsters left), else each its own.
 S.notice_n = S.notice_n or 0
-local function notice_to(world, pid, text, seconds, tag)
+-- (0.15.502, owner 15:14 "is there a way the game can play a siren or warning sound when the raid notice comes in?",
+-- 15:15 "perfect") Plays sounds/<name>.wav in this game: FlameKit Native plays the file named in play_sound.txt
+-- ("<n> <name>", n new each time) through Windows. Only with the player's setting "Raid siren" on.
+local function play_sound(name)
+  if kit.setting("raid_siren", true) ~= true then return end
+  S.sound_n = (S.sound_n or 0) + 1
+  local f = io.open(emf.dir .. "\\play_sound.txt", "w")
+  if f then f:write(string.format("%d %s.wav\n", os.time() * 100 + S.sound_n % 100, name)) f:close() end
+end
+
+local function notice_to(world, pid, text, seconds, tag, sound)
   S.notice_n = S.notice_n + 1
-  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n) }
+  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n), snd = sound }
   if pid == emf.local_player() and kit.is_host() then
     kit.notice("nodes_" .. msg.tag, text, NOTICE_COLOUR, msg.s)
+    if sound then play_sound(sound) end
   else
     pcall(emf.net.send_to, world, pid, CHANNEL, emf.json.encode(msg))
   end
 end
 
 -- (0.15.488) To every player (near = nil) or to the players within NOTICE_DIST m of group `near`'s nodes.
-local function raid_notice(world, gid, text, near, seconds, tag)
+local function raid_notice(world, gid, text, near, seconds, tag, sound)
   local g = group(gid)
   if not g or g.announce == false then return end
   emf.log("spawn nodes: notice: " .. text)
@@ -496,7 +507,7 @@ local function raid_notice(world, gid, text, near, seconds, tag)
         if dist2(p[2], p[3], p[4], n.x, n.y, n.z) <= NOTICE_DIST * NOTICE_DIST then ok = true break end
       end
     end
-    if ok then notice_to(world, p[1], text, seconds, tag) end
+    if ok then notice_to(world, p[1], text, seconds, tag, sound) end
   end
 end
 
@@ -671,7 +682,7 @@ local function raid_tick(world)
           answer and string.format("player %s's minimap: place '%s', region '%s'", tostring(r.ask.by), tostring(answer.place), tostring(answer.region))
           or "no answer came: the nearest flame altar"))
         r.ask = nil
-        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, START_END_S)
+        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, START_END_S, nil, "raid_siren")
       end
     end
   end
@@ -1885,6 +1896,7 @@ function F.setup(k)
       if okd and type(msg) == "table" and msg.op == "notice" and type(msg.t) == "string" and type(msg.tag) == "string" then  -- (0.15.488)
         local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
         if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), NOTICE_COLOUR, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
+        if msg.snd == "raid_siren" then play_sound("raid_siren") end  -- (0.15.502)
         return
       end
       if okd and type(msg) == "table" and msg.op == "state" then

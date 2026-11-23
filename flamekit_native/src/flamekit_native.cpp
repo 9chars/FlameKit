@@ -649,6 +649,50 @@ void on_world_tick(emf::World w) {
     if (std::fabs(fx) + std::fabs(fz) > 1e-4f) g_heading.store(std::atan2(fx, fz));
     g_seen.store(GetTickCount64());
 
+    // (0.15.502, owner 15:14 "is there a way the game can play a siren or warning sound when the raid notice comes in?")
+    // features/spawn_nodes.lua writes emf\mods\flamekit\play_sound.txt ("<n> <file>.wav", n new each time); the file
+    // from emf\mods\flamekit\sounds\ is played through Windows (winmm PlaySoundW, async: it never holds the game)
+    {
+        static uint64_t sound_looked = 0;
+        static std::string sound_last;
+        const uint64_t tnow = GetTickCount64();
+        if (tnow - sound_looked > 250) {
+            sound_looked = tnow;
+            static std::wstring dir;
+            if (dir.empty()) {
+                wchar_t exe[MAX_PATH];
+                const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
+                std::wstring d(exe, n);
+                const size_t slash = d.find_last_of(L"\\/");
+                dir = (slash == std::wstring::npos ? std::wstring() : d.substr(0, slash + 1)) + L"emf\\mods\\flamekit\\";
+            }
+            if (FILE* f = _wfsopen((dir + L"play_sound.txt").c_str(), L"rb", _SH_DENYNO)) {
+                char buf[128] = {};
+                const size_t got = fread(buf, 1, sizeof buf - 1, f);
+                fclose(f);
+                std::string line(buf, got);
+                while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) line.pop_back();
+                if (!sound_last.empty() && line != sound_last) {
+                    const size_t sp = line.find(' ');
+                    std::string name = sp == std::string::npos ? std::string() : line.substr(sp + 1);
+                    bool ok = !name.empty() && name.size() < 64;
+                    for (char c : name) ok = ok && (std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.');
+                    ok = ok && name.find("..") == std::string::npos;
+                    if (ok) {
+                        using PlaySoundFn = BOOL(WINAPI*)(LPCWSTR, HMODULE, DWORD);
+                        static PlaySoundFn play = reinterpret_cast<PlaySoundFn>(GetProcAddress(LoadLibraryW(L"winmm.dll"), "PlaySoundW"));
+                        const std::wstring file = dir + L"sounds\\" + std::wstring(name.begin(), name.end());
+                        const bool played = play && play(file.c_str(), nullptr, 0x00020000 /*SND_FILENAME*/ | 0x0001 /*SND_ASYNC*/ | 0x0002 /*SND_NODEFAULT*/);
+                        FK_LOG(fklog::kInfo, "sound: %s %s", name.c_str(), played ? "played" : "could not be played");
+                    }
+                }
+                sound_last = line.empty() ? std::string("-") : line;
+            } else if (sound_last.empty()) {
+                sound_last = "-";
+            }
+        }
+    }
+
     // markers and players: a look through every entity every two seconds (they seldom change)
     static std::vector<uint32_t> player_ids;
     static uint64_t scanned = 0, updated = 0;

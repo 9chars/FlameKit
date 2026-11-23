@@ -1,3 +1,6 @@
+0.15.502 Nov 23, 2026
+- Spawn Nodes: a siren plays when a raid starts (with the "Raid forces are pushing into ..." notice). Each player can turn it off: setting Raid siren (Messages). It plays at the Windows volume.
+
 0.15.501 Nov 23, 2026
 - Spawn Nodes: every monster that comes into a raid joins it, not only the nodes' own: one made during the raid within 100 m of its nodes that is hostile, or that fights a player there (the Undead's summons, the world's monsters). Joined monsters are counted, marked and watched, and the raid ends only when they are dead too.
 
