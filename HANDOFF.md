@@ -1672,6 +1672,30 @@ the server exe, 98 of 98 in the game; build 1287369 known), FlameKit Native and 
 18:20:00 (hello: EMF 0.6.19, API 47, 18 channels), Free build on for him, no Lua error, no water warning. At his join the
 game logs "net_to_server refused (lua): no server has welcomed this game yet" and "over the channel's rate (30/60 in
 10 s)": the SAME on 0.6.6 (17:51, backup log), not new: FlameKit sends a burst before the welcome (to look at later).
+**18:26 owner: "start building the updater for EMF".** 0.15.454 (commit ea91970, NOT published, NOT installed; DLL built
+md5 0baeda7851290b6d8d9faa0c16423d4c): flamekit_native/src/emf_update.hpp, called by web_update.hpp's Updater after each
+look at FlameKit's list. Its own signed list per channel, emf-dist / emf-dist-test (emf.txt "emf <version>" then "<size>
+<sha256> <path below the game folder>", emf.sig, files/<path>), because an older FlameKit refuses its WHOLE update.txt
+when one line names a path outside flamekit/ and flamekit_native/ (safe() -> "check failed"): EMF lines in update.txt
+would stop every older game from updating. Rules: version = FileVersion of emf\emf_core.dll, install only when the list
+is newer (never older, a player's own newer EMF stays); skip when dinput8.dll's ProductName is not "EMF (Enshrouded
+Modding Framework)" (another loader) or when the list brings an emf/vk file not there yet (Vulkan layer registration is
+the installer's job); paths only dinput8.dll and emf/ (never emf/config, emf/mods/* except emf/mods/lua, emf/flamekit*);
+SHA-256 of every file checked before anything changes; backup of the replaced files in emf\flamekit_emf_backup\
+(backup.txt: "emf <old version>", paths, "+path" = added); install: <name>.emfnew, old renamed <name>.emfold (works for
+files in use), new put in place, dinput8.dll last; any failure puts every changed file back; a failed list is retried
+after 30 min; .emfold/.emfnew removed at the next start (clean_up, also logs "this game runs EMF vX"). The status label
+says "EMF vX is ready: restart the game" (or "Update vA and EMF vX are ready"). Dedicated servers never run the
+updater. Tests: flamekit_native/tests/emf_update_test.cpp, built and run by build.cmd after the DLL (needs ..\EMF-0.6.6
+and ..\EMF-0.6.19; exit 6 = tests failed): 31 checks ALL PASSED 18:5x (bad signature, forbidden paths, bad SHA-256,
+retry wait, older list, other loader, failure half-way with emf_core.dll in use -> all put back, 0.6.6 -> 0.6.19 with
+the core in use, untouched settings/other mods, backup, newer list while one waits, clean-up at the next start,
+unreadable version). Tool: flamekit_native/notes/make_emf_dist.py <repo> emf-dist-test <EMF package> (EMF 0.6.19: 35
+files with licenses, 23 MB; tried in claude_scratch\emf_dist_try); sign like update.txt (copy emf.txt to
+restart_helper\signing\update.txt, "sign", update.sig -> emf.sig); tools/check_sig.py <channel> emf.txt emf.sig.
+Licences: EMF MIT, emf_content.dll (EML) GPL-3.0-or-later: licence files go along (emf/licenses), source = EMF's
+GitHub release. NOTE: build.cmd keeps the EMF 0.6.6 SDK on purpose: emf::init(api) refuses a core older than the SDK,
+so a DLL built with the 0.6.19 SDK would not load for players still on 0.6.6.
 
 ## Things learned the hard way
 
