@@ -335,6 +335,38 @@ local function scan_tick(world)
   return true
 end
 
+-- (0.15.487, owner 13:14 "the remove monsters didn't remove them all... it removed some, but some are still flying
+-- around") Remove also looks through the whole world for the group's tagged monsters, alive or dead, known or not, and
+-- takes them away (a slice per step, as scan_tick). S.purge = { gids = { [gid] = name }, list, i, n }.
+local function purge_tick(world)
+  local pg = S.purge
+  if not pg.list then
+    local ok, list = pcall(world.entities, world)
+    pg.list, pg.i, pg.n = ok and list or {}, 1, 0
+    return
+  end
+  local t0 = clock and clock() or 0
+  local done = 0
+  while pg.i <= #pg.list and done < SCAN_MAX and not (clock and clock() - t0 > SCAN_BUDGET) do
+    local id = pg.list[pg.i]
+    pg.i, done = pg.i + 1, done + 1
+    local oks, scl = pcall(world.get, world, "ScaleComponent", id)
+    local gid = oks and scl and group_of_tag(scl.uniformScale)
+    if gid and pg.gids[gid] then
+      if pcall(emf.destroy, world, id) then pg.n = pg.n + 1 end
+      if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
+      for _, ids in pairs(S.alive) do ids[id] = nil end
+      for _, ids in pairs(S.dead) do ids[id] = nil end
+    end
+  end
+  if pg.i <= #pg.list then return end
+  local names = {}
+  for _, name in pairs(pg.gids) do names[#names + 1] = name end
+  emf.log(string.format("spawn nodes: Remove's world search: %d more monster(s) or bod(ies) of %s taken away (%d entities looked at)",
+    pg.n, table.concat(names, ", "), #pg.list))
+  S.purge = nil
+end
+
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
 local function fire(world, gid, why, manual)
   local g = group(gid)
@@ -467,6 +499,10 @@ local function clean_tick(world)
     local g = node and group(node.g)
     for id in pairs(ids) do
       local ok, cur = pcall(emf.health, world, id)
+      if not ok or cur == nil then  -- (0.15.487) health not readable: still in the world? then it is still alive for us
+        local okp, px = pcall(world.position, world, id)
+        if okp and px then ok, cur = true, 1 end
+      end
       S.miss[id] = (not ok or cur == nil) and ((S.miss[id] or 0) + 1) or nil
       if S.miss[id] and S.miss[id] < MISSES then
         -- (0.15.483) not read this time: still counted alive (and still protecting) until MISSES checks in a row
@@ -842,7 +878,10 @@ local function handle(world, account, entity, msg, from)
       if qn and qn.g == gid then table.remove(S.queue, i) end
     end
     emf.log(string.format("spawn nodes: player %s removed %d monster(s) and %d dead bod(ies) of %s", who, n, bodies, g.name))
-    note(string.format("Removed %d monster(s) and %d dead bod%s of %s.", n, bodies, bodies == 1 and "y" or "ies", g.name))
+    note(string.format("Removed %d monster(s) and %d dead bod%s of %s; the rest of the world is being searched for more.", n, bodies, bodies == 1 and "y" or "ies", g.name))
+    -- (0.15.487) then the whole world, for the group's tagged ones FlameKit lost track of
+    if S.purge and S.purge.list then S.purge.gids[gid] = g.name  -- joins the search under way (it may miss some behind it: Remove again)
+    else S.purge = S.purge or { gids = {} } S.purge.gids[gid] = g.name end
   end
   return state(world, account, from)
 end
@@ -854,12 +893,13 @@ function F.tick(world)
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
     S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
-    S.scan, S.scanned, S.miss = nil, false, {}
+    S.scan, S.scanned, S.miss, S.purge = nil, false, {}, nil
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     scan_tick(world)
     return
   end
+  if S.purge then purge_tick(world) end  -- (0.15.487)
   ground.tick(world)
   spawn_tick(world)
   if S.steps % CLEAN_STEPS == 0 then clean_tick(world) end
