@@ -1,3 +1,6 @@
+0.15.520 Nov 23, 2026
+- Spawn Nodes: raid monsters go after the players: 3 s after a monster appears, it takes a hit of 1 in the name of the nearest player (within 120 m), the game's own way to put him on its threat list, and again every 5 s while it does not move.
+
 0.15.519 Nov 23, 2026
 - Spawn Nodes: Between waves can be 0 s or 5 s too.
 
