@@ -25,6 +25,8 @@
 -- while "Show nodes" is on (this game's own switch, spawn_nodes_client.json). Other players' games never get the list.
 -- The channel "nodes": a player's game asks with {op = "get"}; the server answers {op = "state", admin, groups, nodes,
 -- status, note}; an admin's clicks send {op = ...} (below). In a game that hosts the world everything is done right here.
+-- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and "Players cannot damage placed
+-- objects during its waves" (protect_tick).
 -- Uses only core modules (HANDOFF rule 0b).
 
 local admins = require("core.admins")
@@ -46,6 +48,12 @@ local MAX_GROUPS = 30          -- groups at most
 local SPREAD = 10              -- m: monsters spawn within this of their node
 local ACTIVE_DIST = 100        -- m: a node spawns only while a player is within this
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
+-- (0.15.478, owner 12:01 "that would be cool if monsters could damage structures, that would be an option for that mode",
+-- "prevent players from damaging structures while the raid is active", 12:03 "yes research both we need that setting")
+local BREAK_STEPS = 180        -- monsters of a group with "Monsters damage buildings" hit a wall every 3 s
+local BREAK_REACH = 4          -- m: a player-built block this close to the monster, on its way to the nearest player
+local BREAK_LOOK = 64          -- m: the nearest player it looks toward (EMF's find_wall: a line of at most 64 m)
+local BREAK_MAX = 8            -- hits per 3 s for all groups together (EMF runs 8 breaks a step for all mods)
 
 -- (0.15.477, owner 11:27 "it would be nice if I could have a monster group for bosses as well so I could have one node
 -- spawn a boss") "Bosses": any of the bosses (core/monsters.lua's 26), the only type with bosses in it
@@ -66,7 +74,7 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m" }
-local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", breaks = false, protect = false, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
   cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
@@ -92,7 +100,7 @@ end
 -- ---- the server's half ----
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
-            notes = {}, session = nil }
+            notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {} }
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -306,6 +314,71 @@ local function clean_tick(world)
   end
 end
 
+-- (0.15.478) "Monsters damage buildings": every BREAK_STEPS each monster of such a group looks along the line to the
+-- nearest player within BREAK_LOOK m (emf.find_wall); a player-built block within BREAK_REACH m of it on that line takes
+-- one hit like a top pickaxe (emf.break_blocks, mode damage: cracks and the game's block health; never the ground or the
+-- world's own ruins). Needs EMF Lua 1.37+ on the server (EMF 0.6.19); an older one: S.no_break, said in the tab.
+local function break_tick(world, spots)
+  if not (emf.find_wall and emf.break_blocks) then
+    for _, g in ipairs(groups()) do if g.breaks then S.no_break = true break end end
+    return
+  end
+  local hits = 0
+  for _, g in ipairs(groups()) do
+    if g.breaks then
+      for _, n in ipairs(nodes_of(g.id)) do
+        for id in pairs(S.alive[n.id] or {}) do
+          if hits >= BREAK_MAX then return end
+          local ok, x, y, z = pcall(world.position, world, id)
+          if ok and x then
+            local best, px, py, pz = BREAK_LOOK * BREAK_LOOK, nil, nil, nil
+            for _, p in ipairs(spots) do
+              local d = dist2(p[2], p[3], p[4], x, y, z)
+              if d <= best then best, px, py, pz = d, p[2], p[3], p[4] end
+            end
+            if px then
+              local okw, wall = pcall(emf.find_wall, world, { x = x, y = y + 1, z = z }, { x = px, y = py + 1, z = pz })
+              if okw and type(wall) == "table" and wall.kind == "building" and wall.x
+                and dist2(wall.x, wall.y, wall.z, x, y + 1, z) <= BREAK_REACH * BREAK_REACH then
+                local okb, bid = pcall(emf.break_blocks, world, wall.x, wall.y, wall.z, { radius = 1 }, function(w, result)
+                  if type(result) == "table" and (tonumber(result.removed) or 0) > 0 then
+                    S.broke[g.id] = (S.broke[g.id] or 0) + result.removed
+                  end
+                end)
+                if okb and bid then hits = hits + 1 end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+-- (0.15.478) "Players cannot damage placed objects during its waves": while such a group runs, one EMF hit rule
+-- cancels every player's hits on placed objects (chests, stations, doors...: EMF's "objects"), everywhere on the
+-- server (EMF's rules have no area). Gone when no such group runs. Walls and floors are not hits: research.
+local function protect_tick(world)
+  local want = false
+  for gid in pairs(S.runs) do
+    local g = group(gid)
+    if g and g.protect then want = true break end
+  end
+  if want and not S.protect_rule then
+    local ok, id = pcall(emf.hit_rule, { from = "players", to = "objects", cancel = true })
+    if ok and id then
+      S.protect_rule = id
+      emf.log("spawn nodes: a raid runs: players' hits on placed objects are cancelled until it ends")
+    else
+      emf.log("spawn nodes: the rule against players' hits on placed objects was refused (" .. tostring(id) .. ")")
+    end
+  elseif not want and S.protect_rule then
+    pcall(emf.hit_rule_remove, S.protect_rule)
+    S.protect_rule = nil
+    emf.log("spawn nodes: no raid with protection runs: players can hit placed objects again")
+  end
+end
+
 -- The triggers of every group that is on and not running.
 local function trigger_tick(world, spots)
   local tod = nil
@@ -359,7 +432,8 @@ local function status(gid)
   local run = S.runs[gid]
   local alive = 0
   for _, n in ipairs(nodes_of(gid)) do alive = alive + alive_count(n.id) end
-  local a = alive > 0 and string.format(" %d of its monsters alive.", alive) or ""
+  local a = (alive > 0 and string.format(" %d of its monsters alive.", alive) or "")
+    .. ((S.broke[gid] or 0) > 0 and string.format(" Blocks they broke: %d.", S.broke[gid]) or "")
   if run then
     if run.wave == 0 then return "Running: the first wave starts now." .. a end
     return string.format("Running: wave %d of %d done, the next in %d s.", run.wave, run.waves,
@@ -400,6 +474,7 @@ local function state(world, account, from)
   end
   table.sort(st.nodes, function(a, b) return a[1] < b[1] end)
   st.max_nodes, st.max_groups = MAX_NODES, MAX_GROUPS
+  st.no_break = S.no_break
   return st
 end
 
@@ -447,8 +522,8 @@ local function handle(world, account, entity, msg, from)
     note(string.format("Deleted %s and its %d node(s).", g.name, n))
   elseif msg.op == "set" and g then
     local key, v = tostring(msg.key), msg.value
-    if key == "on" then
-      g.on = v == true
+    if key == "on" or key == "breaks" or key == "protect" then  -- (0.15.478) the two raid switches
+      g[key] = v == true
     elseif allowed(key, v) then
       g[key] = v
       if key == "trigger" or key == "timer_min" or key == "timer_max" then S.next_timer[gid] = nil end
@@ -524,14 +599,18 @@ function F.tick(world)
   ground.tick(world)
   spawn_tick(world)
   if S.steps % CLEAN_STEPS == 0 then clean_tick(world) end
-  local need_spots = S.steps % CHECK_STEPS == 0
+  local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end
   if not need_spots then return end
   local spots = player_spots(world)
   for gid, run in pairs(S.runs) do
     if S.steps >= run.next_at then wave(world, gid, spots) end
   end
-  if S.steps % CHECK_STEPS == 0 then trigger_tick(world, spots) end
+  if S.steps % CHECK_STEPS == 0 then
+    trigger_tick(world, spots)
+    protect_tick(world)
+  end
+  if S.steps % BREAK_STEPS == 0 then break_tick(world, spots) end
 end
 
 -- ---- the player's game ----
@@ -690,6 +769,14 @@ function F.panel(world)
     FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
   choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
     .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
+  rows[#rows + 1] = { button = "breaks", text = (g.breaks and "On    " or "Off   ") .. "Monsters damage buildings", selected = g.breaks == true,
+    tooltip = "Every 3 seconds each of its monsters hits a player-built block within " .. BREAK_REACH .. " m of it, on its way to the nearest "
+      .. "player, like a top pickaxe: stone takes about 22 hits, wood far fewer. Never the ground or the world's own ruins. Inside a "
+      .. "flame altar's area what breaks stays broken. Needs EMF 0.6.19 on the server." }
+  if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
+  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot damage placed objects during its waves", selected = g.protect == true,
+    tooltip = "While its waves run, players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the "
+      .. "whole server. Walls, floors and other building blocks are not covered yet." }
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
   if g.trigger == "timer" then
     choice_row(rows, g, "timer_min", "Timer from", "The timer fires at a random time between these two (after the cooldown).")
@@ -758,6 +845,8 @@ function F.click(world, key)
     C.del_asked = nil
     act(world, { op = "delete_group", g = gid })
   elseif key == "on" then act(world, { op = "set", g = gid, key = "on", value = not g.on })
+  elseif key == "breaks" then act(world, { op = "set", g = gid, key = "breaks", value = not g.breaks })
+  elseif key == "protect" then act(world, { op = "set", g = gid, key = "protect", value = not g.protect })
   elseif key == "start" then act(world, { op = "start", g = gid })
   elseif key == "stop" then act(world, { op = "stop", g = gid })
   elseif key == "remove" then act(world, { op = "remove", g = gid })

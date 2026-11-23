@@ -1,3 +1,6 @@
+0.15.478 Nov 23, 2026
+- Spawn Nodes: two switches per group for raids: Monsters damage buildings (they hit player-built blocks near them, like a pickaxe; needs EMF 0.6.19 on the server), and Players cannot damage placed objects during its waves.
+
 0.15.477 Nov 23, 2026
 - Spawn Nodes: a monster type Bosses (any boss), so a node can spawn a boss.
 - Spawn Nodes: choose which way the monsters face when they appear: the nearest player, the node's direction (the way you faced when you added or moved it), or random.
