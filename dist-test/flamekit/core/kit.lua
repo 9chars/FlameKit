@@ -31,6 +31,26 @@ function kit.is_host()
   return os.time() - server_seen <= 2
 end
 
+-- (0.15.462, owner 2026-11-22 20:29 "#2 why aren't we fixing this now?") A message to the server goes out only once the
+-- server has welcomed this game and has that channel (emf.net.peer is not 0). Before that EMF refuses it and logs
+-- "net_to_server refused (lua): no server has welcomed this game yet", and features that try again every step (the
+-- player's settings, core/player_prefs.lua) then also hit the channel's rate ("over the channel's rate (30 in 10 s)"):
+-- seen at every join, about 9 s before the welcome. Every feature already treats a send that answered false as not sent
+-- and tries again later, so held back here it simply goes after the welcome. Not in a game you host (its server world is
+-- in this game: nothing to wait for).
+do
+  local raw_send = emf.net and emf.net.send
+  if raw_send then
+    emf.net.send = function(channel, data, ...)
+      if not kit.is_host() then
+        local ok, version = pcall(emf.net.peer, nil, 0, channel)
+        if ok and (version or 0) == 0 then return false end
+      end
+      return raw_send(channel, data, ...)
+    end
+  end
+end
+
 -- (0.15.138, owner: keep track of compatibility) The oldest FlameKit on the other side this one still works with.
 -- Raise one of them only when a change breaks the older side (HANDOFF "Compatibility"): MIN_SERVER is checked in a
 -- player's game against the server's version, MIN_GAME is sent by the server and checked in each player's game.

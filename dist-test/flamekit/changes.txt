@@ -1,3 +1,7 @@
+0.15.462 Nov 22, 2026
+- Invincible Mode: when a player with it left the server, it could stop keeping the air full for everyone until the server restarted. Fixed.
+- Joining a server: FlameKit waits for the server's hello before it sends anything, so the game's log no longer fills with refused messages at every join.
+
 0.15.461 Nov 22, 2026
 - Building tab: the "This map has no flame altar yet" line is gone: Free build works on a map without any flame altar now. It only comes back if FlameKit ever has to fall back to the old way, which needs an altar.
 

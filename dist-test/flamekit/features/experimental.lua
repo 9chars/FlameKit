@@ -1803,9 +1803,16 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     -- the player's Oxygen data is written directly: dataStorage[1] = the air now, [2] = its maximum (measured on the
     -- local server: "30 30 0 0 0 30" full, "0 30 0 0 0 30" drowning), and the game's leftover fraction
     -- (DynamicOxygenState.accumulatedValue) back to 0.
+    -- (0.15.462) a player who is just leaving has no Oxygen any more: skipped, not counted as "this game version cannot"
+    -- (G-Portal 2026-11-22 18:59:54: SuperB's game dropped, the error switched the air off for everyone until a restart)
+    local oxygen = nil
     if is_on(account, "immortal") and not glide.air_broken then
+      local okg, comp = pcall(world.get, world, "Oxygen", p.entity)
+      if okg then oxygen = comp end
+    end
+    if oxygen then
       local ok, err = pcall(function()
-        local o = world:get("Oxygen", p.entity).dataStorage
+        local o = oxygen.dataStorage
         local now, full = tonumber(o[1]), tonumber(o[2])
         if now and full and full > 0 and now < full then
           o[1] = full
