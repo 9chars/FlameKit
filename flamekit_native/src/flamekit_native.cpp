@@ -6288,7 +6288,10 @@ struct UpdateDialog : Layer {
     RECT ok_r{}, restart_r{};
     int mouse_x = -1, mouse_y = -1;
     bool restarting = false;
-    static constexpr int kW = 560, kH = 176, kHead = 32;  // (0.15.456) 560 wide (was 440): the framework's full name fits
+    // (0.15.457, owner 19:06 "the dialog box is too small or you need to wrap the next to the next line so it doesn't
+    // cut it off") 480 wide again; the message is wrapped by its measured width and the height follows the lines (kH)
+    static constexpr int kW = 480, kHead = 32;
+    int kH = 176;
 
     // Fills a rectangle with colour r, g, b at opacity a.
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
@@ -6326,8 +6329,7 @@ struct UpdateDialog : Layer {
         const std::wstring emf_name = L"Enshrouded Modding Framework (EMF) v" + widen(emf_v);
         message2.clear();
         if (!kit.empty() && !emf_v.empty()) {
-            message = L"FlameKit v" + widen(kit) + L" and";
-            message2 = emf_name + L" have been downloaded.";
+            message = L"FlameKit v" + widen(kit) + L" and " + emf_name + L" have been downloaded.";
         } else if (!kit.empty()) {
             message = L"FlameKit v" + widen(kit) + L" has been downloaded.";
         } else {
@@ -6346,6 +6348,13 @@ struct UpdateDialog : Layer {
             head.ready(g_screen, 17);
             text.ready(g_screen, 16);
         }
+        // the lines of the message, wrapped to the window's width as the font measures them
+        std::vector<std::wstring> lines;
+        for (const std::wstring* m : {&message, &message2})
+            if (!m->empty())
+                for (std::wstring& l : wrap_words(text, *m, kW - 40)) lines.push_back(std::move(l));
+        const int line_h = 24;
+        kH = kHead + 14 + static_cast<int>(lines.size()) * line_h + 8 + line_h + 18 + 32 + 14;
         resize(kW, kH);
         std::fill(pixels.begin(), pixels.end(), 0u);
         box(0, 0, kW, kH, 14, 15, 19, 0.94f);
@@ -6355,9 +6364,12 @@ struct UpdateDialog : Layer {
         box(0, 0, 1, kH, 120, 160, 220, 1.0f);
         box(kW - 1, 0, kW, kH, 120, 160, 220, 1.0f);
         head.draw(canvas, 12, 6, L"FlameKit update", 235, 225, 205);
-        text.draw(canvas, 20, kHead + 14, message, 90, 220, 110);
-        if (!message2.empty()) text.draw(canvas, 20, kHead + 36, message2, 90, 220, 110);
-        text.draw(canvas, 20, kHead + (message2.empty() ? 44 : 62), restarting ? L"Closing the game; it starts again by itself..." : L"Restart the game to load it!",
+        int ty = kHead + 14;
+        for (const std::wstring& l : lines) {
+            text.draw(canvas, 20, ty, l, 90, 220, 110);
+            ty += line_h;
+        }
+        text.draw(canvas, 20, ty + 8, restarting ? L"Closing the game; it starts again by itself..." : L"Restart the game to load it!",
                   225, 225, 230);
         const int bw = 130, bh = 32, by = kH - bh - 14;
         restart_r = {kW - 16 - bw, by, kW - 16, by + bh};

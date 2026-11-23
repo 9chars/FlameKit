@@ -1,3 +1,6 @@
+0.15.457 Nov 22, 2026
+- Updates: the update window wraps its text to the next line and grows to fit, so the Enshrouded Modding Framework's full name is no longer cut off.
+
 0.15.456 Nov 22, 2026
 - Updates: the update window and the Messages line name the Enshrouded Modding Framework (EMF) when a new EMF was downloaded (it said "FlameKit v0.6.19"), and both when FlameKit and EMF were downloaded together. The update window is wider so the full name fits.
 - About tab: a downloaded EMF shows as "(v0.6.19 installs at restart)".
