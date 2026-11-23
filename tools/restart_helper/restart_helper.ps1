@@ -18,6 +18,9 @@
 #           installtest\game (a fake dedicated server folder: an empty enshrouded_server.exe, so no save backup is made)
 #           gets installtest\old\install.ps1 (the old FlameKit package) or installtest\new\install.ps1 (the new one),
 #           -NoDesktopShortcut; the output goes to installtest\old.log or installtest\new.log
+#   logs    (2026-11-22, owner 19:35 "yes read the logs") only fetch the production server's logs into
+#           ..\production_stable_logs (upload.ps1 -LogsOnly, as the nightly fetch): nothing is uploaded, whatever the
+#           outbox holds
 #   stop    stop this helper
 # Whenever a file chime.request appears, it plays a chime: Claude is done and waits for the owner.
 #
@@ -318,8 +321,9 @@ while ($true) {
                 'installnew' { $ok = Install-Test 'new'; Finish $ok 'installnew' }
                 'upload' { $ok = Upload; Finish $ok 'upload' }
                 'ftplist' { $ok = Upload -List; Finish $ok 'ftplist' }
+                'logs' { $ok = Upload -LogsOnly; Finish $ok 'logs' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, buildprobe, keygen, sign, installold, installnew, upload, ftplist, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, buildprobe, keygen, sign, installold, installnew, upload, ftplist, logs, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"

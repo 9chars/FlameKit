@@ -1752,6 +1752,19 @@ OFF test (owner switched "Keep EMF updated" off 19:21:05): rolled back (.v0619d)
 EMF is left as it is", nothing downloaded. 19:30:08 owner switched it on: "is on again", 0.6.19 in place 19:30:17,
 dialog; 19:32:11 game on EMF 0.6.19, "nothing to do". **19:32 owner: "looks like that worked"**. ALL EMF UPDATER TESTS
 DONE except the combined dialog (FlameKit + EMF waiting together) live.
+19:34 owner "yes": deleted the 73 leftover .v0619/.v0619b/.v0619c/.v0619d test copies in the owner's game folder
+(delete permission granted for D:\...\Enshrouded and its emf; nothing else removed; EMF 0.6.19 intact).
+**19:35 owner: "yes read the logs, but I'm assuming it was a local game crash"** (the player SuperB, 0.15.423). The
+helper's "upload" would also upload the outbox (it is NOT empty: core, features, _flamekit_native), so the restart
+helper got a new request **logs** (upload.ps1 -LogsOnly, as the nightly fetch; nothing uploaded); it overwrites today's
+dated copy emf_core_<date>.log, so the 03:55 copy was renamed emf_core_2026-11-22_nightly.log first. Fetched 19:37.
+FINDINGS: G-Portal did NOT crash (emf_core up since 08:10, saving until 19:35; newest crash dump still 20261120_042620).
+Game server log (uptime + 08:10:06 = clock): 18:59:36 "Congestion detected for machine 1 (rtt 663 ms)", then ping 999 ms
+and nothing received from the client, 18:59:51 "Timeout for peer 0(1)", player removed; FlameKit 18:59:54 "SuperB left the
+server!"; he connected again 19:00:40 and was in at 19:01:20. So his game stopped answering (froze/crashed on his PC, or
+his network): the owner's guess is right. Side note: at the leave 0.15.423 logged "experimental: air cannot be kept
+full on this game version (...experimental.lua:1837: attempt to index a nil value)": Invincible Mode touched the leaving
+player's component; harmless noise, to guard later (check against the current experimental.lua).
 
 ## Things learned the hard way
 
