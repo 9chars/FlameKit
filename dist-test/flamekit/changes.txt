@@ -1,3 +1,6 @@
+0.15.481 Nov 23, 2026
+- Spawn Nodes: Building damage levels for raids (Low, Medium, High, Extreme; High by default): how often and how hard the monsters hit, how far they reach and how big the holes are. Monsters with no player in reach hit building blocks right beside them.
+
 0.15.480 Nov 23, 2026
 - Spawn Nodes: Players cannot change bases now lasts until the last of the group's monsters is dead, not only while its waves run.
 

@@ -51,10 +51,21 @@ local ACTIVE_DIST = 100        -- m: a node spawns only while a player is within
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
 -- (0.15.478, owner 12:01 "that would be cool if monsters could damage structures, that would be an option for that mode",
 -- "prevent players from damaging structures while the raid is active", 12:03 "yes research both we need that setting")
-local BREAK_STEPS = 180        -- monsters of a group with "Monsters damage buildings" hit a wall every 3 s
-local BREAK_REACH = 4          -- m: a player-built block this close to the monster, on its way to the nearest player
+local BREAK_STEPS = 30         -- the building damage is looked at every half second
 local BREAK_LOOK = 64          -- m: the nearest player it looks toward (EMF's find_wall: a line of at most 64 m)
-local BREAK_MAX = 8            -- hits per 3 s for all groups together (EMF runs 8 breaks a step for all mods)
+local BREAK_MAX = 15           -- hits per half second for all groups together (30 a second; EMF runs 8 breaks a step)
+-- (0.15.481, owner 12:26 "anyway to make that more agressive?", 12:27 "yes" to these levels, "high should be the default IMO"):
+-- how often each monster hits (server steps), how hard (times the game's top pickaxe: 100, 100, 95, 60, 50 per hardness
+-- class), how far (m) and how big a hole (m)
+local PICKAXE = { 100, 100, 95, 60, 50 }
+local BREAK_LEVELS = { "low", "medium", "high", "extreme" }
+local BREAK_LEVEL = {
+  low = { every = 180, mult = 1, reach = 4, radius = 1, label = "Low: a hit every 3 s" },
+  medium = { every = 90, mult = 2, reach = 5, radius = 1, label = "Medium: every 1.5 s, twice as hard" },
+  high = { every = 60, mult = 4, reach = 6, radius = 1.5, label = "High: every 1 s, 4 times as hard" },
+  extreme = { every = 30, mult = 8, reach = 6, radius = 1.5, label = "Extreme: every 0.5 s, 8 times as hard" },
+}
+local NEAR_DIRS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }  -- where a monster with no player in reach looks for a wall
 
 -- (0.15.477, owner 11:27 "it would be nice if I could have a monster group for bosses as well so I could have one node
 -- spawn a boss") "Bosses": any of the bosses (core/monsters.lua's 26), the only type with bosses in it
@@ -75,7 +86,7 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m" }
-local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", breaks = false, protect = false, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
   cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
@@ -315,10 +326,12 @@ local function clean_tick(world)
   end
 end
 
--- (0.15.478) "Monsters damage buildings": every BREAK_STEPS each monster of such a group looks along the line to the
--- nearest player within BREAK_LOOK m (emf.find_wall); a player-built block within BREAK_REACH m of it on that line takes
--- one hit like a top pickaxe (emf.break_blocks, mode damage: cracks and the game's block health; never the ground or the
--- world's own ruins). Needs EMF Lua 1.37+ on the server (EMF 0.6.19); an older one: S.no_break, said in the tab.
+-- (0.15.478) "Monsters damage buildings": each monster of such a group looks along the line to the nearest player within
+-- BREAK_LOOK m (emf.find_wall); a player-built block within the level's reach on that line takes one hit (emf.break_blocks,
+-- mode damage: cracks and the game's block health; never the ground or the world's own ruins). (0.15.481) How often, how
+-- hard, how far and how big: the group's Building damage level (BREAK_LEVEL); with no wall on that line, a building block
+-- beside it (four directions, the level's reach). Needs EMF Lua 1.37+ on the server (EMF 0.6.19); an older one:
+-- S.no_break, said in the tab.
 local function break_tick(world, spots)
   if not (emf.find_wall and emf.break_blocks) then
     for _, g in ipairs(groups()) do if g.breaks then S.no_break = true break end end
@@ -326,28 +339,41 @@ local function break_tick(world, spots)
   end
   local hits = 0
   for _, g in ipairs(groups()) do
-    if g.breaks then
+    local lv = BREAK_LEVEL[g.break_level] or BREAK_LEVEL.high
+    if g.breaks and S.steps % lv.every == 0 then
+      local damage = {}
+      for i, d in ipairs(PICKAXE) do damage[i] = math.floor(d * lv.mult) end
       for _, n in ipairs(nodes_of(g.id)) do
         for id in pairs(S.alive[n.id] or {}) do
           if hits >= BREAK_MAX then return end
           local ok, x, y, z = pcall(world.position, world, id)
           if ok and x then
+            local from = { x = x, y = y + 1, z = z }
+            local wall = nil
+            -- on its way to the nearest player within BREAK_LOOK m
             local best, px, py, pz = BREAK_LOOK * BREAK_LOOK, nil, nil, nil
             for _, p in ipairs(spots) do
               local d = dist2(p[2], p[3], p[4], x, y, z)
               if d <= best then best, px, py, pz = d, p[2], p[3], p[4] end
             end
             if px then
-              local okw, wall = pcall(emf.find_wall, world, { x = x, y = y + 1, z = z }, { x = px, y = py + 1, z = pz })
-              if okw and type(wall) == "table" and wall.kind == "building" and wall.x
-                and dist2(wall.x, wall.y, wall.z, x, y + 1, z) <= BREAK_REACH * BREAK_REACH then
-                local okb, bid = pcall(emf.break_blocks, world, wall.x, wall.y, wall.z, { radius = 1 }, function(w, result)
-                  if type(result) == "table" and (tonumber(result.removed) or 0) > 0 then
-                    S.broke[g.id] = (S.broke[g.id] or 0) + result.removed
-                  end
-                end)
-                if okb and bid then hits = hits + 1 end
+              local okw, w = pcall(emf.find_wall, world, from, { x = px, y = py + 1, z = pz })
+              if okw and type(w) == "table" and w.kind == "building" and w.x and dist2(w.x, w.y, w.z, from.x, from.y, from.z) <= lv.reach * lv.reach then wall = w end
+            end
+            -- (0.15.481) else any player-built block right beside it
+            if not wall then
+              for _, dxz in ipairs(NEAR_DIRS) do
+                local okw, w = pcall(emf.find_wall, world, from, { x = x + dxz[1] * lv.reach, y = y + 1, z = z + dxz[2] * lv.reach })
+                if okw and type(w) == "table" and w.kind == "building" and w.x then wall = w break end
               end
+            end
+            if wall then
+              local okb, bid = pcall(emf.break_blocks, world, wall.x, wall.y, wall.z, { radius = lv.radius, damage = damage }, function(w2, result)
+                if type(result) == "table" and (tonumber(result.removed) or 0) > 0 then
+                  S.broke[g.id] = (S.broke[g.id] or 0) + result.removed
+                end
+              end)
+              if okb and bid then hits = hits + 1 end
             end
           end
         end
@@ -521,6 +547,7 @@ local function allowed(key, v)
   if key == "family" then for _, f in ipairs(FAMILIES) do if f == v then return true end end return false end
   if key == "trigger" then for _, t in ipairs(TRIGGERS) do if t == v then return true end end return false end
   if key == "face" then for _, f in ipairs(FACES) do if f == v then return true end end return false end
+  if key == "break_level" then return BREAK_LEVEL[v] ~= nil end
   for _, c in ipairs(CHOICES[key] or {}) do if c == v then return true end end
   return false
 end
@@ -808,9 +835,14 @@ function F.panel(world)
   choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
     .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
   rows[#rows + 1] = { button = "breaks", text = (g.breaks and "On    " or "Off   ") .. "Monsters damage buildings", selected = g.breaks == true,
-    tooltip = "Every 3 seconds each of its monsters hits a player-built block within " .. BREAK_REACH .. " m of it, on its way to the nearest "
-      .. "player, like a top pickaxe: stone takes about 22 hits, wood far fewer. Never the ground or the world's own ruins. Inside a "
-      .. "flame altar's area what breaks stays broken. Needs EMF 0.6.19 on the server." }
+    tooltip = "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "
+      .. "Building damage below. Never the ground or the world's own ruins. Inside a flame altar's area what breaks stays broken. "
+      .. "Needs EMF 0.6.19 on the server." }
+  if g.breaks then
+    choice_row(rows, g, "break_level", "Building damage", "Low: a hit every 3 s like a top pickaxe, blocks within 4 m. Medium: every 1.5 s, "
+      .. "twice as hard, 5 m. High: every 1 s, 4 times as hard, 6 m, 1.5 m holes. Extreme: every 0.5 s, 8 times as hard, 6 m, 1.5 m holes. "
+      .. "Stone takes about 22 top-pickaxe hits.", BREAK_LEVELS, function(l) return (BREAK_LEVEL[l] or {}).label or l end)
+  end
   if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
   rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot change bases during its waves", selected = g.protect == true,
     tooltip = "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
