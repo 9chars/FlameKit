@@ -93,13 +93,10 @@ if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = ni
 -- something like "New incoming wave at Melissa's Hideout!"") FlameKit notices (orange, the Notices window and a line in
 -- the Messages window), per group switch "announce" (on by default). The start, the end and a Remove go to every player;
 -- the waves and the count of monsters left to the players within NOTICE_DIST m of one of the group's nodes. The place:
--- the name of the flame altar nearest the group's nodes within BASE_NAME_DIST m (base_names_server.txt, written by
--- FlameKit Native every 30 s: "x y z<TAB>name"; no name: "a base").
+-- the map marker nearest the group's nodes (raid_place): flame altars from base_names_server.txt (FlameKit Native,
+-- every 30 s: "x y z<TAB>name"), the other named places from map_places_server.txt + core/place_names.lua.
 local NOTICE_COLOUR = "#ff9632"
 local NOTICE_DIST = 300
-local BASE_NAME_DIST = 200
-local PLACE_DIST = 500         -- m: (owner 13:37 "or whatever the nearest map marker is..") no flame altar that near: the
-                               -- nearest named place on the map within this (map_places_server.txt + core/place_names.lua)
 local place_names_ok, PLACE_NAMES = pcall(require, "core.place_names")
 if not place_names_ok or type(PLACE_NAMES) ~= "table" then PLACE_NAMES = {} end
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
@@ -419,27 +416,20 @@ local function map_places()
   return list
 end
 
--- (0.15.488) Where group `gid` raids: the nearest flame altar's name ("a base" when it has none) within BASE_NAME_DIST
--- m of its nodes, else the nearest named place on the map within PLACE_DIST m, else nil.
+-- (0.15.488, owner 13:44 "it should just use the nearest map marker to identify the raid location") Where group `gid`
+-- raids: the map marker nearest its nodes, wherever it is: a flame altar by the name a player gave it ("a Flame Altar"
+-- when it has none), any other named place by the game's name for it. nil only when no marker is known at all.
 local function raid_place(gid)
   local best, name = nil, nil
-  for _, a in ipairs(base_names()) do
+  local function consider(x, z, label)
     for _, n in ipairs(nodes_of(gid)) do
-      local dx, dz = a[1] - n.x, a[3] - n.z
+      local dx, dz = x - n.x, z - n.z
       local d = dx * dx + dz * dz
-      if d <= BASE_NAME_DIST * BASE_NAME_DIST and (not best or d < best) then
-        best, name = d, (a[4] ~= "" and a[4] or "a base")
-      end
+      if not best or d < best then best, name = d, label end
     end
   end
-  if name then return name end
-  for _, a in ipairs(map_places()) do
-    for _, n in ipairs(nodes_of(gid)) do
-      local dx, dz = a[1] - n.x, a[2] - n.z
-      local d = dx * dx + dz * dz
-      if d <= PLACE_DIST * PLACE_DIST and (not best or d < best) then best, name = d, a[3] end
-    end
-  end
+  for _, a in ipairs(base_names()) do consider(a[1], a[3], a[4] ~= "" and a[4] or "a Flame Altar") end
+  for _, a in ipairs(map_places()) do consider(a[1], a[2], a[3]) end
   return name
 end
 

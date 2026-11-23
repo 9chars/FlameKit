@@ -1,3 +1,6 @@
+0.15.489 Nov 23, 2026
+- Spawn Nodes: the raid's place in its announcements is always the map marker nearest the raid, however far: a flame altar by the name a player gave it, or the game's name of any other place.
+
 0.15.488 Nov 23, 2026
 - Spawn Nodes: raid announcements as orange FlameKit notices (switch Announce the raid to players, on by default): "Raid forces are pushing into <place>!" to everyone when it starts, "New incoming wave at <place>!" and "Final wave incoming" with the wave and its monsters, how many monsters are left (kept up to date), and when the raid is over or called off. The waves and the count go to the players within 300 m of the group's nodes. The place is the name of the nearest flame altar (within 200 m), else the nearest named place on the map (within 500 m).
 
