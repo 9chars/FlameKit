@@ -2041,6 +2041,11 @@ at its next restart). NOT G-Portal (asked separately).
 mod.json, features/building.lua, _flamekit_native/flamekit_native.dll + mod.json; md5 = dist 0.15.475), upload
 10:19:25-10:19:51 (DLL first, mod.json last), ftplist 10:20: all 5 on G-Portal at the right size. No test files on
 G-Portal (sampler, test size/base: off). Waiting for the owner to start it, then helper "logs".
+10:22 owner "looks like its back up" -> logs: FlameKit Native (0.15.475 DLL) loaded 10:21:54, 21 features, world loaded
+10:22:43, "owner numbers the game's way ... storage at world+0xe179c0, id counter at +0x498, world kind 0, next id
+22615", 1 remembered spot, 16 altar areas, 0 errors. Minute 1 "SLOW" (1,175 steps, 51 ms, 0.29 cores, nobody on): the
+server's own idle rate while no player is connected, not a problem (the speed log labels it SLOW anyway).
+**RELEASE 0.15.475 DONE: Stable, package, G-Portal.**
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
