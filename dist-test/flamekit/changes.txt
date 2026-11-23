@@ -1,3 +1,6 @@
+0.15.511 Nov 23, 2026
+- Spawn Nodes: more in the server's log during a raid: each order a monster gets (at which player, how far), every 10 s how many monsters have an order, go for their player and moved, and for each stuck one its order, what it goes for and whether the game has a way from it to the player.
+
 0.15.510 Nov 23, 2026
 - Spawn Nodes: a stuck raid monster is moved next to the player after 5 s (was 30 s).
 

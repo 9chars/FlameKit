@@ -182,7 +182,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -880,6 +880,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
   S.started[gid] = os.time()  -- (0.15.492) for its time limit
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
+  S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -1258,6 +1259,28 @@ local function stuck_tick(world)
             if #S.bad > 200 then table.remove(S.bad, 1) end
           end
         end
+        if why and (S.stuck_log or 0) < 60 then  -- (0.15.511) what a stuck one was doing, and whether it had a way
+          S.stuck_log = (S.stuck_log or 0) + 1
+          local o = S.orders[id]
+          local okt, tgt = pcall(emf.enemy_target, world, id)
+          local pl0, b0 = nil, nil
+          for _, p in ipairs(spots) do
+            local d = dist2(x, y, z, p[2], p[3], p[4])
+            if not b0 or d < b0 then b0, pl0 = d, p end
+          end
+          local head = string.format("spawn nodes: stuck detail: monster %s (%s) at %.0f %.0f %.0f: order %s at player %s, going for %s, nearest player %s %.0f m",
+            tostring(id), why, x, y, z, tostring(o and o.id), tostring(o and o.target), tostring(okt and tgt), tostring(pl0 and pl0[1]), b0 and math.sqrt(b0) or -1)
+          if emf.path_find and pl0 then
+            local okq = pcall(emf.path_find, world, { x, y + 0.5, z }, { pl0[2], pl0[3] + 0.5, pl0[4] }, { closest = true, jumps = true, width = 0.5, height = 2, nodes = 1500 },
+              function(w, result)
+                emf.log(string.format("%s; path from it to him: %s, %.0f m along%s", head, tostring(type(result) == "table" and result.status),
+                  type(result) == "table" and tonumber(result.length) or 0, type(result) == "table" and result.reaches and ", reaches him" or ", does not reach him"))
+              end)
+            if not okq then emf.log(head .. "; no path query") end
+          else
+            emf.log(head)
+          end
+        end
         if why and (t.moves or 0) < MOVE_MAX then  -- (0.15.505) first: next to the nearest player
           local best, pl = nil, nil
           for _, p in ipairs(spots) do
@@ -1347,7 +1370,12 @@ local function hunt_tick(world)
           if pid then
             if o and o.id then pcall(emf.enemy_order_cancel, o.id) end
             local ok, oid, why = pcall(emf.enemy_order, world, id, pid)
-            S.orders[id] = { id = ok and oid or nil, target = pid, at = os.time() }
+            S.orders[id] = { id = ok and oid or nil, target = pid, at = os.time(), n = ((o and o.n) or 0) + 1 }
+            if ok and oid and (S.order_log or 0) < 80 then  -- (0.15.511, owner 16:17 "of course add the fucking logging")
+              S.order_log = (S.order_log or 0) + 1
+              emf.log(string.format("spawn nodes: hunt: monster %s at %.0f %.0f %.0f ordered at player %s (%.0f m away), order %s%s", tostring(id),
+                x, y, z, tostring(pid), math.sqrt(best), tostring(oid), o and string.format(", again (#%d; it went for %s)", S.orders[id].n, tostring(okt and tgt)) or ""))
+            end
             if not (ok and oid) and (S.order_said or 0) < 10 then
               S.order_said = (S.order_said or 0) + 1
               emf.log(string.format("spawn nodes: monster %s: no order to go for player %s (%s)", tostring(id), tostring(pid), tostring(ok and why or oid)))
@@ -1355,6 +1383,30 @@ local function hunt_tick(world)
           end
         end
       end
+    end
+  end
+  -- (0.15.511) every 10 s while monsters live: how many have an order, go for their player, moved
+  S.hunt_n = (S.hunt_n or 0) + 1
+  if S.hunt_n % 5 == 0 then
+    local n, ordered, going, moved = 0, 0, 0, 0
+    for _, ids in pairs(S.alive) do
+      for id in pairs(ids) do
+        n = n + 1
+        local o = S.orders[id]
+        if o and o.id then ordered = ordered + 1 end
+        local okt, tgt = pcall(emf.enemy_target, world, id)
+        if o and okt and tgt == o.target then going = going + 1 end
+        local okp, x, y, z = pcall(world.position, world, id)
+        local last = S.hunt_pos[id]
+        if okp and x then
+          if last and dist2(x, y, z, last[1], last[2], last[3]) >= 1 then moved = moved + 1 end
+          S.hunt_pos[id] = { x, y, z }
+        end
+      end
+    end
+    if n > 0 then
+      emf.log(string.format("spawn nodes: hunt: %d raid monster(s) alive: %d with an order, %d going for their player, %d moved 1 m or more in the last 10 s",
+        n, ordered, going, moved))
     end
   end
   for id in pairs(S.orders) do  -- dead or gone: forgotten
@@ -1846,6 +1898,7 @@ function F.tick(world)
     S.bad, S.verify = {}, nil  -- (0.15.505)
     S.join_wait = {}  -- (0.15.507)
     S.checks = {}  -- (0.15.508)
+    S.hunt_pos = {}  -- (0.15.511)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
