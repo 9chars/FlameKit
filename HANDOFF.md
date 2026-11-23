@@ -1725,6 +1725,21 @@ the local server 18:57-18:58. **18:58:46 the owner's game: emf_core 0.6.19, 98 o
 "this game runs EMF v0.6.19 (10 file(s) left by an EMF update removed)", "EMF v0.6.19 in the list, v0.6.19 here:
 nothing to do", no .emfold/.emfnew left, emf\flamekit_emf_backup = EMF 0.6.6. THE EMF UPDATER WORKS END TO END.**
 Not yet: the Stable channel (emf-dist + dist) and the players' package; G-Portal stays on EMF 0.6.6 (rule 0g).
+19:00-19:02 a player said he got an update and his game crashed: he is on 0.15.423 (Stable): dist/ untouched since
+11-21 20:55, no Enshrouded patch since Nov 4 (hotfix v1.0.1.2; the game exe is dated Nov 4, build 1287369). Cause
+unknown; offered to fetch G-Portal's logs (download only): no answer yet.
+19:04 owner "can you roll me back to 0.6.6 and test everything all over again": rolled back from emf\flamekit_emf_backup
+(also tests the "back by hand" path; renamed the 0.6.19 files <name>.v0619b), helper "client" 19:05: EMF 0.6.6 ->
+updater installed 0.6.19 (19:05:44), dialog "for EMF v0.6.19", Messages line right; 19:06:45 "v0.6.19 here: nothing to
+do" (the on-disk version fix works). 19:06 owner screenshot: dialog text cut off ("...v0.6.19 has been downloade") ->
+0.15.457 (ed4b080, DLL md5 3a5cac4ef017e6f96a9936e7c8ee04b3): dialog 480 wide, text wrapped by measured width
+(wrap_words), height follows the lines. Published to Development + local server 19:09. 19:08 owner asked whether the
+EMF update brings everything in EMF's package: no, EMF's own 35 files only (no example mods, no SDK/docs, no
+emf\config). 19:15 owner "test it again until its perfect": 19:13 game on 0.15.457 + EMF 0.6.19; rolled back again
+(.v0619c), helper "client" 19:16; 19:16:42 new dialog (EMF only); **19:18 owner "looks good so far"**; 19:18:26 game on
+EMF 0.6.19, cleanup 10 files, "nothing to do". Left on the owner's PC: <name>.v0619 / .v0619b / .v0619c copies (no
+delete permission asked yet). Not tested live: the combined dialog (FlameKit + EMF waiting together, new layout), the
+"Keep EMF updated" OFF switch.
 
 ## Things learned the hard way
 
