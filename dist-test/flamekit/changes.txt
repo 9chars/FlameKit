@@ -1,3 +1,10 @@
+0.15.509 Nov 23, 2026
+- Spawn Nodes: the raid's monsters are found surely: a new one still coming up (0 health) is asked about again, and every 10 s all the monsters made since the raid began are looked at again (some Undead came into the count only after a reload).
+
+0.15.508 Nov 23, 2026
+- Spawn Nodes: before a monster appears, the game's own path grid is asked for a way from its spot to the nearest player: a spot inside a fence, an object or water, or one it cannot get out of, is not used (6 tries, then next to the player). FlameKit's own check saw only building blocks and terrain.
+- Spawn Nodes: Remove's log no longer lists the summons it takes away as "not one of its monsters".
+
 0.15.507 Nov 23, 2026
 - Spawn Nodes: monsters the raid's monsters make (the Undead's summons) are counted now: a new monster is looked at again until the game has given it its health and faction (before, the ones not ready in the step they were made were never counted). The end check and Remove its monsters take in every hostile monster made since the raid's first one within 100 m of the group's nodes, not only the nodes' own.
 

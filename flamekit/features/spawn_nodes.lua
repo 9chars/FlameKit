@@ -182,7 +182,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -430,6 +430,14 @@ local function purge_tick(world)
     pg.i, done = pg.i + 1, done + 1
     local oks, scl = pcall(world.get, world, "ScaleComponent", id)
     local gid = oks and scl and group_of_tag(scl.uniformScale)
+    if not gid then  -- (0.15.507) a monster of the group's raid area without the tag (a summon, a monster that came in)
+      for g2 in pairs(pg.gids) do
+        local gd = data().groups[tostring(g2)]
+        local first = gd and tonumber(gd.last_first_id) or 0  -- not known (a raid before 0.15.507): every hostile one there
+        local nid0 = raid_monster(world, g2, first, id, false)
+        if nid0 then gid = g2 break end
+      end
+    end
     if not gid and (pg.near_n or 0) < 25 then
       -- (0.15.499, owner 14:50 "the remove all monsters doesn't work either": its search found none of the group's
       -- monsters while he still saw some) every living creature near the group's nodes that is NOT one of its
@@ -450,14 +458,6 @@ local function purge_tick(world)
             end
           end
         end
-      end
-    end
-    if not gid then  -- (0.15.507) a monster of the group's raid area without the tag (a summon, a monster that came in)
-      for g2 in pairs(pg.gids) do
-        local gd = data().groups[tostring(g2)]
-        local first = gd and tonumber(gd.last_first_id) or 0  -- not known (a raid before 0.15.507): every hostile one there
-        local nid0 = raid_monster(world, g2, first, id, false)
-        if nid0 then gid = g2 break end
       end
     end
     if gid and pg.gids[gid] then
@@ -568,6 +568,10 @@ local function group_queued(gid)
     local qn = data().nodes[tostring(q.node)]
     if qn and qn.g == gid then n = n + 1 end
   end
+  for q in pairs(S.checks) do  -- (0.15.508) a spot being checked
+    local qn = data().nodes[tostring(q.node)]
+    if qn and qn.g == gid then n = n + 1 end
+  end
   return n
 end
 
@@ -648,6 +652,7 @@ end
 -- JOIN_EVERY steps (only the ids above the highest one looked at before) and by every hit.
 local JOIN_R = 100
 local JOIN_EVERY = 120
+local JOIN_FULL = 5            -- (0.15.509) every 5th look (10 s): all ids since the raid's first monster
 local FRIENDLY = { [0] = true, [5] = true, [7] = true, [8] = true, [11] = true, [12] = true }
 local function known(id)
   for _, ids in pairs(S.alive) do if ids[id] then return true end end
@@ -693,6 +698,7 @@ local function try_join(world, id, engaged)
     if r.first_id and id > r.first_id then
       local nid, cur, faction, x, y, z = raid_monster(world, gid, r.first_id, id, engaged)
       if cur == "wait" then wait = true end
+      if nid and cur == 0 then wait = true end  -- (0.15.509) 0 health: still coming up out of the ground (the Undead), asked again
       if nid and type(cur) == "number" and cur > 0 then
         do
           S.alive[nid] = S.alive[nid] or {}
@@ -716,6 +722,10 @@ local function join_tick(world)
   local low = nil
   for _, r in pairs(S.raid) do if r.first_id and (not low or r.first_id < low) then low = r.first_id end end
   if not low then return end
+  -- (0.15.509, 16:07-16:10: four Undead of the raid were joined only when a reload looked at every id again) every
+  -- JOIN_FULL-th look goes over every id since the raid's first monster again, not only the new ones
+  S.join_n = (S.join_n or 0) + 1
+  if S.join_n % JOIN_FULL == 0 then S.join_seen = nil end
   local seen = S.join_seen or low
   local ok, list = pcall(world.entities, world)
   if not ok or type(list) ~= "table" then return end
@@ -1056,57 +1066,125 @@ local function pick_spot(world, q, spread)
   return q.x, find_surface(world, q.x, q.y, q.z) or q.y, q.z
 end
 
+-- (0.15.508) Spawns queue entry `q`'s monster at x, sy, z (the body of spawn_tick before 0.15.508).
+local function do_spawn(world, q, x, sy, z)
+  -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
+  local yaw = math.random() * 360
+  if q.face == "player" and q.tx then yaw = yaw_to(x, z, q.tx, q.tz)
+  elseif q.face == "node" and q.yaw then yaw = q.yaw end
+  local qn0 = data().nodes[tostring(q.node)]
+  local tag = { ScaleComponent = { uniformScale = tag_of(qn0 and qn0.g or 0) } }  -- (0.15.483) its group, for a reload
+  local ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag, { yaw = yaw })
+  local how = "tagged"
+  if not ok or not id or id == 0 then
+    local why1 = id
+    ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag)  -- an older EMF: no yaw
+    how = "tagged, no yaw (" .. tostring(why1) .. ")"
+  end
+  if not ok or not id or id == 0 then
+    local why2 = id
+    ok, id = pcall(emf.spawn, world, q.guid, x, sy, z)  -- nor the tag
+    how = "UNTAGGED (" .. tostring(why2) .. ")"
+  end
+  if how ~= "tagged" and (S.spawn_said or 0) < 30 then  -- (0.15.506) a monster spawned without its group's tag cannot be found again
+    S.spawn_said = (S.spawn_said or 0) + 1
+    emf.log(string.format("spawn nodes: node %s: monster %s spawned %s (template %s)", tostring(q.node), tostring(id), how, tostring(q.guid)))
+  end
+  if ok and id and id ~= 0 then
+    local rq = qn0 and S.raid[qn0.g]
+    if rq and not q.respawn then rq.spawned = rq.spawned + 1 end  -- (0.15.488); (0.15.493) a replacement is not one more
+    if rq and (not rq.first_id or id < rq.first_id) then  -- (0.15.501) its first monster's id
+      rq.first_id = id
+      local gq = qn0 and data().groups[tostring(qn0.g)]
+      if gq then gq.last_first_id = id save() end  -- (0.15.507) kept: Remove and the end check use it
+    end
+    S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
+    S.alive[q.node] = S.alive[q.node] or {}
+    S.alive[q.node][id] = true
+    local qn = data().nodes[tostring(q.node)]
+    local qg = qn and group(qn.g)
+    if qg and qg.spare then  -- (0.15.482) it never hurts animals, pets or villagers
+      local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
+      if okr and rid then S.spare_rules[id] = rid end
+    end
+    if not emf.block_at then ground.add(id, x, q.y, z, yaw) end  -- (0.15.493) only where the ground could not be found here
+  else
+    emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
+  end
+end
+
+-- (0.15.508, owner 16:08 "monsters stuck in fence railings again": FlameKit's own spot check sees building blocks and
+-- terrain, not placed objects such as fences) Before a monster appears, the game's own path grid (emf.path_find: it
+-- knows terrain, buildings, placed objects and doors) is asked for a way from the spot to the nearest player within
+-- HUNT_R m (else the node). A spot with no start on the grid (inside a fence or an object, in water) or from which the
+-- way gets nowhere (not PATH_GAIN m along it, or half the way) is not used (S.bad) and another is tried, PATH_TRIES in
+-- all; then the monster appears near that player (4-8 m, on the ground, nothing built between) or on the node.
+local PATH_TRIES = 6
+local PATH_GAIN = 8
+local PATH_TARGET_R = 120      -- m: the player the way is asked to (as HUNT_R, below)
+local function near_player_spot(world, pl)
+  for _ = 1, 12 do
+    local a, r = math.random() * 2 * math.pi, 4 + math.random() * 4
+    local cx, cz = pl[2] + math.cos(a) * r, pl[4] + math.sin(a) * r
+    local cy = find_surface(world, cx, pl[3], cz)
+    if cy and not wall_between(world, { pl[2], pl[3] + 1, pl[4] }, { cx, cy + 1, cz }) and block_kind(world, cx, cy + 1, cz) ~= "building" then
+      return cx, cy, cz
+    end
+  end
+  return nil
+end
 local function spawn_tick(world)
   local done = 0
   while #S.queue > 0 and done < SPAWN_PER_STEP do
     local q = table.remove(S.queue, 1)
     done = done + 1
-    if data().nodes[tostring(q.node)] then
-      local qn1 = data().nodes[tostring(q.node)]
-      local x, sy, z = pick_spot(world, q, (qn1 and tonumber(qn1.spread)) or SPREAD)  -- (0.15.485) the node's spread, a clear spot; (0.15.493) its ground
-      -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
-      local yaw = math.random() * 360
-      if q.face == "player" and q.tx then yaw = yaw_to(x, z, q.tx, q.tz)
-      elseif q.face == "node" and q.yaw then yaw = q.yaw end
-      local qn0 = data().nodes[tostring(q.node)]
-      local tag = { ScaleComponent = { uniformScale = tag_of(qn0 and qn0.g or 0) } }  -- (0.15.483) its group, for a reload
-      local ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag, { yaw = yaw })
-      local how = "tagged"
-      if not ok or not id or id == 0 then
-        local why1 = id
-        ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag)  -- an older EMF: no yaw
-        how = "tagged, no yaw (" .. tostring(why1) .. ")"
+    local qn1 = data().nodes[tostring(q.node)]
+    if qn1 then
+      local x, sy, z = pick_spot(world, q, tonumber(qn1.spread) or SPREAD)  -- (0.15.485) the node's spread, a clear spot; (0.15.493) its ground
+      local pl, best = nil, nil
+      for _, p in ipairs(player_spots(world)) do
+        local d = dist2(x, sy, z, p[2], p[3], p[4])
+        if d <= PATH_TARGET_R * PATH_TARGET_R and (not best or d < best) then best, pl = d, p end
       end
-      if not ok or not id or id == 0 then
-        local why2 = id
-        ok, id = pcall(emf.spawn, world, q.guid, x, sy, z)  -- nor the tag
-        how = "UNTAGGED (" .. tostring(why2) .. ")"
+      local tx, ty, tz = q.x, q.y, q.z
+      if pl then tx, ty, tz = pl[2], pl[3], pl[4] end
+      local far = math.sqrt(dist2(x, sy, z, tx, ty, tz))
+      local asked = false
+      if emf.path_find and far > 3 then
+        q.tries = (q.tries or 0) + 1
+        S.checks[q] = true
+        local okq, qid = pcall(emf.path_find, world, { x, sy + 0.5, z }, { tx, ty + 0.5, tz },
+          { closest = true, jumps = true, width = 0.5, height = 2, nodes = 1500 }, function(w, result)
+            S.checks[q] = nil
+            if not w then return end
+            local status = type(result) == "table" and result.status or "?"
+            local len = type(result) == "table" and tonumber(result.length) or 0
+            local good = status == "found" and (result.reaches or len >= math.min(PATH_GAIN, far * 0.5))
+            if (S.path_said or 0) < 40 then
+              S.path_said = (S.path_said or 0) + 1
+              emf.log(string.format("spawn nodes: node %s: spot %.0f %.0f %.0f, try %d: path %s, %.0f of %.0f m%s: %s", tostring(q.node), x, sy, z,
+                q.tries, status, len, far, result and result.reaches and ", reaches" or "", good and "used" or "not used"))
+            end
+            if good then
+              do_spawn(w, q, x, sy, z)
+            else
+              S.bad[#S.bad + 1] = { x, z }
+              if #S.bad > 200 then table.remove(S.bad, 1) end
+              if q.tries < PATH_TRIES then
+                table.insert(S.queue, 1, q)
+              else
+                local mx, my, mz = nil, nil, nil
+                if pl then mx, my, mz = near_player_spot(w, pl) end
+                emf.log(string.format("spawn nodes: node %s: no spot with a way out after %d tries: %s", tostring(q.node), q.tries,
+                  mx and "next to the player" or "on the node"))
+                if mx then do_spawn(w, q, mx, my, mz) else do_spawn(w, q, q.x, find_surface(w, q.x, q.y, q.z) or q.y, q.z) end
+              end
+            end
+          end)
+        asked = okq and qid ~= nil
+        if not asked then S.checks[q] = nil end
       end
-      if how ~= "tagged" and (S.spawn_said or 0) < 30 then  -- (0.15.506) a monster spawned without its group's tag cannot be found again
-        S.spawn_said = (S.spawn_said or 0) + 1
-        emf.log(string.format("spawn nodes: node %s: monster %s spawned %s (template %s)", tostring(q.node), tostring(id), how, tostring(q.guid)))
-      end
-      if ok and id and id ~= 0 then
-        local rq = qn0 and S.raid[qn0.g]
-        if rq and not q.respawn then rq.spawned = rq.spawned + 1 end  -- (0.15.488); (0.15.493) a replacement is not one more
-        if rq and (not rq.first_id or id < rq.first_id) then  -- (0.15.501) its first monster's id
-          rq.first_id = id
-          local gq = qn0 and data().groups[tostring(qn0.g)]
-          if gq then gq.last_first_id = id save() end  -- (0.15.507) kept: Remove and the end check use it
-        end
-        S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
-        S.alive[q.node] = S.alive[q.node] or {}
-        S.alive[q.node][id] = true
-        local qn = data().nodes[tostring(q.node)]
-        local qg = qn and group(qn.g)
-        if qg and qg.spare then  -- (0.15.482) it never hurts animals, pets or villagers
-          local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
-          if okr and rid then S.spare_rules[id] = rid end
-        end
-        if not emf.block_at then ground.add(id, x, q.y, z, yaw) end  -- (0.15.493) only where the ground could not be found here
-      else
-        emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
-      end
+      if not asked then do_spawn(world, q, x, sy, z) end
     end
   end
 end
@@ -1767,6 +1845,7 @@ function F.tick(world)
     S.orders = {}  -- (0.15.503)
     S.bad, S.verify = {}, nil  -- (0.15.505)
     S.join_wait = {}  -- (0.15.507)
+    S.checks = {}  -- (0.15.508)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
@@ -2163,6 +2242,7 @@ F._handle = function(world, account, entity, msg, from) return handle(world, acc
 F._test_set_shown = function(st) C.shown = st end  -- (0.15.504)
 F._test_raid_monster = function(...) return raid_monster(...) end  -- (0.15.507)
 F._test_S = S  -- (0.15.507)
+F._test_spawn_tick = function(w) spawn_tick(w) end  -- (0.15.508)
 F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
 
 return F
