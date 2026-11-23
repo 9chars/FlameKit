@@ -389,6 +389,9 @@ struct Updater {
         // (0.15.472) EMF files restored in this game (emf_update.hpp repair_missing), when nothing else is to be said
         if (emf.restored > 0 && emf.ready.empty() && (text.empty() || text.rfind("ok|", 0) == 0))
             text = "ready|FlameKit restored " + std::to_string(emf.restored) + " missing Enshrouded Modding Framework (EMF) file(s): restart the game";
+        // (0.15.473, the test of 09:18: the window said "restored 1" for one FlameKit and one EMF file) both counted
+        if (emf.restored > 0 && restored_here > 0 && text.rfind("ready|FlameKit restored ", 0) == 0)
+            text = "ready|FlameKit restored " + std::to_string(restored_here + emf.restored) + " missing file(s): restart the game";
         if (text == last_status) return;
         last_status = text;
         write_file(mods + L"flamekit\\update_status.txt", std::vector<uint8_t>(text.begin(), text.end()));
@@ -575,6 +578,7 @@ struct Updater {
     // the files and the count are logged, and the lower left corner asks for a restart. `files` is the list after its
     // version line. True when files were restored.
     bool repair_done = false;
+    int restored_here = 0;  // (0.15.473) FlameKit's own files restored in this game
     bool repair_missing(const std::string& files, const std::wstring& base, const std::string& version) {
         if (repair_done) return false;
         std::vector<File> missing;
@@ -614,6 +618,7 @@ struct Updater {
         }
         say("update: repair: " + std::to_string(restored) + " of " + std::to_string(missing.size()) + " missing file(s) restored" +
                 (restored ? ": they are used from the next game start" : ""), restored == int(missing.size()) ? 0 : 2);
+        restored_here = restored;
         if (restored) {
             status("ready|FlameKit restored " + std::to_string(restored) + " missing file(s): restart the game");
             waiting_for_restart = true;
