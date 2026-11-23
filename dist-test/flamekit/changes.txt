@@ -1,3 +1,6 @@
+0.15.463 Nov 22, 2026
+- Free build: the building area is now 16 m around where you aim with a building tool, and only there while the tool is out. It was 112 m around you all the time, and on the production server that made the server overloaded. Remembered spots stay as they are.
+
 0.15.462 Nov 22, 2026
 - Invincible Mode: when a player with it left the server, it could stop keeping the air full for everyone until the server restarted. Fixed.
 - Joining a server: FlameKit waits for the server's hello before it sends anything, so the game's log no longer fills with refused messages at every join.

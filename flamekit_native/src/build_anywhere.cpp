@@ -5,12 +5,14 @@
 //  - the server only: a zone over each remembered spot (free_build_spots.txt, "x y z" in m per line, written by
 //    features/building.lua): a 48 m box, from the server's start, so what was built there is saved and kept like
 //    inside an altar's area;
-//  - a box around each player Free build is on for (free_build_server.txt / free_build_client.txt: one player a line,
-//    "<entity id>" or "<entity id> a"; read every 15 steps), in the server and in that player's own game. The box sits
-//    on a kGridStep grid (a box that moved smoothly made the server resend the whole zone list every step). The
-//    players' positions are read on the world's own step (on_tick) and kept for this code, which runs inside the
-//    game's addZone. The game draws the border only while the building tool is selected.
-// Free build works only outside flame altar areas (owner 2026-11-22 11:06): no player box while the player stands in
+//  - (0.15.463) a 16 m box around where each player Free build is on for aims, only while a building tool is out
+//    (free_build_server.txt / free_build_client.txt: one player a line, "<entity id>" or "<entity id> a"; read every 15
+//    steps), in the server and in that player's own game. The box sits on a kAimStep grid (a box that moved smoothly
+//    made the server resend the whole zone list every step). The aims are read on the world's own step (on_tick) and
+//    kept for this code. Until 0.15.462 the box was 112 m around the player, always: on G-Portal that made the server's
+//    steps 48 ms instead of 17 ("server overloaded"; the game does much more work for everything inside a build zone).
+//    The game draws the border only while the building tool is selected.
+// Free build works only outside flame altar areas (owner 2026-11-22 11:06): no box where the player aims inside
 // an altar's area (as added, after the bigger size), unless the player's line has "a" (an admin's "Free build inside
 // altar areas" in the Building tab, owner 17:29). A remembered spot's area reaches free_build_spot_half.txt m from its
 // centre. The server writes its altar areas to altar_areas_server.txt (min xyz, max xyz in m per line) for the Lua,
@@ -193,12 +195,20 @@ using AddZoneFn = uint64_t (*)(void* bzs, uint8_t list, uint8_t flag, uint8_t ow
 AddZoneFn g_add_zone = nullptr;
 std::atomic<int> g_zone_said{0};
 
-constexpr double kPlayerHalf = 40.0;  // m each way the box always covers around the player
-constexpr double kGridStep = 32.0;    // m: the box moves only when the player crosses a grid line
+// (0.15.463, owner 2026-11-22 21:35-21:46: G-Portal "server overloaded" while in Free build outside an altar area,
+// confirmed by switching it off and on: 48 ms steps instead of 17; "112m wide is way to fucking big", "as small as
+// possible", "yes" to 16 m) the area is no longer a 112 m box around the player (40 m + half a 32 m grid step each way)
+// but a 16 m box around where the player aims (the building tool's cursor), only while a building tool is out. It moves
+// in 4 m steps (each move sends every player the zone list again, about 1 KB).
+constexpr double kAimHalf = 8.0;  // m each way from the middle of the aim's grid cell
+constexpr double kAimStep = 4.0;  // m: the box moves only when the aim crosses a grid line
 std::atomic<uint64_t> g_steps{0};     // world steps (on_tick), so the player boxes go in once per step
 // (0.15.453, owner 17:19 "#7 go ahead") the positions of the players Free build is on for, read on each world's own
 // step (on_tick, the world thread) and used by the box code, which runs inside the game's addZone (its thread is not
-// known): no game data is read there. Per side: 1 the server, 0 the player's own game.
+// known): no game data is read there. Per side: 1 the server, 0 the player's own game. (0.15.463) The position is where
+// the player aims with a building tool (the server: the construction cursor entity named by the player's NetworkCursor;
+// the player's own game: ClientCursor.primaryTransform while NetworkCursor names a cursor); a player without a building
+// tool out has no entry, so no box.
 struct Pos { int64_t x, y, z; };
 std::mutex g_pos_mx;
 std::unordered_map<uint64_t, Pos> g_pos;  // (side << 32 | entity) -> position (2^32 per m), under g_pos_mx
@@ -342,8 +352,8 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
                     ws ? ws.singleton("BuildZoneSystem") : nullptr, wc ? wc.singleton("BuildZoneSystem") : nullptr);
         return;
     }
-    const int64_t step = int64_t(kGridStep * 4294967296.0);
-    const int64_t half = int64_t((kPlayerHalf + kGridStep / 2) * 4294967296.0);
+    const int64_t step = int64_t(kAimStep * 4294967296.0);
+    const int64_t half = int64_t(kAimHalf * 4294967296.0);  // (0.15.463) around the middle of the aim's grid cell
     auto cell_mid = [step](int64_t v) {
         int64_t q = v / step;
         if (v % step < 0) --q;  // floor for negative values
@@ -365,7 +375,7 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         {
             std::lock_guard<std::mutex> lk(g_pos_mx);
             auto it = g_pos.find(side_bit | id);
-            if (it == g_pos.end()) continue;  // not read on a world step yet
+            if (it == g_pos.end()) continue;  // no building tool out (or not read on a world step yet): no box
             p = it->second;
         }
         bool inside = false;  // (0.15.443) in an altar's area: the game's own rules, no Free build box
@@ -379,7 +389,7 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
             auto it = said.find(k);
             if (it == said.end() || it->second != inside) {
                 said[k] = inside;
-                EMF_LOG(kMod, "free build (%s): player %u at %.1f %.1f %.1f is %s an altar area (%zu known)%s", side, id,
+                EMF_LOG(kMod, "free build (%s): player %u aims at %.1f %.1f %.1f, %s an altar area (%zu known)%s", side, id,
                         double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0, inside ? "inside" : "outside",
                         altars.size(), inside ? (also ? ": Free build box anyway (admin, also in altar areas)" : ": no Free build box") : "");
             }
@@ -391,8 +401,8 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
         g_boxes.fetch_add(1);
         if (g_box_said.fetch_add(1) < 4)
-            EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around player %u at %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
-                    (kPlayerHalf + kGridStep / 2) * 2, id, double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0,
+            EMF_LOG(kMod, "free build (%s): a build zone %.0f m wide around where player %u aims, %.1f %.1f %.1f (grid cell centre %.0f %.0f %.0f)", side,
+                    kAimHalf * 2, id, double(p.x) / 4294967296.0, double(p.y) / 4294967296.0, double(p.z) / 4294967296.0,
                     double(cx) / 4294967296.0, double(cy) / 4294967296.0, double(cz) / 4294967296.0);
     }
 }
@@ -532,10 +542,38 @@ bool fk_build_anywhere_load(bool dedicated) {
                 else ++it;
             }
             for (uint32_t id : ids) {
-                if (auto* ct = w.get<gen::ecs::CurrentTransform>(id)) {
-                    const auto& p = ct->transform.position;
-                    g_pos[side_bit | id] = Pos{p.x, p.y, p.z};
+                // (0.15.463) where the player aims while a building tool is out; nothing (no box) otherwise
+                bool aiming = false;
+                Pos aim{};
+                const auto* nc = w.get<gen::ecs::NetworkCursor>(id);
+                const uint32_t cursor = nc ? nc->cursorEntityId.id : 0;
+                if (cursor && server) {
+                    if (auto* ct = w.get<gen::ecs::CurrentTransform>(cursor)) {
+                        const auto& p = ct->transform.position;
+                        aim = Pos{p.x, p.y, p.z};
+                        aiming = true;
+                    }
+                } else if (cursor) {
+                    if (auto* cc = w.get<gen::ecs::ClientCursor>(id)) {
+                        const auto& p = cc->primaryTransform.position;
+                        aim = Pos{p.x, p.y, p.z};
+                        aiming = p.x != 0 || p.y != 0 || p.z != 0;
+                    }
                 }
+                {
+                    static std::unordered_map<uint64_t, bool> said;  // (side, player) -> aiming, logged on change (this thread only per side)
+                    static std::mutex said_mx;
+                    std::lock_guard<std::mutex> slk(said_mx);
+                    auto it = said.find(side_bit | id);
+                    if (it == said.end() || it->second != aiming) {
+                        said[side_bit | id] = aiming;
+                        EMF_LOG(kMod, "free build (%s): player %u %s", server ? "server" : "this game", id,
+                                aiming ? "has a building tool out: a 16 m Free build area where they aim"
+                                       : "has no building tool out (or no cursor yet): no Free build area");
+                    }
+                }
+                if (aiming) g_pos[side_bit | id] = aim;
+                else g_pos.erase(side_bit | id);
             }
         }
         if (w.is_server() || w.is_client()) {  // (0.15.459, probe) once more 10 s into the running world: the steady order

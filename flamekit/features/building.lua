@@ -4,8 +4,9 @@
 -- gone; this tab has the same controls).
 --
 -- FREE BUILD (per player, saved; off while the player is in PvP). FlameKit Native (src/build_anywhere.cpp) adds a
--- building area around each player it is on for (free_build_server.txt on the server, free_build_client.txt in that
--- player's own game: entity ids, one a line), outside flame altar areas only. Every piece such a player places outside
+-- building area for each player it is on for (free_build_server.txt on the server, free_build_client.txt in that
+-- player's own game: entity ids, one a line), outside flame altar areas only: since 0.15.463 a 16 m area around where
+-- the player aims, only while a building tool is out (it was 112 m around the player and overloaded G-Portal). Every piece such a player places outside
 -- the altar areas and the remembered spots makes its 32 m grid cell a REMEMBERED SPOT (the server's BuildingPlaceEvent):
 -- the spots are kept in free_build_spots.json (kit.store) and handed to FlameKit Native in free_build_spots.txt ("x y z"
 -- of each cell's centre in m), which keeps a 48 m building area over each from the server's start, so what is built
