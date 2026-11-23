@@ -1969,6 +1969,11 @@ addZone: entity = the altar's entity (1037..), abandoned 0, base id = a GUID per
 08:03:02: SLOW within ~1.5 min (9.2 M/min); entity again 08:06:07 while slow: still slow 3 min (does not end a running
 slowdown). One run each: the owner entity looks like what prevents it. Owner 08:06: "what exactly did you attach my
 player id to...?" (the addZone owner entity slot, rebuilt each step, nothing saved). Tool away 08:10. Next: a repeat.
+08:11 owner: repeat "for a longer duration to make sure its actually fixed and not just delaying something". Restart
+08:11 with entity + 112 m from the start; owner at 5801 5109 with a piece out from 08:15:27. **19 minutes 08:16-08:34: 0
+SLOW minutes, 16.7 ms, a steady 2.41 M unpacks/min (no growth).** Owner 08:16: an NPC he placed in the test area shows
+"Base 2" in its location (not checked before): possibly the game now treats our area (owner entity set) as a base;
+to check by comparing with the owner slot empty.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
