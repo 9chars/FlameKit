@@ -1,3 +1,6 @@
+0.15.515 Nov 23, 2026
+- Spawn Nodes: a node's next monster comes right after one dies: deaths are seen every 0.25 s (was 2 s) and the next monster queued every 0.25 s (was 0.5 s). A spot check that gives no answer within 0.75 s, or an unclear answer, no longer holds the monster back (some answers took 10 s).
+
 0.15.514 Nov 23, 2026
 - Spawn Nodes: the raid's whole number: the start notice says how many monsters are coming, and the count shows "N of TOTAL monsters left to kill" from TOTAL down to 0 (every node's Monsters per node in every wave). Summons still alive when it reaches 0 are named apart.
 - Spawn Nodes: Stop now stops everything coming: the waves, the monsters queued or having their spot checked, and the replacing of stuck monsters (Remove and the time limit too). The monsters alive stay until Remove.

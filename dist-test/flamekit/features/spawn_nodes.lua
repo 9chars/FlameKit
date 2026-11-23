@@ -44,7 +44,8 @@ local CHANNEL = "nodes"
 local ASK_STEPS = 120          -- the player's game asks for the state every 2 s while the tab may show
 local ASK_STEPS_PLAYER = 1800  -- a player who is not an admin: every 30 s (he becomes one: seen within 30 s)
 local CHECK_STEPS = 60         -- the triggers are checked every second
-local CLEAN_STEPS = 120        -- dead or gone monsters are forgotten every 2 s
+local CLEAN_STEPS = 120        -- dead or gone monsters are forgotten every 2 s (0.15.515: deaths every FAST_STEPS)
+local FAST_STEPS = 15          -- (0.15.515) 0.25 s: deaths seen, the next monster queued, spot checks timed out
 local SPAWN_PER_STEP = 4       -- monsters spawned in one server step at most (the rest on the next steps)
 local MAX_NODES = 200          -- nodes on the server at most
 local MAX_GROUPS = 30          -- groups at most
@@ -991,6 +992,21 @@ local function wave(world, gid, spots)
   end
 end
 
+-- (0.15.515) A spot whose check has no answer after CHECK_WAIT steps is used anyway (the check is cancelled).
+local CHECK_WAIT = 45  -- 0.75 s
+local do_spawn_ref = nil  -- set below (do_spawn)
+local function check_timeouts(world)
+  for q in pairs(S.checks) do
+    if q.asked_at and S.steps - q.asked_at > CHECK_WAIT and not q.cancelled then
+      q.cancelled = true
+      S.checks[q] = nil
+      if q.qid then pcall(emf.path_cancel, q.qid) end
+      emf.log(string.format("spawn nodes: node %s: the spot check gave no answer in %.1f s: the spot is used", tostring(q.node), CHECK_WAIT / 60))
+      if do_spawn_ref then do_spawn_ref(world, q, q.sx, q.sy, q.sz) end
+    end
+  end
+end
+
 -- (0.15.513) Drops group `gid`'s spots being checked (their answers then spawn nothing): Remove and the time limit.
 -- (16:31: a Remove at 16:31:41 called the raid off, and the spots still being checked spawned 3 more monsters.)
 local function cancel_checks(gid)
@@ -1241,6 +1257,7 @@ local function near_player_spot(world, pl)
   end
   return nil
 end
+do_spawn_ref = do_spawn  -- (0.15.515) for check_timeouts
 local function spawn_tick(world)
   local done = 0
   while #S.queue > 0 and done < SPAWN_PER_STEP do
@@ -1260,6 +1277,7 @@ local function spawn_tick(world)
       local asked = false
       if emf.path_find and far > 3 then
         q.tries = (q.tries or 0) + 1
+        q.asked_at, q.sx, q.sy, q.sz = S.steps, x, sy, z  -- (0.15.515) for check_timeouts
         S.checks[q] = true
         local okq, qid = pcall(emf.path_find, world, { x, sy + 0.5, z }, { tx, ty + 0.5, tz },
           { closest = true, jumps = true, width = 0.5, height = 2, nodes = 1500 }, function(w, result)
@@ -1268,6 +1286,9 @@ local function spawn_tick(world)
             local status = type(result) == "table" and result.status or "?"
             local len = type(result) == "table" and tonumber(result.length) or 0
             local good = status == "found" and (result.reaches or len >= math.min(PATH_GAIN, far * 0.5))
+            -- (0.15.515: answers "other, 0 m" came 10 s late at 16:41:44 for three nodes at once) only a clear no (no start,
+            -- no path, or a found way that gets nowhere) refuses a spot; any other answer: the spot is used
+            if status ~= "found" and status ~= "no_start" and status ~= "no_path" then good = true end
             if (S.path_said or 0) < 40 then
               S.path_said = (S.path_said or 0) + 1
               emf.log(string.format("spawn nodes: node %s: spot %.0f %.0f %.0f, try %d: path %s, %.0f of %.0f m%s: %s", tostring(q.node), x, sy, z,
@@ -1290,6 +1311,7 @@ local function spawn_tick(world)
             end
           end)
         asked = okq and qid ~= nil
+        if asked then q.qid = qid end
         if not asked then S.checks[q] = nil end
       end
       if not asked then do_spawn(world, q, x, sy, z) end
@@ -2030,11 +2052,16 @@ function F.tick(world)
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)
-  if S.steps % 30 == 11 then local okt, why = pcall(trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
+  if S.steps % FAST_STEPS == 5 then check_timeouts(world) end  -- (0.15.515)
+  if S.steps % FAST_STEPS == 4 then local okt, why = pcall(trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
   if S.verify then verify_tick(world) end  -- (0.15.505)
   if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
   ground.tick(world)
   spawn_tick(world)
+  -- (0.15.515, owner 16:42 "the nodes are spawning monsters too slowly? if a node spawns a monster and it gets killed it
+  -- needs to immediately spawn another one": a death was seen only every 2 s (clean_tick) and the next one queued every
+  -- 0.5 s (trickle_tick)) deaths are seen and the next monster queued every 0.25 s
+  if S.steps % FAST_STEPS == 3 and S.steps % CLEAN_STEPS ~= 0 then clean_tick(world) end
   if S.steps % CLEAN_STEPS == 0 then
     clean_tick(world) stuck_tick(world) pcall(mark_tick, world)  -- (0.15.493) stuck_tick, mark_tick
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
