@@ -2037,6 +2037,10 @@ then and do a release build". **STABLE 0.15.475** (commit 7984142; DLL md5 02784
 dist-test, one signature, sig good): owner numbers (0.15.474) + the moving area 24 m (kAimHalf 12). Package
 release\FlameKit-0.15.475.zip (md5 04949be942c0d6da79b84594a19acd35). Local server has 0.15.475 files (.old_474; loads
 at its next restart). NOT G-Portal (asked separately).
+10:18 owner: "G-portal is shut down and ready to be updated" -> outbox = the 5 files changed since 0.15.462 (changes.txt,
+mod.json, features/building.lua, _flamekit_native/flamekit_native.dll + mod.json; md5 = dist 0.15.475), upload
+10:19:25-10:19:51 (DLL first, mod.json last), ftplist 10:20: all 5 on G-Portal at the right size. No test files on
+G-Portal (sampler, test size/base: off). Waiting for the owner to start it, then helper "logs".
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
