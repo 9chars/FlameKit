@@ -18,6 +18,9 @@
 #           installtest\game (a fake dedicated server folder: an empty enshrouded_server.exe, so no save backup is made)
 #           gets installtest\old\install.ps1 (the old FlameKit package) or installtest\new\install.ps1 (the new one),
 #           -NoDesktopShortcut; the output goes to installtest\old.log or installtest\new.log
+#   serverstop   (2026-11-22, owner 20:10 "yes test the fresh map") close the client, save and stop the server, and
+#           leave both stopped (for work on the world files while nothing runs)
+#   serverstart  start the server, wait until its world is loaded and 30 s more, then start the client
 #   logs    (2026-11-22, owner 19:35 "yes read the logs") only fetch the production server's logs into
 #           ..\production_stable_logs (upload.ps1 -LogsOnly, as the nightly fetch): nothing is uploaded, whatever the
 #           outbox holds
@@ -322,8 +325,10 @@ while ($true) {
                 'upload' { $ok = Upload; Finish $ok 'upload' }
                 'ftplist' { $ok = Upload -List; Finish $ok 'ftplist' }
                 'logs' { $ok = Upload -LogsOnly; Finish $ok 'logs' }
+                'serverstop' { $ok = (Close-Client) -and (Stop-Server); Finish $ok 'client and server stopped' }
+                'serverstart' { $ok = (Start-Server) -and (Wait-ForServer) -and (Start-Client); Finish $ok 'server and client started' }
                 'stop' { Finish $true 'helper stopped'; exit 0 }
-                default { Finish $false "unknown request '$what' (only client, server, both, build, buildprobe, keygen, sign, installold, installnew, upload, ftplist, logs, stop)" }
+                default { Finish $false "unknown request '$what' (only client, server, both, build, buildprobe, keygen, sign, installold, installnew, upload, ftplist, logs, serverstop, serverstart, stop)" }
             }
         } catch {
             Finish $false "error: $($_.Exception.Message)"

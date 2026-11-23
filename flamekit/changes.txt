@@ -1,3 +1,6 @@
+0.15.461 Nov 22, 2026
+- Building tab: the "This map has no flame altar yet" line is gone: Free build works on a map without any flame altar now. It only comes back if FlameKit ever has to fall back to the old way, which needs an altar.
+
 0.15.460 Nov 22, 2026
 - Free build: FlameKit adds its building areas right after the game clears its list of building areas each moment, instead of together with the first flame altar. This is the step towards Free build on a map without any flame altar. If that way cannot be set up, FlameKit uses the old way.
 

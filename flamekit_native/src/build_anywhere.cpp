@@ -269,6 +269,15 @@ void write_altar_areas(void* bzs) {
 // altar on the map. false (fkbuild clear off, or the program hooks could not be set): the old way, from inside the
 // game's addZone call for the first altar of each rebuild (no altar on the map: no Free build).
 std::atomic<bool> g_clear_path{true};
+// (0.15.461) Writes which way is in use to free_build_way.txt for the Lua part: "clear" (no altar needed) or "altar"
+// (the old way: the Building tab warns on a map without an altar).
+void write_way() {
+    const char* way = g_clear_path.load() ? "clear\n" : "altar\n";
+    if (FILE* f = _wfopen(lua_file(L"free_build_way.txt").c_str(), L"wb")) {
+        std::fwrite(way, 1, std::strlen(way), f);
+        std::fclose(f);
+    }
+}
 // (0.15.460) the flag the game passes to addZone for an altar (list 0), per zone list, learned from its calls (the
 // probe of 0.15.459 saw 0 for list 1 on both sides and 1 for list 2 in the player's game); FlameKit passes the same
 // one for its zones. Until an altar was seen (a map without one): kFlagUnknown, then 0 is used.
@@ -500,6 +509,7 @@ bool fk_build_anywhere_load(bool dedicated) {
     }
     EMF_LOG(kMod, "free build: FlameKit's zones are added %s", g_clear_path.load() ? "right after the game empties its zone list (no altar needed)"
                                                                                   : "with the first altar of each rebuild (the old way: an altar is needed)");
+    write_way();  // (0.15.461)
     emf::on_tick([](emf::World w) {  // the lists of players and the factor, every 15 steps of each world
         g_steps.fetch_add(1);  // the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
@@ -560,6 +570,7 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (all.find(" altar off ") != std::string::npos) g_altar_on = false;
         if (all.find(" clear on ") != std::string::npos) g_clear_path = true;    // (0.15.460)
         if (all.find(" clear off ") != std::string::npos) g_clear_path = false;
+        write_way();  // (0.15.461)
         EMF_LOG(kMod, "fkbuild:%s", all.c_str());
         size_t ns = 0, nc = 0;
         {

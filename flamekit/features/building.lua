@@ -126,6 +126,17 @@ local function altar_count()
   return n
 end
 
+-- (0.15.461) Whether FlameKit Native adds Free build's areas the old way, which needs a flame altar on the map
+-- (free_build_way.txt "altar": its hooks on the game's list could not be set, or "fkbuild clear off"). Since 0.15.460 it
+-- adds them right after the game empties its list ("clear"), with or without an altar: no file (an older FlameKit Native)
+-- counts as that too.
+local function needs_altar()
+  local f = io.open(emf.dir .. "\\free_build_way.txt", "r")
+  local way = f and f:read("l")
+  if f then f:close() end
+  return way ~= nil and way:match("^%s*altar") ~= nil
+end
+
 -- The world's Bigger altar areas: on unless an admin switched it off (experimental_world.json).
 local function big_on()
   if S.world == nil then
@@ -341,10 +352,11 @@ function F.tick(world)
     if ok and account and free_on(account) then ids[#ids + 1] = tostring(id) .. (altars_on(account) and " a" or "") end
   end
   table.sort(ids)
-  -- (0.15.453, owner 17:19 "#5 go ahead") a map without any flame altar: Free build cannot work yet (FlameKit Native adds
-  -- its areas when the game adds an altar's); the tab says so once it has been so for a minute
+  -- (0.15.453, owner 17:19 "#5 go ahead") a map without any flame altar while FlameKit Native adds Free build's areas the
+  -- old way, which needs one: the tab says so once it has been so for a minute. (0.15.461, owner 20:15 "it does show the
+  -- "map has no flame alter yet" message": since 0.15.460 Free build works without an altar, so only in the old way)
   local altars = altar_count()
-  if altars == 0 then S.no_altar_since = S.no_altar_since or os.time() else S.no_altar_since = nil end
+  if altars == 0 and needs_altar() then S.no_altar_since = S.no_altar_since or os.time() else S.no_altar_since = nil end
   write_file("free_build_server.txt", table.concat(ids, "\n") .. (#ids > 0 and "\n" or ""), "free build: server list")
   write_file("altar_size_server.txt", (big_on() and ALTAR_FACTOR or "1") .. "\n", "bigger altar areas: altar_size_server.txt")
   spots_write(false)
