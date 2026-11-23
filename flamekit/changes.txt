@@ -1,3 +1,8 @@
+0.15.503 Nov 23, 2026
+- Spawn Nodes: raid monsters no longer stand around their node: each one is sent at the player nearest it (within 120 m), walks up and attacks; when that player dies or leaves, the next nearest.
+- Spawn Nodes: Most alive per node can be 1 or 2 too.
+- Spawn Nodes: a new siren: an air-raid siren's slow wail (8 s) in place of the short beeping one.
+
 0.15.502 Nov 23, 2026
 - Spawn Nodes: a siren plays when a raid starts (with the "Raid forces are pushing into ..." notice). Each player can turn it off: setting Raid siren (Messages). It plays at the Windows volume.
 

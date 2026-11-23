@@ -135,7 +135,7 @@ local TRIGGER_LABEL = { manual = "Manual (Start now)", timer = "Timer", wire = "
 -- the choices of each drop-down (the units in UNIT)
 local CHOICES = {
   waves = { 1, 2, 3, 5, 10 }, per_wave = { 1, 2, 3, 5, 8, 10, 15 }, wave_gap = { 10, 20, 30, 60, 120, 300 },
-  max_alive = { 3, 6, 10, 20, 40 }, cooldown = { 1, 2, 5, 10, 15, 30, 60 }, timer_min = { 1, 2, 5, 10, 15, 30, 60, 120 },
+  max_alive = { 1, 2, 3, 6, 10, 20, 40 },  -- (0.15.503, owner 15:30: 1 and 2 added) cooldown = { 1, 2, 5, 10, 15, 30, 60 }, timer_min = { 1, 2, 5, 10, 15, 30, 60, 120 },
   timer_max = { 1, 2, 5, 10, 15, 30, 60, 120 }, wire_r = { 5, 10, 20, 30, 50 }, hour = { 0, 6, 12, 18, 20, 22 },
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
@@ -170,7 +170,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -1045,6 +1045,49 @@ local function stuck_tick(world)
   end
 end
 
+-- (0.15.503, owner 15:30 "monsters just bunch up at the node ... the just seem to stay there and never run out") Every 2 s
+-- each living raid monster without an order (EMF's enemy_order: it walks up to its target and attacks it, at once and
+-- after every step) is sent at the player nearest it within HUNT_R m; an order ends when the target dies or leaves
+-- (then the next nearest player), when the monster dies, or with a reload (sent again 2 s later). Bosses are refused by
+-- EMF: they keep the game's own way.
+local HUNT_R = 120
+local function hunt_tick(world)
+  if not emf.enemy_order then return end
+  local spots = player_spots(world)
+  if #spots == 0 then return end
+  for _, ids in pairs(S.alive) do
+    for id in pairs(ids) do
+      local o = S.orders[id]
+      local okt, tgt = pcall(emf.enemy_target, world, id)
+      local still = o and okt and tgt == o.target
+      if not still and (not o or os.time() - o.at >= 4) then
+        local okp, x, y, z = pcall(world.position, world, id)
+        if okp and x then
+          local best, pid = nil, nil
+          for _, p in ipairs(spots) do
+            local d = dist2(x, y, z, p[2], p[3], p[4])
+            if d <= HUNT_R * HUNT_R and (not best or d < best) then best, pid = d, p[1] end
+          end
+          if pid then
+            if o and o.id then pcall(emf.enemy_order_cancel, o.id) end
+            local ok, oid, why = pcall(emf.enemy_order, world, id, pid)
+            S.orders[id] = { id = ok and oid or nil, target = pid, at = os.time() }
+            if not (ok and oid) and (S.order_said or 0) < 10 then
+              S.order_said = (S.order_said or 0) + 1
+              emf.log(string.format("spawn nodes: monster %s: no order to go for player %s (%s)", tostring(id), tostring(pid), tostring(ok and why or oid)))
+            end
+          end
+        end
+      end
+    end
+  end
+  for id in pairs(S.orders) do  -- dead or gone: forgotten
+    local alive = false
+    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
+    if not alive then S.orders[id] = nil end
+  end
+end
+
 -- (0.15.493, owner 14:33 "all monsters need to get "marked" always") Every living raid monster has an orange marker on
 -- every player's game (EMF's send_marker: over the 3D view within NOTICE_DIST m, with an arrow at the screen's edge and
 -- its health as a bar, and on the map at any distance). Every 2 s: new ones marked, dead or gone ones unmarked, a bar
@@ -1523,6 +1566,7 @@ function F.tick(world)
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
     S.adopted, S.join_hits, S.join_seen = {}, {}, nil  -- (0.15.501)
+    S.orders = {}  -- (0.15.503)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
@@ -1532,7 +1576,11 @@ function F.tick(world)
   if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
   ground.tick(world)
   spawn_tick(world)
-  if S.steps % CLEAN_STEPS == 0 then clean_tick(world) stuck_tick(world) pcall(mark_tick, world) end  -- (0.15.493) stuck_tick, mark_tick
+  if S.steps % CLEAN_STEPS == 0 then
+    clean_tick(world) stuck_tick(world) pcall(mark_tick, world)  -- (0.15.493) stuck_tick, mark_tick
+    local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
+    if not okh then emf.log("spawn nodes: hunt_tick: " .. tostring(why)) end
+  end
   local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end
   if not need_spots then return end

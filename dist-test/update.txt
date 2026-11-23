@@ -1,8 +1,8 @@
-0.15.502
+0.15.503
 2020 a354e5f1 flamekit/README.md
-144515 5a1ac2e0 flamekit/changes.txt
+144886 30ef434f flamekit/changes.txt
 2652 a9dd362b flamekit/main.lua
-15403 6d2524a0 flamekit/mod.json
+15403 bf642969 flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -55,7 +55,7 @@
 1954 eaeca7a7 flamekit/features/server_save.lua
 4581 f83117fb flamekit/features/server_version.lua
 11069 cb2dda6f flamekit/features/settings.lua
-102965 0d4ff55e flamekit/features/spawn_nodes.lua
+105276 9698b64c flamekit/features/spawn_nodes.lua
 6402 f83365e9 flamekit/features/travel_hide.lua
 6443 37b879dd flamekit/features/water_debug.lua
 4619 7bc42353 flamekit/features/companions/01_base.lua
@@ -72,6 +72,6 @@
 15124 b576b343 flamekit/features/loot_filter/client.lua
 2368 5ff9c53d flamekit/features/loot_filter/init.lua
 19086 f0cf30bd flamekit/features/loot_filter/server.lua
-132344 4e0f70e6 flamekit/sounds/raid_siren.wav
+352844 3133a975 flamekit/sounds/raid_siren.wav
 1179136 56081056 flamekit_native/flamekit_native.dll
-464 b5a2e464 flamekit_native/mod.json
+464 1742920b flamekit_native/mod.json
