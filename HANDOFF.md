@@ -1642,6 +1642,13 @@ issues (Claude's doubt was wrong: drop it); "#5 after this test is done" (resear
 owner in 17:51:47 (Building tab answered at once). FACT: the zone list is rebuilt on the world's own thread (t22136, the
 same as the Lua's). No water warning at start or at his join (he joined about 490 m from the dispenser at 5808 816 5104;
 in the earlier map the "BlockWater Entity not found: Outside of Simulation area" warnings came at the join).
+18:00 owner: "I checked the spot and the water dispenser object is gone". FACT: after the restart the dispenser in the
+forgotten spot is gone; no water warning in the server log (he stood at 5812 822 5089 at 18:00:17). So: a forgotten spot
+cleans itself up fully: blocks at the game's ~30-minute reset, placed objects (the dispenser) at the next restart (the
+save at 17:49:29 had no building area there, so the game did not keep it). WATER TEST DONE: water in a remembered spot
+works and survives restarts; forgetting the spot leaves nothing broken behind. GUESS (not tested): the one way to get the
+old broken state would be a save while a Free build player's own box covers a water piece that is in no remembered spot
+(every piece placed with Free build makes a spot, so only after "Forget this spot" while standing right there). Next: #5.
 
 ## Things learned the hard way
 
