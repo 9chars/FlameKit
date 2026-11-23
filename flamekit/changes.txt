@@ -1,3 +1,6 @@
+0.15.459 Nov 22, 2026
+- Free build (research, logging only): FlameKit Native logs, for the first steps after a start, when the game empties and refills its list of building areas, to find a way for Free build to work on a map without any flame altar. Nothing changes in the game.
+
 0.15.458 Nov 22, 2026
 - When the game starts, the Chat tab of the Messages window shows which version of the Enshrouded Modding Framework this game runs: "Enshrouded Modding Framework (EMF): v0.6.19".
 

@@ -368,8 +368,35 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity) {
     }
 }
 
+// (0.15.459, #5 "is there a way to make free build mode not require a flame alter?", owner 19:41 "go ahead": research)
+// A probe, logging only: the game empties the zone list each step in its programs clear_buildzones (server) and
+// clear_buildzones_client (EMF 0.6.19's docs/ecs_programs.md #120, #121) and fills it in add_buildzones_server /
+// add_buildzones_client (#55, #54). If our zones went in right after the clear (EMF hook_program, post), they would
+// not need an altar's addZone call. The probe logs, for the first steps, the order these run in, their threads, and
+// the flag the game passes to addZone for an altar (needed to add our zones without an altar's call).
+std::atomic<uint32_t> g_probe_seq{0};
+// One probe line, the first 10 of each kind (`said` counts them).
+void probe(std::atomic<int>& said, const char* what) {
+    if (said.fetch_add(1) >= 10) return;
+    EMF_LOG(kMod, "free build probe #%u: %s (step %llu, thread %lu)", g_probe_seq.fetch_add(1), what,
+            (unsigned long long)g_steps.load(), GetCurrentThreadId());
+}
+std::atomic<int> g_said_cs{0}, g_said_cc{0}, g_said_as{0}, g_said_ac{0}, g_said_zone{0};
+void probe_clear_server(void*, void*) { probe(g_said_cs, "clear_buildzones done (server)"); }
+void probe_clear_client(void*, void*) { probe(g_said_cc, "clear_buildzones_client done (this game)"); }
+void probe_add_server(void*, void*) { probe(g_said_as, "add_buildzones_server starts"); }
+void probe_add_client(void*, void*) { probe(g_said_ac, "add_buildzones_client starts"); }
+
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
+    {  // (0.15.459, probe) what the game passes
+        if (g_said_zone.load() < 10) {
+            char line[200];
+            snprintf(line, sizeof line, "addZone(list %u, flag %u, owner kind %u, entity %u, abandoned %u, zone list %p)", list, flag, owner,
+                     entity, abandoned, bzs);
+            probe(g_said_zone, line);
+        }
+    }
     // (0.15.443) called with Free build off too: it starts each rebuild's altar list (then adds no boxes)
     if (box && list == 0 && owner == 0) add_player_boxes(bzs, flag, entity);
     const float factor = g_factor.load();
@@ -408,6 +435,14 @@ bool fk_build_anywhere_load(bool dedicated) {
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
     EMF_LOG(kMod, "free build and bigger altar areas (up to x%.1f, the world's option): hook on addZone %s", kMaxFactor,
             al ? "installed" : "NOT installed");
+    if (emf::api()->hook_program) {  // (0.15.459, #5 research) the probe: logging only
+        const bool a = emf::api()->hook_program("clear_buildzones", nullptr, probe_clear_server, nullptr);
+        const bool b = emf::api()->hook_program("clear_buildzones_client", nullptr, probe_clear_client, nullptr);
+        const bool c = emf::api()->hook_program("add_buildzones_server", probe_add_server, nullptr, nullptr);
+        const bool d = emf::api()->hook_program("add_buildzones_client", probe_add_client, nullptr, nullptr);
+        EMF_LOG(kMod, "free build probe: program hooks clear_buildzones %s, clear_buildzones_client %s, add_buildzones_server %s, add_buildzones_client %s",
+                a ? "on" : "NOT on", b ? "on" : "NOT on", c ? "on" : "NOT on", d ? "on" : "NOT on");
+    }
     emf::on_tick([](emf::World w) {  // the lists of players and the factor, every 15 steps of each world
         g_steps.fetch_add(1);  // the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
@@ -434,6 +469,13 @@ bool fk_build_anywhere_load(bool dedicated) {
                     const auto& p = ct->transform.position;
                     g_pos[side_bit | id] = Pos{p.x, p.y, p.z};
                 }
+            }
+        }
+        if (w.is_server() || w.is_client()) {  // (0.15.459, probe) once more 10 s into the running world: the steady order
+            static uint32_t probe_steps = 0;
+            if (++probe_steps == 1200) {
+                EMF_LOG(kMod, "free build probe: again, 10 s into the running world(s)");
+                g_said_cs = 0, g_said_cc = 0, g_said_as = 0, g_said_ac = 0, g_said_zone = 0;
             }
         }
         if (w.is_server()) {
