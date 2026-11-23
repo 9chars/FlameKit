@@ -1,3 +1,6 @@
+0.15.469 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): also counts how much terrain data the game unpacks each minute. Nothing in the game changes.
+
 0.15.468 Nov 23, 2026
 - Server (test servers only, off unless switched on by a file): also counts errors the game raises and recovers from, each minute. Nothing in the game changes.
 

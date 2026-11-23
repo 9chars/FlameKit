@@ -58,7 +58,8 @@
 // average and the slowest step, the process's CPU, each Free build area that was on and the remembered spots; a minute
 // whose steps average more than kSlowMs is logged as SLOW with the threads that used the most CPU in it, each next to
 // what it uses in a normal minute. Logging only. (0.15.467) THE SAMPLER (see sampler_thread): with speed_sampler.txt "on",
-// where the world step thread is while the server runs slow; (0.15.468) and every exception raised, counted each minute.
+// where the world step thread is while the server runs slow; (0.15.468) and every exception raised, counted each minute;
+// (0.15.469) and how many terrain chunks the game unpacks each minute (see kUnpackSig).
 #include <windows.h>
 #include <tlhelp32.h>
 
@@ -806,14 +807,39 @@ void exc_report(uint32_t minute, bool slow) {
             total, world, lost ? ", some not placed" : "", top.empty() ? "" : ": ", top.c_str());
 }
 
-// At each minute's end (world thread): the report of the minute just sampled, and whether to sample the next one.
-void sampler_minute(uint32_t minute, bool slow, uint32_t world_tid) {
+// (0.15.469, owner 07:24 "build it") THE CHUNK COUNTER: how often the game unpacks terrain (terraforming) chunk data.
+// The sampler found the slow work in the server's two terraforming voxel data stores (made at 0x1407ab3ba / 0x1407ab415
+// by 0x140834510, budgets 38 MB and 20 MB), which unpack chunks with the game's decompressor 0x1408514b0
+// (enshrouded_server.exe build 1287369; its 40 first bytes, unique in the server exe: kUnpackSig). Its arguments:
+// (result*, destination slice*, source slice*), a slice's length at +8. Hooked only on a dedicated server whose
+// speed_sampler.txt says "on" when it starts; the detour only counts (calls, packed and unpacked bytes, the world step
+// thread apart) and calls the game's own function. Logged each minute with the sampler's lines.
+constexpr const char* kUnpackSig = "48 89 6C 24 18 48 89 74 24 20 48 89 4C 24 08 57 41 54 41 55 41 56 41 57 49 8B 30 48 8B FA 49 8B 68 08 45 33 D2 45 33 C9";
+using UnpackFn = void* (*)(void*, void*, void*);
+UnpackFn g_unpack = nullptr;
+std::atomic<uint64_t> g_unpack_world{0}, g_unpack_other{0}, g_unpack_in{0}, g_unpack_out{0};
+
+void* unpack_detour(void* result, void* dst, void* src) {
+    if (GetCurrentThreadId() == g_sample_tid.load(std::memory_order_relaxed)) g_unpack_world.fetch_add(1, std::memory_order_relaxed);
+    else g_unpack_other.fetch_add(1, std::memory_order_relaxed);
+    if (src) g_unpack_in.fetch_add(*reinterpret_cast<const uint64_t*>(static_cast<const char*>(src) + 8), std::memory_order_relaxed);
+    if (dst) g_unpack_out.fetch_add(*reinterpret_cast<const uint64_t*>(static_cast<const char*>(dst) + 8), std::memory_order_relaxed);
+    return g_unpack(result, dst, src);
+}
+
+bool sampler_file_on() {
     bool on = false;
     if (FILE* f = _wfopen(lua_file(L"speed_sampler.txt").c_str(), L"r")) {
         char w[8] = {};
         on = fscanf(f, "%7s", w) == 1 && strcmp(w, "on") == 0;
         fclose(f);
     }
+    return on;
+}
+
+// At each minute's end (world thread): the report of the minute just sampled, and whether to sample the next one.
+void sampler_minute(uint32_t minute, bool slow, uint32_t world_tid) {
+    const bool on = sampler_file_on();
     static bool started = false, said_on = false;
     if (on && !said_on) EMF_LOG(kMod, "server speed: the sampler is on (speed_sampler.txt): it samples the minute after a SLOW one");
     said_on = on;
@@ -823,6 +849,11 @@ void sampler_minute(uint32_t minute, bool slow, uint32_t world_tid) {
         started = true;
     }
     if (g_exc_on.load()) exc_report(minute, slow);  // (0.15.468) the minute that just ended
+    if (g_unpack) {  // (0.15.469) the chunk counter, every minute
+        const uint64_t w = g_unpack_world.exchange(0), o = g_unpack_other.exchange(0), in = g_unpack_in.exchange(0), out = g_unpack_out.exchange(0);
+        EMF_LOG(kMod, "server speed, minute %u%s: terrain chunks unpacked: %llu on the world step thread, %llu on other threads; %.1f MB packed -> %.1f MB",
+                minute, slow ? " SLOW" : "", (unsigned long long)w, (unsigned long long)o, in / 1048576.0, out / 1048576.0);
+    }
     g_exc_on = on;
     if (g_sampling.load()) {  // the minute just ended was sampled
         std::unordered_map<uint64_t, uint32_t> leaf, chain;
@@ -939,6 +970,12 @@ bool fk_build_anywhere_load(bool dedicated) {
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
     EMF_LOG(kMod, "free build and bigger altar areas (up to x%.1f, the world's option): hook on addZone %s", kMaxFactor,
             al ? "installed" : "NOT installed");
+    if (dedicated && sampler_file_on()) {  // (0.15.469) the chunk counter: test servers only
+        const bool u = emf::hook_pattern("flamekit: terrain chunk unpack (counter)", kUnpackSig, reinterpret_cast<void*>(&unpack_detour),
+                                         reinterpret_cast<void**>(&g_unpack));
+        if (!u) g_unpack = nullptr;
+        EMF_LOG(kMod, "server speed: the terrain chunk counter is %s", u ? "on" : "NOT on (the game's function was not found)");
+    }
     if (emf::api()->hook_program) {  // (0.15.459, #5 research) the probe: logging only
         const bool a = emf::api()->hook_program("clear_buildzones", nullptr, probe_clear_server, nullptr);
         const bool b = emf::api()->hook_program("clear_buildzones_client", nullptr, probe_clear_client, nullptr);
