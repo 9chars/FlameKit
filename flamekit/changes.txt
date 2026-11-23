@@ -1,3 +1,6 @@
+0.15.473 Nov 23, 2026
+- The window after missing files were put back counts FlameKit's and EMF's files together.
+
 0.15.472 Nov 23, 2026
 - Missing files are put back: when an antivirus program (or anything else) removes FlameKit files or files of the Enshrouded Modding Framework (EMF), FlameKit downloads them again when the game starts and asks you to restart the game. If EMF's loader itself was removed, FlameKit cannot start and cannot do this.
 

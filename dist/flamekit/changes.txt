@@ -1,3 +1,36 @@
+0.15.473 Nov 23, 2026
+- The window after missing files were put back counts FlameKit's and EMF's files together.
+
+0.15.472 Nov 23, 2026
+- Missing files are put back: when an antivirus program (or anything else) removes FlameKit files or files of the Enshrouded Modding Framework (EMF), FlameKit downloads them again when the game starts and asks you to restart the game. If EMF's loader itself was removed, FlameKit cannot start and cannot do this.
+
+0.15.471 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): the base data test can also use a fixed owner. Nothing changes unless that file is there.
+
+0.15.470 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): a test of giving the Free build area the same base data a flame altar's area has. Nothing changes unless that file is there.
+
+0.15.469 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): also counts how much terrain data the game unpacks each minute. Nothing in the game changes.
+
+0.15.468 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): also counts errors the game raises and recovers from, each minute. Nothing in the game changes.
+
+0.15.467 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): a sampler that finds which part of the game keeps the server busy while it runs slow. Nothing in the game changes.
+
+0.15.466 Nov 22, 2026
+- Server: writes a line about its speed to the log every minute (steps, slowest step, CPU, Free build areas), and which parts of the game were busy when it ran slow. For finding what slows a server down. Nothing in the game changes.
+
+0.15.465 Nov 22, 2026
+- Free build: the building area is 16 m around you (it was 24 m), only while you have a building piece selected.
+
+0.15.464 Nov 22, 2026
+- Free build: the building area is 24 m around you, only while you have a building piece selected (0.15.463 put it in the wrong place on the server, so building outside altar areas did not work).
+
+0.15.463 Nov 22, 2026
+- Free build: the building area is now 16 m around where you aim with a building tool, and only there while the tool is out. It was 112 m around you all the time, and on the production server that made the server overloaded. Remembered spots stay as they are.
+
 0.15.462 Nov 22, 2026
 - Invincible Mode: when a player with it left the server, it could stop keeping the air full for everyone until the server restarted. Fixed.
 - Joining a server: FlameKit waits for the server's hello before it sends anything, so the game's log no longer fills with refused messages at every join.
