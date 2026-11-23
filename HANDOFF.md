@@ -2014,6 +2014,18 @@ ce8db86938ab9326aef22d695db1b286; emf-dist 0.6.19 unchanged, sig good) and the i
 release\FlameKit-0.15.473.zip (md5 8083c03ab77a5f3aba123d2ad6c1b69c, from dist + emf-dist). NOT G-Portal (not asked).
 Stable now has: the repair, the 16 m moving area (only with a building piece selected), the speed log (a line a minute
 on any server world), the test switches (off without their files). The owner-number fix for Free build is NOT in it.
+09:26 owner: the player updated, the game worked, no "missing" message (the normal update re-downloads any missing
+file too: probably why updating always fixed it; his logs would tell: asked for later). 09:28 "lets continue with our
+previous work". **HOW THE GAME GIVES OUT ENTITY IDS:** createEntity (server 0x140623ce0, sig in EMF's
+emf_signatures.patterns): id 0 = new: `mov eax,1; lock xadd [storage+0x498],eax; inc eax` (one counter per world's
+entity storage; ids only go up), then the id goes into the storage's id map (+0x148). storage = world + 0xe179c0 (the
+spawn wrapper 0x140620d00's `add rcx,0xe179c0`). Both found by pattern (kStorageSig / kCounterSig, unique in the server
+and the client exe). **0.15.474 (DLL md5 131692589cf5ab42e3291759da9c5a9b): OWNER NUMBERS** (build_anywhere.cpp
+reserve_owner / spot_owner): the moving area's owner = its player; each remembered spot = an id reserved from that
+counter (InterlockedIncrement, as the game does), kept per spot for the session (a new world: new ids); checks the
+world kind byte at storage+8; if anything does not check out: owner 0 as before (logged). free_build_test_base.txt
+"none" = the old way (owner 0) for comparison; any other word / no file = the new way. Development + local server
+(.old_470); local test files now: base "owner", size 112.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
