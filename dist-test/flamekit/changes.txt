@@ -1,3 +1,6 @@
+0.15.518 Nov 23, 2026
+- Spawn Nodes: every raid monster is moved onto the ground by the game's own move 2 s after it appears again, as before 0.15.493: without it the monsters stood and did not fight.
+
 0.15.517 Nov 23, 2026
 - Spawn Nodes: the siren sounds twice when a raid starts and once at the start of every new wave (for the players within 300 m of the nodes, as the wave notice).
 

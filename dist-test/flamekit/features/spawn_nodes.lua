@@ -920,6 +920,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
   S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
   S.trickle_log = nil  -- (0.15.512)
+  S.ground_log = nil  -- (0.15.518)
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -1233,7 +1234,15 @@ local function do_spawn(world, q, x, sy, z)
       local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
       if okr and rid then S.spare_rules[id] = rid end
     end
-    if not emf.block_at then ground.add(id, x, q.y, z, yaw) end  -- (0.15.493) only where the ground could not be found here
+    -- (0.15.518, owner 17:11 "the monsters are literally just standing around? not fighting at all? something is wrong with
+  -- how they're getting spawned", 17:13 "um sure") the game's own move onto the ground after every spawn again, as until
+  -- 0.15.493 (raids "worked pretty well", 13:32): since 0.15.493 dropped it, 11-15 monsters at a time stood with their
+  -- order and 0 moved (17:11). It starts from the ground found here (no monster starts inside the ground).
+  ground.add(id, x, sy, z, yaw)
+  if (S.ground_log or 0) < 40 then
+    S.ground_log = (S.ground_log or 0) + 1
+    emf.log(string.format("spawn nodes: node %s: monster %s spawned at %.1f %.1f %.1f, the game's ground move queued", tostring(q.node), tostring(id), x, sy, z))
+  end
   else
     emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
   end
