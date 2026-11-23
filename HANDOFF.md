@@ -1963,6 +1963,12 @@ how we can add the missing base data its looking for"; 07:41: "the problem is a 
 player builds it bigger". **0.15.470 (d109916, DLL 3d4ee8684bae5d0954dc5320843ce4e2): base data test**:
 free_build_test_base.txt none|entity|altar (server only) = what our addZone passes (entity 0 + no base id / the
 player's entity / the nearest real altar's entity + base id + abandoned); real altars' values logged.
+07:50 owner: "I don't like the idea of attaching it to an existing base" -> the "altar" mode is NOT used. Real altars'
+addZone: entity = the altar's entity (1037..), abandoned 0, base id = a GUID per base. **Test 07:56-08:09 at 112 m, 5801
+5100:** entity = player 1 (no base id) 07:56:15: 6 minutes NORMAL (2.44 M unpacks/min, 16.7 ms); entity 0 (as always)
+08:03:02: SLOW within ~1.5 min (9.2 M/min); entity again 08:06:07 while slow: still slow 3 min (does not end a running
+slowdown). One run each: the owner entity looks like what prevents it. Owner 08:06: "what exactly did you attach my
+player id to...?" (the addZone owner entity slot, rebuilt each step, nothing saved). Tool away 08:10. Next: a repeat.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
