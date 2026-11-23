@@ -2032,6 +2032,11 @@ over ~700 m, 09:36-09:55: no slowdown while building). Then 112 m moving area, p
 09:56-10:11: **0 SLOW minutes, 16.7 ms**, and terrain chunks unpacked on the world thread **~37,000-40,000 a minute**
 (owner 0: ~1.35 M normal and ~9.3 M when slow; the player as owner alone: ~2.4 M). So the old 'normal' was already the
 remembered spots being reloaded every step. Test files on the local server: base "owner", size 112 (to set back to 16).
+10:15 owner: "does 16 m make sense? should it be a bit bigger now that we've fixed it? 24 m?" -> "lets set it to 24 m
+then and do a release build". **STABLE 0.15.475** (commit 7984142; DLL md5 02784565a2d7784ddbb5dfa3d5a04777; dist =
+dist-test, one signature, sig good): owner numbers (0.15.474) + the moving area 24 m (kAimHalf 12). Package
+release\FlameKit-0.15.475.zip (md5 04949be942c0d6da79b84594a19acd35). Local server has 0.15.475 files (.old_474; loads
+at its next restart). NOT G-Portal (asked separately).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
