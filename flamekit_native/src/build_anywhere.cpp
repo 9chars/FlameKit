@@ -716,6 +716,62 @@ void read_raid_lock(emf::World w) {
     }
 }
 
+// (0.15.486, owner 13:02 "certain monster won't take any damage from me?", 13:05 "yeah thats it.. I turned that option off
+// and I can kill them again") RAID PROTECTION OF PLACED OBJECTS, here instead of the Lua hit rule {from = "players",
+// to = "objects", cancel}: EMF's "objects" class is any entity the game marks Destructible, and some monsters (the
+// Undead) are, so that rule made them unkillable during a raid. raid_protect_server.txt (features/spawn_nodes.lua: "1"
+// while a protecting group runs or has a monster alive) switches g_protect_objects; protect_hit (EMF's on_hit_before, on
+// the game's impact thread) then cancels a player's hit on anything without a faction: placed objects (chests,
+// stations, doors) and the world's props. Never a hit on a creature (it has a faction: a monster, an animal, a villager)
+// or on a player. Counted, and the count logged every 15 s while it is not 0 (no logging on the impact thread).
+std::atomic<bool> g_protect_objects{false};
+std::atomic<uint32_t> g_protect_cancels{0};
+std::atomic<uint32_t> g_protect_last_target{0};
+std::atomic<uint32_t> g_protect_last_attacker{0};
+bool g_protect_hook = false;
+
+bool has_faction(EmfWorld* w, uint32_t id) {  // a Faction other than Environment, on the entity or its template
+    auto* a = emf::api();
+    uint64_t size = 0;
+    const void* f = a->get_component(w, gen::ecs::Faction::kHash, id, &size);
+    if (!f && a->get_template_component) f = a->get_template_component(w, gen::ecs::Faction::kHash, id, &size);
+    return f && *static_cast<const uint8_t*>(f) != 0;
+}
+
+void protect_hit(EmfWorld* w, EmfHit* hit, void*) {
+    if (!hit || !g_protect_objects.load(std::memory_order_relaxed)) return;
+    if (hit->kind != EMF_HIT_KIND_HIT || hit->cancel || (hit->flags & EMF_HIT_HEALING) || !hit->attacker) return;
+    if (hit->target_faction != 0) return;  // a creature or a player: never
+    auto* a = emf::api();
+    if (!a->get_component(w, emf::detail::kPlayerStateHash, hit->attacker, nullptr)) return;  // not a player's hit
+    if (a->get_component(w, emf::detail::kPlayerStateHash, hit->target, nullptr)) return;
+    if (has_faction(w, hit->target) || (hit->part != hit->target && has_faction(w, hit->part))) return;
+    hit->cancel = 1;
+    g_protect_cancels.fetch_add(1, std::memory_order_relaxed);
+    g_protect_last_target.store(hit->target, std::memory_order_relaxed);
+    g_protect_last_attacker.store(hit->attacker, std::memory_order_relaxed);
+}
+
+void read_raid_protect() {  // every 15 server steps
+    bool on = false;
+    if (FILE* f = _wfopen(lua_file(L"raid_protect_server.txt").c_str(), L"r")) {
+        int c = fgetc(f);
+        on = c == '1';
+        fclose(f);
+    }
+    if (on != g_protect_objects.load()) {
+        g_protect_objects = on;
+        EMF_LOG(kMod, "raid protection: players' hits on placed objects (anything without a faction) are %s%s", on ? "cancelled now" : "allowed again",
+                g_protect_hook ? "" : " (NOT in force: EMF's on_hit_before is not available here)");
+    }
+    static uint32_t steps = 0;
+    if (++steps % 60 == 0) {  // every 15 s
+        const uint32_t n = g_protect_cancels.exchange(0);
+        if (n) EMF_LOG(kMod, "raid protection: %u player hit(s) on placed objects cancelled in the last 15 s (last: player %u on entity %u)", n,
+                       g_protect_last_attacker.load(), g_protect_last_target.load());
+    }
+}
+
 void read_test_base() {  // (0.15.470) see g_test_base
     char w[16] = {};
     unsigned long fixed = 0;
@@ -1201,6 +1257,8 @@ bool fk_build_anywhere_load(bool dedicated) {
     EMF_LOG(kMod, "free build: FlameKit's zones are added %s", g_clear_path.load() ? "right after the game empties its zone list (no altar needed)"
                                                                                   : "with the first altar of each rebuild (the old way: an altar is needed)");
     write_way();  // (0.15.461)
+    g_protect_hook = emf::api()->on_hit_before && emf::api()->on_hit_before(protect_hit, nullptr);  // (0.15.486)
+    EMF_LOG(kMod, "raid protection: placed objects hook %s", g_protect_hook ? "on" : "NOT on (EMF's on_hit_before is not available)");
     emf::on_tick([](emf::World w) {  // the lists of players and the factor, every 15 steps of each world
         g_steps.fetch_add(1);  // the player boxes: once per step
         static uint32_t steps_server = 0, steps_client = 0;
@@ -1265,6 +1323,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)
+                read_raid_protect();  // (0.15.486)
                 read_test_base();  // (0.15.470)
                 read_list(L"free_build_server.txt", g_free_server, g_alt_server, "server");
                 read_spots("server");

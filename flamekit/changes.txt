@@ -1,3 +1,6 @@
+0.15.486 Nov 23, 2026
+- Spawn Nodes: monsters can be hurt again during a raid with Players cannot damage base structures on. The protection of placed objects (chests, stations, doors) now spares every creature: some monsters, the Undead among them, counted as placed objects and took no damage. Needs FlameKit Native 0.15.486 on the server.
+
 0.15.485 Nov 23, 2026
 - Spawn Nodes: each node has its own Spawn within (on the node, 2, 5, 10, 15, 20 or 30 m; 10 m as before).
 - Spawn Nodes: monsters no longer appear behind or inside walls or inside rock: a spot with a building block or placed terrain between it and the node, a building block at it, or solid rock is not used (8 tries, then the node itself). Placed objects such as chests are not seen.

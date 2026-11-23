@@ -284,10 +284,13 @@ local function scan_tick(world)
     local text = f and f:read("*a") or ""
     if f then f:close() end
     S.lock_text = text
-    if text ~= "" and not S.protect_rule then
-      local ok, id = pcall(emf.hit_rule, { from = "players", to = "objects", cancel = true })
-      if ok and id then S.protect_rule = id end
-      emf.log("spawn nodes: loaded during a raid lock: protection kept while the raid's monsters are looked for")
+    -- (0.15.486) the placed objects' protection is FlameKit Native's (raid_protect_server.txt): kept as it is too
+    local pf = io.open(emf.dir .. "\\raid_protect_server.txt", "r")
+    local pt = pf and pf:read("*a") or ""
+    if pf then pf:close() end
+    S.protect_on = pt:sub(1, 1) == "1"
+    if text ~= "" or S.protect_on then
+      emf.log("spawn nodes: loaded during a raid: its protection is kept while the raid's monsters are looked for")
     end
     S.scan = { i = 1, found = 0 }
     return false  -- the list in this step, the walk in the next ones (a big world has tens of thousands)
@@ -596,18 +599,21 @@ local function protect_tick(world, spots)
       end
     end
   end
-  if want and not S.protect_rule then
-    local ok, id = pcall(emf.hit_rule, { from = "players", to = "objects", cancel = true })
-    if ok and id then
-      S.protect_rule = id
-      emf.log("spawn nodes: a raid runs: players' hits on placed objects are cancelled until it ends")
-    else
-      emf.log("spawn nodes: the rule against players' hits on placed objects was refused (" .. tostring(id) .. ")")
+  -- (0.15.486, owner 13:05: the Undead could not be killed) players' hits on placed objects are cancelled by FlameKit
+  -- Native (build_anywhere.cpp, protect_hit), which spares every creature; no EMF hit rule any more (EMF's "objects"
+  -- class takes in monsters the game marks breakable). raid_protect_server.txt: "1" while wanted.
+  if want ~= S.protect_on then
+    local f = io.open(emf.dir .. "\\raid_protect_server.txt.tmp", "w")
+    if f then
+      f:write(want and "1\n" or "0\n")
+      f:close()
+      os.remove(emf.dir .. "\\raid_protect_server.txt")
+      if os.rename(emf.dir .. "\\raid_protect_server.txt.tmp", emf.dir .. "\\raid_protect_server.txt") then
+        S.protect_on = want
+        emf.log(want and "spawn nodes: a raid runs: players' hits on placed objects are cancelled until its last monster is dead"
+          or "spawn nodes: no raid with protection runs: players can hit placed objects again")
+      end
     end
-  elseif not want and S.protect_rule then
-    pcall(emf.hit_rule_remove, S.protect_rule)
-    S.protect_rule = nil
-    emf.log("spawn nodes: no raid with protection runs: players can hit placed objects again")
   end
 end
 
