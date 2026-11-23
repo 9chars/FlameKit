@@ -1,3 +1,6 @@
+0.15.492 Nov 23, 2026
+- Spawn Nodes: Raid lasts at most (10, 15, 20, 30, 45, 60 or 90 min, or no limit; 30 min by default): when the time from its start is up the raid ends: no more waves, its living monsters are taken away (and its protection ends with them), the bodies stay, and everyone is told "Time is up!".
+
 0.15.491 Nov 23, 2026
 - Spawn Nodes: a group starts only when a player is within its new Player within distance of one of its nodes (20, 30, 50, 75 or 100 m; 50 m by default), whatever its trigger, also Start now; its waves come only while one is, and then at all its nodes. A timer that is due waits for a player; a time of day with nobody near is skipped that day.
 

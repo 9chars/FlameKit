@@ -119,10 +119,11 @@ local CHOICES = {
   timer_max = { 1, 2, 5, 10, 15, 30, 60, 120 }, wire_r = { 5, 10, 20, 30, 50 }, hour = { 0, 6, 12, 18, 20, 22 },
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
+  duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
 }
-local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m" }
+local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
 local DEFAULTS = { announce = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
-  cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50 }
+  cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
 -- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
@@ -141,6 +142,7 @@ end
 -- A drop-down value as text ("30 s", "10 min", "20:00").
 local function label(key, v)
   if key == "hour" then return string.format("%02d:00", v) end
+  if key == "duration" and v == 0 then return "No limit" end  -- (0.15.492)
   return tostring(v) .. (UNIT[key] and (" " .. UNIT[key]) or "")
 end
 
@@ -148,7 +150,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0 }  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -345,6 +347,12 @@ local function scan_tick(world)
   if sc.i <= #sc.list then return false end
   emf.log(string.format("spawn nodes: world scan done: %d of the nodes' monsters found again (of %d entities)", sc.found, #sc.list))
   S.scan, S.scanned = nil, true
+  -- (0.15.492) a raid found again after a reload: its time limit counts from now (its real start is not known)
+  for _, g in ipairs(groups()) do
+    for _, n in ipairs(nodes_of(g.id)) do
+      if alive_count(n.id) > 0 then S.started[g.id] = S.started[g.id] or os.time() break end
+    end
+  end
   return true
 end
 
@@ -491,6 +499,7 @@ local function raid_tick(world)
       -- the start notice comes first
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
+      S.started[gid] = nil
       raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, 15)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
@@ -530,6 +539,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
     return false, string.format("Nobody is within %d m of its nodes: it does not start.", g.near_r or 50), "nobody"
   end
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
+  S.started[gid] = os.time()  -- (0.15.492) for its time limit
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -597,6 +607,43 @@ local function wave(world, gid, spots)
       r.place or "the raid", run.wave, run.waves, queued), true, 10)
   end
   if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
+end
+
+-- (0.15.492, owner 14:07 "there needs to be a total raid duration.. so if the raid goes on for 30 mins the raid ends,
+-- that should be a configurable setting. so if someone cant finish a raid in a given amount of time it just ends")
+-- Every second: a group whose raid has lasted its duration (minutes from its start; 0 = no limit) ends: no more waves,
+-- nothing more spawns, its living monsters are taken away (so its protection ends too); the bodies stay.
+local function time_tick(world)
+  local now = os.time()
+  for gid, at in pairs(S.started) do
+    local g = group(gid)
+    if not g then
+      S.started[gid] = nil
+    elseif (g.duration or 30) > 0 and now - at >= g.duration * 60 then
+      S.started[gid] = nil
+      if S.runs[gid] then finish(gid) end
+      for i = #S.queue, 1, -1 do
+        local qn = data().nodes[tostring(S.queue[i].node)]
+        if qn and qn.g == gid then table.remove(S.queue, i) end
+      end
+      local n = 0
+      for _, node in ipairs(nodes_of(gid)) do
+        for id in pairs(S.alive[node.id] or {}) do
+          if pcall(emf.destroy, world, id) then n = n + 1 end
+          if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
+        end
+        S.alive[node.id] = nil
+      end
+      emf.log(string.format("spawn nodes: %s: its time is up (%d min): its raid ends, %d living monster(s) taken away", g.name, g.duration, n))
+      local r = S.raid[gid]
+      if r then
+        raid_notice(world, gid, string.format("Time is up! The raid on %s is over%s.", r.place or "the area",
+          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, 15)
+        raid_notice(world, gid, "", true, 1, "left_" .. gid)
+        S.raid[gid] = nil
+      end
+    end
+  end
 end
 
 -- Spawns up to SPAWN_PER_STEP queued monsters.
@@ -1082,6 +1129,7 @@ local function handle(world, account, entity, msg, from)
     end
     emf.log(string.format("spawn nodes: player %s removed %d monster(s) and %d dead bod(ies) of %s", who, n, bodies, g.name))
     note(string.format("Removed %d monster(s) and %d dead bod%s of %s; the rest of the world is being searched for more.", n, bodies, bodies == 1 and "y" or "ies", g.name))
+    S.started[gid] = nil  -- (0.15.492)
     if S.raid[gid] then  -- (0.15.488)
       if S.runs[gid] then finish(gid) end
       raid_notice(world, gid, string.format("The raid on %s was called off.", S.raid[gid].place or "the area"), nil, 15)
@@ -1102,7 +1150,7 @@ function F.tick(world)
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
     S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
-    S.scan, S.scanned, S.miss, S.purge, S.raid = nil, false, {}, nil, {}
+    S.scan, S.scanned, S.miss, S.purge, S.raid, S.started = nil, false, {}, nil, {}, {}
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     scan_tick(world)
@@ -1123,6 +1171,7 @@ function F.tick(world)
     trigger_tick(world, spots)
     protect_tick(world, spots)
     raid_tick(world)  -- (0.15.488)
+    time_tick(world)  -- (0.15.492)
   end
   if S.steps % BREAK_STEPS == 0 then break_tick(world, spots) end
 end
@@ -1341,6 +1390,8 @@ function F.panel(world)
   choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves.")
   choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave.")
   choice_row(rows, g, "max_alive", "Most alive per node", "A node spawns no more while this many of its monsters are alive.")
+  choice_row(rows, g, "duration", "Raid lasts at most", "From its start: when this time is up its raid ends, whatever is left: no more waves, its "
+    .. "living monsters are taken away (and with them its protection), the bodies stay.")  -- (0.15.492)
   choice_row(rows, g, "cooldown", "Cooldown", "After its waves, the trigger cannot fire again for this long.")
 
   local mine = {}
