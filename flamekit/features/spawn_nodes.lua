@@ -68,6 +68,17 @@ local BREAK_LEVEL = {
   extreme = { every = 30, mult = 8, reach = 6, radius = 1.5, label = "Extreme: every 0.5 s, 8 times as hard" },
 }
 local NEAR_DIRS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }  -- where a monster with no player in reach looks for a wall
+-- (0.15.483, owner 12:42 "Players should not be able to damage structures while there are monsters from the raid still
+-- alive. If you made a bug that violates this than fix it.": a reload of FlameKit on the server forgot the raid's
+-- monsters, so the protection ended at once) Every monster a node spawns carries its group in a ScaleComponent tag:
+-- uniformScale = TAG_BASE - group * TAG_STEP (not visible; the test monsters' tag is 0.999, core/test_tag.lua). After a
+-- reload (or a new world) FlameKit scans the world for them (SCAN_BUDGET seconds a step at most) and knows them again,
+-- alive or dead; until that scan is done the protection stays as it was (the raid lock file is not touched).
+local TAG_BASE, TAG_STEP = 0.996, 0.00002
+local SCAN_BUDGET, SCAN_MAX = 0.02, 3000   -- s and entities per server step for that scan
+local clock_ok, clock = pcall(function() return os.clock end)
+if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = nil end
+local MISSES = 3  -- (0.15.483) a monster whose health can't be read is forgotten only after this many checks in a row
 
 -- (0.15.477, owner 11:27 "it would be nice if I could have a monster group for bosses as well so I could have one node
 -- spawn a boss") "Bosses": any of the bosses (core/monsters.lua's 26), the only type with bosses in it
@@ -115,7 +126,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {} }  -- (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {} }  -- (0.15.483) scan, scanned, miss; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -245,6 +256,73 @@ local function alive_count(nid)
   return n
 end
 
+-- (0.15.483) The tag of group `gid`, and the group a tag names (nil: not one of ours).
+local function tag_of(gid) return TAG_BASE - gid * TAG_STEP end
+local function group_of_tag(v)
+  if type(v) ~= "number" or v > TAG_BASE or v < TAG_BASE - 1000 * TAG_STEP then return nil end
+  local gid = math.floor((TAG_BASE - v) / TAG_STEP + 0.5)
+  if gid < 1 or math.abs(tag_of(gid) - v) > TAG_STEP * 0.3 then return nil end
+  return gid
+end
+
+-- (0.15.483) One step of the world scan that finds the nodes' monsters again: each one tagged with a group that still
+-- has nodes goes to that group's nearest node, alive (S.alive) or dead (S.dead). True when the scan is done.
+local function scan_tick(world)
+  if not S.scan then
+    -- the protection stays as it was meanwhile: the raid lock file is kept, and if it names players the rule against
+    -- players' hits on placed objects comes back now (EMF dropped it with the old script)
+    local f = io.open(emf.dir .. "\\raid_lock_server.txt", "r")
+    local text = f and f:read("*a") or ""
+    if f then f:close() end
+    S.lock_text = text
+    if text ~= "" and not S.protect_rule then
+      local ok, id = pcall(emf.hit_rule, { from = "players", to = "objects", cancel = true })
+      if ok and id then S.protect_rule = id end
+      emf.log("spawn nodes: loaded during a raid lock: protection kept while the raid's monsters are looked for")
+    end
+    S.scan = { i = 1, found = 0 }
+    return false  -- the list in this step, the walk in the next ones (a big world has tens of thousands)
+  end
+  local sc = S.scan
+  if not sc.list then
+    local ok, list = pcall(world.entities, world)
+    sc.list = ok and list or {}
+    return false
+  end
+  local t0 = clock and clock() or 0
+  local done = 0
+  while sc.i <= #sc.list and done < SCAN_MAX and not (clock and clock() - t0 > SCAN_BUDGET) do
+    local id = sc.list[sc.i]
+    sc.i, done = sc.i + 1, done + 1
+    local oks, scl = pcall(world.get, world, "ScaleComponent", id)
+    local gid = oks and scl and group_of_tag(scl.uniformScale)
+    local nodes = gid and nodes_of(gid)
+    if nodes and #nodes > 0 then
+      local okp, x, y, z = pcall(world.position, world, id)
+      local best, nid = nil, nodes[1].id
+      if okp and x then
+        for _, n in ipairs(nodes) do
+          local d = dist2(n.x, n.y, n.z, x, y, z)
+          if not best or d < best then best, nid = d, n.id end
+        end
+      end
+      local okh, cur = pcall(emf.health, world, id)
+      if okh and cur and cur > 0 then
+        S.alive[nid] = S.alive[nid] or {}
+        S.alive[nid][id] = true
+      elseif okh and cur then
+        S.dead[nid] = S.dead[nid] or {}
+        S.dead[nid][id] = true
+      end
+      sc.found = sc.found + 1
+    end
+  end
+  if sc.i <= #sc.list then return false end
+  emf.log(string.format("spawn nodes: world scan done: %d of the nodes' monsters found again (of %d entities)", sc.found, #sc.list))
+  S.scan, S.scanned = nil, true
+  return true
+end
+
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
 local function fire(world, gid, why, manual)
   local g = group(gid)
@@ -305,8 +383,11 @@ local function spawn_tick(world)
       local yaw = math.random() * 360
       if q.face == "player" and q.tx then yaw = yaw_to(x, z, q.tx, q.tz)
       elseif q.face == "node" and q.yaw then yaw = q.yaw end
-      local ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, {}, { yaw = yaw })
-      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z) end  -- an older EMF
+      local qn0 = data().nodes[tostring(q.node)]
+      local tag = { ScaleComponent = { uniformScale = tag_of(qn0 and qn0.g or 0) } }  -- (0.15.483) its group, for a reload
+      local ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, tag, { yaw = yaw })
+      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, tag) end  -- an older EMF: no yaw
+      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z) end  -- nor the tag
       if ok and id and id ~= 0 then
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
@@ -333,8 +414,12 @@ local function clean_tick(world)
     local g = node and group(node.g)
     for id in pairs(ids) do
       local ok, cur = pcall(emf.health, world, id)
-      if not ok or not cur or cur <= 0 then
+      S.miss[id] = (not ok or cur == nil) and ((S.miss[id] or 0) + 1) or nil
+      if S.miss[id] and S.miss[id] < MISSES then
+        -- (0.15.483) not read this time: still counted alive (and still protecting) until MISSES checks in a row
+      elseif not ok or not cur or cur <= 0 then
         ids[id] = nil
+        S.miss[id] = nil
         if ok and cur then  -- dead, the body still there
           S.dead[nid] = S.dead[nid] or {}
           S.dead[nid][id] = true
@@ -701,9 +786,14 @@ function F.tick(world)
   if not world:is_server() then return end
   S.steps = S.steps + 1
   local session = emf.session()
-  if session ~= S.session then  -- a new world: the monsters of the old one mean nothing
+  if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
     S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
+    S.scan, S.scanned, S.miss = nil, false, {}
+  end
+  if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
+    scan_tick(world)
+    return
   end
   ground.tick(world)
   spawn_tick(world)

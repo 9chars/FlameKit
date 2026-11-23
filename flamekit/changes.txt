@@ -1,3 +1,6 @@
+0.15.483 Nov 23, 2026
+- Spawn Nodes: the raid protection (players cannot change or damage bases) now holds while any of the raid's monsters is alive, also when FlameKit reloads on the server mid-raid: each node monster carries its group, and after a reload FlameKit finds them again before it changes the protection. A monster is no longer forgotten on one failed health check.
+
 0.15.482 Nov 23, 2026
 - Spawn Nodes: Its monsters spare animals, pets and villagers (on by default): a group's monsters cannot hurt anything that is not a player. Remove its monsters now also takes the group's dead bodies off the ground, and only that group's.
 
