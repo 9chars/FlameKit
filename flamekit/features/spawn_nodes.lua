@@ -112,6 +112,8 @@ local NOTICE_DIST = 300
 local PLACE_WAIT = 180         -- steps (3 s): how long the start notice waits for the asked player's place
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
 local LEFT_MIN_GAP = 5         -- s: and changed at most this often when the count changes
+local START_END_S = 60         -- s: (0.15.494, owner 14:35 "the beginning raid notice and the end raid notice needs to stay up
+                               -- longer.. I never even saw the end raid notice") the start and end notices stay this long (was 15)
 local MISSES = 3  -- (0.15.483) a monster whose health can't be read is forgotten only after this many checks in a row
 
 -- (0.15.477, owner 11:27 "it would be nice if I could have a monster group for bosses as well so I could have one node
@@ -499,7 +501,7 @@ local function raid_tick(world)
           answer and string.format("player %s's minimap: place '%s', region '%s'", tostring(r.ask.by), tostring(answer.place), tostring(answer.region))
           or "no answer came: the nearest flame altar"))
         r.ask = nil
-        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, 15)
+        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, START_END_S)
       end
     end
   end
@@ -513,7 +515,7 @@ local function raid_tick(world)
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       S.started[gid] = nil
-      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, 15)
+      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, START_END_S)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
       local now = os.time()
@@ -652,7 +654,7 @@ local function time_tick(world)
       local r = S.raid[gid]
       if r then
         raid_notice(world, gid, string.format("Time is up! The raid on %s is over%s.", r.place or "the area",
-          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, 15)
+          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S)
         raid_notice(world, gid, "", true, 1, "left_" .. gid)
         S.raid[gid] = nil
       end
@@ -1271,7 +1273,7 @@ local function handle(world, account, entity, msg, from)
     S.started[gid] = nil  -- (0.15.492)
     if S.raid[gid] then  -- (0.15.488)
       if S.runs[gid] then finish(gid) end
-      raid_notice(world, gid, string.format("The raid on %s was called off.", S.raid[gid].place or "the area"), nil, 15)
+      raid_notice(world, gid, string.format("The raid on %s was called off.", S.raid[gid].place or "the area"), nil, START_END_S)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)
       S.raid[gid] = nil
     end

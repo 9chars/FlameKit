@@ -1,3 +1,6 @@
+0.15.494 Nov 23, 2026
+- Spawn Nodes: the raid's start and end notices (also Time is up and called off) stay up for 60 s instead of 15 s.
+
 0.15.493 Nov 23, 2026
 - Spawn Nodes: monsters appear on the ground: each spot's ground is found first (a spot without ground is not used), so none starts inside the ground any more.
 - Spawn Nodes: a raid monster that ends up in the ground, in water, or stuck (not moved 1 m in 30 s, no hit given or taken) is taken away and a new one comes at its node (at most 10 times per node in a raid).
