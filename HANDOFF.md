@@ -1928,6 +1928,16 @@ SLOW minute a thread suspends the world step thread ~1000 times a minute, walks 
 frames, __try), logs the top functions ("where it was", "most often in its call chain") as enshrouded_server.exe
 0x14xxxxxxx. Development dist-test + local server (.old_466). No release decided (owner questioned releasing without
 knowing the cause).
+**07:02-07:06 SAMPLER RESULT (local, 0.15.467, spawn point active, 5798 5102):** 112 m from 07:02:20 -> SLOW minute 14
+(21.8 ms, world thread 87% of a core vs 49%); minute 15 sampled (992 samples). Exe base that run 0x7ff629dd0000
+(found by matching .pdata; the sampler printed real addresses because Windows writes the real base into the in-memory
+header: fix it to print 0x140000000 + rva). Hot (enshrouded_server.exe build 1287369 addresses): 0x14083f6f6 17%,
+0x140845960 14% (called from the savegame terraforming chunk reader 0x140830e30), 0x1408514b0 11% (called from every
+'Failed to decompress terraforming chunk' path, incl. VoxelDataContentLoader 0x140835750: the chunk decompressor),
+0x140836a80 3% / 24% in chain (VoxelDataContentLoader method, no direct calls), 0x140845310 2% ("Failed to decompress
+terraforming chunk"), memcpy 0x140bd0b00 4%. ~half the samples are TERRAFORMING / VOXEL CHUNK data being decompressed
+on the main server thread. Best reading (not proven): inside a build zone the game keeps/loads terraforming chunk data;
+a big zone with no base makes it decompress far more chunks. Scripts: claude_scratch/v467/*.py. Test size back to 16 m.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
