@@ -1,3 +1,6 @@
+0.15.496 Nov 23, 2026
+- Spawn Nodes: a monster that only stands and waits because no player is near is no longer taken away as stuck: only a monster with a player within 40 m can be stuck.
+
 0.15.495 Nov 23, 2026
 - Spawn Nodes: the wave notices no longer say which wave and how many monsters.
 

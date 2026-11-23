@@ -69,6 +69,8 @@ local SPOT_TRIES = 8
 -- at its node (at most RESPAWN_MAX per node in one raid, then it is only taken away).
 local SURFACE_UP = 12
 local STUCK_S = 30
+local STUCK_NEAR = 40          -- m: (0.15.496: 25 monsters were taken away as "stuck" at 14:43-14:46 while they only stood
+                               -- waiting, the player more than 50 m away) only a monster with a player this near can be stuck
 local RESPAWN_MAX = 10
 local SOLID_UP = { 1.5, 3.0 }
 local ACTIVE_DIST = 100        -- m: (0.15.491) now only how far a monster looks for the player to face
@@ -774,6 +776,7 @@ end
 -- the last hit it gave or took (emf.on_hit) or wall it broke.
 local function stuck_tick(world)
   local now = os.time()
+  local spots = player_spots(world)
   for nid, ids in pairs(S.alive) do
     for id in pairs(ids) do
       local t = S.track[id]
@@ -797,8 +800,10 @@ local function stuck_tick(world)
         if not why then
           if dist2(x, y, z, t.x, t.y, t.z) >= 1 then
             t.x, t.y, t.z, t.at = x, y, z, now
+          elseif not player_near(spots, x, y, z, STUCK_NEAR) then
+            t.at = now  -- (0.15.496) nobody near: it only waits; the clock starts again
           elseif now - t.at >= STUCK_S and now - (S.active_at[id] or t.born) >= STUCK_S then
-            why = string.format("stuck (not moved for %d s)", now - t.at)
+            why = string.format("stuck (not moved for %d s with a player within %d m)", now - t.at, STUCK_NEAR)
           end
         end
         if why then
