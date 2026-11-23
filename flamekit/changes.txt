@@ -1,3 +1,8 @@
+0.15.493 Nov 23, 2026
+- Spawn Nodes: monsters appear on the ground: each spot's ground is found first (a spot without ground is not used), so none starts inside the ground any more.
+- Spawn Nodes: a raid monster that ends up in the ground, in water, or stuck (not moved 1 m in 30 s, no hit given or taken) is taken away and a new one comes at its node (at most 10 times per node in a raid).
+- Spawn Nodes: every raid monster has an orange marker with its health bar for every player: over the world within 300 m (an arrow at the screen's edge points to it) and on the map at any distance.
+
 0.15.492 Nov 23, 2026
 - Spawn Nodes: Raid lasts at most (10, 15, 20, 30, 45, 60 or 90 min, or no limit; 30 min by default): when the time from its start is up the raid ends: no more waves, its living monsters are taken away (and its protection ends with them), the bodies stay, and everyone is told "Time is up!".
 

@@ -57,6 +57,19 @@ local SPREAD = 10              -- m: monsters spawn within this of their node (t
 -- (a rock or cliff). All refused: the monster appears on the node itself. Not seen: placed objects (chests and the like).
 local SPREADS = { 0, 2, 5, 10, 15, 20, 30 }
 local SPOT_TRIES = 8
+-- (0.15.493, owner 14:30 "I can't find the last monster is it stuck in terrain", 14:32 "I thought your code was doing
+-- that making sure the monsters were already spawning above ground? any monster then ends up in the ground or in water
+-- or in an object needs to get respawned") 0.15.485 only refused rock at 1.5 m and 3 m over the node's height, so a
+-- spot on rising ground (the ground 0.5-1.5 m higher) passed: the monster appeared in the ground and the game's ground
+-- search (core/spawn.lua) did not get it out. Now each spot's ground is found (find_surface: from 2 m under the node's
+-- height up to SURFACE_UP over it, the first place with solid ground under it and 2 m of air above it) and the
+-- monster appears on it; no ground: the spot is not used. And every 2 s each living monster is checked (stuck_tick):
+-- in the ground (solid at 0.6 m and 1.4 m over its feet), in water (swimming or under water), or stuck (not 1 m away
+-- from where it was STUCK_S seconds ago and no hit given or taken in that time): it is taken away and a new one comes
+-- at its node (at most RESPAWN_MAX per node in one raid, then it is only taken away).
+local SURFACE_UP = 12
+local STUCK_S = 30
+local RESPAWN_MAX = 10
 local SOLID_UP = { 1.5, 3.0 }
 local ACTIVE_DIST = 100        -- m: (0.15.491) now only how far a monster looks for the player to face
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
@@ -150,7 +163,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -540,6 +553,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   end
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
   S.started[gid] = os.time()  -- (0.15.492) for its time limit
+  for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -662,10 +676,35 @@ local function wall_between(world, a, b)
   return ok and w ~= nil and w ~= false
 end
 
--- (0.15.485) A spot for a monster of node `n` (its own spread): x, z. See SPOT_TRIES.
+-- (0.15.493) Whether the cell at a point is solid (terrain or a building block); nil when not known.
+local function solid_at(world, x, y, z)
+  local k = block_kind(world, x, y, z)
+  if k == nil then return nil end
+  return k == "terrain" or k == "building"
+end
+
+-- (0.15.493) The height to stand on at x, z near height y: from 2 m under it up to SURFACE_UP over it, the first place
+-- with solid ground just under it and 2 m of air over it. y itself when the cells cannot be read (an older EMF, not
+-- loaded); nil when there is no such place.
+local function find_surface(world, x, y, z)
+  if not emf.block_at or solid_at(world, x, y, z) == nil then return y end
+  local h = y - 2
+  while h <= y + SURFACE_UP do
+    if solid_at(world, x, h - 0.25, z) and not solid_at(world, x, h + 0.25, z) and not solid_at(world, x, h + 1, z)
+        and not solid_at(world, x, h + 1.75, z) then
+      return h + 0.1
+    end
+    h = h + 0.5
+  end
+  return nil
+end
+
+-- (0.15.485) A spot for a monster of node `n` (its own spread): x, y, z. See SPOT_TRIES. (0.15.493) y: the ground there.
 local function pick_spot(world, q, spread)
-  if spread <= 0 then return q.x, q.z end
   local from = { q.x, q.y + 1, q.z }
+  if spread <= 0 then
+    return q.x, find_surface(world, q.x, q.y, q.z) or q.y, q.z
+  end
   for _ = 1, SPOT_TRIES do
     local a, r = math.random() * 2 * math.pi, math.sqrt(math.random()) * spread
     local x, z = q.x + math.cos(a) * r, q.z + math.sin(a) * r
@@ -678,14 +717,17 @@ local function pick_spot(world, q, spread)
       end
       bad = solid
     end
-    if not bad then return x, z end
+    if not bad then
+      local y = find_surface(world, x, q.y, z)  -- (0.15.493) its ground, or not this spot
+      if y then return x, y, z end
+    end
   end
   S.spot_fallbacks = (S.spot_fallbacks or 0) + 1
   if S.spot_fallbacks <= 20 or S.spot_fallbacks % 100 == 0 then
     emf.log(string.format("spawn nodes: node %s: no clear spot within %d m after %d tries: on the node itself (%d times so far)",
       tostring(q.node), spread, SPOT_TRIES, S.spot_fallbacks))
   end
-  return q.x, q.z
+  return q.x, find_surface(world, q.x, q.y, q.z) or q.y, q.z
 end
 
 local function spawn_tick(world)
@@ -695,19 +737,20 @@ local function spawn_tick(world)
     done = done + 1
     if data().nodes[tostring(q.node)] then
       local qn1 = data().nodes[tostring(q.node)]
-      local x, z = pick_spot(world, q, (qn1 and tonumber(qn1.spread)) or SPREAD)  -- (0.15.485) the node's spread, a clear spot
+      local x, sy, z = pick_spot(world, q, (qn1 and tonumber(qn1.spread)) or SPREAD)  -- (0.15.485) the node's spread, a clear spot; (0.15.493) its ground
       -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
       local yaw = math.random() * 360
       if q.face == "player" and q.tx then yaw = yaw_to(x, z, q.tx, q.tz)
       elseif q.face == "node" and q.yaw then yaw = q.yaw end
       local qn0 = data().nodes[tostring(q.node)]
       local tag = { ScaleComponent = { uniformScale = tag_of(qn0 and qn0.g or 0) } }  -- (0.15.483) its group, for a reload
-      local ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, tag, { yaw = yaw })
-      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, tag) end  -- an older EMF: no yaw
-      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z) end  -- nor the tag
+      local ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag, { yaw = yaw })
+      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag) end  -- an older EMF: no yaw
+      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, sy, z) end  -- nor the tag
       if ok and id and id ~= 0 then
         local rq = qn0 and S.raid[qn0.g]
-        if rq then rq.spawned = rq.spawned + 1 end  -- (0.15.488)
+        if rq and not q.respawn then rq.spawned = rq.spawned + 1 end  -- (0.15.488); (0.15.493) a replacement is not one more
+        S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
         local qn = data().nodes[tostring(q.node)]
@@ -716,10 +759,106 @@ local function spawn_tick(world)
           local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
           if okr and rid then S.spare_rules[id] = rid end
         end
-        ground.add(id, x, q.y, z, yaw)
+        if not emf.block_at then ground.add(id, x, q.y, z, yaw) end  -- (0.15.493) only where the ground could not be found here
       else
         emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
       end
+    end
+  end
+end
+
+-- (0.15.493) Every 2 s: monsters in the ground, in water or stuck are taken away and come again at their node (see
+-- STUCK_S). S.track[id] = { x, y, z (where it was), at (since when), born, guid, q (its queue entry) }; S.active_at[id]:
+-- the last hit it gave or took (emf.on_hit) or wall it broke.
+local function stuck_tick(world)
+  local now = os.time()
+  for nid, ids in pairs(S.alive) do
+    for id in pairs(ids) do
+      local t = S.track[id]
+      local okp, x, y, z = pcall(world.position, world, id)
+      local node = data().nodes[tostring(nid)]
+      if not t and okp and x and node then  -- found again after a reload: watched from now on, a new one of its group's kind
+        local g = group(node.g)
+        local pool = POOL[g and g.family or "Random"] or POOL.Random
+        t = { x = x, y = y, z = z, at = now, born = now,
+              q = { node = nid, x = node.x, y = node.y, z = node.z, guid = pool[math.random(#pool)], face = g and g.face, yaw = node.yaw } }
+        S.track[id] = t
+      end
+      if t and okp and x then
+        local why = nil
+        if now - t.born >= 3 and solid_at(world, x, y + 0.6, z) and solid_at(world, x, y + 1.4, z) then why = "in the ground" end
+        if not why then
+          local okm, move = pcall(world.get, world, "DynamicLocomotion", id)
+          local st = okm and move and tonumber(move.state)
+          if st == 9 or st == 10 then why = "in water" end
+        end
+        if not why then
+          if dist2(x, y, z, t.x, t.y, t.z) >= 1 then
+            t.x, t.y, t.z, t.at = x, y, z, now
+          elseif now - t.at >= STUCK_S and now - (S.active_at[id] or t.born) >= STUCK_S then
+            why = string.format("stuck (not moved for %d s)", now - t.at)
+          end
+        end
+        if why then
+          pcall(emf.destroy, world, id)
+          ids[id] = nil
+          if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
+          S.track[id], S.active_at[id] = nil, nil
+          S.respawns[nid] = (S.respawns[nid] or 0) + 1
+          local again = S.respawns[nid] <= RESPAWN_MAX and data().nodes[tostring(nid)] ~= nil
+          if again then
+            local q = {}
+            for k, v in pairs(t.q) do q[k] = v end
+            q.respawn = true
+            S.queue[#S.queue + 1] = q
+          end
+          emf.log(string.format("spawn nodes: node %s: monster %s %s at %.0f %.0f %.0f: taken away%s", tostring(nid), tostring(id), why, x, y, z,
+            again and ", a new one comes" or string.format(" (%d times at this node in this raid: no new one)", S.respawns[nid])))
+        end
+      end
+    end
+  end
+  for id in pairs(S.track) do  -- dead or gone: no longer watched
+    local alive = false
+    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
+    if not alive then S.track[id], S.active_at[id] = nil, nil end
+  end
+end
+
+-- (0.15.493, owner 14:33 "all monsters need to get "marked" always") Every living raid monster has an orange marker on
+-- every player's game (EMF's send_marker: over the 3D view within NOTICE_DIST m, with an arrow at the screen's edge and
+-- its health as a bar, and on the map at any distance). Every 2 s: new ones marked, dead or gone ones unmarked, a bar
+-- sent again when the health moved 5 %; all sent again every MARK_RESEND s (players who joined since).
+local MARK_COLOUR = 0xff9632ff
+local MARK_RESEND = 15
+local function mark_spec(id, share)
+  return { entity = id, height = 2.6, text = "Raid monster", colour = MARK_COLOUR, shape = "diamond", edge_arrow = true,
+           game_map = true, max_distance = NOTICE_DIST, bar = share }
+end
+local function mark_tick(world)
+  if not emf.send_marker then return end
+  local now = os.time()
+  local resend = now - (S.mark_sent_at or 0) >= MARK_RESEND
+  if resend then S.mark_sent_at = now end
+  local living = {}
+  for _, ids in pairs(S.alive) do
+    for id in pairs(ids) do
+      living[id] = true
+      local share = nil
+      local okh, cur, max = pcall(emf.health, world, id)
+      if okh and cur and max and max > 0 then share = math.max(0, math.min(1, cur / max)) end
+      local was = S.marked[id]
+      if resend or not was or (share and math.abs(share - (was.share or 1)) >= 0.05) then
+        local ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, share))
+        if not ok then ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, nil)) end  -- an older EMF: no bar
+        if ok then S.marked[id] = { share = share or 1 } end
+      end
+    end
+  end
+  for id in pairs(S.marked) do
+    if not living[id] then
+      pcall(emf.unsend_marker, nil, "m" .. id)
+      S.marked[id] = nil
     end
   end
 end
@@ -814,7 +953,7 @@ local function break_tick(world, spots)
                   S.broke[g.id] = (S.broke[g.id] or 0) + result.removed
                 end
               end)
-              if okb and bid then hits = hits + 1 end
+              if okb and bid then hits = hits + 1 S.active_at[id] = os.time() end  -- (0.15.493) busy, not stuck
             end
           end
         end
@@ -1151,6 +1290,7 @@ function F.tick(world)
     for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
     S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
     S.scan, S.scanned, S.miss, S.purge, S.raid, S.started = nil, false, {}, nil, {}, {}
+    S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     scan_tick(world)
@@ -1159,7 +1299,7 @@ function F.tick(world)
   if S.purge then purge_tick(world) end  -- (0.15.487)
   ground.tick(world)
   spawn_tick(world)
-  if S.steps % CLEAN_STEPS == 0 then clean_tick(world) end
+  if S.steps % CLEAN_STEPS == 0 then clean_tick(world) stuck_tick(world) pcall(mark_tick, world) end  -- (0.15.493) stuck_tick, mark_tick
   local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end
   if not need_spots then return end
@@ -1479,6 +1619,16 @@ end
 function F.setup(k)
   kit = k
   players.setup(k)
+  -- (0.15.493) a monster that gives or takes a hit is busy, not stuck (stuck_tick)
+  if emf.on_hit then
+    pcall(emf.on_hit, kit.guard(F, function(world, hit)
+      if type(hit) ~= "table" then return end
+      local now = os.time()
+      for _, id in ipairs({ hit.attacker, hit.target }) do
+        if id and S.track[id] then S.active_at[id] = now end
+      end
+    end, "a hit (Spawn Nodes)"))
+  end
   local ok = emf.net.channel(CHANNEL, {
     version = 1, to = "both", max = 16384, per_10s = 60,
     on_server = kit.guard(F, function(world, from, data_in)
