@@ -69,8 +69,8 @@ local SPOT_TRIES = 8
 -- from where it was STUCK_S seconds ago and no hit given or taken in that time): it is taken away and a new one comes
 -- at its node (at most RESPAWN_MAX per node in one raid, then it is only taken away).
 local SURFACE_UP = 12
-local STUCK_BORN = 10           -- s: (0.15.513: monsters were taken for stuck 4-6 s after they appeared, while the Undead
-                               -- still climb out of the ground) a monster is not looked at as stuck before this age
+local STUCK_BORN = 5            -- s: (0.15.513: 10; 0.15.516, owner 16:49 "didnt I fucking say 5 seconds earlier?": the
+                               -- 10 s grace I added overrode his 5 s) a monster is not looked at as stuck before this age
 local STUCK_S = 5  -- (0.15.510, owner 16:13 "30 seconds is wayyy too long", "make it like 5"; was 30; looked at every 2 s)
 local STUCK_NEAR = 40          -- m: (0.15.496: 25 monsters were taken away as "stuck" at 14:43-14:46 while they only stood
                                -- waiting, the player more than 50 m away) only a monster with a player this near can be stuck

@@ -1,3 +1,6 @@
+0.15.516 Nov 23, 2026
+- Spawn Nodes: a stuck monster is moved after 5 s also right after it appears (0.15.513 had made that 10 s).
+
 0.15.515 Nov 23, 2026
 - Spawn Nodes: a node's next monster comes right after one dies: deaths are seen every 0.25 s (was 2 s) and the next monster queued every 0.25 s (was 0.5 s). A spot check that gives no answer within 0.75 s, or an unclear answer, no longer holds the monster back (some answers took 10 s).
 
