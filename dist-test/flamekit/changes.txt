@@ -1,3 +1,7 @@
+0.15.505 Nov 23, 2026
+- Spawn Nodes: a monster that falls more than 4 m under its node (into water or a drop) with no player down there, or gets stuck (behind a fence or an object), in the ground or in water, is first moved next to the nearest player (4-8 m from him, on the ground, nothing built between), up to 3 times, before it is replaced. A spot where one got stuck is not used for a spawn again.
+- Spawn Nodes: before the end notice the whole world is searched for the raid's monsters; any still alive is counted again and the raid goes on.
+
 0.15.504 Nov 23, 2026
 - Spawn Nodes: fixed the tab stopping with an error in 0.15.503 (the Cooldown and Timer from choices were lost).
 

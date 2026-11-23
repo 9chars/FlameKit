@@ -74,6 +74,17 @@ local STUCK_NEAR = 40          -- m: (0.15.496: 25 monsters were taken away as "
 local RESPAWN_MAX = 10
 local WATER_DEPTH = 0.8        -- m: (0.15.497) a monster this deep in water is taken away and comes again out of it
 local WET_R = 4                -- m: a spot this close to where a monster was found in water is not used again
+-- (0.15.505, owner 15:48 "monsters that fall into the water still are not respawning. also many monsters are still
+-- getting stuck in fences and objects": the game's submerge depth stayed 0 for monsters in the water (none logged one),
+-- and the monsters at nodes 2 and 3 were stuck 30-68 s at their node again and again, behind the fences) A monster more
+-- than FALL_M m under its node's height while no player is down there with it fell (into the water or a drop). A fallen,
+-- stuck, buried or wet monster is first moved next to the nearest player within MOVE_NEAR m (a spot 4-8 m from him on
+-- the ground, nothing built between them), at most MOVE_MAX times, then taken away and made again at its node. Where one
+-- got stuck is not used for a spawn again (BAD_R m).
+local FALL_M = 4
+local MOVE_NEAR = 60
+local MOVE_MAX = 3
+local BAD_R = 3
 local SOLID_UP = { 1.5, 3.0 }
 local ACTIVE_DIST = 100        -- m: (0.15.491) now only how far a monster looks for the player to face
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
@@ -171,7 +182,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -698,13 +709,18 @@ local function raid_tick(world)
       r.none_since = os.time()  -- (0.15.500) none left: over only when it stays so for END_GRACE s (one may get up again)
     elseif not S.runs[gid] and alive == 0 and queued == 0 and os.time() - r.none_since < END_GRACE then
       -- waiting
+    elseif not S.runs[gid] and alive == 0 and queued == 0 and not r.verified then
+      -- (0.15.505, owner 15:49 "it just announced the raid was over yet theres still tons of monsters on the map from
+      -- the raid?") before the end notice the whole world is searched for the group's monsters (verify_tick); any
+      -- still alive is counted again and the raid goes on
+      if not S.verify then S.verify = { gid = gid, i = 1, found = 0 } end
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       S.started[gid] = nil
       raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, START_END_S)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
-      r.none_since = nil
+      r.none_since, r.verified = nil, nil
       local now = os.time()
       local n = alive + queued
       if (n ~= r.left_n and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
@@ -725,6 +741,53 @@ local function group_near(spots, gid)
     if player_near(spots, n.x, n.y, n.z, r) then return true end
   end
   return false
+end
+
+-- (0.15.505) A slice of the world search before a raid's end notice: the group's tagged monsters still alive.
+local function verify_tick(world)
+  local v = S.verify
+  local r = S.raid[v.gid]
+  if not r then S.verify = nil return end
+  if not v.list then
+    local ok, list = pcall(world.entities, world)
+    v.list = ok and list or {}
+    return
+  end
+  local t0 = clock and clock() or 0
+  local done = 0
+  while v.i <= #v.list and done < SCAN_MAX and not (clock and clock() - t0 > SCAN_BUDGET) do
+    local id = v.list[v.i]
+    v.i, done = v.i + 1, done + 1
+    local oks, scl = pcall(world.get, world, "ScaleComponent", id)
+    if oks and scl and group_of_tag(scl.uniformScale) == v.gid then
+      local okh, cur = pcall(emf.health, world, id)
+      local known = false
+      for _, ids in pairs(S.alive) do if ids[id] then known = true break end end
+      if okh and cur and cur > 0 and not known then
+        local okp, x, y, z = pcall(world.position, world, id)
+        local nodes = nodes_of(v.gid)
+        local best, nid = nil, nodes[1] and nodes[1].id
+        for _, n in ipairs(nodes) do
+          local d = okp and x and dist2(n.x, n.y, n.z, x, y, z) or 0
+          if not best or d < best then best, nid = d, n.id end
+        end
+        if nid then
+          S.alive[nid] = S.alive[nid] or {}
+          S.alive[nid][id] = true
+          for _, ids in pairs(S.dead) do ids[id] = nil end
+          v.found = v.found + 1
+        end
+      end
+    end
+  end
+  if v.i <= #v.list then return end
+  if v.found > 0 then
+    emf.log(string.format("spawn nodes: before the end notice: %d of its monsters found alive in the world: the raid goes on", v.found))
+    r.none_since, r.verified = nil, nil
+  else
+    r.verified = true
+  end
+  S.verify = nil
 end
 
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
@@ -906,10 +969,14 @@ local function pick_spot(world, q, spread)
       end
       bad = solid
     end
-    if not bad then  -- (0.15.497) not where a monster was found in water
+    if not bad then  -- (0.15.497) not where a monster was found in water; (0.15.505) nor where one got stuck
       for _, w in ipairs(S.wet) do
         local dx, dz = w[1] - x, w[2] - z
         if dx * dx + dz * dz <= WET_R * WET_R then bad = true break end
+      end
+      for _, w in ipairs(S.bad) do
+        local dx, dz = w[1] - x, w[2] - z
+        if dx * dx + dz * dz <= BAD_R * BAD_R then bad = true break end
       end
     end
     if not bad then
@@ -1010,6 +1077,17 @@ local function stuck_tick(world)
             if #S.wet > 200 then table.remove(S.wet, 1) end
           end
         end
+        if not why and node and y < node.y - FALL_M then  -- (0.15.505) fell: water or a drop under its node
+          local down = false
+          for _, p in ipairs(spots) do
+            if dist2(x, y, z, p[2], p[3], p[4]) <= 30 * 30 and p[3] < node.y - FALL_M + 1 then down = true break end
+          end
+          if not down then
+            why = string.format("fell (%.0f m under its node)", node.y - y)
+            S.wet[#S.wet + 1] = { x, z }
+            if #S.wet > 200 then table.remove(S.wet, 1) end
+          end
+        end
         if not why then
           if dist2(x, y, z, t.x, t.y, t.z) >= 1 then
             t.x, t.y, t.z, t.at = x, y, z, now
@@ -1017,6 +1095,44 @@ local function stuck_tick(world)
             t.at = now  -- (0.15.496) nobody near: it only waits; the clock starts again
           elseif now - t.at >= STUCK_S and now - (S.active_at[id] or t.born) >= STUCK_S then
             why = string.format("stuck (not moved for %d s with a player within %d m)", now - t.at, STUCK_NEAR)
+            S.bad[#S.bad + 1] = { x, z }  -- (0.15.505) not a spawn spot again
+            if #S.bad > 200 then table.remove(S.bad, 1) end
+          end
+        end
+        if why and (t.moves or 0) < MOVE_MAX then  -- (0.15.505) first: next to the nearest player
+          local best, pl = nil, nil
+          for _, p in ipairs(spots) do
+            local d = dist2(x, y, z, p[2], p[3], p[4])
+            if d <= MOVE_NEAR * MOVE_NEAR and (not best or d < best) then best, pl = d, p end
+          end
+          local mx, my, mz = nil, nil, nil
+          if pl then
+            for _ = 1, 12 do
+              local a, r = math.random() * 2 * math.pi, 4 + math.random() * 4
+              local cx, cz = pl[2] + math.cos(a) * r, pl[4] + math.sin(a) * r
+              local cy = find_surface(world, cx, pl[3], cz)
+              local ok2 = cy ~= nil and not wall_between(world, { pl[2], pl[3] + 1, pl[4] }, { cx, cy + 1, cz })
+                and block_kind(world, cx, cy + 1, cz) ~= "building"
+              if ok2 then
+                for _, list in ipairs({ S.wet, S.bad }) do
+                  for _, w in ipairs(list) do
+                    local dx, dz = w[1] - cx, w[2] - cz
+                    if dx * dx + dz * dz <= BAD_R * BAD_R then ok2 = false break end
+                  end
+                end
+              end
+              if ok2 then mx, my, mz = cx, cy, cz break end
+            end
+          end
+          local okt, moved = false, false
+          if mx then okt, moved = pcall(emf.teleport, world, id, mx, my, mz, { yaw = yaw_to(mx, mz, pl[2], pl[4]) }) end
+          if okt and moved then
+            t.moves = (t.moves or 0) + 1
+            t.x, t.y, t.z, t.at = mx, my, mz, now
+            S.active_at[id] = now
+            emf.log(string.format("spawn nodes: node %s: monster %s %s at %.0f %.0f %.0f: moved next to player %s (%.0f %.0f %.0f), move %d of %d",
+              tostring(nid), tostring(id), why, x, y, z, tostring(pl[1]), mx, my, mz, t.moves, MOVE_MAX))
+            why = nil
           end
         end
         if why then
@@ -1568,12 +1684,14 @@ function F.tick(world)
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
     S.adopted, S.join_hits, S.join_seen = {}, {}, nil  -- (0.15.501)
     S.orders = {}  -- (0.15.503)
+    S.bad, S.verify = {}, nil  -- (0.15.505)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)
+  if S.verify then verify_tick(world) end  -- (0.15.505)
   if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
   ground.tick(world)
   spawn_tick(world)
