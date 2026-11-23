@@ -1,3 +1,6 @@
+0.15.468 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): also counts errors the game raises and recovers from, each minute. Nothing in the game changes.
+
 0.15.467 Nov 23, 2026
 - Server (test servers only, off unless switched on by a file): a sampler that finds which part of the game keeps the server busy while it runs slow. Nothing in the game changes.
 

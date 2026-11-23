@@ -58,7 +58,7 @@
 // average and the slowest step, the process's CPU, each Free build area that was on and the remembered spots; a minute
 // whose steps average more than kSlowMs is logged as SLOW with the threads that used the most CPU in it, each next to
 // what it uses in a normal minute. Logging only. (0.15.467) THE SAMPLER (see sampler_thread): with speed_sampler.txt "on",
-// where the world step thread is while the server runs slow.
+// where the world step thread is while the server runs slow; (0.15.468) and every exception raised, counted each minute.
 #include <windows.h>
 #include <tlhelp32.h>
 
@@ -75,6 +75,7 @@
 #include <string>
 #include <unordered_map>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "emf/generated/components.hpp"
@@ -687,6 +688,32 @@ void sampler_thread() {
     }
 }
 
+// (0.15.468) The exported function of module `m` at or before `rva`, as "Name+0xoff" ("" when it has no exports).
+std::string export_near(HMODULE m, uint32_t rva) {
+    const auto* base = reinterpret_cast<const uint8_t*>(m);
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+    const IMAGE_DATA_DIRECTORY& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    if (!dir.VirtualAddress || !dir.Size) return "";
+    const auto* ed = reinterpret_cast<const IMAGE_EXPORT_DIRECTORY*>(base + dir.VirtualAddress);
+    const auto* fns = reinterpret_cast<const uint32_t*>(base + ed->AddressOfFunctions);
+    const auto* names = reinterpret_cast<const uint32_t*>(base + ed->AddressOfNames);
+    const auto* ords = reinterpret_cast<const uint16_t*>(base + ed->AddressOfNameOrdinals);
+    uint32_t best = 0;
+    const char* best_name = nullptr;
+    for (uint32_t i = 0; i < ed->NumberOfNames; ++i) {
+        const uint32_t f = fns[ords[i]];
+        if (f <= rva && f >= best) {
+            best = f;
+            best_name = reinterpret_cast<const char*>(base + names[i]);
+        }
+    }
+    if (!best_name) return "";
+    char b[120];
+    snprintf(b, sizeof(b), "%s+0x%x", best_name, rva - best);
+    return b;
+}
+
 // "module 0xADDRESS": the game's own code at its usual base (from its PE header), other modules as module+offset.
 std::string where(uint64_t a) {
     HMODULE m = nullptr;
@@ -703,12 +730,15 @@ std::string where(uint64_t a) {
     char name[96] = {};
     WideCharToMultiByte(CP_UTF8, 0, wp.c_str(), -1, name, sizeof(name) - 1, nullptr, nullptr);
     const uint64_t rva = a - uint64_t(m);
-    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(m);
-    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(reinterpret_cast<const char*>(m) + dos->e_lfanew);
-    if (m == GetModuleHandleW(nullptr))
-        snprintf(buf, sizeof(buf), "%s 0x%llx", name, (unsigned long long)(nt->OptionalHeader.ImageBase + rva));
-    else
-        snprintf(buf, sizeof(buf), "%s+0x%llx", name, (unsigned long long)rva);
+    // (0.15.468) the game at its usual base 0x140000000 (Windows writes the real base into the loaded header, so the
+    // header cannot tell it); other modules by their nearest exported name (ntdll's RtlAllocateHeap and the like)
+    if (m == GetModuleHandleW(nullptr)) {
+        snprintf(buf, sizeof(buf), "%s 0x%llx", name, (unsigned long long)(0x140000000ull + rva));
+        return buf;
+    }
+    const std::string ex = export_near(m, uint32_t(rva));
+    if (!ex.empty()) snprintf(buf, sizeof(buf), "%s!%s", name, ex.c_str());
+    else snprintf(buf, sizeof(buf), "%s+0x%llx", name, (unsigned long long)rva);
     return buf;
 }
 
@@ -724,6 +754,58 @@ std::string top_list(const std::unordered_map<uint64_t, uint32_t>& m, uint32_t t
     return out.empty() ? "none" : out;
 }
 
+// (0.15.468, owner 07:10 "its probably running into an exception over and over or something like that") THE EXCEPTION
+// COUNTER: with the sampler on, a vectored handler counts every exception raised in the process (it only counts: the
+// search goes on as before), by where it was raised and its code, kept in a fixed table without locks (an exception
+// can come while any lock is held). Logged once a minute with the speed line: how many, how many on the world step
+// thread, and the most frequent places.
+struct ExcSlot { std::atomic<uint64_t> addr{0}; std::atomic<uint32_t> code{0}; std::atomic<uint32_t> count{0}; };
+constexpr size_t kExcSlots = 64;
+ExcSlot g_exc[kExcSlots];
+std::atomic<uint32_t> g_exc_total{0}, g_exc_world{0}, g_exc_lost{0};
+std::atomic<bool> g_exc_on{false};
+
+LONG CALLBACK exc_counter(PEXCEPTION_POINTERS ep) {
+    if (!g_exc_on.load(std::memory_order_relaxed) || !ep || !ep->ExceptionRecord) return EXCEPTION_CONTINUE_SEARCH;
+    g_exc_total.fetch_add(1, std::memory_order_relaxed);
+    if (GetCurrentThreadId() == g_sample_tid.load(std::memory_order_relaxed)) g_exc_world.fetch_add(1, std::memory_order_relaxed);
+    const uint64_t a = uint64_t(ep->ExceptionRecord->ExceptionAddress);
+    size_t i = size_t((a >> 4) * 0x9E3779B97F4A7C15ull >> 58) % kExcSlots;
+    for (size_t n = 0; n < kExcSlots; ++n, i = (i + 1) % kExcSlots) {
+        uint64_t cur = g_exc[i].addr.load(std::memory_order_relaxed);
+        if (cur == 0 && g_exc[i].addr.compare_exchange_strong(cur, a)) {
+            g_exc[i].code = ep->ExceptionRecord->ExceptionCode;
+            cur = a;
+        }
+        if (cur == a) {
+            g_exc[i].count.fetch_add(1, std::memory_order_relaxed);
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+    }
+    g_exc_lost.fetch_add(1, std::memory_order_relaxed);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// The minute's exceptions as one log line (and the counts back to 0).
+void exc_report(uint32_t minute, bool slow) {
+    const uint32_t total = g_exc_total.exchange(0), world = g_exc_world.exchange(0), lost = g_exc_lost.exchange(0);
+    std::vector<std::tuple<uint32_t, uint64_t, uint32_t>> v;  // count, address, code
+    for (auto& e : g_exc) {
+        const uint32_t c = e.count.exchange(0);
+        if (c) v.emplace_back(c, e.addr.load(), e.code.load());
+    }
+    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return std::get<0>(a) > std::get<0>(b); });
+    std::string top;
+    char b[220];
+    for (size_t i = 0; i < v.size() && i < 8; ++i) {
+        snprintf(b, sizeof(b), "%s%u x code 0x%08x at %s", top.empty() ? "" : "; ", std::get<0>(v[i]), std::get<2>(v[i]),
+                 where(std::get<1>(v[i])).c_str());
+        top += b;
+    }
+    EMF_LOG(kMod, "server speed, minute %u%s: exceptions: %u (%u on the world step thread)%s%s%s", minute, slow ? " SLOW" : "",
+            total, world, lost ? ", some not placed" : "", top.empty() ? "" : ": ", top.c_str());
+}
+
 // At each minute's end (world thread): the report of the minute just sampled, and whether to sample the next one.
 void sampler_minute(uint32_t minute, bool slow, uint32_t world_tid) {
     bool on = false;
@@ -737,8 +819,11 @@ void sampler_minute(uint32_t minute, bool slow, uint32_t world_tid) {
     said_on = on;
     if (on && !started) {
         std::thread(sampler_thread).detach();
+        AddVectoredExceptionHandler(1, exc_counter);  // (0.15.468) first in line: it only counts
         started = true;
     }
+    if (g_exc_on.load()) exc_report(minute, slow);  // (0.15.468) the minute that just ended
+    g_exc_on = on;
     if (g_sampling.load()) {  // the minute just ended was sampled
         std::unordered_map<uint64_t, uint32_t> leaf, chain;
         uint32_t samples = 0, fail = 0;
