@@ -18,14 +18,15 @@ M.GIVEUP_STEPS = 900   -- a teleport whose answer never came (a reload) is not c
 
 -- A queue of spawned monsters to put on the ground. opts: max = teleports under way at once (default 20),
 -- keep = function(id) -> false when the monster is no longer wanted (then it is skipped). Call q.add(id, x, y, z) after
--- each spawn and q.tick(world) on every server step.
+-- each spawn (yaw: optional, degrees, 0 north (+z), 90 east (+x): the way it faces after the move) and q.tick(world)
+-- on every server step.
 function M.ground(opts)
   opts = opts or {}
   local max = opts.max or 20
   local keep = opts.keep or function() return true end
   local q = { list = {}, head = 1, busy = {}, n = 0, step = 0 }
-  function q.add(id, x, y, z)
-    q.list[#q.list + 1] = { id = id, x = x, y = y, z = z, at = q.step + M.WAIT_STEPS }
+  function q.add(id, x, y, z, yaw)
+    q.list[#q.list + 1] = { id = id, x = x, y = y, z = z, yaw = yaw, at = q.step + M.WAIT_STEPS }
   end
   function q.tick(world)
     q.step = q.step + 1
@@ -45,7 +46,7 @@ function M.ground(opts)
           if px and pz then x, z = px, pz end
         end)
         local id = g.id
-        local okt, queued = pcall(emf.teleport, world, id, x, g.y, z, { ground = true }, function()
+        local okt, queued = pcall(emf.teleport, world, id, x, g.y, z, { ground = true, yaw = g.yaw }, function()
           if q.busy[id] then q.busy[id], q.n = nil, q.n - 1 end
         end)
         if okt and queued then q.busy[id], q.n = q.step, q.n + 1 end

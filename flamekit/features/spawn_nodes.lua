@@ -8,7 +8,7 @@
 --
 -- A NODE is only a saved place (x, y, z) that belongs to a GROUP; nothing of it is in the game world, so players cannot
 -- see or touch it. Only the monsters it spawns are real (ordinary monsters of the game, not test monsters).
--- A GROUP has: a name ("Group 1"), on/off, a monster type (one of core/monsters.lua's groups, or Random; no bosses),
+-- A GROUP has: a name ("Group 1"), on/off, a monster type (one of core/monsters.lua's groups, Random, or (0.15.477) Bosses),
 -- a trigger, and a run: `waves` waves `wave_gap` seconds apart, each wave `per_wave` monsters at every node of the
 -- group, never more than `max_alive` alive from one node; then `cooldown` minutes before the trigger can fire again.
 -- TRIGGERS: manual ("Start now" only), timer (every `timer_min` to `timer_max` minutes, a random time in between),
@@ -47,9 +47,16 @@ local SPREAD = 10              -- m: monsters spawn within this of their node
 local ACTIVE_DIST = 100        -- m: a node spawns only while a player is within this
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
 
-local FAMILIES = { "Random", "Ancients", "Beasts", "Drak", "Scavengers", "Shroud", "Undead", "Vukah" }
-local FAMILY_LABEL = { Shroud = "Shroud (Fell)" }
+-- (0.15.477, owner 11:27 "it would be nice if I could have a monster group for bosses as well so I could have one node
+-- spawn a boss") "Bosses": any of the bosses (core/monsters.lua's 26), the only type with bosses in it
+local FAMILIES = { "Random", "Ancients", "Beasts", "Drak", "Scavengers", "Shroud", "Undead", "Vukah", "Bosses" }
+local FAMILY_LABEL = { Shroud = "Shroud (Fell)", Bosses = "Bosses (any)" }
 local TRIGGERS = { "manual", "timer", "wire", "time", "raid" }
+-- (0.15.477, owner 11:37 "is there a way I can control which direction the monsters face when they spawn? one of the
+-- faced away from the base") which way a spawned monster faces: the nearest player, the node's own direction (the way
+-- the admin faced when he added or moved it), or random
+local FACES = { "player", "node", "random" }
+local FACE_LABEL = { player = "The nearest player", node = "The node's direction", random = "Random" }
 local TRIGGER_LABEL = { manual = "Manual (Start now)", timer = "Timer", wire = "Trip wire", time = "Time of day", raid = "Base raid" }
 -- the choices of each drop-down (the units in UNIT)
 local CHOICES = {
@@ -59,14 +66,17 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m" }
-local DEFAULTS = { on = true, family = "Random", trigger = "manual", waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
   cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
--- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all.
-local POOL = { Random = {} }
+-- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
+-- them; "Bosses": only the bosses.
+local POOL = { Random = {}, Bosses = {} }
 for _, m in ipairs(monsters) do
-  if not m[4] then
+  if m[4] then
+    table.insert(POOL.Bosses, m[3])
+  else
     POOL[m[1]] = POOL[m[1]] or {}
     table.insert(POOL[m[1]], m[3])
     table.insert(POOL.Random, m[3])
@@ -152,6 +162,32 @@ local function dist2(ax, ay, az, bx, by, bz)
   return dx * dx + dy * dy + dz * dz
 end
 
+-- The yaw (degrees, 0 north (+z), 90 east (+x)) from x, z toward tx, tz.
+local function yaw_to(x, z, tx, tz)
+  return math.deg(math.atan(tx - x, tz - z)) % 360
+end
+
+-- The way entity `id` faces (its transform's forward), as a yaw; nil when not known.
+local function facing(world, id)
+  local yaw = nil
+  pcall(function()
+    local q = world:get("CurrentTransform", id).transform.orientation
+    local ax, az = 2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y)
+    if ax * ax + az * az > 0.0001 then yaw = math.deg(math.atan(ax, az)) % 360 end
+  end)
+  return yaw
+end
+
+-- The nearest player to x, y, z within `r` m: its x, z, or nil.
+local function nearest_player(spots, x, y, z, r)
+  local best, bx, bz = r * r, nil, nil
+  for _, p in ipairs(spots) do
+    local d = dist2(p[2], p[3], p[4], x, y, z)
+    if d <= best then best, bx, bz = d, p[2], p[4] end
+  end
+  return bx, bz
+end
+
 -- Whether a player is within `r` m of x, y, z.
 local function player_near(spots, x, y, z, r)
   for _, p in ipairs(spots) do
@@ -218,8 +254,10 @@ local function wave(world, gid, spots)
   for _, n in ipairs(nodes_of(gid)) do
     if player_near(spots, n.x, n.y, n.z, ACTIVE_DIST) then
       local room = math.max(0, g.max_alive - alive_count(n.id))
+      local tx, tz = nearest_player(spots, n.x, n.y, n.z, ACTIVE_DIST)  -- (0.15.477) for "face the nearest player"
       for _ = 1, math.min(g.per_wave, room) do
-        S.queue[#S.queue + 1] = { node = n.id, x = n.x, y = n.y, z = n.z, guid = pool[math.random(#pool)] }
+        S.queue[#S.queue + 1] = { node = n.id, x = n.x, y = n.y, z = n.z, guid = pool[math.random(#pool)], face = g.face,
+                                  tx = tx, tz = tz, yaw = n.yaw }
         queued = queued + 1
       end
     else
@@ -240,11 +278,16 @@ local function spawn_tick(world)
     if data().nodes[tostring(q.node)] then
       local a, r = math.random() * 2 * math.pi, math.sqrt(math.random()) * SPREAD
       local x, z = q.x + math.cos(a) * r, q.z + math.sin(a) * r
-      local ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z)
+      -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
+      local yaw = math.random() * 360
+      if q.face == "player" and q.tx then yaw = yaw_to(x, z, q.tx, q.tz)
+      elseif q.face == "node" and q.yaw then yaw = q.yaw end
+      local ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, {}, { yaw = yaw })
+      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z) end  -- an older EMF
       if ok and id and id ~= 0 then
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
-        ground.add(id, x, q.y, z)
+        ground.add(id, x, q.y, z, yaw)
       else
         emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
       end
@@ -364,6 +407,7 @@ end
 local function allowed(key, v)
   if key == "family" then for _, f in ipairs(FAMILIES) do if f == v then return true end end return false end
   if key == "trigger" then for _, t in ipairs(TRIGGERS) do if t == v then return true end end return false end
+  if key == "face" then for _, f in ipairs(FACES) do if f == v then return true end end return false end
   for _, c in ipairs(CHOICES[key] or {}) do if c == v then return true end end
   return false
 end
@@ -420,7 +464,7 @@ local function handle(world, account, entity, msg, from)
     if not (ok and x) then note("Your position is not known.") return state(world, account, from) end
     local id = d.next_n
     d.next_n = id + 1
-    d.nodes[tostring(id)] = { id = id, g = gid, x = x, y = y, z = z }
+    d.nodes[tostring(id)] = { id = id, g = gid, x = x, y = y, z = z, yaw = facing(world, entity) }
     save()
     emf.log(string.format("spawn nodes: player %s added node %d to %s at %.0f %.0f %.0f", who, id, g.name, x, y, z))
     note(string.format("Node %d added to %s here.", id, g.name))
@@ -436,6 +480,7 @@ local function handle(world, account, entity, msg, from)
       local ok, x, y, z = pcall(world.position, world, entity)
       if not (ok and x) then note("Your position is not known.") return state(world, account, from) end
       n.x, n.y, n.z = x, y, z
+      n.yaw = facing(world, entity)  -- (0.15.477) the node's direction: the way he faces now
       note(string.format("Node %d moved here.", n.id))
       emf.log(string.format("spawn nodes: player %s moved node %d to %.0f %.0f %.0f", who, n.id, x, y, z))
     end
@@ -641,8 +686,10 @@ function F.panel(world)
   rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
   rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
     tooltip = "Removes every monster its nodes spawned that is still alive (since the last restart)." }
-  choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, or Random (any kind). Never bosses.",
+  choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, Random (any kind, no bosses) or Bosses (any boss: set Monsters per node to 1 for one boss).",
     FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
+  choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
+    .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
   if g.trigger == "timer" then
     choice_row(rows, g, "timer_min", "Timer from", "The timer fires at a random time between these two (after the cooldown).")
@@ -672,11 +719,11 @@ function F.panel(world)
   table.sort(mine, function(a, b) return (a.d or 1e9) < (b.d or 1e9) end)
   rows[#rows + 1] = { heading = string.format("Nodes of %s (%d)", g.name, #mine) }
   rows[#rows + 1] = { button = "add", text = "Add node here", disabled = (#(v.nodes or {}) >= (v.max_nodes or MAX_NODES)) or nil,
-    tooltip = "Adds a node to " .. g.name .. " where you stand. Monsters spawn within " .. SPREAD .. " m of it." }
+    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Monsters spawn within " .. SPREAD .. " m of it." }
   for i = 1, math.min(#mine, NEAR_LIST) do
     local n = mine[i]
     rows[#rows + 1] = { dim = true, text = string.format("Node %d: %.0f, %.0f%s", n[1], n[3], n[5], n.d and string.format(", %d m away", math.floor(n.d)) or "") }
-    rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand." }
+    rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand, facing the way you face." }
     rows[#rows + 1] = { button = "del:" .. n[1], text = "Delete", same_line = true, tooltip = "Deletes node " .. n[1] .. "." }
   end
   if #mine > NEAR_LIST then rows[#rows + 1] = { dim = true, text = string.format("(%d more further away)", #mine - NEAR_LIST) } end

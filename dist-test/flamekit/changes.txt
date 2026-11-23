@@ -1,3 +1,7 @@
+0.15.477 Nov 23, 2026
+- Spawn Nodes: a monster type Bosses (any boss), so a node can spawn a boss.
+- Spawn Nodes: choose which way the monsters face when they appear: the nearest player, the node's direction (the way you faced when you added or moved it), or random.
+
 0.15.476 Nov 23, 2026
 - New tab Spawn Nodes, for FlameKit admins: put down spawn nodes where you stand, in groups. When a group's trigger fires, all its nodes spawn monsters of the group's kind (Ancients, Beasts, Drak, Scavengers, Shroud, Undead, Vukah or Random) in waves. Triggers: by hand (Start now), a timer, a trip wire, a time of day, or a player in a base near the group's nodes. Nodes and trip wires show as markers only in admins' games; other players never see them.
 
