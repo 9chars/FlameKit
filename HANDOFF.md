@@ -1740,6 +1740,18 @@ emf\config). 19:15 owner "test it again until its perfect": 19:13 game on 0.15.4
 EMF 0.6.19, cleanup 10 files, "nothing to do". Left on the owner's PC: <name>.v0619 / .v0619b / .v0619c copies (no
 delete permission asked yet). Not tested live: the combined dialog (FlameKit + EMF waiting together, new layout), the
 "Keep EMF updated" OFF switch.
+**19:22 owner: "when the game mod loads up, it needs to add a message to the "Chat" tab displaying the current running
+EMF version. It should look like: Enshrouded Modding Framework (EMF): v0.6.19"** -> 0.15.458 (acd2390, DLL md5
+0cd79efe98c82312e5e7fe680cb50f9e): the DLL writes emf\mods\flamekit\emf_version.txt (runtime file, never deployed) at
+the start; core/kit.lua's hud_tick shows "Enshrouded Modding Framework (EMF): v<x>" (white, kit.note = the Chat tab) once
+per Lua start (seen 19:27:35 when he entered the world). Published to Development + local server 19:24.
+**19:24 owner: "I agree about comparing EMF's installer script against previous versions"** -> make_emf_dist.py takes a
+4th argument, the previous package: prints the diff of install.ps1 / uninstall.ps1 / emf_common.ps1 / install.cmd /
+uninstall.cmd and the files no longer shipped. 0.6.6 -> 0.6.19: all unchanged, none dropped. DO THIS FOR EVERY NEW EMF.
+OFF test (owner switched "Keep EMF updated" off 19:21:05): rolled back (.v0619d), restart 19:25: EMF 0.6.6, "is off:
+EMF is left as it is", nothing downloaded. 19:30:08 owner switched it on: "is on again", 0.6.19 in place 19:30:17,
+dialog; 19:32:11 game on EMF 0.6.19, "nothing to do". **19:32 owner: "looks like that worked"**. ALL EMF UPDATER TESTS
+DONE except the combined dialog (FlameKit + EMF waiting together) live.
 
 ## Things learned the hard way
 
