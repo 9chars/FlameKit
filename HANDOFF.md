@@ -1780,6 +1780,23 @@ the flag = the one the game used for an altar on that list (learned and logged "
 flag %u"), 0 until one was seen; old way when the hooks fail or "fkbuild clear off". Published to Development + local
 server (DLL .old_459), NOT restarted yet. Next: restart, check Free build still works on this map and the logged flag;
 then the clean-map test (back up the world, ASK first).
+19:55-19:56 owner asked whether a clean map is needed (yes: only a map without an altar shows it), "yes" -> restart
+19:56 on this map: server log "the game adds altars to zone list ... with flag 0" (the player's game too: flag 0 = the
+fallback). 20:08 owner "#1 works still"; logs: off inside altar areas, a new remembered spot at 5776 816 5232; 20:09
+"placed ... in an altar area: no spot". **20:10 owner "yes test the fresh map".** Restart helper got requests
+**serverstop** (close the client, save, stop the server, leave both stopped) and **serverstart** (start the server, wait,
+start the client). 20:11 serverstop; backup of world0.ksd + savegame\backup (7 files) + FlameKit server files to
+save_backups\2026-11-22_2011_before_clean_map_test (md5 checked); world and the spots files set aside; serverstart: a
+NEW world (world0.ksd 42 KB, 0 altar areas). **20:14 owner "I was able to randomly build stuff"**: his Free build box
+at 20:13:07 with no altar, a remembered spot at 3920 784 1680 (20:14:01). 20:15 owner "it does show the "map has no
+flame alter yet" message" -> 0.15.461 (e51dfcb, DLL md5 bb421baaa8a89bf5c2e0d4d76934cbf4): the DLL writes
+free_build_way.txt ("clear" / "altar"); building.lua warns about a map without an altar only when it says "altar" (no
+file = clear). Published to Development + local server 20:18 (Lua live at once). 20:15 owner "go ahead and do the
+restart": up 20:16:14, "1 remembered spot zone(s) in the zone list" at load; **20:18 owner "looks like my build is still
+there". #5 DONE: Free build works on a map without any flame altar, spots are kept through a restart.** 20:19 owner "yup
+do it": serverstop, the test world to savegame\clean_test_world (its spots files to flamekit\clean_test_world), the real
+world and spot put back (md5 = the 20:11 backup), serverstart 20:20:31: 16 altars, 1 remembered spot. Empty folders left:
+savegame\aside_for_clean_test, flamekit\aside_for_clean_test (no delete permission there).
 
 ## Things learned the hard way
 
