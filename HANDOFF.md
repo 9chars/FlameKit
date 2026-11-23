@@ -2026,6 +2026,12 @@ counter (InterlockedIncrement, as the game does), kept per spot for the session 
 world kind byte at storage+8; if anything does not check out: owner 0 as before (logged). free_build_test_base.txt
 "none" = the old way (owner 0) for comparison; any other word / no file = the new way. Development + local server
 (.old_470); local test files now: base "owner", size 112.
+**TEST 0.15.474 (owner numbers) 09:34-10:11, local:** restart 09:34; log 09:35:40 "owner numbers the game's way ...
+storage at world+0xe179c0, id counter at +0x498, world kind 0, next id 22728". Owner built 15 remembered spots (spread
+over ~700 m, 09:36-09:55: no slowdown while building). Then 112 m moving area, piece out, standing at 5800 5114,
+09:56-10:11: **0 SLOW minutes, 16.7 ms**, and terrain chunks unpacked on the world thread **~37,000-40,000 a minute**
+(owner 0: ~1.35 M normal and ~9.3 M when slow; the player as owner alone: ~2.4 M). So the old 'normal' was already the
+remembered spots being reloaded every step. Test files on the local server: base "owner", size 112 (to set back to 16).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
