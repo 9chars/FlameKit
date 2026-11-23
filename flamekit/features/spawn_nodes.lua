@@ -619,8 +619,8 @@ local function wave(world, gid, spots)
     end
   elseif r and queued > 0 then
     local last = run.wave >= run.waves
-    raid_notice(world, gid, string.format("%s at %s! (wave %d of %d, %d monsters)", last and "Final wave incoming" or "New incoming wave",
-      r.place or "the raid", run.wave, run.waves, queued), true, 10)
+    -- (0.15.495, owner 14:45 "get rid of the (wave 4 of 5, 6 monsters) bullshit no one wants to see that")
+    raid_notice(world, gid, string.format("%s at %s!", last and "Final wave incoming" or "New incoming wave", r.place or "the raid"), true, 10)
   end
   if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
 end

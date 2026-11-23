@@ -1,3 +1,6 @@
+0.15.495 Nov 23, 2026
+- Spawn Nodes: the wave notices no longer say which wave and how many monsters.
+
 0.15.494 Nov 23, 2026
 - Spawn Nodes: the raid's start and end notices (also Time is up and called off) stay up for 60 s instead of 15 s.
 
