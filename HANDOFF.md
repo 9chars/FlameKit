@@ -2046,6 +2046,10 @@ G-Portal (sampler, test size/base: off). Waiting for the owner to start it, then
 22615", 1 remembered spot, 16 altar areas, 0 errors. Minute 1 "SLOW" (1,175 steps, 51 ms, 0.29 cores, nobody on): the
 server's own idle rate while no player is connected, not a problem (the speed log labels it SLOW anyway).
 **RELEASE 0.15.475 DONE: Stable, package, G-Portal.**
+**G-Portal test 10:25-10:32 (owner + another player, hammers out in different areas, 24 m each):** minutes 5-10 =
+17.0, 17.1, 16.8, 16.7, 16.7, 16.7 ms (3,516-3,586 steps), both areas on all of 10:27:42-10:31:57 (4+ minutes, past the old
+2-3 minute onset): NO slowdown (last night 48 ms). G-Portal's slowest step is ~200-260 ms every minute, also with no
+area on (minute 3: 217 ms): G-Portal itself, not Free build. Process CPU ~3.6 cores.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
