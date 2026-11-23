@@ -68,6 +68,8 @@ local SPOT_TRIES = 8
 -- from where it was STUCK_S seconds ago and no hit given or taken in that time): it is taken away and a new one comes
 -- at its node (at most RESPAWN_MAX per node in one raid, then it is only taken away).
 local SURFACE_UP = 12
+local STUCK_BORN = 10           -- s: (0.15.513: monsters were taken for stuck 4-6 s after they appeared, while the Undead
+                               -- still climb out of the ground) a monster is not looked at as stuck before this age
 local STUCK_S = 5  -- (0.15.510, owner 16:13 "30 seconds is wayyy too long", "make it like 5"; was 30; looked at every 2 s)
 local STUCK_NEAR = 40          -- m: (0.15.496: 25 monsters were taken away as "stuck" at 14:43-14:46 while they only stood
                                -- waiting, the player more than 50 m away) only a monster with a player this near can be stuck
@@ -796,7 +798,23 @@ local function raid_tick(world)
     else
       r.none_since, r.verified = nil, nil
       local now = os.time()
-      local n = alive + queued
+      -- (0.15.513, owner 16:31 "something is fucked with how it counts monsters left to kill": since 0.15.512 the nodes
+      -- spawn one by one, so alive + queued went 4, 3, 2, 1, 2, 1, 4) left = alive + queued + what the nodes still owe in
+      -- this wave + the waves to come (Monsters per node for every node)
+      -- (16:32 "the number keeps going up, you kill more it goes down, it spawns more, number goes up, thats absolutely
+      -- useless") so it only goes down: the monsters that joined (summons, the world's) are not in it while the nodes'
+      -- own are left; when only joined ones are left, it is their number
+      local own, joined = 0, 0
+      for _, nd in ipairs(nodes_of(gid)) do
+        for id in pairs(S.alive[nd.id] or {}) do if S.adopted[id] then joined = joined + 1 else own = own + 1 end end
+      end
+      local n = own + queued
+      local run = S.runs[gid]
+      if run then
+        for _, owed in pairs(run.owed or {}) do n = n + owed end
+        n = n + math.max(0, (run.waves or 0) - (run.wave or 0)) * (g.per_wave or 0) * #nodes_of(gid)
+      end
+      if n == 0 then n = joined end
       if (n ~= r.left_n and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
         r.left_n, r.left_at = n, now
         raid_notice(world, gid, string.format("Raid on %s: %d monster%s left to kill.", r.place or "the area", n, n == 1 and "" or "s"),
@@ -962,6 +980,15 @@ local function wave(world, gid, spots)
   end
 end
 
+-- (0.15.513) Drops group `gid`'s spots being checked (their answers then spawn nothing): Remove and the time limit.
+-- (16:31: a Remove at 16:31:41 called the raid off, and the spots still being checked spawned 3 more monsters.)
+local function cancel_checks(gid)
+  for q in pairs(S.checks) do
+    local qn = data().nodes[tostring(q.node)]
+    if qn and qn.g == gid then q.cancelled = true S.checks[q] = nil end
+  end
+end
+
 -- (0.15.512) The monsters of a node queued or being checked, not spawned yet.
 local function node_pending(nid)
   local n = 0
@@ -1030,6 +1057,7 @@ local function time_tick(world)
     elseif (g.duration or 30) > 0 and now - at >= g.duration * 60 then
       S.started[gid] = nil
       if S.runs[gid] then finish(gid) end
+      cancel_checks(gid)  -- (0.15.513)
       for i = #S.queue, 1, -1 do
         local qn = data().nodes[tostring(S.queue[i].node)]
         if qn and qn.g == gid then table.remove(S.queue, i) end
@@ -1224,7 +1252,7 @@ local function spawn_tick(world)
         local okq, qid = pcall(emf.path_find, world, { x, sy + 0.5, z }, { tx, ty + 0.5, tz },
           { closest = true, jumps = true, width = 0.5, height = 2, nodes = 1500 }, function(w, result)
             S.checks[q] = nil
-            if not w then return end
+            if not w or q.cancelled then return end  -- (0.15.513) called off meanwhile
             local status = type(result) == "table" and result.status or "?"
             local len = type(result) == "table" and tonumber(result.length) or 0
             local good = status == "found" and (result.reaches or len >= math.min(PATH_GAIN, far * 0.5))
@@ -1320,7 +1348,7 @@ local function stuck_tick(world)
             t.x, t.y, t.z, t.at = x, y, z, now
           elseif not player_near(spots, x, y, z, STUCK_NEAR) then
             t.at = now  -- (0.15.496) nobody near: it only waits; the clock starts again
-          elseif now - t.at >= STUCK_S and now - (S.active_at[id] or t.born) >= STUCK_S then
+          elseif now - t.born >= STUCK_BORN and now - t.at >= STUCK_S and now - (S.active_at[id] or t.born) >= STUCK_S then
             why = string.format("stuck (not moved for %d s with a player within %d m)", now - t.at, STUCK_NEAR)
             S.bad[#S.bad + 1] = { x, z }  -- (0.15.505) not a spawn spot again
             if #S.bad > 200 then table.remove(S.bad, 1) end
@@ -1937,6 +1965,7 @@ local function handle(world, account, entity, msg, from)
     emf.log(string.format("spawn nodes: player %s removed %d monster(s) and %d dead bod(ies) of %s", who, n, bodies, g.name))
     note(string.format("Removed %d monster(s) and %d dead bod%s of %s; the rest of the world is being searched for more.", n, bodies, bodies == 1 and "y" or "ies", g.name))
     S.started[gid] = nil  -- (0.15.492)
+    cancel_checks(gid)  -- (0.15.513)
     if S.raid[gid] then  -- (0.15.488)
       if S.runs[gid] then finish(gid) end
       raid_notice(world, gid, string.format("The raid on %s was called off.", S.raid[gid].place or "the area"), nil, START_END_S)

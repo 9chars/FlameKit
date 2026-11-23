@@ -1,3 +1,8 @@
+0.15.513 Nov 23, 2026
+- Spawn Nodes: "monsters left to kill" only goes down: it counts every monster the raid's nodes still have to spawn (this wave and the waves to come) and the ones alive; summons and other monsters that joined are counted only when nothing else is left.
+- Spawn Nodes: Remove and the time limit also stop the monsters whose spots were still being checked (after a Remove 3 more came).
+- Spawn Nodes: a monster is not taken for stuck in its first 10 s (the Undead climb out of the ground first).
+
 0.15.512 Nov 23, 2026
 - Spawn Nodes: Monsters per node and Most alive per node work together: in a wave each node spawns its Monsters per node one after another, never more alive at once than Most alive per node (the next one comes when one dies), and the wave is over only when every node has spawned all of its monsters; then Between waves starts. Before, a node spawned only what fit under Most alive per node and the rest of the wave was lost.
 
