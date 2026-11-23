@@ -1,3 +1,6 @@
+0.15.475 Nov 23, 2026
+- Free build: the area around you is 24 m (12 m each way) while you have a building piece selected (it was 16 m).
+
 0.15.474 Nov 23, 2026
 - Free build: every Free build area now has an owner of its own, the way a flame altar's area does (your own area: you; each remembered spot: a number of its own from the game). Without one, the game took the areas for changed every moment and reloaded the ground under them, which slowed servers down.
 

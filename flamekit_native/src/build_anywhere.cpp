@@ -5,7 +5,7 @@
 //  - the server only: a zone over each remembered spot (free_build_spots.txt, "x y z" in m per line, written by
 //    features/building.lua): a 48 m box, from the server's start, so what was built there is saved and kept like
 //    inside an altar's area;
-//  - (0.15.465) a 16 m box around each player Free build is on for, only while a building item is selected
+//  - (0.15.475) a 24 m box around each player Free build is on for, only while a building item is selected
 //    (free_build_server.txt / free_build_client.txt: one player a line, "<entity id>" or "<entity id> a"; read every 15
 //    steps), in the server and in that player's own game. The box sits on a kAimStep grid (a box that moved smoothly
 //    made the server resend the whole zone list every step). The positions are read on the world's own step (on_tick) and
@@ -310,7 +310,10 @@ std::atomic<uint32_t> g_test_owner{0};
 // changing shit you say you're going to do on me?"). (0.15.465, owner 22:19 "do what we agreed to make it. 16 m") 16 m:
 // 8 m each way from the middle of the player's 4 m grid cell. It moves in 4 m steps (each move sends every player the
 // zone list again, about 1 KB).
-constexpr double kAimHalf = 8.0;   // m each way from the middle of the player's grid cell (16 m box)
+// (0.15.475, owner 2026-11-23 10:15 "does 16 m make sense? should it be a bit bigger now that we've fixed it? 24 m?",
+// "lets set it to 24 m then"; with the owner numbers (0.15.474) 112 m ran 15 minutes without a slowdown) 24 m: 12 m
+// each way.
+constexpr double kAimHalf = 12.0;  // m each way from the middle of the player's grid cell (24 m box)
 // (0.15.466, owner 22:34 "yes" to a test size) what is used: kAimHalf, unless free_build_test_size.txt says otherwise
 std::atomic<double> g_aim_half{kAimHalf};
 constexpr double kAimStep = 4.0;   // m: the box moves only when the player crosses a grid line
