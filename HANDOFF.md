@@ -1797,6 +1797,22 @@ there". #5 DONE: Free build works on a map without any flame altar, spots are ke
 do it": serverstop, the test world to savegame\clean_test_world (its spots files to flamekit\clean_test_world), the real
 world and spot put back (md5 = the 20:11 backup), serverstart 20:20:31: 16 altars, 1 remembered spot. Empty folders left:
 savegame\aside_for_clean_test, flamekit\aside_for_clean_test (no delete permission there).
+20:22 owner: "any remaining clean up items we need to do? I would like to get this released.. I still have to fix the
+water issue on the production server". Found: Invincible Mode's air check marked "air cannot be kept full" for the WHOLE
+server session when a leaving player had no Oxygen any more (G-Portal 18:59:54, SuperB) -> fixed (a missing component is
+skipped). 20:29 owner on the "not blocking" items: "#1 is fine based on what I saw", "#2 why aren't we fixing this now?"
+-> core/kit.lua wraps emf.net.send in a player's game (not when hosting): a message to the server is held back (answer
+false, every caller tries again later) until emf.net.peer for that channel is not 0 (the server welcomed this game and has
+the channel). 0.15.462 (4072738, DLL md5 73ae425e66bdb8b9f4e86d52deb0a97c): both fixes; Development + local server 20:3x;
+the join fix NOT yet seen live (needs the owner's game to restart and join). **20:30 owner: "#3 go ahead and build a new
+clean install package in case someone new wants it"** -> tools/release/ is now in the repository (it was missing):
+README.txt (template, {version} {emf_version}; F4 tabs and EMF updates updated), install.ps1 (EMF 0.6.6's = 0.6.19's,
+plus Remove-OldFlameKit), install.cmd, uninstall.*, emf_common.ps1, make_package.py <repo> <dist|dist-test>
+<emf-dist|emf-dist-test> <EMF package> <out>. release\FlameKit-0.15.462.zip (md5 eca48580eb379ce6cea2c7c00a9f5371, FlameKit
+0.15.462 + EMF 0.6.19, built from dist-test + emf-dist-test). Install test (helper installnew; installtest\new_0.15.124
+is the old one now): over the 0.15.124 test install: exit 0, all 108 game files equal the package, the player's
+junk_list.json and ui_layout.txt kept, emf_core 0.6.19, FlameKit 0.15.462. Rebuild the zip from dist + emf-dist at the
+Stable release (same content).
 
 ## Things learned the hard way
 

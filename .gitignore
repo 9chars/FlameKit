@@ -19,7 +19,8 @@ icons/
 # Never part of this repository: other people's software, packages that contain it, a world's saves
 EMF-*/
 EMF-*.zip
-release/
+# the work folder's release\ (the packages): only at the top, so tools/release/ (their texts, make_package.py) is kept
+/release/
 test mods/
 g-portal backup data/
 
