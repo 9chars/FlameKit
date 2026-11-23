@@ -1,3 +1,6 @@
+0.15.479 Nov 23, 2026
+- Spawn Nodes: the raid switch is now Players cannot change bases during its waves: players near the group's nodes cannot build, dismantle or mine in bases while its waves run (the game's own base permission is taken away for that time), and hits on placed objects do nothing.
+
 0.15.478 Nov 23, 2026
 - Spawn Nodes: two switches per group for raids: Monsters damage buildings (they hit player-built blocks near them, like a pickaxe; needs EMF 0.6.19 on the server), and Players cannot damage placed objects during its waves.
 

@@ -666,6 +666,56 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
 // command "fkbuild size <m>" ("fkbuild size off" removes it) or by hand. Read every 15 steps; logged on change. Only
 // the server's area: the player's own game keeps 16 m (what the server does is what is being measured).
 constexpr double kTestMinM = 4.0, kTestMaxM = 112.0;
+// (0.15.479, owner 2026-11-23 12:01 "prevent players from damaging structures while the raid is active", 12:03 "yes
+// research both we need that setting") RAID LOCK: the game's own way. Each player's permissions are one byte, +0x9d of
+// his 0xA0-byte entry in the BasicPlayerInfos singleton (entry (id-1), +0 = the player's entity id): server exe 1287369
+// getPermissions 0x140163040 and isAdmin 0x140165720 read exactly that; the bits are EMF's EMF_PERM_* (0x01 the game's
+// admin, 0x02 access inventories, 0x04 EDIT BASE, 0x08 edit world, 0x10 extend base, 0x20 receive XP). The game's
+// building cursor (server_cursor_no_prediction) asks for it, and its base protection turns a hit by a player without the
+// build permission into a ProhibitedHit. raid_lock_server.txt (written by features/spawn_nodes.lua): player entity ids,
+// one a line; while a player is listed his EDIT BASE bit is cleared, so the game itself refuses his changes to bases;
+// when he is no longer listed the bit is set back (only if it was set, and only while the entry is still his). Read
+// every 15 server steps; every change logged. A reload or restart of the server gives every player his group's
+// permissions again anyway (they are not saved).
+constexpr uint8_t kPermEditBase = 0x04;
+constexpr size_t kPlayerInfoSize = 0xA0, kPermOffset = 0x9d;
+std::unordered_map<uint32_t, uint8_t> g_locked;  // player -> his permission byte before the lock (world thread only)
+
+// The permission byte of player `id` in this world, or nullptr when his entry is not there.
+uint8_t* perm_byte(emf::World w, uint32_t id) {
+    if (id < 1 || id > 1023) return nullptr;
+    auto* infos = static_cast<uint8_t*>(w.singleton("BasicPlayerInfos"));
+    if (!infos) return nullptr;
+    uint8_t* entry = infos + size_t(id - 1) * kPlayerInfoSize;
+    if (*reinterpret_cast<uint32_t*>(entry) != id) return nullptr;
+    return entry + kPermOffset;
+}
+
+void read_raid_lock(emf::World w) {
+    std::set<uint32_t> want;
+    if (FILE* f = _wfopen(lua_file(L"raid_lock_server.txt").c_str(), L"r")) {
+        unsigned long id = 0;
+        while (fscanf(f, "%lu", &id) == 1 && want.size() < 64) want.insert(uint32_t(id));
+        fclose(f);
+    }
+    for (uint32_t id : want) {
+        if (g_locked.count(id)) continue;
+        uint8_t* b = perm_byte(w, id);
+        if (!b) continue;
+        g_locked[id] = *b;
+        *b = uint8_t(*b & ~kPermEditBase);
+        EMF_LOG(kMod, "raid lock: player %u may not change bases now (permissions 0x%02x -> 0x%02x)", id, g_locked[id], *b);
+    }
+    for (auto it = g_locked.begin(); it != g_locked.end();) {
+        if (want.count(it->first)) { ++it; continue; }
+        uint8_t* b = perm_byte(w, it->first);
+        if (b && (it->second & kPermEditBase)) *b = uint8_t(*b | kPermEditBase);
+        EMF_LOG(kMod, "raid lock: player %u may change bases again%s (permissions 0x%02x)", it->first, b ? "" : " (his entry is gone: nothing to set back)",
+                b ? *b : 0);
+        it = g_locked.erase(it);
+    }
+}
+
 void read_test_base() {  // (0.15.470) see g_test_base
     char w[16] = {};
     unsigned long fixed = 0;
@@ -1214,6 +1264,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             speed_tick();  // (0.15.466)
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
+                read_raid_lock(w);  // (0.15.479)
                 read_test_base();  // (0.15.470)
                 read_list(L"free_build_server.txt", g_free_server, g_alt_server, "server");
                 read_spots("server");

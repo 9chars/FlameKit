@@ -26,7 +26,8 @@
 -- The channel "nodes": a player's game asks with {op = "get"}; the server answers {op = "state", admin, groups, nodes,
 -- status, note}; an admin's clicks send {op = ...} (below). In a game that hosts the world everything is done right here.
 -- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and "Players cannot damage placed
--- objects during its waves" (protect_tick).
+-- objects during its waves" (protect_tick); (0.15.479) renamed "Players cannot change bases during its waves": also the
+-- players near its nodes lose the game's base editing permission while it runs (raid_lock_server.txt, FlameKit Native).
 -- Uses only core modules (HANDOFF rule 0b).
 
 local admins = require("core.admins")
@@ -358,11 +359,36 @@ end
 -- (0.15.478) "Players cannot damage placed objects during its waves": while such a group runs, one EMF hit rule
 -- cancels every player's hits on placed objects (chests, stations, doors...: EMF's "objects"), everywhere on the
 -- server (EMF's rules have no area). Gone when no such group runs. Walls and floors are not hits: research.
-local function protect_tick(world)
+local function protect_tick(world, spots)
   local want = false
+  local lock = {}
   for gid in pairs(S.runs) do
     local g = group(gid)
-    if g and g.protect then want = true break end
+    if g and g.protect then
+      want = true
+      -- (0.15.479) the players within its base distance (raid_r) of one of its nodes may not change bases while it
+      -- runs: FlameKit Native clears their EDIT BASE permission (build_anywhere.cpp, raid lock), so the game itself
+      -- refuses their building, dismantling and mining in bases
+      for _, p in ipairs(spots or {}) do
+        for _, n in ipairs(nodes_of(gid)) do
+          if dist2(p[2], p[3], p[4], n.x, n.y, n.z) <= g.raid_r * g.raid_r then lock[#lock + 1] = p[1] break end
+        end
+      end
+    end
+  end
+  table.sort(lock)
+  local text = (#lock > 0 and (table.concat(lock, "\n") .. "\n") or "")
+  if text ~= S.lock_text then
+    local f = io.open(emf.dir .. "\\raid_lock_server.txt.tmp", "w")
+    if f then
+      f:write(text)
+      f:close()
+      os.remove(emf.dir .. "\\raid_lock_server.txt")
+      if os.rename(emf.dir .. "\\raid_lock_server.txt.tmp", emf.dir .. "\\raid_lock_server.txt") then
+        S.lock_text = text
+        emf.log(string.format("spawn nodes: raid lock: %d player(s) may not change bases now", #lock))
+      end
+    end
   end
   if want and not S.protect_rule then
     local ok, id = pcall(emf.hit_rule, { from = "players", to = "objects", cancel = true })
@@ -608,7 +634,7 @@ function F.tick(world)
   end
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
-    protect_tick(world)
+    protect_tick(world, spots)
   end
   if S.steps % BREAK_STEPS == 0 then break_tick(world, spots) end
 end
@@ -774,9 +800,11 @@ function F.panel(world)
       .. "player, like a top pickaxe: stone takes about 22 hits, wood far fewer. Never the ground or the world's own ruins. Inside a "
       .. "flame altar's area what breaks stays broken. Needs EMF 0.6.19 on the server." }
   if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
-  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot damage placed objects during its waves", selected = g.protect == true,
-    tooltip = "While its waves run, players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the "
-      .. "whole server. Walls, floors and other building blocks are not covered yet." }
+  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot change bases during its waves", selected = g.protect == true,
+    tooltip = "While its waves run: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
+      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when the waves end or they "
+      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
+      .. "Admins too, for now." }
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
   if g.trigger == "timer" then
     choice_row(rows, g, "timer_min", "Timer from", "The timer fires at a random time between these two (after the cooldown).")
