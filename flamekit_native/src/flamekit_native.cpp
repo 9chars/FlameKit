@@ -863,6 +863,30 @@ void on_world_tick(emf::World w) {
                 }
             }
         }
+        {
+            // (0.15.490, owner 13:56-13:57: the raid's place "just like how the mini map uses it to determine the players
+            // location", "just the one thats closest to the player with the raid is triggered or started") what the
+            // minimap names as where this player is goes to emf\mods\flamekit\where_now.txt, "place<TAB>region", when it
+            // changes; features/spawn_nodes.lua sends it to the server when asked at a raid's start
+            static std::string said_where;
+            std::string where_text = (place == nearest_region ? std::string() : place) + "\t" + nearest_region + "\n";
+            for (char& c : where_text) if (c == '\r') c = ' ';
+            if (where_text != said_where) {
+                static std::wstring where_path;
+                if (where_path.empty()) {
+                    wchar_t exe[MAX_PATH];
+                    const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
+                    std::wstring dir(exe, n);
+                    const size_t slash = dir.find_last_of(L"\\/");
+                    where_path = (slash == std::wstring::npos ? std::wstring() : dir.substr(0, slash + 1)) + L"emf\\mods\\flamekit\\where_now.txt";
+                }
+                if (FILE* f = _wfopen(where_path.c_str(), L"wb")) {
+                    std::fwrite(where_text.data(), 1, where_text.size(), f);
+                    std::fclose(f);
+                    said_where = where_text;
+                }
+            }
+        }
         std::lock_guard<std::mutex> l(g_shared.lock);
         g_shared.region = nearest_region;
         g_shared.place = place == nearest_region ? std::string() : place;

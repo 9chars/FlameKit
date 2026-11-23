@@ -93,12 +93,10 @@ if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = ni
 -- something like "New incoming wave at Melissa's Hideout!"") FlameKit notices (orange, the Notices window and a line in
 -- the Messages window), per group switch "announce" (on by default). The start, the end and a Remove go to every player;
 -- the waves and the count of monsters left to the players within NOTICE_DIST m of one of the group's nodes. The place:
--- the map marker nearest the group's nodes (raid_place): flame altars from base_names_server.txt (FlameKit Native,
--- every 30 s: "x y z<TAB>name"), the other named places from map_places_server.txt + core/place_names.lua.
+-- see raid_place (the minimap's place of the player who started or triggered it).
 local NOTICE_COLOUR = "#ff9632"
 local NOTICE_DIST = 300
-local place_names_ok, PLACE_NAMES = pcall(require, "core.place_names")
-if not place_names_ok or type(PLACE_NAMES) ~= "table" then PLACE_NAMES = {} end
+local PLACE_WAIT = 180         -- steps (3 s): how long the start notice waits for the asked player's place
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
 local LEFT_MIN_GAP = 5         -- s: and changed at most this often when the count changes
 local MISSES = 3  -- (0.15.483) a monster whose health can't be read is forgotten only after this many checks in a row
@@ -149,7 +147,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {} }  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0 }  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -398,38 +396,27 @@ local function base_names()
   return list
 end
 
--- (0.15.488) The named places on the map: { { x, z, name } } (only those core/place_names.lua has a name for).
-local places_cache = { at = -1000, list = {} }
-local function map_places()
-  if os.time() - places_cache.at < 60 then return places_cache.list end
-  local list = {}
-  local f = io.open(emf.dir .. "\\map_places_server.txt", "r")
-  if f then
-    for line in f:lines() do
-      local x, _, z, tag = line:match("^(%-?[%d%.]+) (%-?[%d%.]+) (%-?[%d%.]+) (%d+)")
-      local name = tag and PLACE_NAMES[tonumber(tag)]
-      if name then list[#list + 1] = { tonumber(x), tonumber(z), name } end
-    end
-    f:close()
+-- (0.15.490, owner 13:47 "Just use the nearest map marker for the raid location just like how the mini map uses it to
+-- determine the players location", 13:56 "whoever starts the raid OR triggers the raid sends the list to the server",
+-- 13:57 "just the one thats closest to the player with the raid is triggered or started") Where group `gid` raids: what
+-- the minimap of the player who started or triggered it (else the player nearest its nodes) names as where he is (the
+-- named place he is in or nearest to, a flame altar by its given name too; else his region). The dedicated server has no
+-- place names of its own (no English texts in its data), so his game sends it when asked (`answer` = { place, region }).
+-- No answer (an older FlameKit, or none within PLACE_WAIT): the nearest flame altar's name the server has itself
+-- (base_names_server.txt), else nil.
+local function raid_place(gid, answer)
+  if type(answer) == "table" then
+    if type(answer.place) == "string" and answer.place ~= "" then return answer.place:sub(1, 60) end
+    if type(answer.region) == "string" and answer.region ~= "" then return answer.region:sub(1, 60) end
   end
-  places_cache = { at = os.time(), list = list }
-  return list
-end
-
--- (0.15.488, owner 13:44 "it should just use the nearest map marker to identify the raid location") Where group `gid`
--- raids: the map marker nearest its nodes, wherever it is: a flame altar by the name a player gave it ("a Flame Altar"
--- when it has none), any other named place by the game's name for it. nil only when no marker is known at all.
-local function raid_place(gid)
   local best, name = nil, nil
-  local function consider(x, z, label)
+  for _, a in ipairs(base_names()) do
     for _, n in ipairs(nodes_of(gid)) do
-      local dx, dz = x - n.x, z - n.z
+      local dx, dz = a[1] - n.x, a[3] - n.z
       local d = dx * dx + dz * dz
-      if not best or d < best then best, name = d, label end
+      if not best or d < best then best, name = d, (a[4] ~= "" and a[4] or "a Flame Altar") end
     end
   end
-  for _, a in ipairs(base_names()) do consider(a[1], a[3], a[4] ~= "" and a[4] or "a Flame Altar") end
-  for _, a in ipairs(map_places()) do consider(a[1], a[2], a[3]) end
   return name
 end
 
@@ -481,10 +468,26 @@ end
 -- queued). S.raid[gid] = { place, spawned, left_at, left_n } from its first wave until its end.
 local function raid_tick(world)
   for gid, r in pairs(S.raid) do
+    if r.ask then  -- (0.15.490) the start notice, once the list came or the wait is over
+      local answer = S.place_answers[r.ask.q]
+      if answer or S.steps >= r.ask.until_step then
+        S.place_answers[r.ask.q] = nil
+        r.place = raid_place(gid, answer)
+        emf.log(string.format("spawn nodes: place of the raid: %s (%s)", tostring(r.place),
+          answer and string.format("player %s's minimap: place '%s', region '%s'", tostring(r.ask.by), tostring(answer.place), tostring(answer.region))
+          or "no answer came: the nearest flame altar"))
+        r.ask = nil
+        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, 15)
+      end
+    end
+  end
+  for gid, r in pairs(S.raid) do
     local g = group(gid)
     local alive, queued = group_alive(gid), group_queued(gid)
     if not g then
       S.raid[gid] = nil
+    elseif r.ask then
+      -- the start notice comes first
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, 15)
@@ -502,7 +505,7 @@ local function raid_tick(world)
 end
 
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
-local function fire(world, gid, why, manual)
+local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player who started or triggered it
   local g = group(gid)
   if not g or S.runs[gid] then return false, "This group is already running." end
   if not manual then
@@ -510,7 +513,7 @@ local function fire(world, gid, why, manual)
     local since = os.time() - (S.last_end[gid] or 0)
     if since < g.cooldown * 60 then return false end
   end
-  S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps }
+  S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -548,9 +551,28 @@ local function wave(world, gid, spots)
   -- (0.15.488) the notices
   local r = S.raid[gid]
   if not r and queued > 0 then
-    r = { place = raid_place(gid), spawned = 0 }
+    r = { spawned = 0 }
     S.raid[gid] = r
-    raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, 15)
+    -- (0.15.490) the start notice waits (at most PLACE_WAIT steps) for the list of places from the player who started or
+    -- triggered it, else the player nearest its nodes
+    local by = run.by
+    if not by then
+      local best
+      for _, p in ipairs(spots or {}) do
+        for _, n in ipairs(nodes_of(gid)) do
+          local d = dist2(p[2], p[3], p[4], n.x, n.y, n.z)
+          if not best or d < best then best, by = d, p[1] end
+        end
+      end
+    end
+    S.place_q = (S.place_q or 0) + 1
+    r.ask = { q = S.place_q, until_step = S.steps + PLACE_WAIT, by = by }
+    if by then
+      local msg = { op = "place_ask", q = r.ask.q }
+      if by == emf.local_player() and kit.is_host() then S.host_ask = msg
+      else pcall(emf.net.send_to, world, by, CHANNEL, emf.json.encode(msg)) end
+      emf.log(string.format("spawn nodes: %s: asked player %s where he is", g.name, tostring(by)))
+    end
   elseif r and queued > 0 then
     local last = run.wave >= run.waves
     raid_notice(world, gid, string.format("%s at %s! (wave %d of %d, %d monsters)", last and "Final wave incoming" or "New incoming wave",
@@ -816,7 +838,12 @@ local function trigger_tick(world, spots)
           if not fire(world, gid, "the timer") then S.next_timer[gid] = nil end
         end
       elseif g.trigger == "wire" and g.wire then
-        if player_near(spots, g.wire.x, g.wire.y, g.wire.z, g.wire_r) then fire(world, gid, "a player crossed the trip wire") end
+        for _, p in ipairs(spots) do  -- (0.15.490) the one who crossed it
+          if dist2(p[2], p[3], p[4], g.wire.x, g.wire.y, g.wire.z) <= g.wire_r * g.wire_r then
+            fire(world, gid, "player " .. tostring(p[1]) .. " crossed the trip wire", false, p[1])
+            break
+          end
+        end
       elseif g.trigger == "time" and tod then
         local last = S.last_tod[gid]
         local h = g.hour
@@ -825,21 +852,21 @@ local function trigger_tick(world, spots)
           fire(world, gid, string.format("the time of day (%02d:00)", h))
         end
       elseif g.trigger == "raid" then
-        local hit = false
+        local hit, by = false, nil
         for _, b in ipairs(altar_boxes()) do
           for _, p in ipairs(spots) do
             if p[2] >= b[1] and p[2] <= b[4] and p[3] >= b[2] and p[3] <= b[5] and p[4] >= b[3] and p[4] <= b[6] then
               local cx, cz = (b[1] + b[4]) / 2, (b[3] + b[6]) / 2
               for _, n in ipairs(nodes_of(gid)) do
                 local dx, dz = n.x - cx, n.z - cz
-                if dx * dx + dz * dz <= g.raid_r * g.raid_r then hit = true break end
+                if dx * dx + dz * dz <= g.raid_r * g.raid_r then hit, by = true, p[1] break end
               end
             end
             if hit then break end
           end
           if hit then break end
         end
-        if hit then fire(world, gid, "a player is in a base near its nodes") end
+        if hit then fire(world, gid, "player " .. tostring(by) .. " is in a base near its nodes", false, by) end
       end
     end
     if tod then S.last_tod[gid] = tod end
@@ -919,6 +946,15 @@ local function handle(world, account, entity, msg, from)
   account = tostring(account)
   local function note(text) S.notes[account] = text end
   if msg.op == "get" then return state(world, account, from) end
+  if msg.op == "place" then  -- (0.15.490) where the asked player is, at a raid's start: only from the one asked
+    local q = tonumber(msg.q)
+    for _, r in pairs(S.raid) do
+      if r.ask and r.ask.q == q and r.ask.by == entity then
+        S.place_answers[q] = { place = type(msg.place) == "string" and msg.place or "", region = type(msg.region) == "string" and msg.region or "" }
+      end
+    end
+    return nil
+  end
   if not is_admin(account, from) then
     note("Only FlameKit admins can set up spawn nodes.")
     return state(world, account, from)
@@ -1004,7 +1040,7 @@ local function handle(world, account, entity, msg, from)
     note(string.format("%s's trip wire is here: a player within %d m of this spot fires it.", g.name, g.wire_r))
     emf.log(string.format("spawn nodes: player %s put %s's trip wire at %.0f %.0f %.0f", who, g.name, x, y, z))
   elseif msg.op == "start" and g then
-    local ok, why = fire(world, gid, "Start now by player " .. who, true)
+    local ok, why = fire(world, gid, "Start now by player " .. who, true, entity)
     note(ok and (g.name .. " started.") or (why or "It could not start."))
   elseif msg.op == "stop" and g then
     if S.runs[gid] then finish(gid) note(g.name .. " stopped (its cooldown starts now).") else note(g.name .. " is not running.") end
@@ -1116,7 +1152,7 @@ local function act(world, msg)
     local me = emf.local_player()
     local ok, account = pcall(world.account, world, me)
     if ok and account then
-      local st = handle(world, account, me, msg, { is_local = true })
+      local st = handle(world, account, me, msg, { is_local = true }) or {}
       C.note = st.note
       if st.made then C.sel = st.made end
     end
@@ -1158,7 +1194,23 @@ local function markers(world)
   end
 end
 
+-- (0.15.490) What this game's minimap names as where the player is: place, region ("" each when not known), from
+-- where_now.txt (FlameKit Native writes it when it changes).
+local function where_now()
+  local f = io.open(emf.dir .. "\\where_now.txt", "r")
+  if not f then return "", "" end
+  local line = f:read("*l") or ""
+  f:close()
+  local place, region = line:match("^([^\t]*)\t?([^\t]*)")
+  return place or "", region or ""
+end
+
 function F.client_tick(world)
+  if S.host_ask then  -- (0.15.490) the host's own game asked: answered here directly
+    local place, region = where_now()
+    S.place_answers[S.host_ask.q] = { place = place, region = region }
+    S.host_ask = nil
+  end
   local version = peer()
   if version ~= C.last_peer then C.last_peer, C.shown, C.since_ask = version, nil, ASK_STEPS end
   C.since_ask = C.since_ask + 1
@@ -1367,10 +1419,15 @@ function F.setup(k)
       end
       if not account then return end
       local st = handle(world, account, from.player, msg, from)
-      pcall(emf.net.send_to, world, from.player, CHANNEL, emf.json.encode(st))
+      if st then pcall(emf.net.send_to, world, from.player, CHANNEL, emf.json.encode(st)) end
     end, "a Spawn Nodes message from a player"),
     on_player = kit.guard(F, function(world, from, data_in)
       local okd, msg = pcall(emf.json.decode, data_in)
+      if okd and type(msg) == "table" and msg.op == "place_ask" then  -- (0.15.490) where I am, as my minimap says
+        local place, region = where_now()
+        pcall(emf.net.send, CHANNEL, emf.json.encode({ op = "place", q = msg.q, place = place, region = region }))
+        return
+      end
       if okd and type(msg) == "table" and msg.op == "notice" and type(msg.t) == "string" and type(msg.tag) == "string" then  -- (0.15.488)
         local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
         if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), NOTICE_COLOUR, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
