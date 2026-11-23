@@ -1,3 +1,7 @@
+0.15.514 Nov 23, 2026
+- Spawn Nodes: the raid's whole number: the start notice says how many monsters are coming, and the count shows "N of TOTAL monsters left to kill" from TOTAL down to 0 (every node's Monsters per node in every wave). Summons still alive when it reaches 0 are named apart.
+- Spawn Nodes: Stop now stops everything coming: the waves, the monsters queued or having their spot checked, and the replacing of stuck monsters (Remove and the time limit too). The monsters alive stay until Remove.
+
 0.15.513 Nov 23, 2026
 - Spawn Nodes: "monsters left to kill" only goes down: it counts every monster the raid's nodes still have to spawn (this wave and the waves to come) and the ones alive; summons and other monsters that joined are counted only when nothing else is left.
 - Spawn Nodes: Remove and the time limit also stop the monsters whose spots were still being checked (after a Remove 3 more came).

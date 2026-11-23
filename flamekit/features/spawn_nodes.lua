@@ -184,7 +184,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -586,7 +586,7 @@ local function persist()
   local token = nil
   pcall(function() token = emf.session_token() end)
   local out = { token = token, raid = {}, started = {}, runs = {} }
-  for gid, r in pairs(S.raid) do out.raid[tostring(gid)] = { place = r.place, spawned = r.spawned, first_id = r.first_id } end
+  for gid, r in pairs(S.raid) do out.raid[tostring(gid)] = { place = r.place, spawned = r.spawned, first_id = r.first_id, total = r.total } end
   for gid, at in pairs(S.started) do out.started[tostring(gid)] = at end
   for gid, run in pairs(S.runs) do
     local owed = nil
@@ -610,7 +610,7 @@ local function restore()
   for k, r in pairs(saved.raid or {}) do
     local gid = tonumber(k)
     if gid and group(gid) and type(r) == "table" then
-      S.raid[gid] = { place = r.place, spawned = tonumber(r.spawned) or 0, first_id = tonumber(r.first_id) }
+      S.raid[gid] = { place = r.place, spawned = tonumber(r.spawned) or 0, first_id = tonumber(r.first_id), total = tonumber(r.total) }
       n = n + 1
     end
   end
@@ -770,7 +770,8 @@ local function raid_tick(world)
           answer and string.format("player %s's minimap: place '%s', region '%s'", tostring(r.ask.by), tostring(answer.place), tostring(answer.region))
           or "no answer came: the nearest flame altar"))
         r.ask = nil
-        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, START_END_S, nil, "raid_siren")
+        local tot = r.total and string.format(" %d monsters are coming.", r.total) or ""  -- (0.15.514)
+        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren")
       end
     end
   end
@@ -793,7 +794,7 @@ local function raid_tick(world)
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       S.started[gid] = nil
-      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, START_END_S)
+      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.total or r.spawned), nil, START_END_S)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
       r.none_since, r.verified = nil, nil
@@ -814,11 +815,20 @@ local function raid_tick(world)
         for _, owed in pairs(run.owed or {}) do n = n + owed end
         n = n + math.max(0, (run.waves or 0) - (run.wave or 0)) * (g.per_wave or 0) * #nodes_of(gid)
       end
-      if n == 0 then n = joined end
-      if (n ~= r.left_n and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
-        r.left_n, r.left_at = n, now
-        raid_notice(world, gid, string.format("Raid on %s: %d monster%s left to kill.", r.place or "the area", n, n == 1 and "" or "s"),
-          true, LEFT_EVERY + 5, "left_" .. gid)
+      -- (0.15.514, owner 16:33 "you need to tell the player the TOTAL NUMBER of monsters for the entire raid, and count all
+      -- the way down to zero with its over") "N of TOTAL": TOTAL = every node's Monsters per node in every wave, fixed at
+      -- the start; N never above it; at 0 with summons still alive, those are named apart
+      local total = r.total or n
+      if n > total then n = total end
+      local text
+      if n == 0 and joined > 0 then
+        text = string.format("Raid on %s: 0 of %d monsters left. %d summoned monster%s still to kill.", r.place or "the area", total, joined, joined == 1 and "" or "s")
+      else
+        text = string.format("Raid on %s: %d of %d monsters left to kill.", r.place or "the area", n, total)
+      end
+      if (text ~= r.left_text and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
+        r.left_text, r.left_at = text, now
+        raid_notice(world, gid, text, true, LEFT_EVERY + 5, "left_" .. gid)
       end
     end
   end
@@ -902,6 +912,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
     return false, string.format("Nobody is within %d m of its nodes: it does not start.", g.near_r or 50), "nobody"
   end
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
+  S.halted[gid] = nil  -- (0.15.514) a new start
   S.started[gid] = os.time()  -- (0.15.492) for its time limit
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
   S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
@@ -948,7 +959,7 @@ local function wave(world, gid, spots)
   -- (0.15.488) the notices
   local r = S.raid[gid]
   if not r and queued > 0 then
-    r = { spawned = 0 }
+    r = { spawned = 0, total = run.waves * g.per_wave * #nodes_of(gid) }  -- (0.15.514) the raid's whole number
     S.raid[gid] = r
     -- (0.15.490) the start notice waits (at most PLACE_WAIT steps) for the list of places from the player who started or
     -- triggered it, else the player nearest its nodes
@@ -1058,6 +1069,7 @@ local function time_tick(world)
       S.started[gid] = nil
       if S.runs[gid] then finish(gid) end
       cancel_checks(gid)  -- (0.15.513)
+      S.halted[gid] = true  -- (0.15.514)
       for i = #S.queue, 1, -1 do
         local qn = data().nodes[tostring(S.queue[i].node)]
         if qn and qn.g == gid then table.remove(S.queue, i) end
@@ -1419,7 +1431,9 @@ local function stuck_tick(world)
           if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
           S.track[id], S.active_at[id] = nil, nil
           S.respawns[nid] = (S.respawns[nid] or 0) + 1
-          local again = S.respawns[nid] <= RESPAWN_MAX and data().nodes[tostring(nid)] ~= nil and not S.adopted[id]  -- (0.15.501) a joined one is not replaced
+          local nd0 = data().nodes[tostring(nid)]
+          local again = S.respawns[nid] <= RESPAWN_MAX and nd0 ~= nil and not S.adopted[id]  -- (0.15.501) a joined one is not replaced
+            and not S.halted[nd0.g]  -- (0.15.514) nor one of a stopped or removed group
           if again then
             local q = {}
             for k, v in pairs(t.q) do q[k] = v end
@@ -1945,7 +1959,20 @@ local function handle(world, account, entity, msg, from)
     local ok, why = fire(world, gid, "Start now by player " .. who, true, entity)
     note(ok and (g.name .. " started.") or (why or "It could not start."))
   elseif msg.op == "stop" and g then
-    if S.runs[gid] then finish(gid) note(g.name .. " stopped (its cooldown starts now).") else note(g.name .. " is not running.") end
+    -- (0.15.514, owner 16:34 "the stop button doesnt stop the raid. its still spawning monsters": Stop ended the waves but
+    -- not the spots being checked, the queue, nor the replacing of stuck monsters) Stop: nothing more spawns for the
+    -- group; the monsters alive stay (Remove takes them away)
+    local was = S.runs[gid] ~= nil
+    if was then finish(gid) end
+    S.halted[gid] = true
+    cancel_checks(gid)
+    local dropped = 0
+    for i = #S.queue, 1, -1 do
+      local qn = d.nodes[tostring(S.queue[i].node)]
+      if qn and qn.g == gid then table.remove(S.queue, i) dropped = dropped + 1 end
+    end
+    emf.log(string.format("spawn nodes: player %s stopped %s (%s; %d queued monster(s) dropped)", who, g.name, was and "its waves ended" or "no waves were running", dropped))
+    note(g.name .. " stopped: no more monsters come (its cooldown starts now). Remove its monsters takes away the ones still alive.")
   elseif msg.op == "remove" and g then
     local n, bodies = 0, 0
     for _, node in ipairs(nodes_of(gid)) do
@@ -1966,6 +1993,7 @@ local function handle(world, account, entity, msg, from)
     note(string.format("Removed %d monster(s) and %d dead bod%s of %s; the rest of the world is being searched for more.", n, bodies, bodies == 1 and "y" or "ies", g.name))
     S.started[gid] = nil  -- (0.15.492)
     cancel_checks(gid)  -- (0.15.513)
+    S.halted[gid] = true  -- (0.15.514) nothing more comes
     if S.raid[gid] then  -- (0.15.488)
       if S.runs[gid] then finish(gid) end
       raid_notice(world, gid, string.format("The raid on %s was called off.", S.raid[gid].place or "the area"), nil, START_END_S)
@@ -1995,6 +2023,7 @@ function F.tick(world)
     S.join_wait = {}  -- (0.15.507)
     S.checks = {}  -- (0.15.508)
     S.hunt_pos = {}  -- (0.15.511)
+    S.halted = {}  -- (0.15.514)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
