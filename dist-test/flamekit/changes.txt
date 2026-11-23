@@ -1,3 +1,6 @@
+0.15.517 Nov 23, 2026
+- Spawn Nodes: the siren sounds twice when a raid starts and once at the start of every new wave (for the players within 300 m of the nodes, as the wave notice).
+
 0.15.516 Nov 23, 2026
 - Spawn Nodes: a stuck monster is moved after 5 s also right after it appears (0.15.513 had made that 10 s).
 

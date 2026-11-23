@@ -772,7 +772,9 @@ local function raid_tick(world)
           or "no answer came: the nearest flame altar"))
         r.ask = nil
         local tot = r.total and string.format(" %d monsters are coming.", r.total) or ""  -- (0.15.514)
-        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren")
+        -- (0.15.517, owner 17:02 "make the siren sound twice at the beginning of the raid and sound once at the beginning of
+        -- every new wave") the start: twice (sounds/raid_siren_twice.wav: the siren two times, 16 s)
+        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren_twice")
       end
     end
   end
@@ -985,7 +987,7 @@ local function wave(world, gid, spots)
   elseif r and queued > 0 then
     local last = run.wave >= run.waves
     -- (0.15.495, owner 14:45 "get rid of the (wave 4 of 5, 6 monsters) bullshit no one wants to see that")
-    raid_notice(world, gid, string.format("%s at %s!", last and "Final wave incoming" or "New incoming wave", r.place or "the raid"), true, 10)
+    raid_notice(world, gid, string.format("%s at %s!", last and "Final wave incoming" or "New incoming wave", r.place or "the raid"), true, 10, nil, "raid_siren")  -- (0.15.517) once
   end
   if queued == 0 then  -- nobody near: this wave is spent (as before 0.15.512)
     if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
@@ -2432,7 +2434,7 @@ function F.setup(k)
       if okd and type(msg) == "table" and msg.op == "notice" and type(msg.t) == "string" and type(msg.tag) == "string" then  -- (0.15.488)
         local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
         if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), NOTICE_COLOUR, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
-        if msg.snd == "raid_siren" then play_sound("raid_siren") end  -- (0.15.502)
+        if msg.snd == "raid_siren" or msg.snd == "raid_siren_twice" then play_sound(msg.snd) end  -- (0.15.502); (0.15.517) twice
         return
       end
       if okd and type(msg) == "table" and msg.op == "state" then
