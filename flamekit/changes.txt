@@ -1,3 +1,6 @@
+0.15.454 Nov 22, 2026
+- Updates: FlameKit's updater now also keeps EMF (the modding framework FlameKit runs on) up to date, to the EMF version FlameKit was tested with. It never installs an older EMF, keeps the EMF from before the update in emf\flamekit_emf_backup, and the new EMF starts with the next game start. Your EMF settings and other mods are not touched.
+
 0.15.453 Nov 22, 2026
 - Building tab: new admin setting "Free build inside altar areas". While it is on, an admin's Free build also works inside flame altar areas, other players' bases included, so pieces there can be fixed or removed. Off by default; other players are not affected.
 - Building tab: a map without any flame altar now says so. Free build needs at least one flame altar somewhere on the map for now.

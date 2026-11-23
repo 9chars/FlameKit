@@ -19,6 +19,8 @@
 // cover every file. So a change to the repository alone cannot put code on a player's PC.
 // The channel is "dist", or "dist-test" where emf\mods\flamekit\update_channel.txt says "test" (the developer's PC).
 // A game never takes an older version, and never writes outside emf\mods\flamekit and emf\mods\flamekit_native.
+// (0.15.454) EMF itself is kept up to date from a list of its own (emf-dist / emf-dist-test, signed the same way):
+// emf_update.hpp, run after each look at FlameKit's list; it writes EMF's own files in the game folder.
 // What it is doing is written to emf\mods\flamekit\update_status.txt as "<kind>|<text>" (kind: busy, failed, ok or
 // ready) for the lower left corner; empty while there is nothing to say.
 #pragma once
@@ -350,6 +352,12 @@ inline std::string newest_commit() {
     return sha;
 }
 
+}  // namespace web_update
+
+#include "emf_update.hpp"  // (0.15.454) EMF's own update; uses the helpers above
+
+namespace web_update {
+
 // Set by the "Check for updates" button: the updater looks at once.
 inline std::atomic<bool> g_check_now{false};
 
@@ -359,9 +367,19 @@ struct Updater {
     void (*log)(int level, const char* text) = nullptr;  // level: 0 what happens, 1 a detail, 2 a problem
     std::string last_seen;  // the version and commit of the last check (a repeated "up to date" is a detail)
     bool asked = false;     // this check was asked for with the button
+    std::wstring root;      // (0.15.454) "/9chars/FlameKit/<commit or main>/" of the last check, for EMF's list
+    bool test = false;      // (0.15.454) the Development channel (update_channel.txt "test")
+    emf_update::Emf emf;    // (0.15.454) EMF's own update (emf_update.hpp)
 
-    // Writes update_status.txt ("<kind>|<text>") for the lower left corner, when it changed.
-    void status(const std::string& text) {
+    // Writes update_status.txt ("<kind>|<text>") for the lower left corner, when it changed. (0.15.454) While a new EMF
+    // waits for the next start, a ready FlameKit says so too, and an empty status says that EMF is ready.
+    void status(std::string text) {
+        if (!emf.ready.empty()) {
+            if (text.rfind("ready|Update v", 0) == 0 && text.find(" is ready") != std::string::npos)
+                text = text.substr(0, text.find(" is ready")) + " and EMF v" + emf.ready + " are ready: restart the game";
+            else if (text.empty())
+                text = "ready|EMF v" + emf.ready + " is ready: restart the game";
+        }
         if (text == last_status) return;
         last_status = text;
         write_file(mods + L"flamekit\\update_status.txt", std::vector<uint8_t>(text.begin(), text.end()));
@@ -374,10 +392,11 @@ struct Updater {
     // One look at the repository. Returns false when it could not be reached or the update failed.
     bool check() {
         std::vector<uint8_t> flag;
-        const bool test = read_file(mods + L"flamekit\\update_channel.txt", flag) && flag.size() >= 4 && std::memcmp(flag.data(), "test", 4) == 0;
+        test = read_file(mods + L"flamekit\\update_channel.txt", flag) && flag.size() >= 4 && std::memcmp(flag.data(), "test", 4) == 0;
         const std::string commit = newest_commit();
         if (commit.empty()) say("update: the newest commit could not be read (" + g_fetch_error + "): main is used (may be a few minutes old)", 2);
-        const std::wstring base = L"/9chars/FlameKit/" + (commit.empty() ? std::wstring(L"main") : wide(commit)) + (test ? L"/dist-test/" : L"/dist/");
+        root = L"/9chars/FlameKit/" + (commit.empty() ? std::wstring(L"main") : wide(commit)) + L"/";
+        const std::wstring base = root + (test ? L"dist-test/" : L"dist/");
         std::vector<uint8_t> raw;
         const std::string channel = test ? "dist-test" : "dist";
         if (!fetch(base + L"update.txt", raw, nullptr)) {
@@ -540,6 +559,16 @@ struct Updater {
     // The updater thread: waits 15 s after the start, then checks every minute (and at once when the player asks).
     void run() {
         DeleteFileW((mods + L"flamekit_native\\flamekit_native.dll.old").c_str());  // the DLL an update replaced, now unused
+        // (0.15.454) EMF's own update: the game folder is the one above emf\mods\; files over the same connection code
+        emf.game = mods.substr(0, mods.size() - std::wstring(L"emf\\mods\\").size());
+        emf.get = [](const std::wstring& path, std::vector<uint8_t>& out, std::string& why) {
+            const bool ok = fetch(path, out, nullptr);
+            why = g_fetch_error;
+            return ok;
+        };
+        emf.verify = [](const std::vector<uint8_t>& data, const std::string& sig, std::string& why) { return signed_by_release_key(data, sig, why); };
+        emf.say = [this](int level, const std::string& text) { say(text, level); };
+        emf.clean_up();
         status("");
         Sleep(15000);
         uint64_t clear_at = 0;  // when a button answer ("up to date", "could not reach") goes away again
@@ -552,6 +581,11 @@ struct Updater {
                 status("busy|Checking for updates...");
             }
             check();
+            if (!root.empty() && emf.check(root + (test ? L"emf-dist-test/" : L"emf-dist/")) == 1) {  // (0.15.454) then EMF's list
+                const std::string was = last_status;
+                last_status = "?";
+                status(was.rfind("ready|", 0) == 0 || was.rfind("busy|", 0) == 0 || was.rfind("failed|", 0) == 0 ? was : std::string());
+            }
             if (asked && last_status.rfind("ready|", 0) != 0) clear_at = GetTickCount64() + 8000;
             // the next look: every minute on both channels (0.15.131, owner); the button cuts it short
             const uint64_t next = GetTickCount64() + 60ull * 1000;

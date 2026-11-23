@@ -78,6 +78,12 @@ every new workaround gets an entry here. Game addresses are for game build 12873
     (ECDSA P-256), and installs at the next game start. `flamekit_native/src/web_update.hpp`.
 18. **The game clock in nanoseconds.** Derived from `world:tick() * 1e9 / 60` (candidate below).
 19. **Reloading a native mod.** Every C++ change needs a restart of the game and the server (candidate below).
+20. **Updating EMF itself** (0.15.454). EMF has no updater, and a player who installed it once stays on that version.
+   FlameKit's updater keeps EMF at the version FlameKit was tested with, from a signed list of its own (`emf-dist`,
+   `emf-dist-test`): it compares the FileVersion of `emf\emf_core.dll`, never installs an older EMF, leaves another
+   loader's setup and new Vulkan layers to EMF's installer, keeps a backup, and renames the files in use (they take
+   over at the next start). Wanted: an EMF update of its own (EMF.exe or the core), or a documented way for a mod to
+   ask for one. `flamekit_native/src/emf_update.hpp`, `flamekit_native/notes/make_emf_dist.py`.
 
 ## No longer needed (FlameKit draws its own UI since 0.15.26 and its own icons since 0.15.13)
 
@@ -91,7 +97,8 @@ every new workaround gets an entry here. Game addresses are for game build 12873
 
 - A mod window that can be dragged (EMF's windows are fixed: left, centre or right).
 - A way to run code before a hit lands on one player only without a rule per player (the 64 hit rule limit).
-- A documented way to read the game clock in nanoseconds (FlameKit derives it from world:tick() * 1e9 / 60).
+- The game clock in nanoseconds for Lua: the C API has `ecs_time_ns` (already in 0.6.6); Lua has none, so FlameKit's
+  Lua derives it from world:tick() * 1e9 / 60. (Corrected 2026-11-22: this was listed as missing from EMF entirely.)
 - (2026-11-18, owner 12:22: "add them to the list, not a big deal right now") Air in `emf.attribute`: `"oxygen"` and
   `"max_oxygen"` (read, and refill through `emf.attribute_add` like health, stamina and mana). FlameKit's Invincible
   Mode (0.15.280) keeps the air full by writing the player's Oxygen component directly (`dataStorage[1]` = air now,
