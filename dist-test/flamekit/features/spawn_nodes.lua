@@ -48,7 +48,16 @@ local CLEAN_STEPS = 120        -- dead or gone monsters are forgotten every 2 s
 local SPAWN_PER_STEP = 4       -- monsters spawned in one server step at most (the rest on the next steps)
 local MAX_NODES = 200          -- nodes on the server at most
 local MAX_GROUPS = 30          -- groups at most
-local SPREAD = 10              -- m: monsters spawn within this of their node
+local SPREAD = 10              -- m: monsters spawn within this of their node (the default; (0.15.485) each node its own)
+-- (0.15.485, owner 12:49 "is there a setting to control the spawn radius of the monster near the node and make this a
+-- per node setting? ... is it possible to make sure the monster does [not] spawn into an object, terrain or a wall?"):
+-- each node's "Spawn within" (node.spread, m), and SPOT_TRIES random spots looked at before one is used: a spot is
+-- refused when a building block or terrain a player placed is on the line from the node to it (emf.find_wall, 1 m up),
+-- a building block is at it (1 m and 2 m up), or the ground is solid at both SOLID_UP heights over the node's height
+-- (a rock or cliff). All refused: the monster appears on the node itself. Not seen: placed objects (chests and the like).
+local SPREADS = { 0, 2, 5, 10, 15, 20, 30 }
+local SPOT_TRIES = 8
+local SOLID_UP = { 1.5, 3.0 }
 local ACTIVE_DIST = 100        -- m: a node spawns only while a player is within this
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
 -- (0.15.478, owner 12:01 "that would be cool if monsters could damage structures, that would be an option for that mode",
@@ -371,14 +380,55 @@ local function wave(world, gid, spots)
 end
 
 -- Spawns up to SPAWN_PER_STEP queued monsters.
+-- (0.15.485) What is at a point: "building", "terrain", "empty", or nil when not known (an older EMF, not loaded).
+local function block_kind(world, x, y, z)
+  if not emf.block_at then return nil end
+  local ok, b = pcall(emf.block_at, world, x, y, z)
+  return ok and type(b) == "table" and b.kind or nil
+end
+
+-- (0.15.485) Whether a wall (a building block, or terrain a player placed) stands on the line from `a` to `b`.
+local function wall_between(world, a, b)
+  if not emf.find_wall then return false end
+  local ok, w = pcall(emf.find_wall, world, a, b, { terrain = true })
+  if not ok then ok, w = pcall(emf.find_wall, world, a, b) end  -- an older EMF: building blocks only
+  return ok and w ~= nil and w ~= false
+end
+
+-- (0.15.485) A spot for a monster of node `n` (its own spread): x, z. See SPOT_TRIES.
+local function pick_spot(world, q, spread)
+  if spread <= 0 then return q.x, q.z end
+  local from = { q.x, q.y + 1, q.z }
+  for _ = 1, SPOT_TRIES do
+    local a, r = math.random() * 2 * math.pi, math.sqrt(math.random()) * spread
+    local x, z = q.x + math.cos(a) * r, q.z + math.sin(a) * r
+    local bad = wall_between(world, from, { x, q.y + 1, z })
+      or block_kind(world, x, q.y + 1, z) == "building" or block_kind(world, x, q.y + 2, z) == "building"
+    if not bad then
+      local solid = true
+      for _, up in ipairs(SOLID_UP) do
+        if block_kind(world, x, q.y + up, z) ~= "terrain" then solid = false break end
+      end
+      bad = solid
+    end
+    if not bad then return x, z end
+  end
+  S.spot_fallbacks = (S.spot_fallbacks or 0) + 1
+  if S.spot_fallbacks <= 20 or S.spot_fallbacks % 100 == 0 then
+    emf.log(string.format("spawn nodes: node %s: no clear spot within %d m after %d tries: on the node itself (%d times so far)",
+      tostring(q.node), spread, SPOT_TRIES, S.spot_fallbacks))
+  end
+  return q.x, q.z
+end
+
 local function spawn_tick(world)
   local done = 0
   while #S.queue > 0 and done < SPAWN_PER_STEP do
     local q = table.remove(S.queue, 1)
     done = done + 1
     if data().nodes[tostring(q.node)] then
-      local a, r = math.random() * 2 * math.pi, math.sqrt(math.random()) * SPREAD
-      local x, z = q.x + math.cos(a) * r, q.z + math.sin(a) * r
+      local qn1 = data().nodes[tostring(q.node)]
+      local x, z = pick_spot(world, q, (qn1 and tonumber(qn1.spread)) or SPREAD)  -- (0.15.485) the node's spread, a clear spot
       -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
       local yaw = math.random() * 360
       if q.face == "player" and q.tx then yaw = yaw_to(x, z, q.tx, q.tz)
@@ -657,7 +707,7 @@ local function state(world, account, from)
     st.status[tostring(g.id)] = status(g.id)
   end
   for _, n in pairs(data().nodes) do
-    st.nodes[#st.nodes + 1] = { n.id, n.g, math.floor(n.x * 10 + 0.5) / 10, math.floor(n.y * 10 + 0.5) / 10, math.floor(n.z * 10 + 0.5) / 10 }
+    st.nodes[#st.nodes + 1] = { n.id, n.g, math.floor(n.x * 10 + 0.5) / 10, math.floor(n.y * 10 + 0.5) / 10, math.floor(n.z * 10 + 0.5) / 10, tonumber(n.spread) or SPREAD }  -- (0.15.485) [6] its spread
   end
   table.sort(st.nodes, function(a, b) return a[1] < b[1] end)
   st.max_nodes, st.max_groups = MAX_NODES, MAX_GROUPS
@@ -748,6 +798,15 @@ local function handle(world, account, entity, msg, from)
       emf.log(string.format("spawn nodes: player %s moved node %d to %.0f %.0f %.0f", who, n.id, x, y, z))
     end
     save()
+  elseif msg.op == "node_spread" then  -- (0.15.485) a node's "Spawn within"
+    local n = d.nodes[tostring(tonumber(msg.n) or -1)]
+    if not n then note("That node is gone.") return state(world, account, from) end
+    local v, okv = tonumber(msg.value), false
+    for _, c in ipairs(SPREADS) do if c == v then okv = true end end
+    if not okv then note("That setting was refused.") return state(world, account, from) end
+    n.spread = v
+    save()
+    emf.log(string.format("spawn nodes: player %s set node %d's spawn distance to %d m", who, n.id, v))
   elseif msg.op == "wire_here" and g then
     local ok, x, y, z = pcall(world.position, world, entity)
     if not (ok and x) then note("Your position is not known.") return state(world, account, from) end
@@ -1016,12 +1075,22 @@ function F.panel(world)
   table.sort(mine, function(a, b) return (a.d or 1e9) < (b.d or 1e9) end)
   rows[#rows + 1] = { heading = string.format("Nodes of %s (%d)", g.name, #mine) }
   rows[#rows + 1] = { button = "add", text = "Add node here", disabled = (#(v.nodes or {}) >= (v.max_nodes or MAX_NODES)) or nil,
-    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Monsters spawn within " .. SPREAD .. " m of it." }
+    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Its monsters spawn within " .. SPREAD .. " m of it (change it with Spawn within)." }
   for i = 1, math.min(#mine, NEAR_LIST) do
     local n = mine[i]
     rows[#rows + 1] = { dim = true, text = string.format("Node %d: %.0f, %.0f%s", n[1], n[3], n[5], n.d and string.format(", %d m away", math.floor(n.d)) or "") }
     rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand, facing the way you face." }
     rows[#rows + 1] = { button = "del:" .. n[1], text = "Delete", same_line = true, tooltip = "Deletes node " .. n[1] .. "." }
+    -- (0.15.485) its own spawn distance
+    local sp = tonumber(n[6]) or SPREAD
+    local opts = {}
+    for _, c in ipairs(SPREADS) do
+      opts[#opts + 1] = { key = "spread:" .. n[1] .. ":" .. c, text = c == 0 and "On the node" or (c .. " m"), selected = sp == c }
+    end
+    rows[#rows + 1] = { label = true, text = "    Spawn within" }
+    rows[#rows + 1] = { options = opts, text = sp == 0 and "On the node" or (sp .. " m"), same_line = true,
+      tooltip = "How far from node " .. n[1] .. " its monsters may appear. A spot behind a wall, inside a building or inside rock is not used: "
+        .. "FlameKit tries " .. SPOT_TRIES .. " spots, then uses the node itself. Chests and other placed objects are not seen." }
   end
   if #mine > NEAR_LIST then rows[#rows + 1] = { dim = true, text = string.format("(%d more further away)", #mine - NEAR_LIST) } end
 
@@ -1068,6 +1137,8 @@ function F.click(world, key)
     local dl = key:match("^del:(%d+)$")
     if mv then act(world, { op = "move_node", n = tonumber(mv) }) return end
     if dl then act(world, { op = "delete_node", n = tonumber(dl) }) return end
+    local sn, sv = key:match("^spread:(%d+):(%d+)$")
+    if sn then act(world, { op = "node_spread", n = tonumber(sn), value = tonumber(sv) }) return end
     local k, val = key:match("^set:([%w_]+):(.+)$")
     if k then
       local value = tonumber(val) or val

@@ -1,3 +1,7 @@
+0.15.485 Nov 23, 2026
+- Spawn Nodes: each node has its own Spawn within (on the node, 2, 5, 10, 15, 20 or 30 m; 10 m as before).
+- Spawn Nodes: monsters no longer appear behind or inside walls or inside rock: a spot with a building block or placed terrain between it and the node, a building block at it, or solid rock is not used (8 tries, then the node itself). Placed objects such as chests are not seen.
+
 0.15.484 Nov 23, 2026
 - Spawn Nodes: the raid switch is now named Players cannot damage base structures during raid.
 
