@@ -1,8 +1,8 @@
-0.15.520
+0.15.522
 2020 a354e5f1 flamekit/README.md
-149971 609e7882 flamekit/changes.txt
+150508 26dac18d flamekit/changes.txt
 2652 a9dd362b flamekit/main.lua
-15435 e4e6e7b3 flamekit/mod.json
+15435 ec86cd1d flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -35,6 +35,7 @@
 1628 4c6a2186 flamekit/core/store.lua
 3794 7588bc30 flamekit/core/test_players.lua
 629 1ebfa817 flamekit/core/test_tag.lua
+3494 570d163f flamekit/core/threat.lua
 1682 c64d052f flamekit/features/_template.lua
 4660 5910a758 flamekit/features/build_anywhere.lua
 30021 d9c248b9 flamekit/features/building.lua
@@ -55,7 +56,7 @@
 1954 eaeca7a7 flamekit/features/server_save.lua
 4581 f83117fb flamekit/features/server_version.lua
 11069 cb2dda6f flamekit/features/settings.lua
-136425 3a3d2b6d flamekit/features/spawn_nodes.lua
+136433 c30b7847 flamekit/features/spawn_nodes.lua
 6402 f83365e9 flamekit/features/travel_hide.lua
 6443 37b879dd flamekit/features/water_debug.lua
 4619 7bc42353 flamekit/features/companions/01_base.lua
@@ -75,4 +76,4 @@
 352844 3133a975 flamekit/sounds/raid_siren.wav
 705644 c44ea676 flamekit/sounds/raid_siren_twice.wav
 1179136 56081056 flamekit_native/flamekit_native.dll
-464 33069898 flamekit_native/mod.json
+464 11d4919e flamekit_native/mod.json

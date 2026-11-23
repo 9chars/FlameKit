@@ -36,6 +36,7 @@ local admins = require("core.admins")
 local players = require("core.players")
 local monsters = require("core.monsters")
 local spawn = require("core.spawn")
+local threat = require("core.threat")  -- (0.15.522)
 
 local F = { id = "spawn_nodes", title = "Spawn Nodes" }
 local kit
@@ -186,7 +187,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, poked = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, threat_seen = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -921,7 +922,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
   S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
   S.trickle_log = nil  -- (0.15.512)
-  S.ground_log, S.poke_log = nil, nil  -- (0.15.518); (0.15.520)
+  S.ground_log, S.threat_log = nil, nil  -- (0.15.518); (0.15.522)
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -1493,8 +1494,8 @@ end
 -- (then the next nearest player), when the monster dies, or with a reload (sent again 2 s later). Bosses are refused by
 -- EMF: they keep the game's own way.
 local HUNT_R = 120
-local POKE_AFTER = 3           -- s: (0.15.520) the first aggro hit, after the ground move (2 s after the spawn)
-local POKE_EVERY = 5           -- s: again while it has not moved 1 m
+local THREAT_R = 50            -- m: (0.15.521, owner 17:21) every player this near is written into a raid monster's threat table
+
 local function hunt_tick(world)
   if not emf.enemy_order then return end
   local spots = player_spots(world)
@@ -1502,32 +1503,31 @@ local function hunt_tick(world)
   local now0 = os.time()
   for _, ids in pairs(S.alive) do
     for id in pairs(ids) do
-      -- (0.15.520, owner 17:19 "when the monsters spawn can you add the players near by to their threat table or
-      -- something ... they're just not coming after me") the game's own way: a hit of 1 in the name of the nearest
-      -- player within HUNT_R m (emf.damage: a real hit, so the monster's aggro goes to him), POKE_AFTER s after it
-      -- appeared (after the ground move), and again every POKE_EVERY s while it has not moved 1 m
-      local t = S.track[id]
-      local pk = S.poked[id]
+      -- (0.15.522, owner 17:21 "any player near like 50 m gets automatically added to the monsters threat table, one of
+      -- their 5 or 6 slots", 17:22 "no hitting for +1 damage. I asked you to put me directly into their threat table.
+      -- you've done this before") every player within THREAT_R m of a raid monster is written straight into its threat
+      -- table (core/threat.lua: the way PvP players are, experimental.lua since 0.15.69), as Alarmed, every hunt tick
+      -- (2 s) while he is that near, and the game's own AddThreatTargetEvent is sent once for him. No hits.
       local okp0, px0, py0, pz0 = pcall(world.position, world, id)
-      if emf.damage and okp0 and px0 and (not t or now0 - t.born >= POKE_AFTER) then
-        local moved = pk and pk.x and dist2(px0, py0, pz0, pk.x, pk.y, pk.z) >= 1
-        if not pk or (not moved and now0 - pk.at >= POKE_EVERY) then
-          local best0, pid0 = nil, nil
-          for _, p in ipairs(spots) do
-            local d = dist2(px0, py0, pz0, p[2], p[3], p[4])
-            if d <= HUNT_R * HUNT_R and (not best0 or d < best0) then best0, pid0 = d, p[1] end
-          end
-          if pid0 then
-            local okd, hit = pcall(emf.damage, world, pid0, id, 1)
-            S.poked[id] = { at = now0, x = px0, y = py0, z = pz0, n = ((pk and pk.n) or 0) + 1 }
-            if (S.poke_log or 0) < 80 then
-              S.poke_log = (S.poke_log or 0) + 1
-              emf.log(string.format("spawn nodes: aggro: monster %s at %.0f %.0f %.0f hit for 1 in the name of player %s (%.0f m away), #%d: %s",
-                tostring(id), px0, py0, pz0, tostring(pid0), math.sqrt(best0), S.poked[id].n, (okd and hit) and "done" or ("refused: " .. tostring(hit))))
+      if okp0 and px0 then
+        local seen = S.threat_seen[id] or {}
+        S.threat_seen[id] = seen
+        for _, p in ipairs(spots) do
+          local d = dist2(px0, py0, pz0, p[2], p[3], p[4])
+          if d <= THREAT_R * THREAT_R then
+            local oka, res = pcall(threat.alarm, world, id, p[1], math.sqrt(d))
+            if not seen[p[1]] then
+              seen[p[1]] = true
+              local oke, sent = pcall(threat.event, id, p[1])
+              if (S.threat_log or 0) < 120 then
+                S.threat_log = (S.threat_log or 0) + 1
+                local okl, line = pcall(threat.line, world, id)
+                emf.log(string.format("spawn nodes: threat: monster %s at %.0f %.0f %.0f: player %s (%.0f m) written into its threat table: %s; event %s; table now [%s]",
+                  tostring(id), px0, py0, pz0, tostring(p[1]), math.sqrt(d), oka and tostring(res) or ("error: " .. tostring(res)),
+                  (oke and sent) and "sent" or "not sent", okl and line or "?"))
+              end
             end
           end
-        elseif moved then
-          pk.x, pk.y, pk.z, pk.at = px0, py0, pz0, now0  -- it moves: no more pokes needed now
         end
       end
       local o = S.orders[id]
@@ -1588,10 +1588,10 @@ local function hunt_tick(world)
     for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
     if not alive then S.orders[id] = nil end
   end
-  for id in pairs(S.poked) do  -- (0.15.520)
+  for id in pairs(S.threat_seen) do  -- (0.15.522)
     local alive = false
     for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
-    if not alive then S.poked[id] = nil end
+    if not alive then S.threat_seen[id] = nil end
   end
 end
 
@@ -2094,7 +2094,7 @@ function F.tick(world)
     S.checks = {}  -- (0.15.508)
     S.hunt_pos = {}  -- (0.15.511)
     S.halted = {}  -- (0.15.514)
-    S.poked = {}  -- (0.15.520)
+    S.threat_seen = {}  -- (0.15.522)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
@@ -2501,6 +2501,7 @@ F._test_raid_monster = function(...) return raid_monster(...) end  -- (0.15.507)
 F._test_S = S  -- (0.15.507)
 F._test_spawn_tick = function(w) spawn_tick(w) end  -- (0.15.508)
 F._test_trickle = function(w) trickle_tick(w) end  -- (0.15.512)
+F._test_hunt = function(w) hunt_tick(w) end  -- (0.15.521)
 F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
 
 return F
