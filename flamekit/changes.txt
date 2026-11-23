@@ -1,3 +1,6 @@
+0.15.512 Nov 23, 2026
+- Spawn Nodes: Monsters per node and Most alive per node work together: in a wave each node spawns its Monsters per node one after another, never more alive at once than Most alive per node (the next one comes when one dies), and the wave is over only when every node has spawned all of its monsters; then Between waves starts. Before, a node spawned only what fit under Most alive per node and the rest of the wave was lost.
+
 0.15.511 Nov 23, 2026
 - Spawn Nodes: more in the server's log during a raid: each order a monster gets (at which player, how far), every 10 s how many monsters have an order, go for their player and moved, and for each stuck one its order, what it goes for and whether the game has a way from it to the player.
 

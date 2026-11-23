@@ -587,7 +587,10 @@ local function persist()
   for gid, r in pairs(S.raid) do out.raid[tostring(gid)] = { place = r.place, spawned = r.spawned, first_id = r.first_id } end
   for gid, at in pairs(S.started) do out.started[tostring(gid)] = at end
   for gid, run in pairs(S.runs) do
-    out.runs[tostring(gid)] = { wave = run.wave, waves = run.waves, next_in = math.max(0, run.next_at - S.steps), by = run.by }
+    local owed = nil
+    if run.owed then owed = {} for nid, v in pairs(run.owed) do owed[tostring(nid)] = v end end
+    out.runs[tostring(gid)] = { wave = run.wave, waves = run.waves, next_in = math.max(0, run.next_at - S.steps), by = run.by,
+                                in_wave = run.in_wave or nil, owed = owed }  -- (0.15.512)
   end
   local text = emf.json.encode(out)
   if text ~= S.persisted then
@@ -616,7 +619,10 @@ local function restore()
   for k, run in pairs(saved.runs or {}) do
     local gid = tonumber(k)
     if gid and group(gid) and type(run) == "table" then
-      S.runs[gid] = { wave = tonumber(run.wave) or 0, waves = tonumber(run.waves) or 1, next_at = S.steps + (tonumber(run.next_in) or 0), by = run.by }
+      local owed = nil
+      if type(run.owed) == "table" then owed = {} for k2, v in pairs(run.owed) do if tonumber(k2) then owed[tonumber(k2)] = tonumber(v) or 0 end end end
+      S.runs[gid] = { wave = tonumber(run.wave) or 0, waves = tonumber(run.waves) or 1, next_at = S.steps + (tonumber(run.next_in) or 0), by = run.by,
+                      in_wave = run.in_wave == true and owed ~= nil, owed = owed }  -- (0.15.512)
     end
   end
   for _, g in ipairs(groups()) do  -- (0.15.500) its monsters live but its raid was over or not known: a raid again
@@ -881,6 +887,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.started[gid] = os.time()  -- (0.15.492) for its time limit
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
   S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
+  S.trickle_log = nil  -- (0.15.512)
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -902,19 +909,22 @@ local function wave(world, gid, spots)
   local pool = POOL[g.family] or POOL.Random
   local queued, skipped = 0, 0
   local anyone = group_near(spots, gid)
+  -- (0.15.512, owner 16:19 "I want each monster to spawn once at a time in a node and I want it to spawn 5 monsters
+  -- before that wave is over", 16:20 "in some spots you cannot spawn 5 monsters at once in a tiny spot") a wave gives
+  -- every node "Monsters per node" monsters to spawn (run.owed); trickle_tick spawns them one by one while fewer than
+  -- "Most alive per node" of the node's are alive; the wave is over when every node has spawned all of them, and only
+  -- then "Between waves" starts. Nobody near: the wave waits.
+  run.owed = {}
+  local _ = pool
   for _, n in ipairs(nodes_of(gid)) do
     if anyone then
-      local room = math.max(0, g.max_alive - alive_count(n.id))
-      local tx, tz = nearest_player(spots, n.x, n.y, n.z, ACTIVE_DIST)  -- (0.15.477) for "face the nearest player"
-      for _ = 1, math.min(g.per_wave, room) do
-        S.queue[#S.queue + 1] = { node = n.id, x = n.x, y = n.y, z = n.z, guid = pool[math.random(#pool)], face = g.face,
-                                  tx = tx, tz = tz, yaw = n.yaw }
-        queued = queued + 1
-      end
+      run.owed[n.id] = g.per_wave
+      queued = queued + g.per_wave
     else
       skipped = skipped + 1
     end
   end
+  run.in_wave = queued > 0
   emf.log(string.format("spawn nodes: %s wave %d of %d: %d monster(s)%s", g.name, run.wave, run.waves, queued,
     skipped > 0 and string.format(", skipped: no player within %d m of its nodes", g.near_r or 50) or ""))
   -- (0.15.488) the notices
@@ -947,7 +957,64 @@ local function wave(world, gid, spots)
     -- (0.15.495, owner 14:45 "get rid of the (wave 4 of 5, 6 monsters) bullshit no one wants to see that")
     raid_notice(world, gid, string.format("%s at %s!", last and "Final wave incoming" or "New incoming wave", r.place or "the raid"), true, 10)
   end
-  if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
+  if queued == 0 then  -- nobody near: this wave is spent (as before 0.15.512)
+    if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
+  end
+end
+
+-- (0.15.512) The monsters of a node queued or being checked, not spawned yet.
+local function node_pending(nid)
+  local n = 0
+  for _, q in ipairs(S.queue) do if q.node == nid then n = n + 1 end end
+  for q in pairs(S.checks) do if q.node == nid then n = n + 1 end end
+  return n
+end
+
+-- (0.15.512) Every half second: each node of a wave spawns its next monster while fewer than its group's "Most alive per
+-- node" are alive (and queued); the wave ends when every node has spawned all of its "Monsters per node".
+local function trickle_tick(world)
+  local spots = nil
+  for gid, run in pairs(S.runs) do
+    local g = group(gid)
+    if g and run.in_wave and run.owed then
+      spots = spots or player_spots(world)
+      if not group_near(spots, gid) then
+        if not run.held then
+          run.held = true
+          emf.log(string.format("spawn nodes: %s wave %d: nobody within %d m of its nodes: it waits", g.name, run.wave, g.near_r or 50))
+        end
+      else
+        run.held = nil
+        local pool = POOL[g.family] or POOL.Random
+        local left = 0
+        for nid, owed in pairs(run.owed) do
+          local n = data().nodes[tostring(nid)]
+          if not n then
+            run.owed[nid] = nil
+          elseif owed > 0 then
+            if alive_count(nid) + node_pending(nid) < g.max_alive then
+              local tx, tz = nearest_player(spots, n.x, n.y, n.z, ACTIVE_DIST)  -- (0.15.477) for "face the nearest player"
+              S.queue[#S.queue + 1] = { node = nid, x = n.x, y = n.y, z = n.z, guid = pool[math.random(#pool)], face = g.face,
+                                        tx = tx, tz = tz, yaw = n.yaw }
+              owed = owed - 1
+              run.owed[nid] = owed
+              if (S.trickle_log or 0) < 200 then
+                S.trickle_log = (S.trickle_log or 0) + 1
+                emf.log(string.format("spawn nodes: %s wave %d: node %d spawns its next monster (%d of %d; %d more to come, %d alive)", g.name,
+                  run.wave, nid, g.per_wave - owed, g.per_wave, owed, alive_count(nid)))
+              end
+            end
+            left = left + owed
+          end
+        end
+        if left == 0 then
+          run.in_wave, run.owed = false, nil
+          emf.log(string.format("spawn nodes: %s wave %d of %d: every node has spawned its monsters", g.name, run.wave, run.waves))
+          if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
+        end
+      end
+    end
+  end
 end
 
 -- (0.15.492, owner 14:07 "there needs to be a total raid duration.. so if the raid goes on for 30 mins the raid ends,
@@ -1905,6 +1972,7 @@ function F.tick(world)
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)
+  if S.steps % 30 == 11 then local okt, why = pcall(trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
   if S.verify then verify_tick(world) end  -- (0.15.505)
   if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
   ground.tick(world)
@@ -1919,7 +1987,7 @@ function F.tick(world)
   if not need_spots then return end
   local spots = player_spots(world)
   for gid, run in pairs(S.runs) do
-    if S.steps >= run.next_at then wave(world, gid, spots) end
+    if S.steps >= run.next_at and not run.in_wave then wave(world, gid, spots) end  -- (0.15.512) not while a wave still spawns
   end
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
@@ -2143,8 +2211,10 @@ function F.panel(world)
   end
   choice_row(rows, g, "waves", "Waves", "How many waves one start brings.")
   choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves.")
-  choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave.")
-  choice_row(rows, g, "max_alive", "Most alive per node", "A node spawns no more while this many of its monsters are alive.")
+  choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave, one after another (see Most alive per node). "
+    .. "The wave is over when every node has spawned all of them; then Between waves starts.")  -- (0.15.512)
+  choice_row(rows, g, "max_alive", "Most alive per node", "At most this many of a node's monsters are alive at once: its next one comes when one of them dies. "
+    .. "1: one at a time.")
   choice_row(rows, g, "duration", "Raid lasts at most", "From its start: when this time is up its raid ends, whatever is left: no more waves, its "
     .. "living monsters are taken away (and with them its protection), the bodies stay.")  -- (0.15.492)
   choice_row(rows, g, "cooldown", "Cooldown", "After its waves, the trigger cannot fire again for this long.")
@@ -2296,6 +2366,7 @@ F._test_set_shown = function(st) C.shown = st end  -- (0.15.504)
 F._test_raid_monster = function(...) return raid_monster(...) end  -- (0.15.507)
 F._test_S = S  -- (0.15.507)
 F._test_spawn_tick = function(w) spawn_tick(w) end  -- (0.15.508)
+F._test_trickle = function(w) trickle_tick(w) end  -- (0.15.512)
 F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
 
 return F
