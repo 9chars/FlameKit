@@ -1,3 +1,6 @@
+0.15.491 Nov 23, 2026
+- Spawn Nodes: a group starts only when a player is within its new Player within distance of one of its nodes (20, 30, 50, 75 or 100 m; 50 m by default), whatever its trigger, also Start now; its waves come only while one is, and then at all its nodes. A timer that is due waits for a player; a time of day with nobody near is skipped that day.
+
 0.15.490 Nov 23, 2026
 - Spawn Nodes: the raid's place is now what the minimap shows as where the player who started or triggered the raid is (the nearest named place, a flame altar by its name too, else the region); his game sends it to the server when the raid starts. For a timer or a time of day it is the player nearest the raid. Needs FlameKit 0.15.490 in that player's game; else the name of the flame altar nearest the raid.
 

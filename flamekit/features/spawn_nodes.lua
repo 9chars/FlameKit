@@ -15,7 +15,7 @@
 -- trip wire (a player within `wire_r` m of the group's trip wire point, set with "Put trip wire here"), time of day
 -- (when the game's clock passes `hour`), base raid (a player inside a flame altar area within `raid_r` m of one of the
 -- group's nodes). "Start now" works for every trigger and ignores the cooldown.
--- A node spawns only while a player is within ACTIVE_DIST m of it (the game removes monsters far from every player);
+-- (0.15.491: a group starts and its waves come only while a player is within its near_r of one of its nodes.) Before: a node spawned only while a player was within ACTIVE_DIST m of it (the game removes monsters far from every player);
 -- the others skip that wave. Monsters spawn within SPREAD m of their node and are put on the ground (core/spawn.lua).
 -- Kept on the server in spawn_nodes.json (kit.store): groups and nodes. What runs (waves, monsters alive) is not kept:
 -- a restart or reload ends running waves; the game keeps or removes the monsters as it does any monster.
@@ -58,7 +58,7 @@ local SPREAD = 10              -- m: monsters spawn within this of their node (t
 local SPREADS = { 0, 2, 5, 10, 15, 20, 30 }
 local SPOT_TRIES = 8
 local SOLID_UP = { 1.5, 3.0 }
-local ACTIVE_DIST = 100        -- m: a node spawns only while a player is within this
+local ACTIVE_DIST = 100        -- m: (0.15.491) now only how far a monster looks for the player to face
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
 -- (0.15.478, owner 12:01 "that would be cool if monsters could damage structures, that would be an option for that mode",
 -- "prevent players from damaging structures while the raid is active", 12:03 "yes research both we need that setting")
@@ -118,10 +118,11 @@ local CHOICES = {
   max_alive = { 3, 6, 10, 20, 40 }, cooldown = { 1, 2, 5, 10, 15, 30, 60 }, timer_min = { 1, 2, 5, 10, 15, 30, 60, 120 },
   timer_max = { 1, 2, 5, 10, 15, 30, 60, 120 }, wire_r = { 5, 10, 20, 30, 50 }, hour = { 0, 6, 12, 18, 20, 22 },
   raid_r = { 50, 100, 150, 250, 400 },
+  near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
 }
-local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m" }
+local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m" }
 local DEFAULTS = { announce = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
-  cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150 }
+  cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
 -- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
@@ -504,7 +505,19 @@ local function raid_tick(world)
   end
 end
 
+-- (0.15.491, owner 14:04 "someone should be near it for it to even start... 100 m is kind of far way don't you think?",
+-- "yeah build it that way") Whether a player is within the group's "Player within" (near_r) of one of its nodes.
+local function group_near(spots, gid)
+  local g = group(gid)
+  local r = g and g.near_r or 50
+  for _, n in ipairs(nodes_of(gid)) do
+    if player_near(spots, n.x, n.y, n.z, r) then return true end
+  end
+  return false
+end
+
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
+-- (0.15.491) Never without a player within its near_r of one of its nodes: false, the reason, "nobody".
 local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player who started or triggered it
   local g = group(gid)
   if not g or S.runs[gid] then return false, "This group is already running." end
@@ -512,6 +525,9 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
     if not g.on then return false end
     local since = os.time() - (S.last_end[gid] or 0)
     if since < g.cooldown * 60 then return false end
+  end
+  if not group_near(player_spots(world), gid) then
+    return false, string.format("Nobody is within %d m of its nodes: it does not start.", g.near_r or 50), "nobody"
   end
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
@@ -525,7 +541,8 @@ local function finish(gid)
   S.next_timer[gid] = nil  -- the timer picks its next time from now
 end
 
--- One wave of group `gid`: monsters queued at every node with a player near.
+-- One wave of group `gid`: monsters queued at every node, (0.15.491) while a player is within its near_r of any of
+-- them (else the wave is skipped: nobody there).
 local function wave(world, gid, spots)
   local g = group(gid)
   local run = S.runs[gid]
@@ -533,8 +550,9 @@ local function wave(world, gid, spots)
   run.wave = run.wave + 1
   local pool = POOL[g.family] or POOL.Random
   local queued, skipped = 0, 0
+  local anyone = group_near(spots, gid)
   for _, n in ipairs(nodes_of(gid)) do
-    if player_near(spots, n.x, n.y, n.z, ACTIVE_DIST) then
+    if anyone then
       local room = math.max(0, g.max_alive - alive_count(n.id))
       local tx, tz = nearest_player(spots, n.x, n.y, n.z, ACTIVE_DIST)  -- (0.15.477) for "face the nearest player"
       for _ = 1, math.min(g.per_wave, room) do
@@ -547,7 +565,7 @@ local function wave(world, gid, spots)
     end
   end
   emf.log(string.format("spawn nodes: %s wave %d of %d: %d monster(s)%s", g.name, run.wave, run.waves, queued,
-    skipped > 0 and string.format(", %d node(s) skipped (no player within %d m)", skipped, ACTIVE_DIST) or ""))
+    skipped > 0 and string.format(", skipped: no player within %d m of its nodes", g.near_r or 50) or ""))
   -- (0.15.488) the notices
   local r = S.raid[gid]
   if not r and queued > 0 then
@@ -835,7 +853,9 @@ local function trigger_tick(world, spots)
           local lo, hi = math.min(g.timer_min, g.timer_max), math.max(g.timer_min, g.timer_max)
           S.next_timer[gid] = os.time() + math.random(lo * 60, hi * 60)
         elseif os.time() >= S.next_timer[gid] then
-          if not fire(world, gid, "the timer") then S.next_timer[gid] = nil end
+          -- (0.15.491) nobody near: it waits (fires when someone comes); any other refusal: a new time
+          local ok, _, code = fire(world, gid, "the timer")
+          if not ok and code ~= "nobody" then S.next_timer[gid] = nil end
         end
       elseif g.trigger == "wire" and g.wire then
         for _, p in ipairs(spots) do  -- (0.15.490) the one who crossed it
@@ -1271,7 +1291,7 @@ function F.panel(world)
   rows[#rows + 1] = { button = "on", text = (g.on and "On    " or "Off   ") .. "Group on", selected = g.on == true,
     tooltip = "Off: its trigger never fires (Start now still works)." }
   rows[#rows + 1] = { button = "start", text = "Start now", same_line = true, disabled = g.running or nil,
-    tooltip = "Starts its waves now, whatever its trigger, also during its cooldown. Nodes without a player within " .. ACTIVE_DIST .. " m skip a wave." }
+    tooltip = "Starts its waves now, whatever its trigger, also during its cooldown, when a player is within its Player within distance of one of its nodes." }
   rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
   rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
     tooltip = "Removes this group's monsters only, alive or dead (their bodies on the ground too); other groups' and the world's "
@@ -1301,6 +1321,8 @@ function F.panel(world)
       .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
       .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
       .. "Admins too, for now." }
+  choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
+    .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
   if g.trigger == "timer" then
     choice_row(rows, g, "timer_min", "Timer from", "The timer fires at a random time between these two (after the cooldown).")
