@@ -1709,6 +1709,22 @@ once). Published to Development (dist-test 0.15.455 signed, replaces 0.15.454) a
 .old_453, Lua mod.json + changes.txt; hot reload fine 18:49:35). Next: the real test on the owner's game (put the game's
 EMF back to 0.6.6 from the .old_066 files, start: FlameKit updates to 0.15.455, restart: EMF update to 0.6.19, restart:
 check) - ASK before touching his game's EMF.
+18:52 owner "lets do the test": game's EMF put back to 0.6.6 (current files renamed <name>.v0619, .old_066 back; all 10
+equal to the 0.6.6 backup; the .v0619 copies are still there, harmless), game started by the helper 18:52:29.
+FlameKit 0.15.453 -> 0.15.455 (owner clicked Restart Game 18:52:52), 18:53:00 game on EMF 0.6.6 + FlameKit 0.15.455:
+18:53:19 "EMF v0.6.19 is there (here: v0.6.6): 21 file(s), 21728 KB", 18:53:28 "is in place". BUGS the owner found:
+18:53 "it says "FlameKit v0.6.19 has been downloaded" thats a bug" (the update dialog took the first " v" of the status
+line), 18:54 "it should say Enshrouded Modding Framework (EMF)", 18:56 About: "(v0.6.19 at next game start)" "should
+be rephrased to say (v0.6.19 installs at restart)". Also found in the log: GetFileVersionInfo answers for a LOADED DLL
+with the loaded copy ("v0.6.6 here" after the install). 0.15.456 (9ec397d, DLL md5 d33b17824a50651cfad78468a2cac15c,
+tests ALL PASSED): the dialog and the Messages line name "Enshrouded Modding Framework (EMF) vY" (status text "ready|
+Enshrouded Modding Framework (EMF) vY is ready..." / "ready|Update vX and Enshrouded Modding Framework (EMF) vY are
+ready..."; the dialog reads the versions after "|Update v" and "(EMF) v"; dialog 560 wide, two lines for both), About
+"(vY installs at restart)", the version read from the file's bytes (cached by size + time). Published to Development and
+the local server 18:57-18:58. **18:58:46 the owner's game: emf_core 0.6.19, 98 of 98 signatures, FlameKit 0.15.456,
+"this game runs EMF v0.6.19 (10 file(s) left by an EMF update removed)", "EMF v0.6.19 in the list, v0.6.19 here:
+nothing to do", no .emfold/.emfnew left, emf\flamekit_emf_backup = EMF 0.6.6. THE EMF UPDATER WORKS END TO END.**
+Not yet: the Stable channel (emf-dist + dist) and the players' package; G-Portal stays on EMF 0.6.6 (rule 0g).
 
 ## Things learned the hard way
 
