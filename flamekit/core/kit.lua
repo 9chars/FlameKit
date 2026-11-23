@@ -343,8 +343,24 @@ local function update_message()
   end
 end
 
+-- (0.15.458, owner 2026-11-22 19:22 "when the game mod loads up, it needs to add a message to the "Chat" tab displaying
+-- the current running EMF version. It should look like: Enshrouded Modding Framework (EMF): v0.6.19") once when the Lua
+-- part starts: FlameKit Native writes the version of the EMF this game runs to emf_version.txt at the game's start
+-- (nothing with an older FlameKit Native: no file).
+local emf_version_told = false
+local function emf_version_message()
+  if emf_version_told then return end
+  emf_version_told = true
+  local f = io.open(emf.dir .. "\\emf_version.txt", "r")
+  local v = f and f:read("l")
+  if f then f:close() end
+  v = v and v:match("^%s*([%d%.]+)%s*$")
+  if v then kit.note("Enshrouded Modding Framework (EMF): v" .. v, "#ffffff", true) end
+end
+
 -- Every step of the player's own world: writes the feed, the tabs, the notices and the HUD label for FlameKit Native.
 local function hud_tick(world)
+  emf_version_message()  -- (0.15.458) once
   write_messages()
   write_tabs()  -- (0.15.377)
   expire_notices()

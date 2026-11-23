@@ -7532,8 +7532,14 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
         EMF_LOG(kMod, "on a dedicated server: only the companion part runs (%s)", ok ? "loaded" : "NOT loaded");
         return true;
     }
-    // (0.15.455) the EMF this game runs, for the About tab: read before any thread of this DLL starts
-    g_emf_version = widen(emf_update::version_string(g_game_dir + L"emf\\emf_core.dll", L"FileVersion"));
+    // (0.15.455) the EMF this game runs, for the About tab: read before any thread of this DLL starts. (0.15.458, owner
+    // 19:22 "when the game mod loads up, it needs to add a message to the "Chat" tab displaying the current running EMF
+    // version") also written to emf\mods\flamekit\emf_version.txt, which the Lua part reads once (core/kit.lua)
+    {
+        const std::string v = emf_update::version_string(g_game_dir + L"emf\\emf_core.dll", L"FileVersion");
+        g_emf_version = widen(v);
+        web_update::write_file(g_flamekit_dir + L"emf_version.txt", std::vector<uint8_t>(v.begin(), v.end()));
+    }
     // a new version's Lua part, held since the last session: in place now, so the Lua part and this DLL switch together
     const bool installed = web_update::install_pending(g_game_dir + L"emf\\mods\\", [](const char* text) {
         FK_LOG(std::strstr(text, "failed") || std::strstr(text, "does not match") ? fklog::kWarn : fklog::kInfo, "%s", text);

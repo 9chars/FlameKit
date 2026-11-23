@@ -1,3 +1,6 @@
+0.15.458 Nov 22, 2026
+- When the game starts, the Chat tab of the Messages window shows which version of the Enshrouded Modding Framework this game runs: "Enshrouded Modding Framework (EMF): v0.6.19".
+
 0.15.457 Nov 22, 2026
 - Updates: the update window wraps its text to the next line and grows to fit, so the Enshrouded Modding Framework's full name is no longer cut off.
 
