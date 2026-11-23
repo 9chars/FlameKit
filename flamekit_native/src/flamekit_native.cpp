@@ -87,6 +87,7 @@ inline uint32_t pointer_key_vk(const std::string& text) {
 struct Settings {
     bool show = true;
     bool hide_build = true;  // ui_hide_build: all of FlameKit's UI hides in build mode (switched in the Windows tab)
+    bool emf_update = true;  // (0.15.455) emf_update: FlameKit's updater keeps EMF up to date (switched in the About tab)
     int size = 300;          // the dial's width and height in pixels
     bool square = false;     // map_shape: the dial is a square instead of a circle (0.15.75)
     uint32_t toggle_vk = VK_F10;
@@ -189,6 +190,7 @@ void read_settings() {
     s.labels = emf::setting_bool(kKit, "map_labels", true);
     s.hide_menus = emf::setting_bool(kKit, "map_hide_in_menus", true);
     s.hide_build = emf::setting_bool(kKit, "ui_hide_build", true);
+    s.emf_update = emf::setting_bool(kKit, "emf_update", true);  // (0.15.455) also true with an older Lua part (not declared)
     s.move = false;  // set by the UI thread while the pointer is out (the setting map_move is gone since 0.15.34)
     s.pos_x = static_cast<int>(emf::setting_float(kKit, "map_x", -1.0));
     s.pos_y = static_cast<int>(emf::setting_float(kKit, "map_y", -1.0));
@@ -2339,6 +2341,7 @@ struct Layer {
 HDC g_screen = nullptr;  // the screen's DC, for the text painters (UI thread)
 std::wstring g_flamekit_dir;  // ...\emf\mods\flamekit\ (ends with a backslash)
 std::wstring g_game_dir;      // the game's folder (ends with a backslash)
+std::wstring g_emf_version;   // (0.15.455) the EMF this game runs (emf\emf_core.dll's FileVersion at the start), for the About tab
 
 // The folder of the running exe (the game's folder), with a trailing backslash.
 std::wstring game_dir_of_process() {
@@ -4164,7 +4167,7 @@ struct WindowLayer : Layer {
         std::vector<ListOpt> list;  // a drop-down's entries (kind d)
     };
     static constexpr wchar_t kRedLine = L'\x01';  // at the start of a tooltip's paragraph: drawn in red
-    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kChangeLog, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey };
+    enum Kind { kBagItem, kJunkItem, kAuto, kDump, kDrop, kDropOption, kBagPrev, kBagNext, kJunkPrev, kJunkNext, kTab, kRowButton, kRowPrev, kRowNext, kCheckUpdates, kPinShow, kPinReset, kHideBuild, kScrollTrack, kScrollThumb, kClose, kOpt, kRowItem, kListBox, kListOpt, kChangeLog, kWinKey, kWinToggle, kMapShow, kMapReset, kResetAll, kWinPtrKey, kEmfUpdate };
     struct Hit {
         RECT r;
         Kind kind;
@@ -4987,7 +4990,7 @@ struct WindowLayer : Layer {
         kBagTop = kBagHead + 30;
         kJunkHead = kBagTop + kBagRows * kIcon + (kBagRows - 1) * kGap + kPad;
         kJunkTop = kJunkHead + 30;
-        kViewTop = kTop + 2 + (current == "about" ? 44 : 0);  // About: the Check for updates button above
+        kViewTop = kTop + 2 + (current == "about" ? 84 : 0);  // About: the Check for updates button and (0.15.455) the EMF row above
         kViewBottom = kH - kPad;
     }
 
@@ -5046,6 +5049,23 @@ struct WindowLayer : Layer {
             button(kW - kPad - cw, kTop + 4, cw, L"Check for updates", false, kCheckUpdates);
             const int lw = text.width(L"Change Log") + 24;  // (0.15.193, owner) changes.txt in its own window (ChangeLogDialog)
             button(kW - kPad - cw - 8 - lw, kTop + 4, lw, L"Change Log", false, kChangeLog);
+            // (0.15.455, owner 18:45 "we need my mod to display the EMF version some place too, probably in the "About"
+            // tab? and probably add an option there also to "Keep Enshrouded Modding Framework (EMF) updated."") the EMF
+            // this game runs (and one waiting for the next start), and the switch for EMF's own update (emf_update.hpp)
+            static const std::wstring kEmfTip =
+                L"On: FlameKit keeps the Enshrouded Modding Framework (EMF), which FlameKit runs on, at the version FlameKit "
+                L"was tested with. It never installs an older EMF, keeps the EMF from before the update in "
+                L"emf\\flamekit_emf_backup, and the new EMF starts with the next game start. Your EMF settings and other "
+                L"mods are not touched.\nOff: EMF stays as it is; you update it yourself.";
+            const std::string waiting = emf_update::ready_version();
+            std::wstring line = L"Enshrouded Modding Framework (EMF): v" + (g_emf_version.empty() ? std::wstring(L"?") : g_emf_version);
+            if (!waiting.empty()) line += L"  (v" + widen(waiting) + L" at the next game start)";
+            text.draw(canvas, kPad, kTop + 49, line, 150, 155, 165);
+            const bool on = settings().emf_update;
+            const std::wstring label = on ? L"Keep EMF updated: ON" : L"Keep EMF updated: OFF";
+            const int ew = text.width(L"Keep EMF updated: OFF") + 24;
+            button(kW - kPad - ew, kTop + 44, ew, label, on, kEmfUpdate);
+            hits.back().tip = &kEmfTip;
         }
         // the frame, and the grip in the lower right corner that resizes the window
         frame_box(0, 0, kW, kH, 1, 120, 160, 220);
@@ -5402,6 +5422,10 @@ struct WindowLayer : Layer {
                 break;
             case kHideBuild:  // the setting is switched by the Lua part (features/settings.lua), like the Auto Junk List's options
                 act("opt", "b:ui_hide_build");
+                break;
+            case kEmfUpdate:  // (0.15.455) the same way: EMF's own setting emf_update, saved by the Lua part
+                act("opt", "b:emf_update");
+                FK_LOG(fklog::kInfo, "window: Keep EMF updated %s", settings().emf_update ? "off" : "on");
                 break;
             case kWinKey:  // (0.15.112) wait for a key (the same click again: stop waiting)
                 if (h.index < kWinKeyCount) {
@@ -7438,6 +7462,7 @@ void updater_body() {
     updater.log = [](int level, const char* text) {
         FK_LOG(level == 2 ? fklog::kWarn : level == 1 ? fklog::kDebug : fklog::kInfo, "%s", text);
     };
+    updater.emf_wanted = [] { return settings().emf_update; };  // (0.15.455) the About tab's "Keep EMF updated"
     updater.run();
 }
 void updater_thread() { fklog::guarded("updater", updater_body); }
@@ -7472,6 +7497,8 @@ extern "C" __declspec(dllexport) bool emf_mod_load(const EmfApi* api) {
         EMF_LOG(kMod, "on a dedicated server: only the companion part runs (%s)", ok ? "loaded" : "NOT loaded");
         return true;
     }
+    // (0.15.455) the EMF this game runs, for the About tab: read before any thread of this DLL starts
+    g_emf_version = widen(emf_update::version_string(g_game_dir + L"emf\\emf_core.dll", L"FileVersion"));
     // a new version's Lua part, held since the last session: in place now, so the Lua part and this DLL switch together
     const bool installed = web_update::install_pending(g_game_dir + L"emf\\mods\\", [](const char* text) {
         FK_LOG(std::strstr(text, "failed") || std::strstr(text, "does not match") ? fklog::kWarn : fklog::kInfo, "%s", text);

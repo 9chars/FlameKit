@@ -1,3 +1,7 @@
+0.15.455 Nov 22, 2026
+- About tab: shows which version of the Enshrouded Modding Framework (EMF) this game runs, and a new EMF version waiting for the next game start.
+- About tab: new switch "Keep EMF updated" (on by default; also in EMF's Mods tab as "Keep Enshrouded Modding Framework (EMF) updated"). Off: FlameKit leaves EMF as it is.
+
 0.15.454 Nov 22, 2026
 - Updates: FlameKit's updater now also keeps EMF (the modding framework FlameKit runs on) up to date, to the EMF version FlameKit was tested with. It never installs an older EMF, keeps the EMF from before the update in emf\flamekit_emf_backup, and the new EMF starts with the next game start. Your EMF settings and other mods are not touched.
 

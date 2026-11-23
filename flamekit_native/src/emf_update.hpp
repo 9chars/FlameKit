@@ -34,6 +34,7 @@
 #pragma once
 
 #include <functional>
+#include <mutex>
 #include <string>
 #include <vector>
 #pragma comment(lib, "version.lib")
@@ -112,6 +113,14 @@ inline bool allowed(const std::string& p) {
     const size_t dot = low.find_last_of('.');
     if (dot != std::string::npos && (low.substr(dot) == ".emfold" || low.substr(dot) == ".emfnew")) return false;  // the update's own names
     return true;
+}
+
+// (0.15.455) The EMF version put in place in this session (waiting for the next start), for the About tab; empty when none.
+inline std::mutex g_ready_mx;
+inline std::string g_ready;
+inline std::string ready_version() {
+    std::lock_guard<std::mutex> l(g_ready_mx);
+    return g_ready;
 }
 
 // One file of the list.
@@ -403,6 +412,10 @@ struct Emf {
                         " changed file(s) put back; tried again in 30 minutes");
         }
         ready = version;
+        {
+            std::lock_guard<std::mutex> l(g_ready_mx);
+            g_ready = version;
+        }
         failed_list.clear();
         last_note.clear();
         note(0, "update (EMF): EMF v" + version + " is in place (" + std::to_string(done.size()) + " file(s), " + std::to_string(total / 1024) +

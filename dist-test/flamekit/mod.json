@@ -1,7 +1,7 @@
 {
   "id": "flamekit",
   "name": "FlameKit",
-  "version": "0.15.454",
+  "version": "0.15.455",
   "description": "One toolkit, many features (F4 opens its window). Auto Junk List: junk is dropped or deleted when you loot it. Minimap: a round map of the ground around you (needs the FlameKit Native part, in your game only). Experimental: each player's own switches (no shroud damage, no fall damage, invincible mode, unlimited stamina, enhanced glider) and two travel buttons. On a dedicated server, install FlameKit on the server and in your game.",
   "authors": [
     "Ninechars"
@@ -274,6 +274,15 @@
       "help": "While you build, all of FlameKit on your screen is hidden so nothing is in the way: the minimap, the party window, Messages, Notices and the FlameKit lines in the lower left corner. FlameKit's window still opens.",
       "live": true,
       "group": "Windows"
+    },
+    {
+      "key": "emf_update",
+      "type": "bool",
+      "default": true,
+      "label": "Keep Enshrouded Modding Framework (EMF) updated",
+      "help": "On: FlameKit keeps EMF, which FlameKit runs on, at the version FlameKit was tested with. It never installs an older EMF, keeps the EMF from before the update in emf\\flamekit_emf_backup, and the new EMF starts with the next game start. Off: EMF stays as it is. Also in FlameKit's About tab.",
+      "live": true,
+      "group": "Updates"
     },
     {
       "key": "map_x",

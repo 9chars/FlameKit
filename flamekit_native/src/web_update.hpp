@@ -370,6 +370,8 @@ struct Updater {
     std::wstring root;      // (0.15.454) "/9chars/FlameKit/<commit or main>/" of the last check, for EMF's list
     bool test = false;      // (0.15.454) the Development channel (update_channel.txt "test")
     emf_update::Emf emf;    // (0.15.454) EMF's own update (emf_update.hpp)
+    bool (*emf_wanted)() = nullptr;  // (0.15.455) the About tab's "Keep EMF updated" (setting emf_update); null: always
+    bool emf_was_wanted = true;      // (0.15.455) for the log line when it changes
 
     // Writes update_status.txt ("<kind>|<text>") for the lower left corner, when it changed. (0.15.454) While a new EMF
     // waits for the next start, a ready FlameKit says so too, and an empty status says that EMF is ready.
@@ -581,7 +583,12 @@ struct Updater {
                 status("busy|Checking for updates...");
             }
             check();
-            if (!root.empty() && emf.check(root + (test ? L"emf-dist-test/" : L"emf-dist/")) == 1) {  // (0.15.454) then EMF's list
+            const bool emf_on = !emf_wanted || emf_wanted();
+            if (emf_on != emf_was_wanted) {
+                say(emf_on ? "update (EMF): \"Keep EMF updated\" is on again: EMF's list is read again" : "update (EMF): \"Keep EMF updated\" is off (About tab): EMF is left as it is");
+                emf_was_wanted = emf_on;
+            }
+            if (emf_on && !root.empty() && emf.check(root + (test ? L"emf-dist-test/" : L"emf-dist/")) == 1) {  // (0.15.454) then EMF's list
                 const std::string was = last_status;
                 last_status = "?";
                 status(was.rfind("ready|", 0) == 0 || was.rfind("busy|", 0) == 0 || was.rfind("failed|", 0) == 0 ? was : std::string());
