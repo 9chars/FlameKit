@@ -1876,6 +1876,10 @@ block outside a base: 0.15.464 works locally.** Not yet tested on G-Portal (the 
 changing shit you say you're going to do on me?"** Claude had changed the agreed 16 m to 24 m in 0.15.464 without
 asking. **RULE 0z extended: once the owner agrees to a size or a plan, Claude never changes it on its own, not even
 while fixing a bug. If the fix needs a different value, Claude ASKS first and waits.**
+22:19 owner: "unfuck it and do what we agreed to make it. 16 m". **0.15.465 (3c4a819, DLL md5
+628b8651e9e8e042e90a2079ca4fb67c): the moving area = 16 m (kAimHalf 8 m each way) around the player, 4 m grid, only
+while a building item is selected.** Development dist-test (sig good) + installed on the local server (old DLL
+flamekit_native.dll.old_464); the local server loads it only at its next restart (ask first). NOT on G-Portal/Stable.
 
 ## Things learned the hard way
 
