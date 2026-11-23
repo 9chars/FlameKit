@@ -169,7 +169,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -492,6 +492,53 @@ local function group_queued(gid)
   return n
 end
 
+-- (0.15.498, owner 14:49 "it also stopped recording how many monsters I was killing mid fight, not sure if you fucked
+-- that up with an update": yes: each reload of FlameKit on the server (the updates at 14:46-14:48) forgot the raid
+-- itself: its count, its end notice, its waves still to come) What runs is kept in spawn_nodes_raid.json, written every
+-- second when it changed, and taken back after a reload of the same world run (emf.session_token): the raids (place,
+-- monsters spawned), their start times and the runs (wave, waves, steps to the next one, who started it).
+local function persist()
+  local token = nil
+  pcall(function() token = emf.session_token() end)
+  local out = { token = token, raid = {}, started = {}, runs = {} }
+  for gid, r in pairs(S.raid) do out.raid[tostring(gid)] = { place = r.place, spawned = r.spawned } end
+  for gid, at in pairs(S.started) do out.started[tostring(gid)] = at end
+  for gid, run in pairs(S.runs) do
+    out.runs[tostring(gid)] = { wave = run.wave, waves = run.waves, next_in = math.max(0, run.next_at - S.steps), by = run.by }
+  end
+  local text = emf.json.encode(out)
+  if text ~= S.persisted then
+    S.persisted = text
+    pcall(kit.store.save, "spawn_nodes_raid", out)
+  end
+end
+local function restore()
+  local ok, saved = pcall(kit.store.load, "spawn_nodes_raid", nil)
+  if not ok or type(saved) ~= "table" then return end
+  local token = nil
+  pcall(function() token = emf.session_token() end)
+  if not token or saved.token ~= token then return end  -- another world run: its raids are gone
+  local n = 0
+  for k, r in pairs(saved.raid or {}) do
+    local gid = tonumber(k)
+    if gid and group(gid) and type(r) == "table" then
+      S.raid[gid] = { place = r.place, spawned = tonumber(r.spawned) or 0 }
+      n = n + 1
+    end
+  end
+  for k, at in pairs(saved.started or {}) do
+    local gid = tonumber(k)
+    if gid and group(gid) and tonumber(at) then S.started[gid] = tonumber(at) end
+  end
+  for k, run in pairs(saved.runs or {}) do
+    local gid = tonumber(k)
+    if gid and group(gid) and type(run) == "table" then
+      S.runs[gid] = { wave = tonumber(run.wave) or 0, waves = tonumber(run.waves) or 1, next_at = S.steps + (tonumber(run.next_in) or 0), by = run.by }
+    end
+  end
+  emf.log(string.format("spawn nodes: after the reload: %d raid(s) and %d run(s) taken back", n, (function() local c = 0 for _ in pairs(S.runs) do c = c + 1 end return c end)()))
+end
+
 -- (0.15.488) Every second: the count of monsters left, and the end of a raid (no waves to come, none alive, none
 -- queued). S.raid[gid] = { place, spawned, left_at, left_n } from its first wave until its end.
 local function raid_tick(world)
@@ -810,6 +857,11 @@ local function stuck_tick(world)
           if not depth then
             local okn, nsub = pcall(world.get, world, "NetworkSubmerge", id)
             if okn and nsub then depth = tonumber(nsub.submergeDepth) end
+          end
+          if not S.sub_said[id] and (S.sub_said_n or 0) < 12 then  -- (0.15.498) which water reading monsters have, for the log
+            S.sub_said[id], S.sub_said_n = true, (S.sub_said_n or 0) + 1
+            emf.log(string.format("spawn nodes: monster %s at %.0f %.0f %.0f: ServerSubmerge %s, NetworkSubmerge %s, depth %s", tostring(id), x, y, z,
+              (oks and sub) and "yes" or "no", select(2, pcall(world.get, world, "NetworkSubmerge", id)) and "yes" or "no", tostring(depth)))
           end
           if depth and depth > 0 and not S.depth_said[id] then  -- the first wet reading of each monster, for the log
             S.depth_said[id] = true
@@ -1325,7 +1377,7 @@ function F.tick(world)
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
-    scan_tick(world)
+    if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)
@@ -1344,6 +1396,7 @@ function F.tick(world)
     protect_tick(world, spots)
     raid_tick(world)  -- (0.15.488)
     time_tick(world)  -- (0.15.492)
+    pcall(persist)  -- (0.15.498)
   end
   if S.steps % BREAK_STEPS == 0 then break_tick(world, spots) end
 end

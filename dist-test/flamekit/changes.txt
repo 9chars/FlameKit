@@ -1,3 +1,6 @@
+0.15.498 Nov 23, 2026
+- Spawn Nodes: a reload of FlameKit on the server during a raid no longer loses the raid: its count of monsters left, its end notice, its remaining waves and its time limit go on (spawn_nodes_raid.json).
+
 0.15.497 Nov 23, 2026
 - Spawn Nodes: a raid monster in water (0.8 m deep or more, by the game's own submerge depth) is taken away and comes again at its node, not where a monster was found in water before (4 m around). The 0.15.493 water check never worked: monsters have no swimming state.
 
