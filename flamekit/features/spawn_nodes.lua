@@ -392,6 +392,28 @@ local function purge_tick(world)
     pg.i, done = pg.i + 1, done + 1
     local oks, scl = pcall(world.get, world, "ScaleComponent", id)
     local gid = oks and scl and group_of_tag(scl.uniformScale)
+    if not gid and (pg.near_n or 0) < 25 then
+      -- (0.15.499, owner 14:50 "the remove all monsters doesn't work either": its search found none of the group's
+      -- monsters while he still saw some) every living creature near the group's nodes that is NOT one of its
+      -- monsters goes into the log: what it is, so the ones Remove leaves can be told apart
+      local okp, x, y, z = pcall(world.position, world, id)
+      if okp and x then
+        for g2 in pairs(pg.gids) do
+          for _, n in ipairs(nodes_of(g2)) do
+            if dist2(x, y, z, n.x, n.y, n.z) <= 80 * 80 then
+              local okh, cur = pcall(emf.health, world, id)
+              local okpl, acc = pcall(world.account, world, id)
+              if okh and cur and cur > 0 and not (okpl and acc) then
+                pg.near_n = (pg.near_n or 0) + 1
+                emf.log(string.format("spawn nodes: Remove: not one of its monsters, alive near node %d: entity %s at %.0f %.0f %.0f, health %s, scale %s",
+                  n.id, tostring(id), x, y, z, tostring(cur), oks and scl and tostring(scl.uniformScale) or "none"))
+              end
+              break
+            end
+          end
+        end
+      end
+    end
     if gid and pg.gids[gid] then
       if pcall(emf.destroy, world, id) then pg.n = pg.n + 1 end
       if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
@@ -883,7 +905,8 @@ local function stuck_tick(world)
           end
         end
         if why then
-          pcall(emf.destroy, world, id)
+          local okd, gone = pcall(emf.destroy, world, id)
+          if not (okd and gone) then emf.log(string.format("spawn nodes: monster %s: EMF did not take it away (%s)", tostring(id), tostring(gone))) end  -- (0.15.499)
           ids[id] = nil
           if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
           S.track[id], S.active_at[id] = nil, nil

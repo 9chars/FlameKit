@@ -1,3 +1,6 @@
+0.15.499 Nov 23, 2026
+- Spawn Nodes: Remove its monsters writes into the server's log every living creature near the group's nodes that is not one of its monsters (to find out what it leaves behind).
+
 0.15.498 Nov 23, 2026
 - Spawn Nodes: a reload of FlameKit on the server during a raid no longer loses the raid: its count of monsters left, its end notice, its remaining waves and its time limit go on (spawn_nodes_raid.json).
 
