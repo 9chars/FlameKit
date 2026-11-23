@@ -1823,6 +1823,15 @@ Upload 20:40:31 FAILED at the first file, the DLL: FTP "(451) Local error in pro
 holds flamekit_native.dll. Nothing was uploaded (all 63 still in the outbox). On Nov 21 the server happened to be shut
 down before the upload. => G-Portal must be STOPPED for the upload (owner, G-Portal panel), then upload, then start.
 (Correction: the outbox at 19:35 held only empty folders, not files.)
+20:47 owner "G-Portal server is stopped": upload 20:47-20:48, 63 files, the DLL first, mod.json last; ftplist: all 73
+files of 0.15.462 on G-Portal at the right size. 20:56 owner "its up, check the logs" (helper "logs"): G-Portal started
+20:51:40 (EMF 0.6.6), FlameKit Native 0.15.462 loaded (companion part, build zone hook, the clear_buildzones hooks: "no
+altar needed"), 21 features, world loaded 20:52:32, 16 altar areas, the game's altar flag 0; "Free build switches copied
+from experimental.json: 2 player(s)" (building.json made); the owner (Midevil) in 20:53:36, Free build on for him, off in
+altar areas; 0 FlameKit errors; no new crash dump. **RELEASE 0.15.462 DONE: Stable (dist + emf-dist), package, G-Portal.**
+G-Portal still logs at a join: "Could not find Entity for UniqueId '701ad7cc'" and twice "[Water] BlockWater Entity not
+found: Outside of Simulation area" = the water issue the owner will fix next (old Free build 0.15.413-0.15.425 pieces;
+tools now on G-Portal: /flamekit.water [radius] (admins), Building tab Forget this spot / Forget all spots).
 
 ## Things learned the hard way
 
