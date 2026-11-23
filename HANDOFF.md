@@ -2004,6 +2004,16 @@ missing EMF files restored the same way, status "...missing Enshrouded Modding F
 "Keep EMF updated" is on). Files that are present but different are NOT touched. If dinput8.dll or emf_core.dll is
 removed nothing starts: needs a repair outside the game (idea: a repair.cmd that can also add a Defender exclusion).
 Development dist-test only; tests ALL PASSED; not yet tested in the game.
+09:17 owner: the player's updater "has always worked even when his game got missed with" (so dinput8/emf_core/FlameKit's
+DLL survive; the Lua side is hit). **Test 09:17-09:21 on the owner's client:** lua.dll and features/building.lua renamed
+to *.avtest (still there, harmless; to be removed), client restart: both reported MISSING and restored within seconds, the
+window showed ("I got a nice pop up"), after the next restart lua.dll loaded and every file was there. The window counted
+only FlameKit's file -> fixed in 0.15.473 (both counted). **09:22 owner: "go ahead and push that to release and stable
+now yes" -> STABLE 0.15.473** (commit d83140d; dist = dist-test, the same update.txt and signature, sig good; DLL md5
+ce8db86938ab9326aef22d695db1b286; emf-dist 0.6.19 unchanged, sig good) and the install package
+release\FlameKit-0.15.473.zip (md5 8083c03ab77a5f3aba123d2ad6c1b69c, from dist + emf-dist). NOT G-Portal (not asked).
+Stable now has: the repair, the 16 m moving area (only with a building piece selected), the speed log (a line a minute
+on any server world), the test switches (off without their files). The owner-number fix for Free build is NOT in it.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
