@@ -51,6 +51,10 @@
 // clear_buildzones_client; EMF hook_program), so Free build no longer needs a flame altar on the map; the old way (from
 // the first altar's addZone) is the fallback when those hooks cannot be set (fkbuild clear off switches to it).
 //
+// (0.15.474) OWNER NUMBERS: every FlameKit zone has an owner entity id of its own, as a flame altar's zone has (the moving
+// area: the player; a remembered spot: an id taken from the world's own entity id counter): see reserve_owner. Owner 0
+// for all of them made the game count them as changed every step and reload their terrain (the server slowdown).
+//
 // Console: fkbuild stats | free on|off | altar on|off | clear on|off (debug master switches; free and altar on at start)
 //          | size <m>|off (0.15.466, a test on the owner's own server: the moving area's size, see read_test_size).
 //
@@ -218,8 +222,80 @@ std::atomic<int> g_zone_said{0};
 struct AltarInfo { int64_t cx = 0, cy = 0, cz = 0; uint32_t entity = 0; uint8_t abandoned = 0; uint8_t base_id[16] = {}; };
 std::mutex g_altar_info_mx;
 std::unordered_map<uint32_t, AltarInfo> g_altar_info;  // altar entity -> what the game passed (under g_altar_info_mx)
-enum class TestBase { None, Entity, Altar, Fixed };
-std::atomic<int> g_test_base{int(TestBase::None)};
+enum class TestBase { None, Entity, Altar, Fixed, Owner };
+std::atomic<int> g_test_base{int(TestBase::Owner)};  // (0.15.474) the normal way now: owner numbers (see reserve_owner)
+// (0.15.474, owner 2026-11-23 08:44 "I'd rather you just go and look at what the game is doing and do that", 08:53
+// "figure out how game assigns owner numbers for the flame alters and duplicate that?", 09:10 "if you pick a number
+// clearly the game allocates that some place so it doesn't pick that same number again.. figure that out?")
+// OWNER NUMBERS, THE GAME'S WAY. Why: each step the game compares its build zones with the last step's by their owner
+// entity (0x140920380 in the server exe 1287369: same owner, other box = "changed"; owner gone = "removed"), and the
+// terrain stores reload what lies in a changed zone. FlameKit's zones all had owner 0, so each matched the first owner-0
+// zone and counted as changed every step: the slowdown (a big moving area: the server's main thread unpacking ~9 M
+// terrain chunks a minute instead of ~1.4 M). A flame altar's zone has the altar's own entity id as its owner. The game
+// gives out entity ids from one counter of the world's entity storage (createEntity 0x140623ce0: id 0 = "a new one" =
+// `lock xadd [storage+0x498], 1`, plus one), so an id taken from that counter the same way is never given to anything
+// else in this world. reserve_owner takes ids like that (the storage's place in the world and the counter's place in
+// the storage are read from the game's own code: kStorageSig, kCounterSig, checked against the world's kind byte at
+// storage+8). The moving area's owner: the player's own entity id (unique, and the player's while he is on); each
+// remembered spot: an id reserved for it the first time it is added in this world, kept for the session. If the code
+// cannot be found or does not check out: owner 0 as before (logged).
+constexpr const char* kStorageSig = "48 83 EC 58 0F 10 02 8B 15 ?? ?? ?? ?? 33 C0 41 0F 10 08 48 81 C1";  // spawn wrapper: add rcx, <storage>
+constexpr int kStorageSigImm = 22;
+constexpr const char* kCounterSig = "B8 01 00 00 00 F0 41 0F C1 84 24 ?? ?? 00 00";  // createEntity: mov eax,1; lock xadd [r12+<counter>],eax
+constexpr int kCounterSigImm = 11;
+std::atomic<int> g_owner_ok{-1};  // -1 not looked yet, 0 not usable (owner 0 as before), 1 usable
+std::atomic<uint32_t> g_storage_off{0}, g_counter_off{0};
+std::mutex g_spot_owner_mx;
+std::unordered_map<uint64_t, uint32_t> g_spot_owner;  // remembered spot (its grid cell key) -> its reserved owner id
+void* g_owner_world = nullptr;                         // the world those ids belong to (a new world: new ids)
+
+// Finds the two offsets once (the first server step); then the checks. Logged.
+bool owner_setup(emf::World w) {
+    int st = g_owner_ok.load();
+    if (st >= 0) return st == 1;
+    const uintptr_t a = emf::find_pattern(kStorageSig, kStorageSigImm), b = emf::find_pattern(kCounterSig, kCounterSigImm);
+    const uint32_t so = a ? *reinterpret_cast<const uint32_t*>(a) : 0, co = b ? *reinterpret_cast<const uint32_t*>(b) : 0;
+    bool ok = so > 0x1000 && so < 0x4000000 && co >= 0x10 && co < 0x10000 && w;
+    uint8_t kind = 0xff;
+    uint32_t counter = 0;
+    if (ok) {
+        const uint8_t* storage = reinterpret_cast<const uint8_t*>(w.raw()) + so;
+        kind = storage[8];
+        counter = *reinterpret_cast<const uint32_t*>(storage + co);
+        ok = kind == w.kind() && counter > 0 && counter < 0x40000000u;
+    }
+    g_storage_off = so;
+    g_counter_off = co;
+    g_owner_ok = ok ? 1 : 0;
+    EMF_LOG(kMod, "free build: owner numbers %s (entity storage at world+0x%x, id counter at +0x%x, world kind %u, next id %u)",
+            ok ? "the game's way: FlameKit's zones get owner ids from the game's own id counter"
+               : "NOT usable (the game's code was not found or did not check out): FlameKit's zones keep owner 0",
+            so, co, kind, counter + 1);
+    return ok;
+}
+
+// A new entity id from the world's own counter, as createEntity takes one: never given to anything else in this world.
+uint32_t reserve_owner(emf::World w) {
+    if (!owner_setup(w)) return 0;
+    auto* counter = reinterpret_cast<volatile LONG*>(reinterpret_cast<uint8_t*>(w.raw()) + g_storage_off.load() + g_counter_off.load());
+    return uint32_t(InterlockedIncrement(counter));
+}
+
+// The owner id of remembered spot `c` in world `w` (reserved the first time; the same id every step after).
+uint32_t spot_owner(emf::World w, const std::array<int64_t, 3>& c) {
+    const uint64_t key = (uint64_t(uint32_t(c[0] >> 32)) << 32) ^ (uint64_t(uint32_t(c[2] >> 32)) << 8) ^ uint64_t(uint32_t(c[1] >> 32));
+    std::lock_guard<std::mutex> lk(g_spot_owner_mx);
+    if (g_owner_world != w.raw()) {  // another world (a new game or a reload): the old ids mean nothing there
+        g_spot_owner.clear();
+        g_owner_world = w.raw();
+    }
+    auto it = g_spot_owner.find(key);
+    if (it != g_spot_owner.end()) return it->second;
+    const uint32_t id = reserve_owner(w);
+    if (id) g_spot_owner[key] = id;
+    return id;
+}
+
 // (0.15.471, owner 08:40 "I guess" to: does the owner have to be a player?) "id <number>" in free_build_test_base.txt:
 // that number as the owner entity (a number that matches nothing, or a real non-player entity such as an NPC)
 std::atomic<uint32_t> g_test_owner{0};
@@ -370,10 +446,11 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
             spots = g_spots;
         }
         const int64_t sh = int64_t(g_spot_half.load() * 4294967296.0);
+        const bool owners = TestBase(g_test_base.load()) != TestBase::None;  // (0.15.474) "none": owner 0 as before
         for (const auto& c : spots) {  // (0.15.440) the remembered spots
             int64_t b[6] = {c[0] - sh, c[1] - sh, c[2] - sh, c[0] + sh, c[1] + sh, c[2] + sh};
             uint8_t no_base[16] = {};
-            g_add_zone(bzs, 0, flag, 0, b, 0, 0, no_base);
+            g_add_zone(bzs, 0, flag, 0, b, owners ? spot_owner(w, c) : 0, 0, no_base);  // (0.15.474) its own owner id
         }
         static std::atomic<int> spots_said{0};
         if (!spots.empty() && spots_said.fetch_add(1) == 0)
@@ -439,8 +516,8 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         uint8_t no_base[16] = {};
         uint32_t z_entity = 0;  // (0.15.470) the base data test (free_build_test_base.txt): none unless asked
         uint8_t z_abandoned = 0;
-        const TestBase tb = w.is_server() ? TestBase(g_test_base.load()) : TestBase::None;
-        if (tb == TestBase::Entity) {
+        const TestBase tb = w.is_server() ? TestBase(g_test_base.load()) : TestBase::Owner;  // (0.15.474) this game: owner = the player
+        if (tb == TestBase::Entity || tb == TestBase::Owner) {  // (0.15.474) the moving area's owner: the player
             z_entity = id;
         } else if (tb == TestBase::Fixed) {
             z_entity = g_test_owner.load();
@@ -597,7 +674,8 @@ void read_test_base() {  // (0.15.470) see g_test_base
     const TestBase tb = strcmp(w, "entity") == 0 ? TestBase::Entity
                         : strcmp(w, "altar") == 0 ? TestBase::Altar
                         : (strcmp(w, "id") == 0 && fixed) ? TestBase::Fixed
-                                                          : TestBase::None;
+                        : strcmp(w, "none") == 0 ? TestBase::None
+                                                 : TestBase::Owner;  // (0.15.474) no file: the normal way, owner numbers
     if (int(tb) != g_test_base.load() || (tb == TestBase::Fixed && fixed != g_test_owner.load())) {
         g_test_owner = uint32_t(fixed);
         g_test_base = int(tb);
@@ -605,7 +683,8 @@ void read_test_base() {  // (0.15.470) see g_test_base
                 tb == TestBase::Entity ? "the player's own entity id, no base id"
                 : tb == TestBase::Altar ? "the nearest real flame altar's entity, base id and abandoned flag"
                 : tb == TestBase::Fixed ? "a fixed owner entity id, no base id"
-                                        : "none (entity 0, no base id, as normal)", fixed);
+                : tb == TestBase::Owner ? "normal (owner numbers: the player for the moving area, a reserved id per remembered spot)"
+                                        : "none (entity 0 for every FlameKit zone, the old way)", fixed);
     }
 }
 
