@@ -1,3 +1,9 @@
+0.15.472 Nov 23, 2026
+- Missing files are put back: when an antivirus program (or anything else) removes FlameKit files or files of the Enshrouded Modding Framework (EMF), FlameKit downloads them again when the game starts and asks you to restart the game. If EMF's loader itself was removed, FlameKit cannot start and cannot do this.
+
+0.15.471 Nov 23, 2026
+- Server (test servers only, off unless switched on by a file): the base data test can also use a fixed owner. Nothing changes unless that file is there.
+
 0.15.470 Nov 23, 2026
 - Server (test servers only, off unless switched on by a file): a test of giving the Free build area the same base data a flame altar's area has. Nothing changes unless that file is there.
 

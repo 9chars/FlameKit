@@ -218,8 +218,11 @@ std::atomic<int> g_zone_said{0};
 struct AltarInfo { int64_t cx = 0, cy = 0, cz = 0; uint32_t entity = 0; uint8_t abandoned = 0; uint8_t base_id[16] = {}; };
 std::mutex g_altar_info_mx;
 std::unordered_map<uint32_t, AltarInfo> g_altar_info;  // altar entity -> what the game passed (under g_altar_info_mx)
-enum class TestBase { None, Entity, Altar };
+enum class TestBase { None, Entity, Altar, Fixed };
 std::atomic<int> g_test_base{int(TestBase::None)};
+// (0.15.471, owner 08:40 "I guess" to: does the owner have to be a player?) "id <number>" in free_build_test_base.txt:
+// that number as the owner entity (a number that matches nothing, or a real non-player entity such as an NPC)
+std::atomic<uint32_t> g_test_owner{0};
 
 // (0.15.463, owner 2026-11-22 21:35-21:46: G-Portal "server overloaded" while in Free build outside an altar area,
 // confirmed by switching it off and on: 48 ms steps instead of 17; "112m wide is way to fucking big", "as small as
@@ -439,6 +442,8 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
         const TestBase tb = w.is_server() ? TestBase(g_test_base.load()) : TestBase::None;
         if (tb == TestBase::Entity) {
             z_entity = id;
+        } else if (tb == TestBase::Fixed) {
+            z_entity = g_test_owner.load();
         } else if (tb == TestBase::Altar) {
             std::lock_guard<std::mutex> lk(g_altar_info_mx);
             double best = -1;
@@ -583,17 +588,24 @@ uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, i
 constexpr double kTestMinM = 4.0, kTestMaxM = 112.0;
 void read_test_base() {  // (0.15.470) see g_test_base
     char w[16] = {};
+    unsigned long fixed = 0;
     if (FILE* f = _wfopen(lua_file(L"free_build_test_base.txt").c_str(), L"r")) {
         if (fscanf(f, "%15s", w) != 1) w[0] = 0;
+        if (strcmp(w, "id") == 0 && fscanf(f, "%lu", &fixed) != 1) fixed = 0;
         fclose(f);
     }
-    const TestBase tb = strcmp(w, "entity") == 0 ? TestBase::Entity : strcmp(w, "altar") == 0 ? TestBase::Altar : TestBase::None;
-    if (int(tb) != g_test_base.load()) {
+    const TestBase tb = strcmp(w, "entity") == 0 ? TestBase::Entity
+                        : strcmp(w, "altar") == 0 ? TestBase::Altar
+                        : (strcmp(w, "id") == 0 && fixed) ? TestBase::Fixed
+                                                          : TestBase::None;
+    if (int(tb) != g_test_base.load() || (tb == TestBase::Fixed && fixed != g_test_owner.load())) {
+        g_test_owner = uint32_t(fixed);
         g_test_base = int(tb);
-        EMF_LOG(kMod, "free build (server): TEST base data from free_build_test_base.txt: %s",
+        EMF_LOG(kMod, "free build (server): TEST base data from free_build_test_base.txt: %s (%lu)",
                 tb == TestBase::Entity ? "the player's own entity id, no base id"
                 : tb == TestBase::Altar ? "the nearest real flame altar's entity, base id and abandoned flag"
-                                        : "none (entity 0, no base id, as normal)");
+                : tb == TestBase::Fixed ? "a fixed owner entity id, no base id"
+                                        : "none (entity 0, no base id, as normal)", fixed);
     }
 }
 

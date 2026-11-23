@@ -21,6 +21,8 @@
 // A game never takes an older version, and never writes outside emf\mods\flamekit and emf\mods\flamekit_native.
 // (0.15.454) EMF itself is kept up to date from a list of its own (emf-dist / emf-dist-test, signed the same way):
 // emf_update.hpp, run after each look at FlameKit's list; it writes EMF's own files in the game folder.
+// (0.15.472) REPAIR: with the list's version installed, a listed file that is MISSING (taken by an antivirus) is
+// downloaded and put back, once per game (repair_missing); EMF's files the same way (emf_update.hpp).
 // What it is doing is written to emf\mods\flamekit\update_status.txt as "<kind>|<text>" (kind: busy, failed, ok or
 // ready) for the lower left corner; empty while there is nothing to say.
 #pragma once
@@ -384,6 +386,9 @@ struct Updater {
             else if (text.empty())
                 text = "ready|Enshrouded Modding Framework (EMF) v" + emf.ready + " is ready: restart the game";
         }
+        // (0.15.472) EMF files restored in this game (emf_update.hpp repair_missing), when nothing else is to be said
+        if (emf.restored > 0 && emf.ready.empty() && (text.empty() || text.rfind("ok|", 0) == 0))
+            text = "ready|FlameKit restored " + std::to_string(emf.restored) + " missing Enshrouded Modding Framework (EMF) file(s): restart the game";
         if (text == last_status) return;
         last_status = text;
         write_file(mods + L"flamekit\\update_status.txt", std::vector<uint8_t>(text.begin(), text.end()));
@@ -441,6 +446,7 @@ struct Updater {
                     " there, here v" + have_lua + " (Lua) and v" + have_map + " (native): up to date",
                 seen == last_seen && !asked ? 1 : 0);
             last_seen = seen;
+            if (version == have_lua && version == have_map && repair_missing(text.substr(eol + 1), base, version)) return true;  // (0.15.472)
             if (asked) status("ok|FlameKit is up to date (v" + have_lua + ")");
             else if (last_status.rfind("failed|", 0) == 0) status("");  // an earlier failure or refusal is over
             return true;
@@ -559,6 +565,63 @@ struct Updater {
     }
 
     bool waiting_for_restart = false;
+
+    // (0.15.472, owner 2026-11-23 09:10 "anti-virus on peoples computers keep blowing away the EMF and/or the lua stuff
+    // breaking all their UI again ... a check and fix on start up to download the missing files") REPAIR: when this
+    // game has the list's version, every file the list names must be here; one that is MISSING (an antivirus took it,
+    // or it was deleted) is downloaded from the same signed list, checked (size and fingerprint) and written in its
+    // place. Only missing files: a file that is here but different is left alone (the player may have changed it). The
+    // running DLL is never missing. Once per game (an antivirus that takes the file again is not fought every minute);
+    // the files and the count are logged, and the lower left corner asks for a restart. `files` is the list after its
+    // version line. True when files were restored.
+    bool repair_done = false;
+    bool repair_missing(const std::string& files, const std::wstring& base, const std::string& version) {
+        if (repair_done) return false;
+        std::vector<File> missing;
+        for (size_t at = 0; at < files.size();) {
+            size_t end = files.find('\n', at);
+            if (end == std::string::npos) end = files.size();
+            std::string line = files.substr(at, end - at);
+            at = end + 1;
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+            File f;
+            char path[200] = "";
+            if (line.empty() || sscanf(line.c_str(), "%u %x %199s", &f.size, &f.hash, path) != 3 || !safe(path)) continue;
+            f.path = path;
+            if (GetFileAttributesW(backslashes(mods + wide(f.path)).c_str()) == INVALID_FILE_ATTRIBUTES) missing.push_back(std::move(f));
+            if (missing.size() > 200) break;
+        }
+        repair_done = true;
+        if (missing.empty()) {
+            say("update: repair check: every file of v" + version + " is here", 1);
+            return false;
+        }
+        std::string names;
+        for (const File& f : missing) names += (names.empty() ? "" : ", ") + f.path;
+        say("update: repair: " + std::to_string(missing.size()) + " file(s) of v" + version +
+            " are MISSING here (removed by something else, an antivirus most likely): " + names, 2);
+        int restored = 0;
+        for (File& f : missing) {
+            status("busy|Restoring missing FlameKit files: " + std::to_string(restored) + " of " + std::to_string(missing.size()));
+            if (!fetch(base + wide(f.path), f.data, nullptr) || f.data.size() != f.size || fnv(f.data) != f.hash) {
+                say("update: repair: " + f.path + " could not be downloaded as listed (" + (g_fetch_error.empty() ? std::string("wrong size or fingerprint") : g_fetch_error) + ")", 2);
+                continue;
+            }
+            const std::wstring local = backslashes(mods + wide(f.path));
+            make_folders(mods, local);
+            if (write_file(local, f.data)) ++restored;
+            else say("update: repair: " + f.path + " could not be written (error " + std::to_string(GetLastError()) + ")", 2);
+        }
+        say("update: repair: " + std::to_string(restored) + " of " + std::to_string(missing.size()) + " missing file(s) restored" +
+                (restored ? ": they are used from the next game start" : ""), restored == int(missing.size()) ? 0 : 2);
+        if (restored) {
+            status("ready|FlameKit restored " + std::to_string(restored) + " missing file(s): restart the game");
+            waiting_for_restart = true;
+        } else {
+            status("failed|FlameKit files are missing and could not be restored");
+        }
+        return true;
+    }
 
     // The updater thread: waits 15 s after the start, then checks every minute (and at once when the player asks).
     void run() {

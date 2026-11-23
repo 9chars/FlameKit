@@ -230,6 +230,46 @@ struct Emf {
     std::string last_note;    // the last "nothing to do" line (said again only as a detail)
     std::string failed_list;  // the list whose install failed, and until when it is not tried again
     uint64_t retry_at = 0;
+    bool repair_done = false; // (0.15.472) the missing-file check ran in this game (once per game)
+    int restored = 0;         // (0.15.472) EMF files restored in this game (they are used from the next game start)
+
+    // (0.15.472, owner 2026-11-23 09:10: antivirus programs "keep blowing away the EMF and/or the lua stuff") REPAIR:
+    // when the installed EMF is the list's version, every file the list names must be here; a MISSING one is
+    // downloaded from the same signed list, checked (size and SHA-256) and written in its place (nothing to rename: it
+    // is not there). A file that is here but different is left alone. Once per game; logged by name. EMF's loader
+    // (dinput8.dll) and core (emf\emf_core.dll) cannot be missing while this runs: without them nothing of EMF or
+    // FlameKit starts (that needs a repair outside the game). Returns how many were restored.
+    int repair_missing(const std::wstring& root, std::vector<Entry>& files, const std::string& version) {
+        if (repair_done) return 0;
+        repair_done = true;
+        std::vector<Entry*> missing;
+        for (Entry& e : files)
+            if (!exists(local(e.path))) missing.push_back(&e);
+        if (missing.empty()) {
+            note(1, "update (EMF): repair check: every file of EMF v" + version + " is here");
+            return 0;
+        }
+        std::string names;
+        for (const Entry* e : missing) names += (names.empty() ? "" : ", ") + e->path;
+        note(2, "update (EMF): repair: " + std::to_string(missing.size()) + " file(s) of EMF v" + version +
+                    " are MISSING here (removed by something else, an antivirus most likely): " + names);
+        int n = 0;
+        for (Entry* e : missing) {
+            std::string why;
+            if (!get(root + L"files/" + web_update::wide(e->path), e->data, why) || e->data.size() != e->size || sha256_hex(e->data) != e->sha) {
+                note(2, "update (EMF): repair: " + e->path + " could not be downloaded as listed (" + (why.empty() ? std::string("size or SHA-256") : why) + ")");
+                continue;
+            }
+            const std::wstring dst = local(e->path);
+            web_update::make_folders(game, dst);
+            if (web_update::write_file(dst, e->data)) ++n;
+            else note(2, "update (EMF): repair: " + e->path + " could not be written (error " + std::to_string(GetLastError()) + ")");
+        }
+        note(n == int(missing.size()) ? 0 : 2, "update (EMF): repair: " + std::to_string(n) + " of " + std::to_string(missing.size()) +
+                                                    " missing file(s) restored" + (n ? ": they are used from the next game start" : ""));
+        restored += n;
+        return n;
+    }
 
     void note(int level, const std::string& text) {
         if (say) say(level, text);
@@ -305,6 +345,7 @@ struct Emf {
             return 0;
         }
         if (!web_update::newer(version, have)) {
+            if (version == have && repair_missing(root, files, version) > 0) return 1;  // (0.15.472) missing files restored
             nothing(0, "update (EMF): EMF v" + version + " in the list, v" + have + " here: nothing to do");
             return 0;
         }

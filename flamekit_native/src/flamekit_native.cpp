@@ -6320,7 +6320,10 @@ struct UpdateDialog : Layer {
             return ver;
         };
         const std::string kit = after("|Update v"), emf_v = after("(EMF) v");
-        if (kit.empty() && emf_v.empty()) return;
+        // (0.15.472) "ready|FlameKit restored N missing ... file(s): restart the game" (web_update.hpp's repair): the
+        // window says what was restored and why it was missing
+        const bool restored = std::strstr(line, "|FlameKit restored ") != nullptr;
+        if (kit.empty() && emf_v.empty() && !restored) return;
         std::string key = line;
         while (!key.empty() && (key.back() == '\n' || key.back() == '\r' || key.back() == ' ')) key.pop_back();
         if (key == announced && !asked) return;
@@ -6328,7 +6331,11 @@ struct UpdateDialog : Layer {
         announced = key;
         const std::wstring emf_name = L"Enshrouded Modding Framework (EMF) v" + widen(emf_v);
         message2.clear();
-        if (!kit.empty() && !emf_v.empty()) {
+        if (restored) {
+            std::string what = key.substr(key.find('|') + 1);
+            what = what.substr(0, what.find(':'));
+            message = widen(what) + L". They were most likely removed by an antivirus program.";
+        } else if (!kit.empty() && !emf_v.empty()) {
             message = L"FlameKit v" + widen(kit) + L" and " + emf_name + L" have been downloaded.";
         } else if (!kit.empty()) {
             message = L"FlameKit v" + widen(kit) + L" has been downloaded.";
