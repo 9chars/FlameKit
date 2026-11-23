@@ -1841,6 +1841,24 @@ call was only waiting; "logs" always reads G-Portal. 21:29 logs: world loaded 21
 errors, two players joined (Midevil 21:29:23): NO "BlockWater Entity not found" and NO "Could not find Entity for
 UniqueId" any more. **G-Portal's water issue is gone.** Open: why "Needs building area" with the admin's "inside altar
 areas" switch on G-Portal (test it in another player's base before relying on it).
+21:31 owner: the "inside altar areas" problem was distance ("I was to far away"); he thought the switch also lifted
+the distance limit; it does not (the box size is unchanged): "that setting did not help me".
+**21:34-21:40 G-Portal "server overloaded" while the owner was in Free build outside an altar area (at ~5770 5226):**
+steps 48 ms instead of 17 from 21:33:40 (ECS work only ~11 ms: ~37 ms of non-ECS game work), the zone list unchanged
+(not network); both players switched Free build off 21:37:33 -> back to ~17 ms at once; on again (owner only) -> the
+errors at once. The local copy did the same at 20:07 at 5776 5232 (33 ms steps). Cause: the game's extra work for
+what lies inside a build zone (likely water / terrain; not proven which), with the 112 m box (40 m + 16 m each way)
+around the player. **Owner 21:44: "112m wide is way to fucking big", 21:45 "can we make it even smaller", 21:46
+"yes" (16 m), 21:52: "if I had known you selected a size that big I would have immediately said no way".**
+**RULE 0z (owner 21:52): every size, distance, count or limit Claude picks is told to the owner in plain numbers
+BEFORE it ships (what it is, why that value).** Also: two kinds of Free build area exist and must be named apart:
+remembered spots (48 m, fixed) and the moving area (now 16 m around the aim).
+0.15.463 (81cb9e1, DLL md5 22ee3a8d918c4ea6f2c8e316a33823f6): the moving area = 16 m (kAimHalf 8) around the building
+tool's cursor (server: NetworkCursor.cursorEntityId's CurrentTransform; the player's game: ClientCursor.primaryTransform
+while NetworkCursor names a cursor), on a 4 m grid, only while a building tool is out (no tool: no box; logged on
+change). Development + local server; NOT on G-Portal/Stable (they still have the 112 m box: G-Portal players should keep
+Free build off until 0.15.463 is tested and released). 21:50 owner "sure..." -> local server restarted 21:50-21:51:06,
+the helper starts his game at ~21:51:36 (his game was not running). Test: 5776 5232, Free build on, place blocks.
 
 ## Things learned the hard way
 
