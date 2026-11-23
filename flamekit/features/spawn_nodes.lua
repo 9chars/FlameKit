@@ -182,7 +182,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -356,6 +356,30 @@ local function scan_tick(world)
     local oks, scl = pcall(world.get, world, "ScaleComponent", id)
     local gid = oks and scl and group_of_tag(scl.uniformScale)
     local nodes = gid and nodes_of(gid)
+    -- (0.15.506, owner 15:56 "the left over monsters were definitely spawned from the nodes ... look at the problem"):
+    -- a census at every load: each living creature within 150 m of any node, with its tag (scale), faction and
+    -- template, so the leftovers can be told what they are
+    if (S.census_n or 0) < 60 then
+      local okp, cx, cy, cz = pcall(world.position, world, id)
+      if okp and cx then
+        local near = nil
+        for _, n in pairs(data().nodes) do
+          if dist2(cx, cy, cz, n.x, n.y, n.z) <= 150 * 150 then near = n break end
+        end
+        if near then
+          local okh, cur = pcall(emf.health, world, id)
+          local oka, acc = pcall(world.account, world, id)
+          if okh and cur and cur > 0 and not (oka and acc) then
+            local okf, f = pcall(world.get, world, "Faction", id)
+            local okg, guid = pcall(emf.template, world, id)
+            S.census_n = (S.census_n or 0) + 1
+            emf.log(string.format("spawn nodes: census: entity %s alive at %.0f %.0f %.0f (node %d %.0f m), health %s, scale %s, tag group %s, faction %s, template %s",
+              tostring(id), cx, cy, cz, near.id, math.sqrt(dist2(cx, cy, cz, near.x, near.y, near.z)), tostring(cur),
+              oks and scl and tostring(scl.uniformScale) or "none", tostring(gid), okf and f and tostring(f.faction) or "?", okg and tostring(guid) or "?"))
+          end
+        end
+      end
+    end
     if nodes and #nodes > 0 then
       local okp, x, y, z = pcall(world.position, world, id)
       local best, nid = nil, nodes[1].id
@@ -391,6 +415,7 @@ end
 -- (0.15.487, owner 13:14 "the remove monsters didn't remove them all... it removed some, but some are still flying
 -- around") Remove also looks through the whole world for the group's tagged monsters, alive or dead, known or not, and
 -- takes them away (a slice per step, as scan_tick). S.purge = { gids = { [gid] = name }, list, i, n }.
+local raid_monster  -- (0.15.507) below (join_node, FRIENDLY)
 local function purge_tick(world)
   local pg = S.purge
   if not pg.list then
@@ -425,6 +450,14 @@ local function purge_tick(world)
             end
           end
         end
+      end
+    end
+    if not gid then  -- (0.15.507) a monster of the group's raid area without the tag (a summon, a monster that came in)
+      for g2 in pairs(pg.gids) do
+        local gd = data().groups[tostring(g2)]
+        local first = gd and tonumber(gd.last_first_id) or 0  -- not known (a raid before 0.15.507): every hostile one there
+        local nid0 = raid_monster(world, g2, first, id, false)
+        if nid0 then gid = g2 break end
       end
     end
     if gid and pg.gids[gid] then
@@ -630,21 +663,38 @@ local function join_node(gid, x, y, z)
   end
   return nid
 end
+-- (0.15.507) Whether entity `id` is a monster of group `gid`'s raid area: made after `first_id`, within JOIN_R m of its
+-- nodes, not a player, hostile (or `engaged`). Returns its node, its health ("dead" for 0), or nil and "wait" when the
+-- game has not given it a position, health or faction yet (just made: asked again later).
+raid_monster = function(world, gid, first_id, id, engaged)
+  if not first_id or id <= first_id then return nil end
+  local okp, x, y, z = pcall(world.position, world, id)
+  if not (okp and x) then return nil, "wait" end
+  local nid = join_node(gid, x, y, z)
+  if not nid then return nil end
+  local oka, acc = pcall(world.account, world, id)
+  if oka and acc then return nil end  -- a player
+  local okh, cur = pcall(emf.health, world, id)
+  if not (okh and cur) then return nil, "wait" end
+  local okf, f = pcall(world.get, world, "Faction", id)
+  local faction = okf and f and tonumber(f.faction)
+  if not engaged and faction == nil then return nil, "wait" end
+  if not engaged and FRIENDLY[faction] then return nil end
+  return nid, cur, faction, x, y, z
+end
+
 -- Lets entity `id` join a running raid when it is a monster of it (see above); `engaged`: it hit or was hit by a player.
+-- (0.15.507) "wait": not ready yet (the summons the Undead make had no health or faction in the step they were made, and
+-- the old sweep looked at each new id only once: 50 of them were never counted, census 15:57).
 local function try_join(world, id, engaged)
   if not id or id == 0 or known(id) then return false end
+  local wait = false
   for gid, r in pairs(S.raid) do
     if r.first_id and id > r.first_id then
-      local okp, x, y, z = pcall(world.position, world, id)
-      local nid = okp and x and join_node(gid, x, y, z)
-      if nid then
-        local oka, acc = pcall(world.account, world, id)
-        if oka and acc then return false end  -- a player
-        local okh, cur = pcall(emf.health, world, id)
-        if not (okh and cur and cur > 0) then return false end
-        local okf, f = pcall(world.get, world, "Faction", id)
-        local faction = okf and f and tonumber(f.faction)
-        if engaged or (faction and not FRIENDLY[faction]) then
+      local nid, cur, faction, x, y, z = raid_monster(world, gid, r.first_id, id, engaged)
+      if cur == "wait" then wait = true end
+      if nid and type(cur) == "number" and cur > 0 then
+        do
           S.alive[nid] = S.alive[nid] or {}
           S.alive[nid][id] = true
           S.adopted[id] = true
@@ -659,7 +709,7 @@ local function try_join(world, id, engaged)
       end
     end
   end
-  return false
+  return false, wait
 end
 local function join_tick(world)
   if next(S.raid) == nil then S.join_seen = nil return end
@@ -670,13 +720,21 @@ local function join_tick(world)
   local ok, list = pcall(world.entities, world)
   if not ok or type(list) ~= "table" then return end
   local top = seen
+  local now = os.time()
   for _, id in ipairs(list) do
     if id > seen then
       if id > top then top = id end
-      try_join(world, id, false)
+      local _, wait = try_join(world, id, false)
+      if wait then S.join_wait[id] = now end  -- (0.15.507) asked again for up to 20 s
     end
   end
   S.join_seen = top
+  local n = 0
+  for id, at in pairs(S.join_wait) do
+    n = n + 1
+    local joined, wait = try_join(world, id, false)
+    if joined or not wait or now - at > 20 or n > 3000 then S.join_wait[id] = nil end
+  end
   for id in pairs(S.join_hits) do try_join(world, id, true) end
   S.join_hits = {}
 end
@@ -759,7 +817,13 @@ local function verify_tick(world)
     local id = v.list[v.i]
     v.i, done = v.i + 1, done + 1
     local oks, scl = pcall(world.get, world, "ScaleComponent", id)
-    if oks and scl and group_of_tag(scl.uniformScale) == v.gid then
+    local mine = oks and scl and group_of_tag(scl.uniformScale) == v.gid
+    if not mine and r.first_id then  -- (0.15.507) or a monster of its raid area without the tag (a summon)
+      local nid0, cur0 = raid_monster(world, v.gid, r.first_id, id, false)
+      mine = nid0 ~= nil and type(cur0) == "number" and cur0 > 0
+      if mine then S.adopted[id] = true end
+    end
+    if mine then
       local okh, cur = pcall(emf.health, world, id)
       local known = false
       for _, ids in pairs(S.alive) do if ids[id] then known = true break end end
@@ -1007,12 +1071,29 @@ local function spawn_tick(world)
       local qn0 = data().nodes[tostring(q.node)]
       local tag = { ScaleComponent = { uniformScale = tag_of(qn0 and qn0.g or 0) } }  -- (0.15.483) its group, for a reload
       local ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag, { yaw = yaw })
-      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag) end  -- an older EMF: no yaw
-      if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, sy, z) end  -- nor the tag
+      local how = "tagged"
+      if not ok or not id or id == 0 then
+        local why1 = id
+        ok, id = pcall(emf.spawn, world, q.guid, x, sy, z, tag)  -- an older EMF: no yaw
+        how = "tagged, no yaw (" .. tostring(why1) .. ")"
+      end
+      if not ok or not id or id == 0 then
+        local why2 = id
+        ok, id = pcall(emf.spawn, world, q.guid, x, sy, z)  -- nor the tag
+        how = "UNTAGGED (" .. tostring(why2) .. ")"
+      end
+      if how ~= "tagged" and (S.spawn_said or 0) < 30 then  -- (0.15.506) a monster spawned without its group's tag cannot be found again
+        S.spawn_said = (S.spawn_said or 0) + 1
+        emf.log(string.format("spawn nodes: node %s: monster %s spawned %s (template %s)", tostring(q.node), tostring(id), how, tostring(q.guid)))
+      end
       if ok and id and id ~= 0 then
         local rq = qn0 and S.raid[qn0.g]
         if rq and not q.respawn then rq.spawned = rq.spawned + 1 end  -- (0.15.488); (0.15.493) a replacement is not one more
-        if rq and (not rq.first_id or id < rq.first_id) then rq.first_id = id end  -- (0.15.501) its first monster's id
+        if rq and (not rq.first_id or id < rq.first_id) then  -- (0.15.501) its first monster's id
+          rq.first_id = id
+          local gq = qn0 and data().groups[tostring(qn0.g)]
+          if gq then gq.last_first_id = id save() end  -- (0.15.507) kept: Remove and the end check use it
+        end
         S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
@@ -1685,6 +1766,7 @@ function F.tick(world)
     S.adopted, S.join_hits, S.join_seen = {}, {}, nil  -- (0.15.501)
     S.orders = {}  -- (0.15.503)
     S.bad, S.verify = {}, nil  -- (0.15.505)
+    S.join_wait = {}  -- (0.15.507)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
@@ -2079,6 +2161,8 @@ end
 -- tests only
 F._handle = function(world, account, entity, msg, from) return handle(world, account, entity, msg, from) end
 F._test_set_shown = function(st) C.shown = st end  -- (0.15.504)
+F._test_raid_monster = function(...) return raid_monster(...) end  -- (0.15.507)
+F._test_S = S  -- (0.15.507)
 F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
 
 return F

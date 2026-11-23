@@ -1,3 +1,9 @@
+0.15.507 Nov 23, 2026
+- Spawn Nodes: monsters the raid's monsters make (the Undead's summons) are counted now: a new monster is looked at again until the game has given it its health and faction (before, the ones not ready in the step they were made were never counted). The end check and Remove its monsters take in every hostile monster made since the raid's first one within 100 m of the group's nodes, not only the nodes' own.
+
+0.15.506 Nov 23, 2026
+- Spawn Nodes: logging to find the raid monsters that are left over: a census of the living creatures near the nodes at every load, and every monster spawned without its group's tag.
+
 0.15.505 Nov 23, 2026
 - Spawn Nodes: a monster that falls more than 4 m under its node (into water or a drop) with no player down there, or gets stuck (behind a fence or an object), in the ground or in water, is first moved next to the nearest player (4-8 m from him, on the ground, nothing built between), up to 3 times, before it is replaced. A spot where one got stuck is not used for a spawn again.
 - Spawn Nodes: before the end notice the whole world is searched for the raid's monsters; any still alive is counted again and the raid goes on.
