@@ -1904,6 +1904,15 @@ emf_core.log, panel spot lines, his id 0x485890b753e75ad1 = entity 1) puts him a
 0x05891a85470cffe2) was at ~5955-6075 4657-4680 21:32-21:38. Not logged where the owner was after 21:35:30. Still
 unexplained: what differed on G-Portal (two players with 112 m areas, a big world, its water problem then) and locally
 at 20:07 (older version, the 112 m box always on, on a 32 m grid).
+**23:03-23:35 REPRODUCED locally (0.15.462 put back on the local server; DLL now back to 0.15.466 at 23:35):** with
+0.15.462 at 5770 5222 first no slowdown (16.7 ms). Owner cleared all remembered spots, restart 23:12, then ACTIVATED A
+PLAYER SPAWN POINT at that spot and built a base piece there (23:16): "Build zones changed" 00:03:20 -> 6 s later
+Bad Performance ~33 ms steps (Stats Upd ~1,840/min, ECS max 15 ms: the same pattern as G-Portal). Free build off
+23:18:49 -> normal within 3 s; on 23:20:40 -> 32.6 ms again. 130 m away (area not covering the spot): still slow, 26 ms.
+Restart 23:26 (spot loaded from start): still slow 25 ms at 5800 5099 -> NOT the mid-session spot. Base pieces
+removed, spawn point still active: still ~20 ms. => Since the spawn point was activated, the moving Free build area
+slows the server wherever the player is (best reading; the why is unproven). Owner 23:34: "whole lot of tests soooo
+few answers". Next: 0.15.466 (16 m, speed log with threads) at 5800 5100 with the spawn point active.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
