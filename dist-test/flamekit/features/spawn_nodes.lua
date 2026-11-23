@@ -135,7 +135,8 @@ local TRIGGER_LABEL = { manual = "Manual (Start now)", timer = "Timer", wire = "
 -- the choices of each drop-down (the units in UNIT)
 local CHOICES = {
   waves = { 1, 2, 3, 5, 10 }, per_wave = { 1, 2, 3, 5, 8, 10, 15 }, wave_gap = { 10, 20, 30, 60, 120, 300 },
-  max_alive = { 1, 2, 3, 6, 10, 20, 40 },  -- (0.15.503, owner 15:30: 1 and 2 added) cooldown = { 1, 2, 5, 10, 15, 30, 60 }, timer_min = { 1, 2, 5, 10, 15, 30, 60, 120 },
+  max_alive = { 1, 2, 3, 6, 10, 20, 40 },  -- (0.15.503, owner 15:30: 1 and 2 added)
+  cooldown = { 1, 2, 5, 10, 15, 30, 60 }, timer_min = { 1, 2, 5, 10, 15, 30, 60, 120 },
   timer_max = { 1, 2, 5, 10, 15, 30, 60, 120 }, wire_r = { 5, 10, 20, 30, 50 }, hour = { 0, 6, 12, 18, 20, 22 },
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
@@ -1959,6 +1960,7 @@ end
 
 -- tests only
 F._handle = function(world, account, entity, msg, from) return handle(world, account, entity, msg, from) end
+F._test_set_shown = function(st) C.shown = st end  -- (0.15.504)
 F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
 
 return F
