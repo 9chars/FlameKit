@@ -772,6 +772,108 @@ void read_raid_protect() {  // every 15 server steps
     }
 }
 
+// (0.15.488, owner 13:32 "when it announces the raid beginning can it say where its near? like I'm in "Melissa's
+// Hideaway" base area", 13:37 "or whatever the nearest map marker is..") Two files for the Lua (features/spawn_nodes.lua),
+// written every 30 s on the server when they changed:
+// - base_names_server.txt: "x y z<TAB>name" per flame altar (an entity with BaseIdComponent); the name is the one a
+//   player gave it: its CustomPlayerString key looked up in the server's "CustomPlayerStringsSystem" pool (entries of
+//   0x140 bytes from the pointer at +0x1e8, their number at +0x1e0; key +0x10, text pointer +0x18 = the entry's own
+//   +0x38, length +0x20: as in the player's game, flamekit_native.cpp read_custom_names). A text is only believed when
+//   its FNV-1a 64 is its key (the game's own key for a name), so a wrong layout gives no name, never a wrong one.
+// - map_places_server.txt: "x y z <tag>" per named place (an entity with Location or MapMarker and a LocaTagComponent;
+//   tag = FNV-1a 32 of the tag's 16 bytes, as the minimap's place names). The dedicated server has no English texts
+//   (none of its data files holds "Flame Altar"), so the names come from core/place_names.lua (tag -> name, made from
+//   the game's own texts).
+bool read_mem(uint64_t at, void* into, size_t n) {
+    SIZE_T got = 0;
+    return at > 0x10000 && ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<LPCVOID>(at), into, n, &got) && got == n;
+}
+uint64_t fnv64(const char* p, size_t n) {
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (size_t i = 0; i < n; ++i) { h ^= static_cast<unsigned char>(p[i]); h *= 0x100000001b3ull; }
+    return h;
+}
+void server_names(void* sys, std::unordered_map<uint64_t, std::string>& names, uint32_t& pool_size) {
+    const uint64_t b = reinterpret_cast<uint64_t>(sys);
+    uint32_t capacity = 0;
+    uint64_t pool = 0;
+    pool_size = 0;
+    if (!b || !read_mem(b + 0x1e0, &capacity, 4) || !read_mem(b + 0x1e8, &pool, 8)) return;
+    if (capacity == 0 || capacity > 65536) return;
+    pool_size = capacity;
+    std::vector<uint8_t> all(static_cast<size_t>(capacity) * 0x140);
+    if (!read_mem(pool, all.data(), all.size())) return;
+    for (uint32_t i = 0; i < capacity; ++i) {
+        const uint8_t* e = &all[static_cast<size_t>(i) * 0x140];
+        uint64_t key, text, length;
+        std::memcpy(&key, e + 0x10, 8);
+        std::memcpy(&text, e + 0x18, 8);
+        std::memcpy(&length, e + 0x20, 8);
+        if (!key || text != pool + static_cast<uint64_t>(i) * 0x140 + 0x38 || length == 0 || length > 0x100) continue;
+        const char* t = reinterpret_cast<const char*>(e + 0x38);
+        if (fnv64(t, static_cast<size_t>(length)) != key) continue;
+        std::string name(t, static_cast<size_t>(length));
+        for (char& c : name) if (c == '\t' || c == '\n' || c == '\r') c = ' ';
+        names[key] = name;
+    }
+}
+bool write_if_changed(const wchar_t* file, const wchar_t* tmp_file, const std::string& text, std::string& last) {
+    if (text == last) return false;
+    const std::wstring dest = lua_file(file), tmp = lua_file(tmp_file);
+    FILE* f = _wfopen(tmp.c_str(), L"wb");
+    if (!f) return false;
+    const bool ok = text.empty() || std::fwrite(text.data(), 1, text.size(), f) == text.size();
+    std::fclose(f);
+    if (!ok || !MoveFileExW(tmp.c_str(), dest.c_str(), MOVEFILE_REPLACE_EXISTING)) return false;
+    last = text;
+    return true;
+}
+void write_places(emf::World w) {
+    static std::string last_bases, last_places;
+    std::unordered_map<uint64_t, std::string> names;
+    uint32_t pool_size = 0;
+    if (void* sys = w.singleton("CustomPlayerStringsSystem")) server_names(sys, names, pool_size);
+    std::vector<std::string> bases, places;
+    size_t named = 0;
+    char line[400];
+    w.for_each_entity([&](uint32_t id) {
+        const bool base = w.get<gen::ecs::BaseIdComponent>(id) != nullptr;
+        const bool place = !base && (w.get<gen::ecs::Location>(id) || w.get<gen::ecs::MapMarker>(id));
+        if (!base && !place) return;
+        const auto* ct = w.get<gen::ecs::CurrentTransform>(id);
+        if (!ct) return;
+        const double x = double(ct->transform.position.x) / 4294967296.0, y = double(ct->transform.position.y) / 4294967296.0,
+                     z = double(ct->transform.position.z) / 4294967296.0;
+        if (base) {
+            std::string name;
+            if (const auto* cps = w.get<gen::ecs::CustomPlayerString>(id)) {
+                auto it = names.find(cps->stringId.value);
+                if (it != names.end()) name = it->second, ++named;
+            }
+            std::snprintf(line, sizeof line, "%.1f %.1f %.1f\t%s\n", x, y, z, name.c_str());
+            bases.push_back(line);
+        } else {
+            const gen::ecs::LocaTagComponent* tag = w.get_template<gen::ecs::LocaTagComponent>(id);
+            if (!tag) tag = w.get<gen::ecs::LocaTagComponent>(id);
+            if (!tag) return;
+            uint32_t t = 0x811c9dc5u;
+            for (uint8_t b : tag->locaTag.bytes) t = (t ^ b) * 0x01000193u;
+            std::snprintf(line, sizeof line, "%.1f %.1f %.1f %u\n", x, y, z, t);
+            places.push_back(line);
+        }
+    });
+    std::sort(bases.begin(), bases.end());
+    std::sort(places.begin(), places.end());
+    std::string tb, tp;
+    for (const auto& l : bases) tb += l;
+    for (const auto& l : places) tp += l;
+    if (write_if_changed(L"base_names_server.txt", L"base_names_server.tmp", tb, last_bases))
+        EMF_LOG(kMod, "raid places: %zu flame altar(s), %zu with a name (%zu name(s) read from the server's pool of %u)", bases.size(), named,
+                names.size(), pool_size);
+    if (write_if_changed(L"map_places_server.txt", L"map_places_server.tmp", tp, last_places))
+        EMF_LOG(kMod, "raid places: %zu named place(s) on the map written", places.size());
+}
+
 void read_test_base() {  // (0.15.470) see g_test_base
     char w[16] = {};
     unsigned long fixed = 0;
@@ -1324,6 +1426,8 @@ bool fk_build_anywhere_load(bool dedicated) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)
                 read_raid_protect();  // (0.15.486)
+                static uint32_t places_n = 0;
+                if (places_n++ % 120 == 2) write_places(w);  // (0.15.488) every 30 s (120 x 15 steps), the first 0.5 s after the start
                 read_test_base();  // (0.15.470)
                 read_list(L"free_build_server.txt", g_free_server, g_alt_server, "server");
                 read_spots("server");

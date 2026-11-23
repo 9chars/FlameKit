@@ -1,8 +1,8 @@
-0.15.487
+0.15.488
 2020 a354e5f1 flamekit/README.md
-139948 92697e36 flamekit/changes.txt
+140529 3128962a flamekit/changes.txt
 2652 a9dd362b flamekit/main.lua
-15087 ba7d4e1f flamekit/mod.json
+15087 23eac570 flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -27,6 +27,7 @@
 19441 3598eb05 flamekit/core/msg_feed.lua
 1793 bba63004 flamekit/core/own_puts.lua
 3769 efcada73 flamekit/core/pets.lua
+477 56685db6 flamekit/core/place_names.lua
 4034 f4b14a84 flamekit/core/player_prefs.lua
 2850 d9b70bb4 flamekit/core/players.lua
 775 971217ca flamekit/core/pvp_state.lua
@@ -55,7 +56,7 @@
 1954 eaeca7a7 flamekit/features/server_save.lua
 4581 f83117fb flamekit/features/server_version.lua
 11069 cb2dda6f flamekit/features/settings.lua
-64534 8f422d38 flamekit/features/spawn_nodes.lua
+73251 e5f22f58 flamekit/features/spawn_nodes.lua
 6402 f83365e9 flamekit/features/travel_hide.lua
 6443 37b879dd flamekit/features/water_debug.lua
 4619 7bc42353 flamekit/features/companions/01_base.lua
@@ -72,5 +73,5 @@
 15124 b576b343 flamekit/features/loot_filter/client.lua
 2368 5ff9c53d flamekit/features/loot_filter/init.lua
 19086 f0cf30bd flamekit/features/loot_filter/server.lua
-1165312 c34e29d5 flamekit_native/flamekit_native.dll
-464 060c57c8 flamekit_native/mod.json
+1175040 f85f0de1 flamekit_native/flamekit_native.dll
+464 87be6e41 flamekit_native/mod.json

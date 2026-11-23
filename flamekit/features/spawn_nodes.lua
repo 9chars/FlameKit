@@ -87,6 +87,23 @@ local TAG_BASE, TAG_STEP = 0.996, 0.00002
 local SCAN_BUDGET, SCAN_MAX = 0.02, 3000   -- s and entities per server step for that scan
 local clock_ok, clock = pcall(function() return os.clock end)
 if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = nil end
+-- (0.15.488, owner 13:32 "would there be a way to announce a message that a raid has begun, and then announce each
+-- wave of monster? and then also announce periodically how many monsters are left to kill? ... say where its near",
+-- 13:33 "they should be notice messages put in orange maybe?", 13:36 "yes and when a new wave happens it could say
+-- something like "New incoming wave at Melissa's Hideout!"") FlameKit notices (orange, the Notices window and a line in
+-- the Messages window), per group switch "announce" (on by default). The start, the end and a Remove go to every player;
+-- the waves and the count of monsters left to the players within NOTICE_DIST m of one of the group's nodes. The place:
+-- the name of the flame altar nearest the group's nodes within BASE_NAME_DIST m (base_names_server.txt, written by
+-- FlameKit Native every 30 s: "x y z<TAB>name"; no name: "a base").
+local NOTICE_COLOUR = "#ff9632"
+local NOTICE_DIST = 300
+local BASE_NAME_DIST = 200
+local PLACE_DIST = 500         -- m: (owner 13:37 "or whatever the nearest map marker is..") no flame altar that near: the
+                               -- nearest named place on the map within this (map_places_server.txt + core/place_names.lua)
+local place_names_ok, PLACE_NAMES = pcall(require, "core.place_names")
+if not place_names_ok or type(PLACE_NAMES) ~= "table" then PLACE_NAMES = {} end
+local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
+local LEFT_MIN_GAP = 5         -- s: and changed at most this often when the count changes
 local MISSES = 3  -- (0.15.483) a monster whose health can't be read is forgotten only after this many checks in a row
 
 -- (0.15.477, owner 11:27 "it would be nice if I could have a monster group for bosses as well so I could have one node
@@ -108,7 +125,7 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m" }
-local DEFAULTS = { on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+local DEFAULTS = { announce = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
   cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
@@ -135,7 +152,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {} }  -- (0.15.483) scan, scanned, miss; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {} }  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -367,6 +384,133 @@ local function purge_tick(world)
   S.purge = nil
 end
 
+-- (0.15.488) The flame altars' names from FlameKit Native: { { x, y, z, name } }, read again at most every 10 s.
+local names_cache = { at = -100, list = {} }
+local function base_names()
+  if os.time() - names_cache.at < 10 then return names_cache.list end
+  local list = {}
+  local f = io.open(emf.dir .. "\\base_names_server.txt", "r")
+  if f then
+    for line in f:lines() do
+      local x, y, z, name = line:match("^(%-?[%d%.]+) (%-?[%d%.]+) (%-?[%d%.]+)\t?(.*)$")
+      if x then list[#list + 1] = { tonumber(x), tonumber(y), tonumber(z), name or "" } end
+    end
+    f:close()
+  end
+  names_cache = { at = os.time(), list = list }
+  return list
+end
+
+-- (0.15.488) The named places on the map: { { x, z, name } } (only those core/place_names.lua has a name for).
+local places_cache = { at = -1000, list = {} }
+local function map_places()
+  if os.time() - places_cache.at < 60 then return places_cache.list end
+  local list = {}
+  local f = io.open(emf.dir .. "\\map_places_server.txt", "r")
+  if f then
+    for line in f:lines() do
+      local x, _, z, tag = line:match("^(%-?[%d%.]+) (%-?[%d%.]+) (%-?[%d%.]+) (%d+)")
+      local name = tag and PLACE_NAMES[tonumber(tag)]
+      if name then list[#list + 1] = { tonumber(x), tonumber(z), name } end
+    end
+    f:close()
+  end
+  places_cache = { at = os.time(), list = list }
+  return list
+end
+
+-- (0.15.488) Where group `gid` raids: the nearest flame altar's name ("a base" when it has none) within BASE_NAME_DIST
+-- m of its nodes, else the nearest named place on the map within PLACE_DIST m, else nil.
+local function raid_place(gid)
+  local best, name = nil, nil
+  for _, a in ipairs(base_names()) do
+    for _, n in ipairs(nodes_of(gid)) do
+      local dx, dz = a[1] - n.x, a[3] - n.z
+      local d = dx * dx + dz * dz
+      if d <= BASE_NAME_DIST * BASE_NAME_DIST and (not best or d < best) then
+        best, name = d, (a[4] ~= "" and a[4] or "a base")
+      end
+    end
+  end
+  if name then return name end
+  for _, a in ipairs(map_places()) do
+    for _, n in ipairs(nodes_of(gid)) do
+      local dx, dz = a[1] - n.x, a[2] - n.z
+      local d = dx * dx + dz * dz
+      if d <= PLACE_DIST * PLACE_DIST and (not best or d < best) then best, name = d, a[3] end
+    end
+  end
+  return name
+end
+
+-- (0.15.488) A notice in player `pid`'s game (Spawn Nodes' own channel; the host's own game: directly). `tag`: a
+-- notice with the same tag is changed in place (the count of monsters left), else each its own.
+S.notice_n = S.notice_n or 0
+local function notice_to(world, pid, text, seconds, tag)
+  S.notice_n = S.notice_n + 1
+  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n) }
+  if pid == emf.local_player() and kit.is_host() then
+    kit.notice("nodes_" .. msg.tag, text, NOTICE_COLOUR, msg.s)
+  else
+    pcall(emf.net.send_to, world, pid, CHANNEL, emf.json.encode(msg))
+  end
+end
+
+-- (0.15.488) To every player (near = nil) or to the players within NOTICE_DIST m of group `near`'s nodes.
+local function raid_notice(world, gid, text, near, seconds, tag)
+  local g = group(gid)
+  if not g or g.announce == false then return end
+  emf.log("spawn nodes: notice: " .. text)
+  for _, p in ipairs(player_spots(world)) do
+    local ok = not near
+    if near then
+      for _, n in ipairs(nodes_of(gid)) do
+        if dist2(p[2], p[3], p[4], n.x, n.y, n.z) <= NOTICE_DIST * NOTICE_DIST then ok = true break end
+      end
+    end
+    if ok then notice_to(world, p[1], text, seconds, tag) end
+  end
+end
+
+-- (0.15.488) How many monsters of group `gid` are alive (and still to come from the queue).
+local function group_alive(gid)
+  local n = 0
+  for _, node in ipairs(nodes_of(gid)) do n = n + alive_count(node.id) end
+  return n
+end
+local function group_queued(gid)
+  local n = 0
+  for _, q in ipairs(S.queue) do
+    local qn = data().nodes[tostring(q.node)]
+    if qn and qn.g == gid then n = n + 1 end
+  end
+  return n
+end
+
+-- (0.15.488) Every second: the count of monsters left, and the end of a raid (no waves to come, none alive, none
+-- queued). S.raid[gid] = { place, spawned, left_at, left_n } from its first wave until its end.
+local function raid_tick(world)
+  for gid, r in pairs(S.raid) do
+    local g = group(gid)
+    local alive, queued = group_alive(gid), group_queued(gid)
+    if not g then
+      S.raid[gid] = nil
+    elseif not S.runs[gid] and alive == 0 and queued == 0 then
+      S.raid[gid] = nil
+      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.spawned), nil, 15)
+      raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
+    else
+      local now = os.time()
+      local n = alive + queued
+      if (n ~= r.left_n and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
+        r.left_n, r.left_at = n, now
+        raid_notice(world, gid, string.format("Raid on %s: %d monster%s left to kill.", r.place or "the area", n, n == 1 and "" or "s"),
+          true, LEFT_EVERY + 5, "left_" .. gid)
+      end
+    end
+  end
+end
+
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
 local function fire(world, gid, why, manual)
   local g = group(gid)
@@ -411,6 +555,17 @@ local function wave(world, gid, spots)
   end
   emf.log(string.format("spawn nodes: %s wave %d of %d: %d monster(s)%s", g.name, run.wave, run.waves, queued,
     skipped > 0 and string.format(", %d node(s) skipped (no player within %d m)", skipped, ACTIVE_DIST) or ""))
+  -- (0.15.488) the notices
+  local r = S.raid[gid]
+  if not r and queued > 0 then
+    r = { place = raid_place(gid), spawned = 0 }
+    S.raid[gid] = r
+    raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, 15)
+  elseif r and queued > 0 then
+    local last = run.wave >= run.waves
+    raid_notice(world, gid, string.format("%s at %s! (wave %d of %d, %d monsters)", last and "Final wave incoming" or "New incoming wave",
+      r.place or "the raid", run.wave, run.waves, queued), true, 10)
+  end
   if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
 end
 
@@ -474,6 +629,8 @@ local function spawn_tick(world)
       if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z, tag) end  -- an older EMF: no yaw
       if not ok or not id or id == 0 then ok, id = pcall(emf.spawn, world, q.guid, x, q.y, z) end  -- nor the tag
       if ok and id and id ~= 0 then
+        local rq = qn0 and S.raid[qn0.g]
+        if rq then rq.spawned = rq.spawned + 1 end  -- (0.15.488)
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
         local qn = data().nodes[tostring(q.node)]
@@ -802,7 +959,7 @@ local function handle(world, account, entity, msg, from)
     note(string.format("Deleted %s and its %d node(s).", g.name, n))
   elseif msg.op == "set" and g then
     local key, v = tostring(msg.key), msg.value
-    if key == "on" or key == "breaks" or key == "protect" or key == "spare" then  -- (0.15.478) the raid switches; (0.15.482) spare
+    if key == "on" or key == "breaks" or key == "protect" or key == "spare" or key == "announce" then  -- (0.15.488) announce  -- (0.15.478) the raid switches; (0.15.482) spare
       g[key] = v == true
     elseif allowed(key, v) then
       g[key] = v
@@ -879,6 +1036,12 @@ local function handle(world, account, entity, msg, from)
     end
     emf.log(string.format("spawn nodes: player %s removed %d monster(s) and %d dead bod(ies) of %s", who, n, bodies, g.name))
     note(string.format("Removed %d monster(s) and %d dead bod%s of %s; the rest of the world is being searched for more.", n, bodies, bodies == 1 and "y" or "ies", g.name))
+    if S.raid[gid] then  -- (0.15.488)
+      if S.runs[gid] then finish(gid) end
+      raid_notice(world, gid, string.format("The raid on %s was called off.", S.raid[gid].place or "the area"), nil, 15)
+      raid_notice(world, gid, "", true, 1, "left_" .. gid)
+      S.raid[gid] = nil
+    end
     -- (0.15.487) then the whole world, for the group's tagged ones FlameKit lost track of
     if S.purge and S.purge.list then S.purge.gids[gid] = g.name  -- joins the search under way (it may miss some behind it: Remove again)
     else S.purge = S.purge or { gids = {} } S.purge.gids[gid] = g.name end
@@ -893,7 +1056,7 @@ function F.tick(world)
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
     S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
-    S.scan, S.scanned, S.miss, S.purge = nil, false, {}, nil
+    S.scan, S.scanned, S.miss, S.purge, S.raid = nil, false, {}, nil, {}
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     scan_tick(world)
@@ -913,6 +1076,7 @@ function F.tick(world)
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
     protect_tick(world, spots)
+    raid_tick(world)  -- (0.15.488)
   end
   if S.steps % BREAK_STEPS == 0 then break_tick(world, spots) end
 end
@@ -1074,6 +1238,9 @@ function F.panel(world)
     FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
   choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
     .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
+  rows[#rows + 1] = { button = "announce", text = (g.announce ~= false and "On    " or "Off   ") .. "Announce the raid to players", selected = g.announce ~= false,  -- (0.15.488)
+    tooltip = "Orange FlameKit notices: when it starts (to every player, with the name of the nearest flame altar), each new wave and how "
+      .. "many monsters are left (to the players within " .. NOTICE_DIST .. " m of its nodes), and when it is over." }
   rows[#rows + 1] = { button = "spare", text = (g.spare and "On    " or "Off   ") .. "Its monsters spare animals, pets and villagers", selected = g.spare == true,
     tooltip = "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
       .. "safe from them (other monsters too). Players are not covered: they can still be hit." }
@@ -1172,6 +1339,7 @@ function F.click(world, key)
   elseif key == "on" then act(world, { op = "set", g = gid, key = "on", value = not g.on })
   elseif key == "breaks" then act(world, { op = "set", g = gid, key = "breaks", value = not g.breaks })
   elseif key == "spare" then act(world, { op = "set", g = gid, key = "spare", value = not g.spare })
+  elseif key == "announce" then act(world, { op = "set", g = gid, key = "announce", value = g.announce == false })  -- (0.15.488)
   elseif key == "protect" then act(world, { op = "set", g = gid, key = "protect", value = not g.protect })
   elseif key == "start" then act(world, { op = "start", g = gid })
   elseif key == "stop" then act(world, { op = "stop", g = gid })
@@ -1213,6 +1381,11 @@ function F.setup(k)
     end, "a Spawn Nodes message from a player"),
     on_player = kit.guard(F, function(world, from, data_in)
       local okd, msg = pcall(emf.json.decode, data_in)
+      if okd and type(msg) == "table" and msg.op == "notice" and type(msg.t) == "string" and type(msg.tag) == "string" then  -- (0.15.488)
+        local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
+        if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), NOTICE_COLOUR, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
+        return
+      end
       if okd and type(msg) == "table" and msg.op == "state" then
         C.shown = msg
         if msg.note then C.note = msg.note end
