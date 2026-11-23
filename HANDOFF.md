@@ -1974,6 +1974,20 @@ player id to...?" (the addZone owner entity slot, rebuilt each step, nothing sav
 SLOW minutes, 16.7 ms, a steady 2.41 M unpacks/min (no growth).** Owner 08:16: an NPC he placed in the test area shows
 "Base 2" in its location (not checked before): possibly the game now treats our area (owner entity set) as a base;
 to check by comparing with the owner slot empty.
+08:35-08:44 owner: "Base 2" is probably just the second remembered spot; would like "<player>'s base" as the name
+(nice-to-have, later list). 08:37 confusion: the owner test covered only the MOVING area, never the remembered spots
+(owner: "it would have been nice for you to explain this earlier"). Player entity ids change between sessions (G-Portal
+logs: 0x05891a85470cffe2 was entity 2 299x and entity 1 88x); the account id is fixed. Owner 08:44: "I'd rather you just
+go and look at what the game is doing and do that". (08:40 the interrupted call built 0.15.471 = test option "id <n>";
+NOT installed, not committed in dist-test; server still 0.15.470.)
+**THE CAUSE (server exe 1287369, objdump):** addZone 0x140916310 builds a 0x48-byte entry: box +0x00 (6 x i64), base id
++0x30 (16 B), owner entity +0x40 (u32), flag +0x44, owner kind +0x45, abandoned +0x46 (list 0 with flag 1 is not added).
+0x140920380 (on the BuildZoneSystem: list 0 at +0x10/+0x18, last step's list at +0xd8/+0xe0, changes at +0x100, 0x68-byte
+entries) DIFFS the zones step to step BY OWNER ENTITY: an old zone with no current zone of the same entity -> 'removed';
+a current zone with no old one -> 'added'; same entity but another box -> 'changed'. All FlameKit zones had entity 0, so
+each matched the FIRST entity-0 zone and counted as changed every step -> the terrain stores reload those areas each
+step (bigger area = more chunks). The fix the game's way: every zone a UNIQUE owner entity that stays the same step to
+step (the moving area: the player's entity; each remembered spot: its own fixed number; safe numbers to be checked).
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
