@@ -148,7 +148,8 @@ local FACE_LABEL = { player = "The nearest player", node = "The node's direction
 local TRIGGER_LABEL = { manual = "Manual (Start now)", timer = "Timer", wire = "Trip wire", time = "Time of day", raid = "Base raid" }
 -- the choices of each drop-down (the units in UNIT)
 local CHOICES = {
-  waves = { 1, 2, 3, 5, 10 }, per_wave = { 1, 2, 3, 5, 8, 10, 15 }, wave_gap = { 10, 20, 30, 60, 120, 300 },
+  waves = { 1, 2, 3, 5, 10 }, per_wave = { 1, 2, 3, 5, 8, 10, 15 }, wave_gap = { 0, 5, 10, 20, 30, 60, 120, 300 },  -- (0.15.519, owner 17:18: 0 and 5 added)
+ 
   max_alive = { 1, 2, 3, 6, 10, 20, 40 },  -- (0.15.503, owner 15:30: 1 and 2 added)
   cooldown = { 1, 2, 5, 10, 15, 30, 60 }, timer_min = { 1, 2, 5, 10, 15, 30, 60, 120 },
   timer_max = { 1, 2, 5, 10, 15, 30, 60, 120 }, wire_r = { 5, 10, 20, 30, 50 }, hour = { 0, 6, 12, 18, 20, 22 },

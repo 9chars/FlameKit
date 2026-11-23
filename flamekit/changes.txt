@@ -1,3 +1,6 @@
+0.15.519 Nov 23, 2026
+- Spawn Nodes: Between waves can be 0 s or 5 s too.
+
 0.15.518 Nov 23, 2026
 - Spawn Nodes: every raid monster is moved onto the ground by the game's own move 2 s after it appears again, as before 0.15.493: without it the monsters stood and did not fight.
 
