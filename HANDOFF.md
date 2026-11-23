@@ -1667,6 +1667,11 @@ md5 checked): client dinput8.dll, EMF.exe, emf_content.dll, emf_core.dll, emf_fr
 content.js, mods\lua\lua.dll + mod.json; server dinput8.dll, emf_core.dll, mods\lua\lua.dll + mod.json. Only EMF's own
 files, not its example mods. Renaming the running DLLs worked (the same way the updater would do it). Takes effect at the
 next start: waiting for the owner's yes to restart.
+18:16 owner "go ahead": restart 18:17:15 (saved), server up 18:18:02 on emf_core 0.6.19 (signatures 71 of 98 usable on
+the server exe, 98 of 98 in the game; build 1287369 known), FlameKit Native and the Lua host loaded on both, owner in
+18:20:00 (hello: EMF 0.6.19, API 47, 18 channels), Free build on for him, no Lua error, no water warning. At his join the
+game logs "net_to_server refused (lua): no server has welcomed this game yet" and "over the channel's rate (30/60 in
+10 s)": the SAME on 0.6.6 (17:51, backup log), not new: FlameKit sends a burst before the welcome (to look at later).
 
 ## Things learned the hard way
 
