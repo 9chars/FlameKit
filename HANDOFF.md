@@ -2088,6 +2088,15 @@ read_raid_lock clears their EDIT BASE bit 0x04 (kept and set back when unlisted,
 logged. UNTESTED: whether the game's dismantle, pickaxe and placing really check that bit. Admins are locked too (for
 the test). Switch renamed "Players cannot change bases during its waves". Local server: files in place (.old_475);
 needs a server restart (DLL) and the game restart (UI).
+12:11 restart (server + game 0.15.479). **12:17-12:19 owner's raid test** (Group 1, 4 nodes, 5 waves, protect + breaks):
+"raid lock: player 1 may not change bases now (permissions 0x3f -> 0x3b)" and back to 0x3f at the end; owner 12:25 "it worked
+pretty well" (the game itself refused his base changes), but the lock ended with the waves while monsters still lived ->
+**0.15.480 (12a1c59)**: protection lasts while the group runs OR any of its monsters is alive. 12:26 owner saw monsters
+attacking structures, wants it more aggressive -> **0.15.481**: Building damage level per group: Low (every 3 s, 1x top
+pickaxe, 4 m, 1 m holes), Medium (1.5 s, 2x, 5 m, 1 m), High (1 s, 4x, 6 m, 1.5 m: the DEFAULT, owner 12:27 "high should
+be the default IMO"), Extreme (0.5 s, 8x, 6 m, 1.5 m); cap 30 hits a second for all; with no wall toward a player, a
+building block beside the monster (4 directions). Local server reloaded 12:28 (Lua only); the game needs a restart for the
+Building damage drop-down.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
