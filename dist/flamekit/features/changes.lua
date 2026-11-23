@@ -25,6 +25,7 @@ local function open_window(tab)
   kit.debug("info", "changes: FlameKit's window asked to open on " .. tab)
 end
 
+-- Once a game, a moment after the world is there: the Messages line with the window's key, and the update message or (the first time) the window on the About tab.
 function F.client_tick(world)
   if opened_this_game then return end
   steps = steps + 1
@@ -47,6 +48,7 @@ function F.client_tick(world)
   end
 end
 
+-- Reads the last version this player has seen (seen_version.json): a new version or a first install is told once.
 function F.setup(k)
   kit = k
   local seen = kit.store.load("seen_version", {}).version

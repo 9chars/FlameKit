@@ -30,6 +30,7 @@ local board = nil     -- account -> { kills, deaths, name }
 local changed = true  -- send the board out at the next step
 local steps = 0
 
+-- Loads the board (kills, deaths, name per account) from leaderboard.json, once.
 local function load_board()
   if board then return end
   board = {}
@@ -40,14 +41,17 @@ local function load_board()
   end
 end
 
+-- Text without control characters (a line of the board stays one line).
 local function clean(text)
   return (tostring(text or ""):gsub("[%c]", " "))
 end
 
+-- A player's character name, or `fallback`.
 local function name_of(world, entity, fallback)
   return players.name(world, entity, fallback)  -- core/players.lua: the character name first, as everywhere
 end
 
+-- The board's entry for `account` (made when it has none), with the newest name.
 local function entry(account, name)
   local e = board[account]
   if not e then
@@ -88,6 +92,7 @@ end
 
 local receive  -- forward: a player's game (below); the host's own game gets the board directly
 
+-- Sends every player the ranked board with their own row marked (straight in for the host's own player).
 local function send_all(world)
   local list = ranked()
   local me = emf.local_player()
@@ -135,6 +140,7 @@ local function died(world, p)
 end
 F.died = died
 
+-- Every server step: sends the board when it changed, and every 30 s.
 function F.tick(world)
   steps = steps + 1
   load_board()
@@ -152,6 +158,7 @@ local client_steps = 0
 local fake = false         -- (0.15.116) the Debug section's test data is shown instead of the server's board
 local real_text = nil      -- the server's last board, kept while the test data is shown
 
+-- Writes ui_board.dat for FlameKit Native when it changed.
 local function write(text)
   if text == written then return end
   local f = io.open(emf.dir .. "\\ui_board.dat", "w")
@@ -172,12 +179,14 @@ local FAKE = {
   { 8, 8, 20, 0, "Grimble Stonefoot" }, { 9, 3, 1, 0, "Quill" }, { 10, 1, 1234, 0, "Unlucky Larry" },
   { 11, 0, 7, 0, "Pacifist Pete" }, { 12, 0, 99, 0, "Ve" },
 }
+-- The test board (FAKE) in the server's format.
 local function fake_text()
   local lines = {}
   for _, r in ipairs(FAKE) do lines[#lines + 1] = table.concat({ "r", r[1], r[2], r[3], r[4], r[5] }, "\t") end
   return table.concat(lines, "\n")
 end
 
+-- The player's game: a board from the server (kept while the test board is shown), written for FlameKit Native.
 receive = function(world, text)
   if type(text) ~= "string" or #text > 12000 then return end
   heard = true
@@ -192,8 +201,10 @@ receive = function(world, text)
   write("source server\n" .. (#lines > 0 and (table.concat(lines, "\n") .. "\n") or "") .. "end\n")
 end
 
+-- Whether the test board is shown.
 function F.fake_on() return fake end
 
+-- Shows the test board, or the server's board again.
 function F.set_fake(world, on)
   if on == fake then return end
   if on then
@@ -210,12 +221,14 @@ function F.set_fake(world, on)
   kit.debug("info", "leaderboard: test data %s", on and "on" or "off")
 end
 
+-- The player's game: says "no board" when nothing came from a server after 20 s.
 function F.client_tick(world)
   client_steps = client_steps + 1
   -- nothing from a server half after 20 s: say so (a server without FlameKit, or an older one)
   if not heard and client_steps == 1200 then write("source none\nend\n") end
 end
 
+-- Opens the board's channel and listens for player deaths (kills and deaths count in PvP).
 function F.setup(k)
   kit = k
   players.setup(kit)

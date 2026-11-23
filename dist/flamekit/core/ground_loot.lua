@@ -27,16 +27,19 @@ local RARITY = { common = 0, uncommon = 1, rare = 2, epic = 3, legendary = 4 }
 -- `template` (optional): another pickup template (ground.PICKUP_VFX); if the game refuses it, the plain one is used.
 -- (0.15.389) the pickups FlameKit made (entity -> os.time()), kept 5 minutes: features/chop_loot.lua leaves them alone
 local own = {}
+-- Whether loose item `id` was put down by FlameKit in the last 5 minutes.
 function ground.is_own(id)
   local t = own[id]
   if t and os.time() - t > 300 then own[id] = nil t = nil end
   return t ~= nil
 end
+-- Forgets FlameKit's own loose items older than 5 minutes.
 function ground.forget_old()
   local now = os.time()
   for id, t in pairs(own) do if now - t > 300 then own[id] = nil end end
 end
 
+-- Puts `count` of `item` (id or name) on the ground around x, y, z with the given level and rarity, spread over `spread` m; how many were put down.
 function ground.drop(world, item, count, x, y, z, level, rarity, spread, template)
   if type(item) == "string" then
     local ok, id = pcall(emf.item, item)
@@ -89,17 +92,20 @@ ground.FOLLOW_M = 0.6
 -- when it named it at the server start (ground.emits in a feature's setup), so it needs one server restart.
 ground.SPARKLE = false  -- (0.15.175) off: no sparkle seen on a dropped item (owner, 0.15.174)
 local sparkle_ok = nil  -- nil: not asked yet; false: the event cannot be sent
+-- Declares to EMF that FlameKit sends TransformedToLootEvent (the loot sparkle); without it no sparkle is shown.
 function ground.emits()
   local ok, said = pcall(emf.emits, { "TransformedToLootEvent" }, "server")
   sparkle_ok = ok and said ~= false
   if not sparkle_ok then emf.log("ground loot: TransformedToLootEvent cannot be sent (" .. tostring(said) .. "): no sparkle on dropped items") end
 end
+-- Gives loose item `pickup` the game's loot sparkle; true when it was sent.
 function ground.sparkle(world, pickup)
   if not ground.SPARKLE or not sparkle_ok or not pickup then return false end
   local ok, done = pcall(emf.emit, "server", "TransformedToLootEvent", { entityId = pickup, useVfxDefaultParameters = true })
   return ok and done ~= false
 end
 
+-- Puts a marker effect (MARK_FX) on loose item `pickup` (debug); says what happened.
 function ground.mark(world, pickup)
   if not ground.MARK_FX then return "off" end
   if marks_n >= ground.MARK_MAX then return "too many" end

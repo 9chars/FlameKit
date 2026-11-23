@@ -1,3 +1,129 @@
+0.15.462 Nov 22, 2026
+- Invincible Mode: when a player with it left the server, it could stop keeping the air full for everyone until the server restarted. Fixed.
+- Joining a server: FlameKit waits for the server's hello before it sends anything, so the game's log no longer fills with refused messages at every join.
+
+0.15.461 Nov 22, 2026
+- Building tab: the "This map has no flame altar yet" line is gone: Free build works on a map without any flame altar now. It only comes back if FlameKit ever has to fall back to the old way, which needs an altar.
+
+0.15.460 Nov 22, 2026
+- Free build: FlameKit adds its building areas right after the game clears its list of building areas each moment, instead of together with the first flame altar. This is the step towards Free build on a map without any flame altar. If that way cannot be set up, FlameKit uses the old way.
+
+0.15.459 Nov 22, 2026
+- Free build (research, logging only): FlameKit Native logs, for the first steps after a start, when the game empties and refills its list of building areas, to find a way for Free build to work on a map without any flame altar. Nothing changes in the game.
+
+0.15.458 Nov 22, 2026
+- When the game starts, the Chat tab of the Messages window shows which version of the Enshrouded Modding Framework this game runs: "Enshrouded Modding Framework (EMF): v0.6.19".
+
+0.15.457 Nov 22, 2026
+- Updates: the update window wraps its text to the next line and grows to fit, so the Enshrouded Modding Framework's full name is no longer cut off.
+
+0.15.456 Nov 22, 2026
+- Updates: the update window and the Messages line name the Enshrouded Modding Framework (EMF) when a new EMF was downloaded (it said "FlameKit v0.6.19"), and both when FlameKit and EMF were downloaded together. The update window is wider so the full name fits.
+- About tab: a downloaded EMF shows as "(v0.6.19 installs at restart)".
+- Updates: the version of the EMF on disk is now read from the file itself, so right after an EMF update FlameKit knows the new one is in place (it still saw the running one).
+
+0.15.455 Nov 22, 2026
+- About tab: shows which version of the Enshrouded Modding Framework (EMF) this game runs, and a new EMF version waiting for the next game start.
+- About tab: new switch "Keep EMF updated" (on by default; also in EMF's Mods tab as "Keep Enshrouded Modding Framework (EMF) updated"). Off: FlameKit leaves EMF as it is.
+
+0.15.454 Nov 22, 2026
+- Updates: FlameKit's updater now also keeps EMF (the modding framework FlameKit runs on) up to date, to the EMF version FlameKit was tested with. It never installs an older EMF, keeps the EMF from before the update in emf\flamekit_emf_backup, and the new EMF starts with the next game start. Your EMF settings and other mods are not touched.
+
+0.15.453 Nov 22, 2026
+- Building tab: new admin setting "Free build inside altar areas". While it is on, an admin's Free build also works inside flame altar areas, other players' bases included, so pieces there can be fixed or removed. Off by default; other players are not affected.
+- Building tab: a map without any flame altar now says so. Free build needs at least one flame altar somewhere on the map for now.
+- Free build: the size of a remembered spot's area is now set in one place, so the area and the tab's "nearest spot" always agree.
+- Free build: the files FlameKit and FlameKit Native share are now written whole and then put in place, so neither side can read half a file.
+- Free build: FlameKit Native reads the players' positions on the world's own step instead of inside the game's building code.
+
+0.15.452 Nov 22, 2026
+- New Building tab: Free build, Bigger altar areas and the remembered spots moved here from the Experimental tab. Your Free build setting carries over.
+
+0.15.451 Nov 22, 2026
+- Debug: /flamekit.water all [radius] lists every entity within a few metres of you with every component it has, to find what a water piece is made of.
+
+0.15.450 Nov 22, 2026
+- Debug: /flamekit.water [radius] (admins) lists the water pieces the game knows near you into the server's log, to find water left over from removed pieces. Nothing in the world changes.
+
+0.15.449 Nov 22, 2026
+- Free build: at most 100 remembered spots for now (was 2000). When the limit is reached, a player who builds a new spot is told that it is not kept.
+
+0.15.448 Nov 22, 2026
+- Free build: "Forget this spot" and "Forget all spots" are always shown in Experimental > Building, greyed out when they cannot be used (no spot near you, no spots, or not an admin).
+
+0.15.447 Nov 22, 2026
+- Free build: admins can forget every remembered spot at once ("Forget all spots" in Experimental > Building; click twice within 5 seconds). What was built in them is temporary again.
+
+0.15.446 Nov 22, 2026
+- Source documentation: every file and function of FlameKit now says what it does, for anyone reading the code. Nothing changes in the game.
+
+0.15.445 Nov 22, 2026
+- Free build: new tooltip. Free build works outside flame altar areas, and what you build there is remembered and kept through restarts.
+- Free build: clean-up. A test that did not work is taken out of FlameKit Native (giving the Free build area an altar's base id), and old comments are updated. Free build works as before; all its logging stays.
+
+0.15.444 Nov 22, 2026
+- Free build: a piece placed inside an existing remembered spot's area no longer starts a new spot, even when it is over a 32 m grid line.
+
+0.15.443 Nov 22, 2026
+- Free build works only outside flame altar areas. Inside an altar's area the game's own building rules apply, and pieces you place there don't become remembered spots. Needs this version in your own game too.
+
+0.15.442 Nov 22, 2026
+- Free build: Experimental > Building now shows your nearest remembered spot within 64 m and how far its centre is, instead of only the spot whose area you stand in. "Forget this spot" forgets that nearest spot.
+
+0.15.441 Nov 22, 2026
+- Free build: Experimental > Building shows how many spots are remembered and the one you stand in; admins can forget it ("Forget this spot"). What was built there is temporary again.
+
+0.15.440 Nov 22, 2026
+- Test: Free build remembers where you built (32 m squares) and keeps a building area there from the moment the server starts, so what you built there may stay through restarts.
+
+0.15.439 Nov 22, 2026
+- Test (test server only): Free build's moving building area borrows an altar's base, to see whether the game then keeps what is built in it.
+
+0.15.438 Nov 22, 2026
+- Free build: clean-up. The parts that did not work are taken out (changing the build hammer's checks, the building tool signal and its messages to the server). Free build works as before; the logging stays.
+
+0.15.437 Nov 22, 2026
+- Free build works again far from altars: the moving building area is on whenever Free build is on (as in 0.15.428); its border shows while Free build is on.
+
+0.15.436 Nov 22, 2026
+- Logging: what the server knows about a player's building tool (for Free build).
+
+0.15.435 Nov 22, 2026
+- Free build: fixed 0.15.434 (the building tool was only looked at while the moving area was already on).
+
+0.15.434 Nov 22, 2026
+- Free build: the "building tool out" signal now comes from FlameKit Native (the Lua part could not see it), so the server gets it.
+
+0.15.433 Nov 22, 2026
+- Free build: logging of the building tool signal sent to the server.
+
+0.15.432 Nov 22, 2026
+- Free build: fixed 0.15.431 (the server never updated its list of players with the building tool out).
+
+0.15.431 Nov 22, 2026
+- Free build: the server's moving building area (and its border) is there only while your building tool is out; your game tells the server.
+
+0.15.430 Nov 22, 2026
+- Free build: fixed "Needs a Flame Altar nearby" coming back in 0.15.429 (building tool detection).
+
+0.15.429 Nov 22, 2026
+- Free build: the moving building area is there only while your building tool is out (its border is no longer drawn all the time).
+
+0.15.428 Nov 22, 2026
+- Free build: the moving building area moves in 32 m steps, so the server no longer sends every player the building areas each moment you move.
+
+0.15.427 Nov 22, 2026
+- Test: Free build with only the moving building area (the build hammer's checks are no longer changed).
+
+0.15.426 Nov 22, 2026
+- Test: Free build far from every flame altar: a building area moves with each player who has Free build on.
+
+0.15.425 Nov 22, 2026
+- Test: Free build far from every flame altar (a third check of the build hammer switched off), with logging.
+
+0.15.424 Nov 22, 2026
+- Logging for the build hammer again, to find why Free build gave errors on the server.
+
 0.15.423 Nov 21, 2026
 - Bigger altar areas is on by default (an admin can switch it off), and is in place from the moment the server starts.
 

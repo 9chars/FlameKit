@@ -14,6 +14,7 @@ inv.WHEEL = { "Close Chest" }  -- (owner 08:02) while his chest is open the whee
 PET_WHEEL = { "Follow me", "Stay here", "Pet", "Inventory", "Put away", "Companions" }
 FIGHT_MODES = { "Passive", "Defensive", "Aggressive", "Healing" }
 
+-- Tells a player that companion rr is not his (and whose it is).
 function refuse(world, player, rr)
   local who = {}
   for _, a in ipairs(rr.controllers or {}) do who[#who + 1] = (rr.names or {})[a] or "someone else" end
@@ -21,6 +22,7 @@ function refuse(world, player, rr)
 end
 
 
+-- The wheel's Follow: companion `npc` follows the player (saved).
 function do_follow(world, player, npc, rr)
   drives[npc] = { player = player, trail = {} }
   calm(world, npc)
@@ -29,6 +31,7 @@ function do_follow(world, player, npc, rr)
   say(world, player, (rr and (rr.name .. ": ") or "") .. "Following you.")
 end
 
+-- The wheel's Stay: companion `npc` stays where he is (saved).
 function do_stay(world, player, npc, rr)
   drives[npc] = nil
   local x, y, z = world:position(npc)
@@ -38,6 +41,7 @@ function do_stay(world, player, npc, rr)
   say(world, player, (rr and (rr.name .. ": ") or "") .. "Staying here.")
 end
 
+-- The wheel's Put Away: his body is removed; he stays on the roster (a staying one keeps his place).
 function do_away(world, player, npc, rr)
   if not rr then say(world, player, "Not on the list: cannot be put away.") return end
   local x, y, z = world:position(npc)
@@ -69,6 +73,7 @@ function set_fight(world, player, npc, rr, mode)
   say(world, player, rr.name .. ": " .. mode .. ".")
 end
 
+-- E pressed on a companion: refused for someone else's; otherwise the wheel opens on the player's screen with what he can do.
 on_talk = function(world, player, npc)
   log(string.format("E pressed on %s by player %s", tostring(npc), tostring(player)))
   local rr = name_of[npc] and find(name_of[npc])
@@ -143,6 +148,7 @@ function on_call(world, from)
     tostring(player), tostring(id), tostring(old)))
 end
 
+-- A message from a player's game on the wheel channel: a call, his notice preference, or the pick from a wheel (done here).
 function on_pick(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
   if okd and type(m) == "table" and m.op == "call" then return on_call(world, from) end

@@ -39,6 +39,7 @@ end
 -- (0.15.384) A monster's name from core/monster_names.lua: its kind (the template's arsenal), else its species (the
 -- animation graph, for kinds core/monsters.lua does not have), else nil.
 local names
+-- FlameKit's name for the kind of monster `id` is (by its arsenal, else its animation graph; core/monster_names.lua), or nil.
 function print_.name(world, id)
   if names == nil then
     local ok, t = pcall(require, "core.monster_names")

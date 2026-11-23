@@ -10,6 +10,7 @@ local bag = {}
 local GENERIC = 4  -- InventoryCategory::Generic
 local VIRTUAL = 5  -- InventoryCategory::Virtual: the slots of the worn backpack
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, component, id)
   local ok, c = pcall(world.get, world, component, id)
   if ok then return c end
@@ -41,6 +42,7 @@ function bag.stacks(world, player)
   -- `owner`: the entity whose InventorySetup names the inventory (emf.take takes a slot only from its owner): the
   -- player, or for the backpack's further rows the backpack itself
   local ids, seen, owner = {}, {}, {}
+  -- Notes inventory entity `id` (once) and which inventory it belongs to.
   local function add(id, of)
     if id ~= 0 and not seen[id] then
       seen[id] = true
@@ -112,6 +114,7 @@ function bag.entity_stacks(world, entity)
   local out = {}
   if not entity or entity == 0 then return out end
   local ids, seen = {}, {}
+  -- Notes inventory entity `id` once.
   local function add(id) if id and id ~= 0 and not seen[id] then seen[id] = true ids[#ids + 1] = id end end
   local setup = get(world, "InventorySetup", entity)
   for i = 1, #((setup and setup.linksEntities) or {}) do add(setup.linksEntities[i]) end

@@ -31,6 +31,26 @@ function kit.is_host()
   return os.time() - server_seen <= 2
 end
 
+-- (0.15.462, owner 2026-11-22 20:29 "#2 why aren't we fixing this now?") A message to the server goes out only once the
+-- server has welcomed this game and has that channel (emf.net.peer is not 0). Before that EMF refuses it and logs
+-- "net_to_server refused (lua): no server has welcomed this game yet", and features that try again every step (the
+-- player's settings, core/player_prefs.lua) then also hit the channel's rate ("over the channel's rate (30 in 10 s)"):
+-- seen at every join, about 9 s before the welcome. Every feature already treats a send that answered false as not sent
+-- and tries again later, so held back here it simply goes after the welcome. Not in a game you host (its server world is
+-- in this game: nothing to wait for).
+do
+  local raw_send = emf.net and emf.net.send
+  if raw_send then
+    emf.net.send = function(channel, data, ...)
+      if not kit.is_host() then
+        local ok, version = pcall(emf.net.peer, nil, 0, channel)
+        if ok and (version or 0) == 0 then return false end
+      end
+      return raw_send(channel, data, ...)
+    end
+  end
+end
+
 -- (0.15.138, owner: keep track of compatibility) The oldest FlameKit on the other side this one still works with.
 -- Raise one of them only when a change breaks the older side (HANDOFF "Compatibility"): MIN_SERVER is checked in a
 -- player's game against the server's version, MIN_GAME is sent by the server and checked in each player's game.
@@ -50,6 +70,7 @@ function kit.newer(a, b)
   return false
 end
 
+-- Writes a line to EMF's log (emf_core.log).
 function kit.log(...)
   emf.log(...)
 end
@@ -57,6 +78,7 @@ end
 -- The debug level, from debug.txt in the mod's folder (FlameKit's DLL reads the same file; Ctrl+Shift+F12 in the game
 -- changes it): "off", "normal" (also when the file is missing) or "full". Read again every 2 seconds (fresh: now).
 local level_name, level_checked = "normal", -10
+-- The debug level now ("off", "normal", "full"); `fresh` reads debug.txt at once.
 function kit.debug_level(fresh)
   local now = os.time()
   if fresh or now - level_checked >= 2 then
@@ -115,6 +137,7 @@ end
 local TAB_MOST = { battle = 1000, loot = 300 }
 local tabs = { battle = { list = {}, n = 0, dirty = false }, loot = { list = {}, n = 0, dirty = false } }
 local tab_steps = 0
+-- Adds a line to one of FlameKit's message tabs (`tab`), keeping only its newest TAB_MOST[tab] lines.
 function kit.note_tab(tab, text, colour)
   local t = tabs[tab]
   if not t then return end
@@ -129,6 +152,7 @@ function kit.note_tab(tab, text, colour)
   t.dirty = true
 end
 
+-- Writes the message tabs that changed to ui_<tab>.dat for FlameKit Native (4 times a second at most).
 local function write_tabs()
   tab_steps = tab_steps + 1
   if tab_steps % 15 ~= 0 then return end  -- (every 15 steps of your own world: 4 times a second)
@@ -195,6 +219,7 @@ local function expire_notices()
   end
 end
 
+-- Writes the notices (the lines that stay until they are taken away) to ui_notices.dat for FlameKit Native, when they changed.
 local function write_notices()
   if not notices_dirty then return end
   local list = {}
@@ -214,6 +239,7 @@ local function write_notices()
   kit.debug("info", "notices: %d on screen", #list)
 end
 
+-- Writes the message feed to ui_messages.dat for FlameKit Native, when it changed (players' lines marked "p").
 local function write_messages()
   if not messages_dirty then return end
   local lines = {}
@@ -260,6 +286,7 @@ end
 -- low bits are most likely the two building cursors (primary, secondary). The cursor's position (0.15.59) is no
 -- signal: it stays where it was when build mode ends, and FlameKit stayed hidden.
 local build_was = nil
+-- Whether the local player is in build mode (ClientPlayerInput mask), logged when it changes; false where it cannot be read.
 local function in_build_mode(world)
   local me = emf.local_player()
   if not me or me == 0 then return false end
@@ -281,6 +308,7 @@ end
 -- FlameKit answers, then the server's version when it is known; "not supported" only after 20 s without an answer (a
 -- joining game needs a few seconds for it); an older FlameKit on the server once per version it reports.
 local conn = { session = nil, state = nil, steps = 0, older = nil, told = nil }
+-- Tells the player which FlameKit version the server runs (and when it is updated), the server's note, and that the server has no FlameKit when none answers within 1200 steps.
 local function server_messages(world, connected)
   local okS, session = pcall(emf.session)
   if conn.session ~= session then conn = { session = session, state = nil, steps = 0, older = nil, told = nil } end
@@ -315,7 +343,7 @@ end
 
 -- (0.15.117, owner) A new update downloaded: a green line in the Messages window (FlameKit's DLL also opens its update
 -- window). Read from update_status.txt (the DLL's updater writes it), every 2 s, once per version.
-local update_told, update_steps = nil, 0
+local update_told, update_told_emf, update_steps = nil, nil, 0
 local function update_message()
   update_steps = update_steps + 1
   if update_steps % 120 ~= 0 then return end
@@ -327,9 +355,32 @@ local function update_message()
     update_told = v
     kit.note(string.format("%s v%s update downloaded!", kit.name, v), "#5adc6e", true)
   end
+  -- (0.15.456) the Enshrouded Modding Framework's own update (web_update.hpp / emf_update.hpp): its own line, once
+  local e = line:match("^ready|.*%(EMF%) v([%d%.]+)")
+  if e and e ~= update_told_emf then
+    update_told_emf = e
+    kit.note(string.format("Enshrouded Modding Framework (EMF) v%s update downloaded!", e), "#5adc6e", true)
+  end
 end
 
+-- (0.15.458, owner 2026-11-22 19:22 "when the game mod loads up, it needs to add a message to the "Chat" tab displaying
+-- the current running EMF version. It should look like: Enshrouded Modding Framework (EMF): v0.6.19") once when the Lua
+-- part starts: FlameKit Native writes the version of the EMF this game runs to emf_version.txt at the game's start
+-- (nothing with an older FlameKit Native: no file).
+local emf_version_told = false
+local function emf_version_message()
+  if emf_version_told then return end
+  emf_version_told = true
+  local f = io.open(emf.dir .. "\\emf_version.txt", "r")
+  local v = f and f:read("l")
+  if f then f:close() end
+  v = v and v:match("^%s*([%d%.]+)%s*$")
+  if v then kit.note("Enshrouded Modding Framework (EMF): v" .. v, "#ffffff", true) end
+end
+
+-- Every step of the player's own world: writes the feed, the tabs, the notices and the HUD label for FlameKit Native.
 local function hud_tick(world)
+  emf_version_message()  -- (0.15.458) once
   write_messages()
   write_tabs()  -- (0.15.377)
   expire_notices()
@@ -368,12 +419,14 @@ local function read_manifest()
   if type(data.authors) == "table" and type(data.authors[1]) == "string" then kit.author = data.authors[1] end
 end
 
+-- Whether feature `f` runs: not stopped by an error and not switched off by its setting.
 function kit.enabled(f)
   if f.broken then return false end
   if f.enabled_setting and emf.setting(f.enabled_setting) == false then return false end
   return true
 end
 
+-- Stops feature `f` after an error in `where`: logged and told to the player; the rest of FlameKit goes on.
 local function fail(f, where, err)
   f.broken = tostring(err)
   kit.debug("error", "feature %s stopped in %s: %s", f.id, where, f.broken)
@@ -402,6 +455,7 @@ function kit.call(f, method, ...)
   return a, b
 end
 
+-- Calls `method` of every feature (through kit.call: skipped when off, errors caught).
 local function each(method, ...)
   for _, f in ipairs(kit.features) do kit.call(f, method, ...) end
 end

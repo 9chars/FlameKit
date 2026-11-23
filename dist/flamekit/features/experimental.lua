@@ -39,11 +39,6 @@ local SWITCHES = {
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
   { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
   { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
-  -- (0.15.415, owner 2026-11-21 18:38 "add a setting for this and call it "Free build" -- build anywhere in the world,
-  -- but note its temporary"; "make it player specific and put these settings under the "Experimental" tab under a new
-  -- section called "Building""): FlameKit Native (build_anywhere.cpp) lets the build hammer work outside every flame
-  -- altar's area for the players listed in free_build_server.txt (the server) / free_build_client.txt (his own game)
-  { "freebuild", "Free build", nil, "Free build" },
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -82,49 +77,10 @@ local TIPS = {
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
   fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
-  freebuild = "Build anywhere in the world, not only inside a flame altar's area. Outside an altar's area it is temporary: the game removes what you built there after about 30 minutes or when the server restarts. Out there the hammer uses only the materials in your bag. Needs FlameKit on the server too. Off while you are in PvP. Everyone on the server is told when you switch it.",
 }
--- (0.15.415) Free build's bits in one table (the main chunk is at Lua's 200 locals): SECTION = switches shown under
--- their own heading in the tab, not in the list at the top; write = the players it is on for, to FlameKit Native in a
--- file beside the Lua part (one entity id a line; rewritten only when it changes): the server writes
--- free_build_server.txt, a player's own game free_build_client.txt (both in a game that hosts).
-local FB = { SECTION = { freebuild = "Building" }, STEPS = 30, written = {}, steps = 0 }
--- (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that"; 20:21 "Building, admins only"): Bigger
--- altar areas, one switch for the whole world (every altar's area is shared; the server decides what is kept; 0.15.423: on by default), only
--- FlameKit admins (core/admins.lua) may change it. Kept in experimental_world.json ({ bigaltars = true }); FlameKit
--- Native (build_anywhere.cpp) reads the factor from altar_size_server.txt (the server) / altar_size_client.txt (a
--- player's own game: the server's answer). 1.5x: the size tested on the local server (2x lost blocks in the outer ring
--- at restarts, 4x froze the server).
-FB.ALTAR_FACTOR = "1.5"
-FB.admins = require("core.admins")
-FB.world = nil  -- the world switch, loaded once
-function FB.world_on()
-  if FB.world == nil then
-    local ok, w = pcall(kit.store.load, "experimental_world", {})
-    FB.world = (ok and type(w) == "table") and w or {}
-  end
-  return FB.world.bigaltars ~= false  -- (0.15.423, owner 20:43 "can you default it on then?") on unless an admin switched it off
-end
-function FB.write_text(name, text)
-  if FB.written[name] == text then return end
-  local f = io.open(emf.dir .. "\\" .. name, "w")
-  if not f then return end
-  f:write(text, "\n")
-  f:close()
-  FB.written[name] = text
-  emf.log("experimental: bigger altar areas: " .. name .. " now " .. text)
-end
-function FB.write(which, ids)
-  table.sort(ids)
-  local text = table.concat(ids, "\n")
-  if FB.written[which] == text then return end
-  local f = io.open(emf.dir .. "\\free_build_" .. which .. ".txt", "w")
-  if not f then return end
-  f:write(text, text ~= "" and "\n" or "")
-  f:close()
-  FB.written[which] = text
-  emf.log("experimental: free build: " .. which .. " list now " .. (text ~= "" and text:gsub("\n", " ") or "(nobody)"))
-end
+-- (0.15.452) Free build and Bigger altar areas moved to features/building.lua (the Building tab); PvP is told to it
+-- through core/pvp_state.lua.
+local pvp_state = require("core.pvp_state")
 
 -- ---- the host's half ----
 
@@ -142,6 +98,7 @@ local function save_all()
   kit.store.save("experimental", saved)
 end
 
+-- Loads every player's saved switches and values (experimental.json), once.
 local function load_saved()
   if saved then return end
   saved = {}
@@ -161,9 +118,11 @@ function glide.factor(account)
   local f = tonumber(((saved or {})[account] or {}).glide_speed)
   return f and f > 0 and f or 1
 end
+-- A speed factor as text ("1.5x").
 function glide.label(f)
   return (string.format("%.2f", f):gsub("0+$", ""):gsub("%.$", ".0")) .. "x"
 end
+-- Whether `f` is one of the glider speed steps.
 function glide.allowed(f)
   for _, s in ipairs(glide.STEPS) do if s == f then return true end end
   return false
@@ -192,6 +151,7 @@ function glide.sprinting(world, account, p)
   end
   return held
 end
+-- Every server step while the player glides: scales the glider's speed by his factor (and Glider Sprint).
 function glide.apply(world, account, p)
   local f = glide.factor(account)
   if glide.sprinting(world, account, p) then f = f * glide.sbj(account, "sprint") end
@@ -223,6 +183,7 @@ function glide.damage(account)
   local d = tonumber(((saved or {})[account] or {}).damage_pct)
   return d and d > 0 and d or 0
 end
+-- Whether `d` is one of the damage bonus steps.
 function glide.damage_allowed(d)
   for _, s in ipairs(glide.DAMAGE) do if s == d then return true end end
   return false
@@ -272,6 +233,7 @@ glide.SBJ = {
     steps = { 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5 },
     tip = "How much faster you glide while holding Sprint: 2.0x is twice your Glider speed. Only for you." },
 }
+-- A player's value of Super B Jump (or Fast Dive) setting `which` (its default when he has none), and the setting.
 function glide.sbj(account, which)
   for _, d in ipairs(glide.SBJ) do
     if d.which == which or d.key == which then
@@ -304,6 +266,7 @@ function glide.fall_snap(world, entity)
   end)
   return r
 end
+-- Debug: one log line of the fall probe (height, speed, the game's fall data).
 function glide.fall_line(what, entity, r)
   emf.log(string.format("fall probe: player %s %s: y %.1f vy %.1f state %s Falling %s | wasFalling %s start %s dist %s pct %s",
     tostring(entity), what, r.y or 0, r.vy or 0, tostring(r.st), tostring(r.falling), tostring(r.was),
@@ -323,6 +286,7 @@ end
 -- landing (the dive start takes it back in the player's game).
 function glide.glider_tip(world, p, o, what)
   local d = p.dive
+  -- Shows or takes away the tip in the player's game (directly for the host's own player).
   local function say(on)
     local m = { op = "tip", on = on, seconds = on and 10 or nil }  -- (0.15.255) how long the tip stays up
     if kit.is_host() and emf.local_player() == p.entity then
@@ -349,6 +313,7 @@ function glide.glider_tip(world, p, o, what)
     if what ~= "dive" then say(false) end
   end
 end
+-- The player's game: shows the Fast Dive tip for the seconds the server says, or takes it away.
 function glide.tip_notice(msg)
   if msg.on == true then
     -- (0.15.255, owner: "lets make the message stay up for 10 seconds") the server says how long (older servers: 10 s)
@@ -384,6 +349,7 @@ function glide.blast_zone(world, p)
   glide.scans[#glide.scans + 1] = { player = p.entity, x = x, y = y, z = z, r = r, i = 1, n = 0, seen = 0, started = world:tick(),
     dmg = glide.BLAST_DMG[kind] or 0, total = 0 }
 end
+-- Whether entity `id` is a monster (enemy AI and a monster faction; not a player).
 function glide.is_monster(world, id)
   local oka, acc = pcall(world.account, world, id)
   if oka and acc then return false end
@@ -465,10 +431,12 @@ function glide.dive_notice(msg)
     kit.notice("fastdive")
   end
 end
+-- A Super B Jump setting's value as text.
 function glide.sbj_label(f, d)
   if d and d.name then return d.name(f) end
   return f == 0 and "Off (0x)" or glide.label(f)
 end
+-- Whether `f` is one of setting `key`'s steps.
 function glide.sbj_allowed(key, f)
   for _, d in ipairs(glide.SBJ) do
     if d.key == key then
@@ -491,10 +459,12 @@ local function held_by_pvp(account, key)
   return not PVP_KEEPS[key] and wants(account, "pvp")
 end
 
+-- Whether switch `key` works for this player now (he wants it and PvP does not hold it off).
 is_on = function(account, key)
   return wants(account, key) and not held_by_pvp(account, key)
 end
 
+-- Takes away a player's hit rules (made again by apply).
 local function drop_rules(p)
   for key, id in pairs(p.rules) do pcall(emf.hit_rule_remove, id) end
   p.rules = {}
@@ -509,7 +479,9 @@ local function apply()
     if now - p.seen > GONE_AFTER then
       drop_rules(p)
       online[account] = nil
+      pvp_state.set(account, false)  -- (0.15.452) for features/building.lua
     else
+      pvp_state.set(account, wants(account, "pvp"))  -- (0.15.452) Free build is off in PvP (features/building.lua)
       for _, s in ipairs(SWITCHES) do
         local key = s[1]
         local wanted = is_on(account, key)
@@ -563,6 +535,7 @@ end
 local input_broken = false  -- the game's own input cannot be read: players' games send the S and Space keys instead
 
 local body_of  -- forward: the PvP test bodies, below
+-- What a player's Experimental tab shows: his switches, values, PvP state and the world's options (sent to his game).
 local function view(account)
   local v = { op = "state", keys = input_broken or nil, body = body_of and body_of(account) or nil,
               glide_speed = glide.factor(account), damage_pct = glide.damage(account),
@@ -571,8 +544,7 @@ local function view(account)
               sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
               sbj_divebase = glide.sbj(account, "divebase"),
               sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
-              damage_pvp = wants(account, "pvp") or nil,
-              bigaltars = FB.world_on() or nil }  -- (0.15.422) the world's switch
+              damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -581,6 +553,7 @@ local function view(account)
   return v
 end
 
+-- Where entity `id` is (its transform when world:position has none).
 local function where(world, id)
   local x, y, z = world:position(id)
   if x then return x, y, z end
@@ -593,6 +566,7 @@ end
 -- EMF refused a move at once (its log says why: most often one still under way for that player)
 local REFUSED = "The move could not start: wait a moment and try again."
 
+-- Sends the player to the nearest of the bases' flame altars.
 local function go_home(world, player)
   local px, py, pz = where(world, player)
   local best, best_d = nil, nil
@@ -654,6 +628,7 @@ local moving = {}      -- player entity -> os.time() when its waypoint move star
 local retry = {}       -- player entity -> { x, y, z, account, steps }: a raw move to try once the given-up one is gone
 local NEAR_M = 64      -- closer than this: the ground search (its area is loaded around the player)
 
+-- Cancels the player's fall damage for 30 s (a hit rule), for a waypoint move.
 local function guard_falls(player)
   local okr, rule = pcall(emf.hit_rule, { kinds = "fall", to = player, cancel = true })
   if okr and rule then
@@ -665,6 +640,7 @@ end
 -- A line for one player's FlameKit window (the note under the buttons), from a callback: no reply to send it with.
 local tell_player  -- set below, once `view` and the channel are known
 
+-- Moves the player to x, y, z (on the ground, or 1.5 m above the waypoint) with his falls guarded; retried once when EMF's watchdog took the move away; logged and told.
 local function waypoint_move(world, player, account, x, y, z, ground, why)
   guard_falls(player)
   moving[player] = os.time()
@@ -686,6 +662,7 @@ local function waypoint_move(world, player, account, x, y, z, ground, why)
   return queued
 end
 
+-- A waypoint travel asked for by the player's game: checked (on the map, one at a time), then the move; an error text or nil.
 local function go_waypoint(world, player, msg, account)
   local x, y, z = tonumber(msg.x), tonumber(msg.y), tonumber(msg.z)
   if not (x and y and z) or x ~= x or z ~= z or x < 0 or z < 0 or x > 10240 or z > 10240 or y < -1000 or y > 5000 then
@@ -816,11 +793,13 @@ local bodies = {}    -- entity id -> { kind, owner = account, session, rules = {
 local CORPSE_S = 8
 local body_steps = 0
 
+-- Whether entity `id` has component `comp`.
 local function has(world, comp, id)
   local ok, c = pcall(world.get, world, comp, id)
   return ok and c ~= nil
 end
 
+-- Whether entity `id` is an animal, a tame or farm animal, or an ally that is no villager (faction 11 without NpcState). Not called at present.
 local function protected(world, id)
   if has(world, "Wildlife", id) or has(world, "Animal", id) or has(world, "IsTame", id) then return true end
   local ok, f = pcall(world.get, world, "Faction", id)
@@ -829,6 +808,7 @@ local function protected(world, id)
   return n == 11 and not has(world, "NpcState", id)
 end
 
+-- Forgets test monster `id` (its hit rules go; removed with `destroy`).
 local function drop_body(world, id, destroy)
   local b = bodies[id]
   if not b then return end
@@ -838,6 +818,7 @@ local function drop_body(world, id, destroy)
   if destroy then pcall(emf.destroy, world, id) end
 end
 
+-- Forgets every test monster of player `account`.
 local function drop_bodies_of(world, account, destroy)
   for id, b in pairs(bodies) do
     if b.owner == account then drop_body(world, id, destroy) end
@@ -940,6 +921,7 @@ local ground_n = 0  -- how many in ground_busy
 local function to_ground(id, x, y, z)
   ground_q[#ground_q + 1] = { id = id, x = x, y = y, z = z, at = ground_step + GROUND_WAIT_STEPS }
 end
+-- Moves waiting spawned monsters to the ground (emf.teleport with the ground search) once GROUND_WAIT_STEPS have passed, at most GROUND_MAX at once.
 local function ground_tick(world)
   ground_step = ground_step + 1
   if ground_n > 0 and ground_step % 60 == 0 then  -- an answer that never came (a reload): not counted any more
@@ -982,6 +964,7 @@ local function set_id(holder, field, value)
   return false
 end
 local calm = {}  -- dummy entity -> true
+-- Keeps the training dummies calm: their aggro targets cleared every step.
 local function calm_tick(world)
   for id in pairs(calm) do
     local b = bodies[id]
@@ -1077,6 +1060,7 @@ end
 local not_legendary = {}  -- (0.15.168) debug names that came out of the chest below legendary
 local PICK_TRIES = 5
 local give_legendary
+-- Puts legendary item `name` into the loot chest at x, y, z; one that came out below legendary is noted and another one tried (PICK_TRIES).
 give_legendary = function(world, key, x, y, z, name, level, tries)
   loot_chest.put(world, key, x, y, z, name, 1, level, "legendary", function(added, chest)
     if not added or added < 1 or not chest then return end
@@ -1101,6 +1085,7 @@ give_legendary = function(world, key, x, y, z, name, level, tries)
   end)
 end
 
+-- A test monster's loot: runes into the killer's bag (the rest and a legendary item into a chest beside the body); doubled for a boss.
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
   if not ok or not x then return "no position" end
@@ -1250,6 +1235,7 @@ local function spawn_tick(world)
 end
 
 local body_pass = nil  -- a check of the test monsters under way (bodies_tick)
+-- Every server step: the checks of all test monsters (deaths, loot, out of sight), spread over steps within SCAN_BUDGET, one summary line per check.
 local function bodies_tick(world)
   if next(bodies) == nil then
     if duel_guard.objects then guard_duelists(world) end  -- the last one went: the rule goes
@@ -1510,24 +1496,6 @@ local function handle(world, account, entity, msg, from)
     end
     return view(account)
   end
-  if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
-    local v
-    if not FB.admins.is(account, from) then
-      v = view(account)
-      v.note = "Only FlameKit admins can switch Bigger altar areas."
-      return v
-    end
-    FB.world_on()
-    if msg.on == true then FB.world.bigaltars = nil else FB.world.bigaltars = false end  -- (0.15.423) only "off" is kept
-    kit.store.save("experimental_world", FB.world)
-    emf.log(string.format("experimental: player %s switched bigger altar areas %s", tostring(entity), msg.on == true and "on" or "off"))
-    local name = require("core.players").name(world, entity, "a player")
-    pcall(require("features.chat").announce, world, string.format("%s turned %s bigger altar areas.", name, msg.on == true and "ON" or "OFF"),
-      nil, { colour = "#ff9632", seconds = 10 })
-    v = view(account)
-    v.admin = true
-    return v
-  end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
       if s[1] == msg.key and held_by_pvp(account, s[1]) then
@@ -1587,6 +1555,7 @@ end
 -- switch on the timer is simply kept full. A game update that changes the attribute makes this stop, not crash.
 local timer_broken = false
 
+-- Keeps the shroud timer full (FogResistance) for players with the switch on.
 local function keep_timer_full(world)
   if timer_broken then return end
   for account, p in pairs(online) do
@@ -1609,6 +1578,7 @@ end
 -- ids), so nobody stands unprotected until their game's next hello.
 local looked = false
 
+-- Finds the players already here (entity ids 1-64), once.
 local function find_players(world)
   looked = true
   for id = 1, 64 do
@@ -1641,6 +1611,7 @@ local function read_input(world, account, p)
   end
 end
 
+-- Every server step for every player: reads his input, applies his glider speed, the updraft burst again and again, and climbing with the glider (S held).
 local function lift(world)
   if lift_broken then return end
   for account, p in pairs(online) do
@@ -1832,9 +1803,16 @@ local function keep_stamina_full(world)  -- (0.15.207) and the mana of Invincibl
     -- the player's Oxygen data is written directly: dataStorage[1] = the air now, [2] = its maximum (measured on the
     -- local server: "30 30 0 0 0 30" full, "0 30 0 0 0 30" drowning), and the game's leftover fraction
     -- (DynamicOxygenState.accumulatedValue) back to 0.
+    -- (0.15.462) a player who is just leaving has no Oxygen any more: skipped, not counted as "this game version cannot"
+    -- (G-Portal 2026-11-22 18:59:54: SuperB's game dropped, the error switched the air off for everyone until a restart)
+    local oxygen = nil
     if is_on(account, "immortal") and not glide.air_broken then
+      local okg, comp = pcall(world.get, world, "Oxygen", p.entity)
+      if okg then oxygen = comp end
+    end
+    if oxygen then
       local ok, err = pcall(function()
-        local o = world:get("Oxygen", p.entity).dataStorage
+        local o = oxygen.dataStorage
         local now, full = tonumber(o[1]), tonumber(o[2])
         if now and full and full > 0 and now < full then
           o[1] = full
@@ -1864,11 +1842,13 @@ local HIT_ALL, PLAYER_FACTION = 1, 7
 local pvp_steps = 0
 local pvp_scale_rule = nil
 
+-- Entity `id`'s Faction component and its number.
 local function faction(world, id)
   local f = world:get("Faction", id)
   return f, f and tonumber(tostring(f.faction))
 end
 
+-- Gives player p the hit rule `rule` under `key` (once); false and the reason when EMF refuses it.
 local function pvp_rule(p, key, rule)
   if p.rules[key] then return true end
   local ok, id = pcall(emf.hit_rule, rule)
@@ -1876,6 +1856,7 @@ local function pvp_rule(p, key, rule)
   return false, tostring(id)
 end
 
+-- Takes player p's hit rule `key` away.
 local function pvp_unrule(p, key)
   if p.rules[key] then pcall(emf.hit_rule_remove, p.rules[key]) end
   p.rules[key] = nil
@@ -1933,11 +1914,13 @@ local target_broken = false
 local ALARMED, AGGRO_FLOOR = 3, 20
 local function start_aggro(dist) return math.max(40, 100 - 3 * dist) end
 
+-- An entity id from a game value (a table with id, or the number).
 local function eid(v)
   if type(v) == "table" then return v.id end
   return v
 end
 
+-- Puts PvP player `player` into `monster`'s threat table (DynamicAggro), so it attacks him like any player.
 local function alarm(world, monster, player, dist)
   local ag = world:get("DynamicAggro", monster)
   if not ag then return end
@@ -1976,6 +1959,7 @@ local function aggro_line(world, id)
 end
 F._aggro_line = aggro_line
 
+-- Writes the threat of every monster near a PvP player (found by pvp_aggro); switched off for good when it fails.
 local function hunt(world)
   if target_broken or next(hunters) == nil then return end
   local ok, err = pcall(function()
@@ -1990,6 +1974,7 @@ local function hunt(world)
 end
 
 local aggro_i = 1  -- (0.15.137) where pvp_aggro's pass over the world goes on
+-- A pass over the world's entities, a slice per step: the monsters near PvP players, for hunt.
 local function pvp_aggro(world, players)
   if aggro_i == 1 then hunters = {} end  -- a new pass
   if aggro_broken or #players == 0 then hunters, aggro_i = {}, 1 return end
@@ -2040,6 +2025,7 @@ end
 local PET_R, PET_MAX, PET_STEPS = 40, 24, 120
 local pets_full_said = false
 
+-- Whether entity `id` is a pet, a farm animal or an ally that is no villager (kept safe from PvP hits).
 local function pet_like(world, id)
   if has(world, "IsTame", id) then return true end
   local ok, f = pcall(world.get, world, "Faction", id)
@@ -2048,6 +2034,7 @@ local function pet_like(world, id)
 end
 
 local pets_scan = { i = 1, keep = {} }  -- where guard_pets' pass over the world is
+-- While anyone has PvP on: a no-player-damage rule for every pet-like entity near a PvP player (at most PET_MAX); all taken away when nobody has.
 local function guard_pets(world, any)
   if not any then
     for e, r in pairs(pet_rules) do pcall(emf.hit_rule_remove, r) end
@@ -2109,6 +2096,7 @@ local function guard_pets(world, any)
   end
 end
 
+-- Every server step: each PvP player gets faction HitAll and the rule that protects buildings; the others their own faction back; then pets, aggro and threat.
 local function pvp(world)
   pvp_steps = pvp_steps + 1
   local any = false
@@ -2174,6 +2162,7 @@ local function pvp(world)
   end
 end
 
+-- Every step of a world you host: test monsters, loot chests, Fast Dive, the players' switches and rules, the glider, PvP, Invincible Mode, Free build's files.
 function F.tick(world)
   fx_steps = fx_steps + 1
   if world:is_server() then  -- (0.15.161) test monster bodies emptied; (0.15.186) their loot piles removed
@@ -2187,14 +2176,6 @@ function F.tick(world)
   local account, player = me(world)
   if account then seen(account, player) end
   apply()
-  if world:is_server() and fx_steps % FB.STEPS == 0 then  -- (0.15.415) Free build: who, for FlameKit Native
-    local ids = {}
-    for account, p in pairs(online) do
-      if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end
-    end
-    pcall(FB.write, "server", ids)
-    pcall(FB.write_text, "altar_size_server.txt", FB.world_on() and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
-  end
   keep_timer_full(world)
   keep_stamina_full(world)
   if account and online[account] then online[account].kit = true end  -- the host's own game has FlameKit
@@ -2248,6 +2229,7 @@ local function fnv(bytes)
   return h
 end
 
+-- A map marker type's two numbers: FNV-1a over its GUID as the game keeps it in memory, and as written.
 local function marker_ids(guid)
   local hex = tostring(guid):gsub("[^%x]", "")
   if #hex ~= 32 then return nil end
@@ -2262,6 +2244,7 @@ F._marker_ids = marker_ids
 -- (0.15.109, owner) Has the player with this account PvP on right now? (where the world is hosted; for the party list)
 -- tests only: the most entities one scan looks at
 function F._scan_max(n) SCAN_MAX = n end
+-- Tests only: how many spawned monsters are on the way to the ground, and how many wait.
 function F._ground() return ground_n, #ground_q - ground_head + 1 end
 
 -- tests only: end a player's PvP cool-down
@@ -2272,7 +2255,7 @@ end
 -- tests only: put another player into (or out of) the online list, with PvP on or off
 function F._online_test(entity, account, pvp)
   if not account then
-    for acc, p in pairs(online) do if p.entity == entity then drop_rules(p); online[acc] = nil end end
+    for acc, p in pairs(online) do if p.entity == entity then drop_rules(p); online[acc] = nil; pvp_state.set(acc, false) end end
     return
   end
   online[account] = { entity = entity, rules = {}, seen = os.time() + 3600, pvp = pvp or nil }
@@ -2285,6 +2268,7 @@ function F.pvp_lock_left(account)
   return math.max(0, PVP_LOCK_S - (os.time() - p.pvp_hit_at))
 end
 
+-- Whether the player with this account has PvP on right now (where the world is hosted; for the party list).
 function F.pvp_of(account)
   return account ~= nil and is_on(tostring(account), "pvp") == true
 end
@@ -2313,11 +2297,13 @@ local function nearest_spire(world)
   return bx, by, bz
 end
 
+-- The server's version of this channel (0: the server has no FlameKit).
 local function peer()
   local ok, version = pcall(emf.net.peer, nil, 0, CHANNEL)
   return ok and version or 0
 end
 
+-- Sends message `msg` to the server; true when sent.
 local function ask(msg)
   local ok, sent = pcall(emf.net.send, CHANNEL, emf.json.encode(msg))
   since_ask = 0
@@ -2325,15 +2311,8 @@ local function ask(msg)
 end
 
 local my_view  -- (0.15.415) defined below, used by F.client_tick
+-- Every step of the player's game: the waypoint and spire travel asked for, the keys the glider needs, and asking the server for his tab (every ASK_STEPS).
 function F.client_tick(world)
-  FB.steps = FB.steps + 1
-  if FB.steps % FB.STEPS == 0 then  -- (0.15.415) Free build: is it on for me (the server's answer), for FlameKit Native
-    local okv, v = pcall(my_view, world)
-    local me_id = emf.local_player()
-    local on = okv and v and v.freebuild == true and not v.freebuild_pvp and me_id and me_id ~= 0
-    pcall(FB.write, "client", on and { tostring(me_id) } or {})
-    pcall(FB.write_text, "altar_size_client.txt", (okv and v and v.bigaltars == true) and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
-  end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
@@ -2384,10 +2363,12 @@ function F.client_tick(world)
   if version ~= 0 and since_ask >= ASK_STEPS then ask({ op = "get" }) end
 end
 
+-- Whether this game can use the tab: it hosts the world, or the server has FlameKit.
 function F.connected(world)
   return kit.is_host() or peer() ~= 0
 end
 
+-- Whether the world is this Lua state's own (a game that hosts, or the server).
 local function hosting(world)
   return kit.is_host() or world:is_server()
 end
@@ -2416,6 +2397,7 @@ local function dev_channel()
   return t:sub(1, 4) == "test"
 end
 
+-- The Debug section's rows (test players, test monsters, and the other test tools).
 local function debug_rows(world, rows)
   rows[#rows + 1] = { separator = true }
   rows[#rows + 1] = { heading = "Debug" }
@@ -2452,6 +2434,7 @@ local function debug_rows(world, rows)
   return rows
 end
 
+-- This player's tab state: made here in a world you host, else the server's last answer.
 my_view = function(world)
   if hosting(world) then
     load_saved()
@@ -2478,6 +2461,7 @@ local function panel_rows(world)
     return debug_rows(world, rows)
   end
   rows[#rows + 1] = { separator = true }
+  -- The row of switch s (greyed with the reason while PvP or the game version holds it off).
   local function switch_row(s)
       local on = v[s[1]] == true
       local text = (on and "On    " or "Off   ") .. s[2]
@@ -2490,22 +2474,7 @@ local function panel_rows(world)
       end
   end
   for _, s in ipairs(SWITCHES) do
-    if s[1] ~= "pvp" and not FB.SECTION[s[1]] then switch_row(s) end
-  end
-  do  -- (0.15.415) the sections: "Building" (Free build)
-    local done = {}
-    for _, s in ipairs(SWITCHES) do
-      local sec = FB.SECTION[s[1]]
-      if sec then
-        if not done[sec] then done[sec] = true rows[#rows + 1] = { heading = sec } end
-        switch_row(s)
-      end
-    end
-    -- (0.15.422) the world's Bigger altar areas, under Building: everyone sees it, only admins can switch it
-    local on, admin = v.bigaltars == true, v.admin == true or hosting(world)
-    rows[#rows + 1] = { button = "bigaltars", text = (on and "On    " or "Off   ") .. "Bigger altar areas (1.5x)" .. (admin and "" or " (admins only)"),
-      selected = on, disabled = (not admin) or nil,
-      tooltip = "Every flame altar's building area is 1.5 times as wide, high and deep; an altar's level still sets its size (40 m becomes 60 m, 160 m becomes 240 m). For the whole server: everyone's altars. What you build in the bigger area is kept like anything inside an altar's area. Players need this FlameKit version in their own game to see and use the bigger area. On unless an admin switches it off. Only FlameKit admins can switch it; everyone on the server is told." }
+    if s[1] ~= "pvp" then switch_row(s) end
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
   -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B
@@ -2522,6 +2491,7 @@ local function panel_rows(world)
   rows[#rows + 1] = { separator = true }
   do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +1000% (0.15.207)
     local dp = tonumber(v.damage_pct) or 0
+    -- A damage bonus step as text.
     local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
     local opts = {}
     for _, d in ipairs(glide.DAMAGE) do opts[#opts + 1] = { key = "dmg:" .. tostring(d), text = name(d), selected = d == dp } end
@@ -2565,6 +2535,7 @@ local function board_shown()
   return hidden == "0"
 end
 
+-- The Experimental window's rows (FlameKit Native draws them from ui_exp.dat).
 function F.window_rows(world)
   local v = my_view(world)
   if not v then
@@ -2666,6 +2637,7 @@ function F.window_rows(world)
   return rows
 end
 
+-- The Experimental tab's rows.
 function F.panel(world)
   return panel_rows(world)
 end
@@ -2697,6 +2669,7 @@ function F.minimap_waypoint(world, arg)
   end
 end
 
+-- A click in the Experimental tab or window: debug tools, switches, settings and the world's options (sent to the server).
 function F.click(world, key)
   if key:sub(1, 4) == "npc:" then return pcall(function() require("features.npc_wheel_probe").click(world, key) end) end  -- TEMPORARY
   if key:sub(1, 9) == "dbg:test:" then return require("features.party").set_test(world, key:sub(10)) end
@@ -2846,17 +2819,6 @@ function F.click(world, key)
     end
     return
   end
-  if key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas (the server checks the admin)
-    if hosting(world) then
-      local account, player = me(world)
-      if not account then return end
-      load_saved()
-      note = handle(world, account, player, { op = "set", key = "bigaltars", on = not FB.world_on() }, { is_local = true }).note
-    elseif shown then
-      ask({ op = "set", key = "bigaltars", on = not (shown.bigaltars == true) })
-    end
-    return
-  end
   if key:sub(1, 3) ~= "sw:" then return end
   local name = key:sub(4)
   if hosting(world) then
@@ -2872,6 +2834,7 @@ function F.click(world, key)
   end
 end
 
+-- Sets up the channel, keys, hit rules, events and commands.
 function F.setup(k)
   kit = k
   -- A console test for PvP (server console or emf\commands.txt, output in emf_core.log), so it can be tried without a
@@ -3116,6 +3079,7 @@ function F.setup(k)
       end
       drop_rules(online[account])
       online[account] = nil
+      pvp_state.set(account, false)  -- (0.15.452)
     end
     drop_bodies_of(world, account, true)
     for i = #spawn_queue, 1, -1 do  -- (0.15.137) the rest of their spawn is not made
@@ -3184,7 +3148,6 @@ function F.setup(k)
       if type(msg) ~= "table" or not from or not from.player or from.player == 0 then return end
       local v = handle(world, from.account, from.player, msg, from)
       if not v then return end
-      v.admin = FB.admins.is(from.account, from) or nil  -- (0.15.422) may switch the world's options
       pcall(emf.net.send_to, world, from.player, CHANNEL, emf.json.encode(v))
     end, "a message from a player"),
     on_player = kit.guard(F, function(world, from, data)

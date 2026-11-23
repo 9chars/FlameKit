@@ -1,13 +1,8 @@
--- features/build_anywhere.lua (0.15.412, owner 2026-11-21 18:09 "what about adjusting the build hammer to allow you to
--- build anywhere. I get an error that says "Needs a Flame Altar nearby"", 18:12 "lets try to change the may I build
--- here check").
---
--- Step 1 (this version): logging only, nothing in the game changes. The game's placement check is not known (EMF's
--- engine notes: inside client_cursor / server_cursor_no_prediction, not isolated). Both cursors keep flag words:
--- ClientCursor.primaryFlags / secondaryFlags (the player's own game) and ServerCursor.primaryFlags / secondaryFlags
--- (the server). This logs every change of them for the local player (his game) and every online player (the
--- server), so the bit that means "no flame altar here" can be found by pointing the hammer inside and outside an
--- altar's area. Debug log: kept, can be switched off (LOG).
+-- features/build_anywhere.lua: Free build's debug log (nothing in the game changes). Logs, on change, the cursor flag
+-- words (ClientCursor in the player's own game, ServerCursor on the server: primaryFlags / secondaryFlags, with the
+-- player's position) and the server's view of the building tool (NetworkCursor currentBuildingItemId, cursorEntityId,
+-- serverFlags; ServerCursor cursorEntityId and building item). At most LOG_MAX lines a minute; LOG switches it off.
+-- Free build itself: features/experimental.lua and FlameKit Native (build_anywhere.cpp).
 -- Uses only core modules (HANDOFF rule 0b).
 
 local players = require("core.players")
@@ -15,20 +10,23 @@ local players = require("core.players")
 local F = { id = "build_anywhere", title = "Build Anywhere" }
 local kit
 
-local LOG, LOG_MAX = false, 200  -- changes logged per minute at most (0.15.415: off; the bits are known, see build_anywhere.cpp)
+local LOG, LOG_MAX = true, 200   -- changes logged per minute at most
 local said, steps = 0, 0
 local last = {}                  -- "<side>:<id>" -> "<primary>/<secondary>"
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   return ok and v or nil
 end
 
+-- Field `k` of a game value, or nil when it cannot be read.
 local function field(v, k)
   local ok, x = pcall(function() return v[k] end)
   return ok and x or nil
 end
 
+-- A flag word as hex with the numbers of the bits that are set ("0x0000000B [0,1,3]").
 local function bits(n)
   n = math.floor(tonumber(n) or 0)
   local on = {}
@@ -36,6 +34,7 @@ local function bits(n)
   return string.format("0x%08X [%s]", n, table.concat(on, ","))
 end
 
+-- Logs cursor component `comp` of entity `id` (its two flag words and the entity's position) when the flags changed.
 local function look(world, side, comp, id)
   local c = get(world, comp, id)
   if not c then return end
@@ -51,11 +50,52 @@ local function look(world, side, comp, id)
     bits(p), bits(s), x or 0, y or 0, z or 0))
 end
 
+-- the server's own view of the building tool, logged when it changes: NetworkCursor.currentBuildingItemId and
+-- .cursorEntityId, ServerCursor.cursorEntityId and the building item.
+local tool_last = {}
+-- A game value as text (an id's value or a hash, else tostring).
+local function val(v)
+  if type(v) == "userdata" or type(v) == "table" then
+    local okv, x = pcall(function() return v.value end)
+    if okv and x ~= nil then return tostring(x) end
+    local okh, h = pcall(function() return v.hash end)
+    if okh and h ~= nil then return tostring(h) end
+  end
+  return tostring(v)
+end
+-- Logs what the server knows of player `id`'s building tool (NetworkCursor, ServerCursor) when it changed.
+local function look_tool(world, id)
+  local parts = {}
+  local nc = get(world, "NetworkCursor", id)
+  if nc then
+    parts[#parts + 1] = "net item " .. val(field(nc, "currentBuildingItemId"))
+    parts[#parts + 1] = "net cursor " .. val(field(nc, "cursorEntityId"))
+    parts[#parts + 1] = "net flags " .. val(field(nc, "serverFlags"))
+  else
+    parts[#parts + 1] = "no NetworkCursor"
+  end
+  local sc = get(world, "ServerCursor", id)
+  if sc then
+    parts[#parts + 1] = "server cursor " .. val(field(sc, "cursorEntityId"))
+    local ci = field(sc, "currentBuildingItemInstance")
+    parts[#parts + 1] = "server item " .. (ci and val(field(ci, "itemId")) or "nil")
+  end
+  local line = table.concat(parts, ", ")
+  if tool_last[id] == line then return end
+  tool_last[id] = line
+  if said >= LOG_MAX then return end
+  said = said + 1
+  emf.log(string.format("build anywhere: tool signals of %d: %s", id, line))
+end
+
 function F.tick(world)  -- the server
   steps = steps + 1
   if steps % 3600 == 0 then said = 0 end
   if not LOG or steps % 2 ~= 0 then return end
-  for _, id in ipairs(players.ids(world)) do look(world, "server", "ServerCursor", id) end
+  for _, id in ipairs(players.ids(world)) do
+    look(world, "server", "ServerCursor", id)
+    pcall(look_tool, world, id)
+  end
 end
 
 local csteps = 0
@@ -67,9 +107,10 @@ function F.client_tick(world)  -- the player's own game
   if me and me ~= 0 then look(world, "client", "ClientCursor", me) end
 end
 
+-- Says in the log that the debug log is on.
 function F.setup(k)
   kit = k
-  if LOG then emf.log("build anywhere: logging the cursors' flags (nothing in the game changes)") end
+  if LOG then emf.log("build anywhere: Free build debug log on (cursor flags, building tool; nothing in the game changes)") end
 end
 
 return F

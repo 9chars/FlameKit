@@ -24,17 +24,20 @@ local said = { p = 0, c = 0 }
 local last_n = nil     -- the newest number handed on (nil: not read yet: the lines there then are old)
 local last_read = -1000
 
+-- Where entity `id` is (x, y, z), or nil when it is gone.
 local function where(world, id)
   local ok, x, y, z = pcall(world.position, world, id)
   if ok and x then return x, y, z end
   return nil
 end
 
+-- The world's step count (0 when it cannot be read).
 local function tick_of(world)
   local ok, t = pcall(world.tick, world)
   return ok and tonumber(t) or 0
 end
 
+-- One line of news: a loose item ("p") goes to every on_pickup function; a container ("c") is kept for news.containers (KEEP_TICKS, at most 400).
 local function handle(world, kind, id, t)
   local x, y, z = where(world, id)
   if news.LOG and said[kind] < 20 then
@@ -58,6 +61,7 @@ local function handle(world, kind, id, t)
   end
 end
 
+-- Reads loot_news.txt (written by FlameKit Native) and handles the lines not seen yet.
 local function read(world, t)
   local f = io.open(emf.dir .. "\\loot_news.txt", "rb")
   if not f then return end
@@ -80,6 +84,7 @@ local function read(world, t)
   if newest > last_n then last_n = newest end
 end
 
+-- Every server step: reads the news every READ_EVERY steps while a feature waits for loot (`waiting`), at once with `now`.
 function news.tick(world, waiting, now)
   if last_n ~= nil and not waiting then return end
   local t = tick_of(world)
@@ -89,10 +94,13 @@ function news.tick(world, waiting, now)
   if not ok then emf.log("loot news: " .. tostring(err)) end
 end
 
+-- Nothing to set up (the news comes from FlameKit Native); kept so features can call it.
 function news.setup() return true end
 
+-- Registers fn(world, id, x, y, z, tick), called for every new loose item.
 function news.on_pickup(fn) pickup_fns[#pickup_fns + 1] = fn end
 
+-- The new containers (loot piles) within r m of x, z made since step `since`.
 function news.containers(x, z, r, since)
   local out = {}
   for _, c in ipairs(containers) do

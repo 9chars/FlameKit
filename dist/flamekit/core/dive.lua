@@ -72,6 +72,7 @@ local M = {
 }
 
 local ON_GROUND, IN_AIR, GLIDING = 0, 2, 4
+-- A number from any game value (the game's 64-bit numbers come as userdata).
 local function n(v) return tonumber(tostring(v)) end
 
 -- forward pressed (W / the stick): the input the player's game sends; the host's own player by the key
@@ -111,6 +112,7 @@ local function end_push(world, entity, factor)
   end)
 end
 
+-- Pushes the player straight down through the game's Impulse component (ending other pushes unless keep_others); false when the player has no Impulse.
 local function push_down(world, entity, gliding, factor, keep_others)
   local imp = world:get("Impulse", entity)
   if not imp then return false end
@@ -136,6 +138,7 @@ end
 -- the explosion's Faction and OwnerRelationship as the game has them.
 M.BLAST_FACTION = nil  -- (0.15.274: faction 7 made no difference, the explosion still hurt no creature)
 M.boom_said = 0
+-- Spawns the landing blast `guid` at x, y, z (scaled, with FlameKit's faction when it may have one); the spawned entity or nil.
 function M.boom(world, x, y, z, guid, scale)
   if not guid or guid == "" or guid == "off" then return nil end
   local comps = {}
@@ -174,6 +177,7 @@ function M.in_base(world, entity)
   return ok and inside or nil
 end
 
+-- A dive's landing: picks the landing (only the blast in or near a base), keeps the blast off the player for LANDING_SHIELD s and spawns the landing's blasts.
 local function landing(world, entity, kind, s)
   local x, y, z = world:position(entity)
   if not x then return end

@@ -16,6 +16,7 @@ local kit
 -- (core/monster_print.lua) the step after, removes it, and writes monster_prints.txt beside FlameKit:
 -- "<template guid>\t<group>\t<name>\t<boss>\t<one hash per component, - for none>".
 local mp = { queue = nil, out = nil, pending = {}, step = 0, raw = nil, names = nil }
+-- The flamekit.monprints debug command's queue: prints each spawned monster's fingerprint 2 s after its spawn, then removes it.
 local function monprints_tick(world)
   if not mp.queue then return end
   mp.step = mp.step + 1
@@ -56,11 +57,13 @@ local function monprints_tick(world)
   end
 end
 
+-- Every server step: sends the queued Battle and Loot lines, and the monprints queue.
 function F.tick(world)
   feed.tick(world)
   monprints_tick(world)
 end
 
+-- Opens the feed's channel and listens for hits, heals and pickups (Battle and Loot tabs).
 function F.setup(k)
   kit = k
   prefs.setup()

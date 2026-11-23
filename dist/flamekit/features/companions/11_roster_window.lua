@@ -14,6 +14,7 @@ roster.subs = {}                   -- player entity -> tick of his last ask
 roster.known = roster.known or {}  -- account -> the name last seen (players picked by name, also when offline)
 roster.NAME_MAX = 20
 
+-- Notes the character name of every player here (roster.known: account -> name).
 function roster.ui_known(world)
   local ok, ids = pcall(players.ids, world)
   for _, pid in ipairs(ok and ids or {}) do
@@ -26,11 +27,13 @@ function roster.ui_known(world)
   end
 end
 
+-- The Companion Roster window's data as one message: every companion and every known player (online or not).
 function roster.ui_state(world)
   local online = {}
   local ok, ids = pcall(players.ids, world)
   for _, pid in ipairs(ok and ids or {}) do local a = world:account(pid) if a then online[a] = true end end
   local list, seen, pl = {}, {}, {}
+  -- Adds a player (once) to the window's player list.
   local function person(acc, fallback)
     if not acc or seen[acc] then return end
     seen[acc] = true
@@ -47,11 +50,13 @@ function roster.ui_state(world)
   return emf.json.encode({ op = "roster", list = list, players = pl })
 end
 
+-- Sends the window's data to player `pid`.
 function roster.ui_send(world, pid, text)
   local ok, res = pcall(emf.net.send_to, world, pid, roster.RCH, text)
   if not (ok and res) then log("roster window: not sent to " .. tostring(pid) .. " (" .. tostring(res) .. ")") end
 end
 
+-- Sends the window's data to every player who has it open, when it changed (or `force`); viewers gone or older than 10 min are dropped.
 function roster.ui_push(world, force)
   local text = roster.ui_state(world)
   if not force and text == roster.ui_last then return end
@@ -62,6 +67,7 @@ function roster.ui_push(world, force)
   end
 end
 
+-- Every second while someone views the window: known names (saved when new) and the data.
 function roster.ui_tick(world)
   roster.ui_known(world)
   if roster.known_changed then
@@ -152,6 +158,7 @@ function roster.petlog_tick(world)
   local pl = roster.petlog
   local id = pl.id
   if world:tick() > pl.untill or not world:position(id) then roster.petlog = nil log("petlog " .. id .. ": done") return end
+  -- A value read for the log ("err" when it cannot be read).
   local function rd(f) local ok, v = pcall(f) if ok then return v end return "err" end
   local x, y, z = world:position(id)
   local wl = rd(function() local w = world:get("DynamicWildlife", id) return string.format("state %s (last %s), target %.1f %.1f %.1f, keep until %s, flee %s",
@@ -201,6 +208,7 @@ function roster.do_pet(world, player, npc, rr)
   say(world, player, "Press E to pet " .. tostring(rr and rr.name or "your pet") .. ".")
   log(string.format("pet %s (%s): Pet picked by player %s: his offer goes to the game's pet action", tostring(rr and rr.name), tostring(npc), tostring(player)))
 end
+-- A "Pet" from the wheel under way: the pet's offer goes back to Talk once it was petted, or after PET_HOLD.
 function roster.pet_mode_tick(world)
   local t = world:tick()
   for npc, m in pairs(roster.pet_mode) do
@@ -237,6 +245,7 @@ function roster.wheel_list(world, player, npc, rr)
   local oks, sent = pcall(emf.net.send_to, world, player, WHEEL, emf.json.encode({ op = "wheel", npc = npc, title = "Companions", labels = labels }))
   log(string.format("wheel: Companions for player %s: %s (sent %s)", tostring(player), table.concat(labels, ", "), tostring(oks and sent)))
 end
+-- The wheel's Companions list: brings companion `name` to the player (put away first when he is out elsewhere).
 function roster.wheel_summon(world, player, name)
   local r = find(name)
   if not r then say(world, player, tostring(name) .. " is no longer on the roster.") return end
@@ -244,6 +253,7 @@ function roster.wheel_summon(world, player, name)
   if not (account and controls(r, account)) then refuse(world, player, r) return end
   if r.out and still_ours(world, ent_of[r.name]) then
     local real = emf.reply
+    -- (roster_cmd answers through emf.reply: silenced here)
     emf.reply = function() end
     local okc, errc = pcall(roster_cmd, world, { "roster", "away", r.name })
     emf.reply = real
@@ -257,6 +267,7 @@ function roster.wheel_summon(world, player, name)
 end
 
 roster.pet_lines = {}
+-- Keeps pet `id`'s drive target for FlameKit Native (one line of pet_drive.txt).
 function roster.pet_flush(world, id, h)
   local a = h.shim
   local cd = a.combatData
@@ -269,6 +280,7 @@ function roster.pet_flush(world, id, h)
     roster.pet_mode[id] and 1 or ((name_of[id] and inv.open[name_of[id]]) and 2 or 0))
   cd.targetOfMyTarget = false  -- set again each tick where the edge stop is off (edge_off)
 end
+-- Writes pet_drive.txt (the driven pets' targets) for FlameKit Native when it changed (a temporary file moved over it).
 function roster.pet_write()
   local list = {}
   for id, line in pairs(roster.pet_lines) do if drives[id] then list[#list + 1] = line end end
@@ -285,6 +297,7 @@ function roster.pet_write()
   roster.pet_text = text
 end
 
+-- Keeps every pet's own animal AI still (wildlife state 3, no path walking): FlameKit drives them.
 function roster.pets_quiet(world)
   for _, id in pairs(ent_of) do
     local wl = world:get("DynamicWildlife", id)
@@ -301,6 +314,7 @@ end
 -- (C++, pet_offers: right before the game's interaction_offer program each step; a Lua write after the step lost to
 -- the game's own offer every step, 0.15.328-0.15.329). E then fires InteractionAcceptedEvent: his wheel (F.setup).
 
+-- A message from the Companion Roster window (admins only): get the data, or an action (new, rename, delete, give, share, unshare, main, kind, away, back); the answer goes back to the window.
 function roster.ui_do(world, from, data)
   local okd, m = pcall(emf.json.decode, data)
   if not (okd and type(m) == "table") then return end
@@ -330,6 +344,7 @@ function roster.ui_do(world, from, data)
   local said, good
   if what == "new" then  -- (0.15.310) a hound of the asking player, next to him, following him (roster new)
     local real = emf.reply
+    -- (roster_cmd's answer is caught for the window)
     emf.reply = function(t) said = t end
     local okc, errc = pcall(roster_cmd, world, { "roster", "new", tostring(pid) })
     emf.reply = real
@@ -352,6 +367,7 @@ function roster.ui_do(world, from, data)
       said, good = what == "main" and (r.name .. " has no owner.") or "Unknown action.", false
     else
       local real = emf.reply
+      -- (roster_cmd's answer is caught for the window)
       emf.reply = function(t) said = t end
       local okc, errc = pcall(roster_cmd, world, args)
       emf.reply = real

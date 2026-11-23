@@ -36,15 +36,18 @@ local waiting = {}           -- server: { player, src, slot (0-based or nil), al
 local sent = {}              -- client: src -> step of the last "take all" (one a second per chest)
 local registered = nil
 
+-- A component of an entity, or nil when it has none or the read fails.
 local function get(world, c, id)
   local ok, v = pcall(world.get, world, c, id)
   return ok and v or nil
 end
 
+-- A log line (at most LOG_MAX a minute).
 local function note(fmt, ...)
   if LOG and said < LOG_MAX then said = said + 1 emf.log(string.format("chest overflow: " .. fmt, ...)) end
 end
 
+-- Field `k` of a game value, or nil when it cannot be read.
 local function field(v, k)
   local ok, x = pcall(function() return v[k] end)
   return ok and x or nil
@@ -81,6 +84,7 @@ local function on_server(world, from, data)
   waiting[#waiting + 1] = { player = player, src = tonumber(m.src), slot = tonumber(m.slot), all = m.all == true, at = steps + LATER_STEPS }
 end
 
+-- Whether entity `id` is a loot container (random loot or destroyed when looted, with an inventory; not a player).
 local function is_loot_container(world, id)
   return (get(world, "RandomLoot", id) or get(world, "DestroyOnLoot", id)) and get(world, "Inventory", id)
     and not get(world, "PlayerState", id)
@@ -89,11 +93,13 @@ end
 -- (a take that worked: the game's PickupEvent from that chest to that player; a single take that got anything is not
 -- touched: what is left in that slot is what the player chose to leave, only "take all" leftovers are the bag's refusal)
 local picked = {}  -- "<player>:<chest>" -> step of the last pickup
+-- A PickupEvent from a container: notes that this player's take from it worked.
 local function on_pickup(world, e)
   local by, from = tonumber(field(e, "pickedUpByEntityId")) or 0, tonumber(field(e, "pickedUpFromEntityId")) or 0
   if by ~= 0 and from ~= 0 then picked[by .. ":" .. from] = steps end
 end
 
+-- A take that left items behind (the bag was full), for a player whose Auto Loot is bag or companion: takes what is left out of the chest and gives it to his companions (what none takes goes back in).
 local function look(world, w)
   local p = picked[w.player .. ":" .. w.src]
   if not w.all and p and steps - p <= LATER_STEPS + 60 then return end  -- the single take worked
@@ -122,6 +128,7 @@ local function look(world, w)
   end
 end
 
+-- Every server step: looks at the takes whose wait is over.
 function F.tick(world)
   steps = steps + 1
   if steps % 3600 == 0 then said = 0 end
@@ -137,6 +144,7 @@ function F.tick(world)
   waiting = keep
 end
 
+-- Opens the net channel (the player's game tells the server about each take) and listens for pickups and takes.
 function F.setup(k)
   kit = k
   prefs.setup()

@@ -295,6 +295,7 @@ function F.setup(k)
           if type(k) ~= "number" then k = k.value end  -- (a HashKey64 may read as a number or as {value})
           return k
         end
+        -- A name key as hex ("none" when nil; a float as such).
         local function hex(v)
           if v == nil then return "none" end
           if math.type(v) == "integer" then return string.format("0x%016X", v) end

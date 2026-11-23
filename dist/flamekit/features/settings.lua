@@ -25,6 +25,7 @@ local list = nil        -- the settings from mod.json, in order
 local capturing = nil   -- the keybind setting waiting for a key
 local note = nil        -- a line under the heading after a change that needs one
 
+-- Reads the settings that mod.json declares (key, label, group, kind, range, default).
 local function load_list()
   list = {}
   local f = io.open(emf.dir .. "\\mod.json", "r")
@@ -43,16 +44,19 @@ local function load_list()
   kit.debug("info", "settings: %d setting(s) read from mod.json", #list)
 end
 
+-- The declared setting with key `key`.
 local function find(key)
   for _, s in ipairs(list or {}) do
     if s.key == key then return s end
   end
 end
 
+-- A setting's value now (its default when it has none).
 local function value(s)
   return kit.setting(s.key, s.default)
 end
 
+-- Saves a setting's new value through EMF; a note on the tab when EMF refuses it.
 local function set(s, v)
   local ok, done = pcall(emf.set_setting, s.key, v)
   kit.debug("info", "settings: %s = %s (%s)", s.key, tostring(v), ok and done ~= false and "saved" or "refused")
@@ -63,6 +67,7 @@ end
 -- (0.15.376, owner 2026-11-21 09:35) the Auto Loot section ("on the "Settings" tab ABOVE the "Features" section");
 -- later the Messages section
 local OWN_GROUPS = { ["FlameKit"] = true, ["FlameKit label"] = true, ["Auto Loot"] = true, ["Messages"] = true }
+-- Whether setting `s` is shown in the Settings tab itself (FlameKit's own groups and the features' on/off switches).
 local function own(s)
   if OWN_GROUPS[s.group] then return true end
   for _, f in ipairs(kit.features) do
@@ -71,6 +76,7 @@ local function own(s)
   return false
 end
 
+-- The step of a number setting's buttons (bigger for wide ranges: about 20 steps).
 local function step_of(s)
   local step = tonumber(s.step) or 1
   local range = (tonumber(s.max) or 0) - (tonumber(s.min) or 0)
@@ -148,6 +154,7 @@ function F.value_text(key)
   return tostring(v)
 end
 
+-- The Settings tab: FlameKit's own settings by group, then the Features section.
 function F.panel(world)
   if not list then load_list() end
   local rows = {}
@@ -175,6 +182,7 @@ function F.panel(world)
   return rows
 end
 
+-- A click in a settings row: b: a switch, s: a choice or step, k: wait for a new key.
 function F.click(world, key)
   note = nil
   local kind, name, arg = tostring(key):match("^(%a):([%w_]+):?(.*)$")
@@ -208,6 +216,7 @@ end
 -- (0.15.112, owner) Keys that act in the game even while the player types in its chat: only F1-F12 or a numpad key, so
 -- typing never sets them off. Checked here when the key is chosen and where each one is used (F.key_allowed).
 local GAME_KEYS = { lf_dump_key = true, map_zoom_in_key = true, map_zoom_out_key = true }
+-- Whether key `name` may be a FlameKit key (F1-F12 and the numpad keys).
 function F.key_allowed(name)
   if type(name) ~= "string" then return false end
   local f = tonumber(name:match("^[Ff](%d+)$"))
@@ -235,6 +244,7 @@ function F.client_tick(world)
     others_loot = kit.setting("others_loot", true) ~= false }, kit.is_host())
 end
 
+-- Keeps kit and opens the preferences channel (Auto Loot is sent to the server).
 function F.setup(k)
   kit = k
   prefs.setup()

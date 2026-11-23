@@ -64,6 +64,7 @@ local KINDS = {
   { "block", "Building block", "#b9a58c" }, { "material", "Material", "#cdbf9f" }, { "resource", "Material", "#cdbf9f" },
 }
 
+-- The kind of an item for the UI ("Sword", "Ring", "Spell", ...) and its colour, from the item's debug name.
 function items.kind(debug_name)
   if not debug_name then return "Item", nil end
   local first = (debug_name:match("^(%a+)") or ""):lower()
@@ -122,6 +123,7 @@ local CATEGORY = { [1] = "Armor", [2] = "Weapon", [3] = "Tool", [4] = "Instrumen
                    [16] = "Color palette" }
 local AMMUNITION = { [1] = "arrow", [2] = "spell", [3] = "bait" }
 
+-- An item's details (rarity, damage range, category) from item_details.dat, which FlameKit Native writes from the game's data; re-read every 5 s until it exists.
 function items.data(id)
   if not details and os.time() - details_tried >= 5 then
     details_tried = os.time()

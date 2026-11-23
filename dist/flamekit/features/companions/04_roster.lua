@@ -9,6 +9,7 @@ function calm(world, npc)
   local d = world:get("DynamicEnemy01BehaviorState", npc)
   d.disabledFeatures = (tonumber(d.disabledFeatures) or 0) | CALM
 end
+-- Makes companion `npc` stand at x, y, z: his game AI and path walking off, calmed.
 function stay_at(world, npc, x, y, z)
   local a = world:get("DynamicEnemy01BehaviorState", npc)
   a.enabled = false
@@ -50,10 +51,12 @@ function is_admin(account, from)
   for _, a in ipairs(admins) do if a == account then return true end end
   return false
 end
+-- Whether `account` is one of roster entry r's controllers.
 function controls(r, account)
   for _, a in ipairs(r.controllers or {}) do if a == account then return true end end
   return false
 end
+-- Whether `account` may command companion r (a controller or an admin).
 function may_command(r, account) return account and (controls(r, account) or is_admin(account)) end
 
 -- (owner 2026-11-20 08:51 "when the chest spawns and opens I just want it to have the companions name on it") the
@@ -88,6 +91,7 @@ function inv.write_labels()
   os.rename(emf.dir .. "\\labels.tmp", emf.dir .. "\\labels.txt")
   inv.labels_text = text
 end
+-- Writes every companion's name to custom_names.txt for FlameKit Native (the chests' name labels), when the list changed.
 function inv.write_names()
   if not emf.dir then return end
   local list = {}
@@ -103,6 +107,7 @@ function inv.write_names()
   log("names: custom_names.txt now has " .. #list .. " name(s) for the chest labels")
 end
 
+-- Saves the roster (every companion: name, kind, place, mode, owner, chest, ...) with the world; false before it was loaded.
 function roster_save()
   if not roster.loaded then return false end
   pcall(inv.write_names)
@@ -128,15 +133,18 @@ F.SMALL_PETS = {
   ["4757dca8-d76b-4d1c-8215-cb1e7ee533a2"] = true,  -- Desert bird
   ["0eaf60f1-7ab9-4936-9cd0-17233fb339ea"] = true,  -- Bird (flying)
 }
+-- The roster entry (and its index) of the companion called `name`.
 function find(name)
   for i, r in ipairs(roster.list) do if r.name == name then return r, i end end
 end
+-- Whether entity `id` is a small pet (F.SMALL_PETS).
 function F.is_small(id)
   local n = name_of[id]
   local r = n and find(n)
   return r and F.SMALL_PETS[r.guid] or false
 end
 
+-- The player entity of `account` (ids 1-64 are looked at), or nil when he is not here.
 function player_of(world, account)
   if not account then return nil end
   for id = 1, 64 do  -- player entities are the low ids (1..1023; a local server has a handful)
@@ -211,6 +219,7 @@ function match_armor(world, id, r)
   end
 end
 
+-- Sets up a companion's new body `id`: notices cleared, facing, faction, calm, no damage for pets, the E prompt, his armour.
 function bring_to_life(world, r, id, player)
   ent_of[r.name], name_of[id] = id, r.name
   -- a living body again: the death and stuck notices go
@@ -297,6 +306,7 @@ function still_ours(world, id)
   return ok and yes
 end
 
+-- Reads the roster from the world's saved data (`text`, the npc_roster part).
 function roster_loaded(world, text)
   roster.list, roster.next_n, roster.main, ent_of, name_of = {}, 1, {}, {}, {}
   local okd, data = pcall(emf.json.decode, text or "")
@@ -352,6 +362,7 @@ function roster_joined(world, p)
   end
 end
 
+-- The console command `roster`: new (a companion next to a player), list, away, back, delete.
 function roster_cmd(world, args)
   local what = args[2]
   if what == "new" then  -- roster new <player> [guid]: a new NPC next to the player, following him

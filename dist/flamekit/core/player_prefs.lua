@@ -16,6 +16,7 @@ local by_account = {}    -- the server: account -> { key = value }
 local registered = nil
 local last_sent, sent_at = nil, -1e9
 
+-- The account a net message came from (from its player entity when the account is missing).
 local function who(world, from)
   local acc = from and from.account
   if (not acc or tostring(acc):match("^0x0*$")) and from and from.player then
@@ -25,6 +26,7 @@ local function who(world, from)
   return acc
 end
 
+-- The server: a player's game sent its values ("set"): keeps them for that account, checked (at most 32 short values).
 local function on_server(world, from, data)
   local ok, m = pcall(emf.json.decode, data)
   if not (ok and type(m) == "table" and m.op == "set" and type(m.values) == "table") then return end
@@ -43,6 +45,7 @@ local function on_server(world, from, data)
   if not had then emf.log(string.format("prefs: player %s: %d value(s)", tostring(from and from.player), n)) end
 end
 
+-- Opens the preferences' net channel to the server (once); true when it is open.
 function prefs.setup()
   if registered ~= nil then return registered end
   registered = emf.net.channel(CHANNEL, { version = 1, to = "server", max = 1024, per_10s = 30,
@@ -55,6 +58,7 @@ end
 
 -- `host`: this game hosts the world (kit.is_host()): its own values are kept here directly, no message
 local host_values = nil  -- the hosting player's own values (his game and the server world are one Lua state)
+-- The player's game: sends its values to the server when they change, and every SEND_EVERY steps (kept directly in a game that hosts).
 function prefs.client_tick(world, values, host)
   if not registered then return end
   if host then
