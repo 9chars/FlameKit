@@ -323,7 +323,7 @@ end
 
 -- (0.15.117, owner) A new update downloaded: a green line in the Messages window (FlameKit's DLL also opens its update
 -- window). Read from update_status.txt (the DLL's updater writes it), every 2 s, once per version.
-local update_told, update_steps = nil, 0
+local update_told, update_told_emf, update_steps = nil, nil, 0
 local function update_message()
   update_steps = update_steps + 1
   if update_steps % 120 ~= 0 then return end
@@ -334,6 +334,12 @@ local function update_message()
   if v and v ~= update_told then
     update_told = v
     kit.note(string.format("%s v%s update downloaded!", kit.name, v), "#5adc6e", true)
+  end
+  -- (0.15.456) the Enshrouded Modding Framework's own update (web_update.hpp / emf_update.hpp): its own line, once
+  local e = line:match("^ready|.*%(EMF%) v([%d%.]+)")
+  if e and e ~= update_told_emf then
+    update_told_emf = e
+    kit.note(string.format("Enshrouded Modding Framework (EMF) v%s update downloaded!", e), "#5adc6e", true)
   end
 end
 

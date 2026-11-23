@@ -33,11 +33,11 @@
 // build.cmd builds and runs after every build.
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
-#pragma comment(lib, "version.lib")
 
 namespace emf_update {
 
@@ -62,35 +62,62 @@ inline std::string sha256_hex(const std::vector<uint8_t>& data) {
     return out;
 }
 
-// A text of a file's version resource (key "FileVersion" or "ProductName"); empty when the file has none.
+// A text of a file's version resource (key "FileVersion" or "ProductName") as the file on disk says it; empty when it has
+// none. (0.15.456) Read from the file's bytes: Windows' GetFileVersionInfo answers for a DLL that is loaded (emf_core.dll
+// in the game) with the loaded copy, so after an update it still named the running EMF, not the one on disk (seen in the
+// game 18:54: "v0.6.6 here" with 0.6.19 already in place). The value follows its key's UTF-16 name and the padding to
+// the next 4-byte boundary. Cached by size and modification time, so a check reads the file only when it changed.
 inline std::string version_string(const std::wstring& path, const wchar_t* key) {
-    DWORD unused = 0;
-    const DWORD size = GetFileVersionInfoSizeW(path.c_str(), &unused);
-    if (!size) return {};
-    std::vector<uint8_t> buf(size);
-    if (!GetFileVersionInfoW(path.c_str(), 0, size, buf.data())) return {};
-    struct Lang {
-        WORD lang, codepage;
+    WIN32_FILE_ATTRIBUTE_DATA fa{};
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fa)) return {};
+    struct Cached {
+        std::wstring path, key;
+        uint64_t size = 0, time = 0;
+        std::string value;
     };
-    std::vector<Lang> tries;
-    Lang* langs = nullptr;
-    UINT bytes = 0;
-    if (VerQueryValueW(buf.data(), L"\\VarFileInfo\\Translation", reinterpret_cast<void**>(&langs), &bytes) && langs)
-        for (UINT i = 0; i < bytes / sizeof(Lang); ++i) tries.push_back(langs[i]);
-    tries.push_back({0x0409, 0x04b0});  // US English, Unicode: what EMF's files use
-    for (const Lang& l : tries) {
-        wchar_t query[96];
-        swprintf(query, 96, L"\\StringFileInfo\\%04x%04x\\%s", l.lang, l.codepage, key);
-        wchar_t* value = nullptr;
-        UINT len = 0;
-        if (VerQueryValueW(buf.data(), query, reinterpret_cast<void**>(&value), &len) && value && len) {
-            std::string out;
-            for (const wchar_t* c = value; *c; ++c) out += *c < 128 ? static_cast<char>(*c) : '?';
-            while (!out.empty() && out.back() == ' ') out.pop_back();
-            return out;
+    static std::mutex mx;
+    static std::vector<Cached> cache;
+    const uint64_t size = (uint64_t(fa.nFileSizeHigh) << 32) | fa.nFileSizeLow;
+    const uint64_t time = (uint64_t(fa.ftLastWriteTime.dwHighDateTime) << 32) | fa.ftLastWriteTime.dwLowDateTime;
+    {
+        std::lock_guard<std::mutex> l(mx);
+        for (const Cached& c : cache)
+            if (c.path == path && c.key == key && c.size == size && c.time == time) return c.value;
+    }
+    std::string out;
+    std::vector<uint8_t> data;
+    if (size <= (64u << 20) && web_update::read_file(path, data)) {
+        std::vector<uint8_t> name;
+        for (const wchar_t* k = key; *k; ++k) {
+            name.push_back(static_cast<uint8_t>(*k & 0xff));
+            name.push_back(static_cast<uint8_t>(*k >> 8));
+        }
+        name.push_back(0);
+        name.push_back(0);
+        for (size_t at = 0; out.empty() && at + name.size() < data.size();) {
+            const auto hit = std::search(data.begin() + at, data.end(), name.begin(), name.end());
+            if (hit == data.end()) break;
+            size_t v = static_cast<size_t>(hit - data.begin()) + name.size();
+            at = v;
+            while (v % 4) ++v;  // the value starts on a 4-byte boundary
+            std::string text;
+            for (; v + 1 < data.size() && text.size() < 128; v += 2) {
+                const uint16_t c = static_cast<uint16_t>(data[v] | (data[v + 1] << 8));
+                if (c == 0) break;
+                text += c < 128 ? static_cast<char>(c) : '?';
+            }
+            while (!text.empty() && text.back() == ' ') text.pop_back();
+            if (!text.empty()) out = text;
         }
     }
-    return {};
+    std::lock_guard<std::mutex> l(mx);
+    for (Cached& c : cache)
+        if (c.path == path && c.key == key) {
+            c.size = size, c.time = time, c.value = out;
+            return out;
+        }
+    if (cache.size() < 16) cache.push_back({path, key, size, time, out});
+    return out;
 }
 
 // What every file of EMF says it belongs to (its version resource's ProductName): EMF's loader and core say so.

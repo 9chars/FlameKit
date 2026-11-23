@@ -377,10 +377,12 @@ struct Updater {
     // waits for the next start, a ready FlameKit says so too, and an empty status says that EMF is ready.
     void status(std::string text) {
         if (!emf.ready.empty()) {
+            // (0.15.456, owner 18:54 "it should say Enshrouded Modding Framework (EMF)"; the update dialog reads the
+            // versions after "Update v" and "(EMF) v")
             if (text.rfind("ready|Update v", 0) == 0 && text.find(" is ready") != std::string::npos)
-                text = text.substr(0, text.find(" is ready")) + " and EMF v" + emf.ready + " are ready: restart the game";
+                text = text.substr(0, text.find(" is ready")) + " and Enshrouded Modding Framework (EMF) v" + emf.ready + " are ready: restart the game";
             else if (text.empty())
-                text = "ready|EMF v" + emf.ready + " is ready: restart the game";
+                text = "ready|Enshrouded Modding Framework (EMF) v" + emf.ready + " is ready: restart the game";
         }
         if (text == last_status) return;
         last_status = text;

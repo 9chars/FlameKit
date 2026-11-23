@@ -5059,7 +5059,7 @@ struct WindowLayer : Layer {
                 L"mods are not touched.\nOff: EMF stays as it is; you update it yourself.";
             const std::string waiting = emf_update::ready_version();
             std::wstring line = L"Enshrouded Modding Framework (EMF): v" + (g_emf_version.empty() ? std::wstring(L"?") : g_emf_version);
-            if (!waiting.empty()) line += L"  (v" + widen(waiting) + L" at the next game start)";
+            if (!waiting.empty()) line += L"  (v" + widen(waiting) + L" installs at restart)";  // (0.15.456, owner 18:56 wording)
             text.draw(canvas, kPad, kTop + 49, line, 150, 155, 165);
             const bool on = settings().emf_update;
             const std::wstring label = on ? L"Keep EMF updated: ON" : L"Keep EMF updated: OFF";
@@ -6268,7 +6268,9 @@ struct ChangeLogDialog : Layer {
 };
 
 // ---- the update dialog (0.15.83, owner) ----
-// When the updater has a new version ready for the next start (update_status.txt "ready|Update vX is ready: ..."), a
+// When the updater has a new version ready for the next start (update_status.txt "ready|Update vX is ready: ..."; since
+// 0.15.456 also the Enshrouded Modding Framework's: "ready|Enshrouded Modding Framework (EMF) vY is ready: ..." or
+// "ready|Update vX and Enshrouded Modding Framework (EMF) vY are ready: ..."), a
 // small window in the middle of the game window says so, like a Windows dialog, besides the lower left line. Once per
 // version in a game session. It takes the pointer and the keyboard while it is open (0.15.85 tried leaving them to the
 // game; the owner found having to use the pointer key to answer it too clumsy, 0.15.86). OK, Esc or Enter close it; Restart Game closes the game the way Alt+F4 does (WM_CLOSE: the
@@ -6279,14 +6281,14 @@ struct UpdateDialog : Layer {
     bool stays_in_build() const override { return true; }
     const char* name() const override { return "update dialog"; }
     bool open = false, dirty = true, fonts = false;
-    std::string announced;  // the version the dialog was shown for (once per version)
-    std::wstring version;
+    std::string announced;  // the status line the dialog was shown for (once per line: per version)
+    std::wstring message, message2;  // (0.15.456) what was downloaded: FlameKit, the Enshrouded Modding Framework or both (two lines)
     uint64_t next_read = 0;
     TextPainter text, head;
     RECT ok_r{}, restart_r{};
     int mouse_x = -1, mouse_y = -1;
     bool restarting = false;
-    static constexpr int kW = 440, kH = 176, kHead = 32;
+    static constexpr int kW = 560, kH = 176, kHead = 32;  // (0.15.456) 560 wide (was 440): the framework's full name fits
 
     // Fills a rectangle with colour r, g, b at opacity a.
     void box(int x0, int y0, int x1, int y1, float r, float g, float b, float a) {
@@ -6304,17 +6306,37 @@ struct UpdateDialog : Layer {
         const bool got = fgets(line, sizeof line, fp) != nullptr;
         fclose(fp);
         if (!got || std::strncmp(line, "ready|", 6) != 0) return;
-        const char* v = std::strstr(line, " v");
-        if (!v) return;
-        std::string ver;
-        for (v += 2; *v && *v != ' ' && *v != ':' && *v != '\r' && *v != '\n'; ++v) ver += *v;
-        if (ver.empty() || (ver == announced && !asked)) return;
+        // (0.15.456, owner 18:53 "it says "FlameKit v0.6.19 has been downloaded" thats a bug", 18:54 "it should say
+        // Enshrouded Modding Framework (EMF)") the line names FlameKit ("ready|Update vX is ready: ..."), EMF
+        // ("ready|Enshrouded Modding Framework (EMF) vY is ready: ...") or both ("ready|Update vX and Enshrouded Modding
+        // Framework (EMF) vY are ready: ..."; web_update.hpp's status): each version is read after its own name
+        const auto after = [&](const char* key) {
+            std::string ver;
+            if (const char* v = std::strstr(line, key))
+                for (v += std::strlen(key); *v && *v != ' ' && *v != ':' && *v != '\r' && *v != '\n'; ++v) ver += *v;
+            return ver;
+        };
+        const std::string kit = after("|Update v"), emf_v = after("(EMF) v");
+        if (kit.empty() && emf_v.empty()) return;
+        std::string key = line;
+        while (!key.empty() && (key.back() == '\n' || key.back() == '\r' || key.back() == ' ')) key.pop_back();
+        if (key == announced && !asked) return;
         if (asked) g_update_ask_until = 0;
-        announced = ver;
-        version = widen(ver);
+        announced = key;
+        const std::wstring emf_name = L"Enshrouded Modding Framework (EMF) v" + widen(emf_v);
+        message2.clear();
+        if (!kit.empty() && !emf_v.empty()) {
+            message = L"FlameKit v" + widen(kit) + L" and";
+            message2 = emf_name + L" have been downloaded.";
+        } else if (!kit.empty()) {
+            message = L"FlameKit v" + widen(kit) + L" has been downloaded.";
+        } else {
+            message = emf_name + L" has been downloaded.";
+        }
         open = true;
         dirty = true;
-        FK_LOG(fklog::kInfo, "update dialog: shown for v%s%s", ver.c_str(), asked ? " (Check for updates)" : "");
+        FK_LOG(fklog::kInfo, "update dialog: shown for %s%s%s%s", kit.empty() ? "" : ("FlameKit v" + kit).c_str(),
+               !kit.empty() && !emf_v.empty() ? " and " : "", emf_v.empty() ? "" : ("EMF v" + emf_v).c_str(), asked ? " (Check for updates)" : "");
     }
 
     // Draws the update window: what was downloaded and that it takes effect at the next start.
@@ -6333,8 +6355,9 @@ struct UpdateDialog : Layer {
         box(0, 0, 1, kH, 120, 160, 220, 1.0f);
         box(kW - 1, 0, kW, kH, 120, 160, 220, 1.0f);
         head.draw(canvas, 12, 6, L"FlameKit update", 235, 225, 205);
-        text.draw(canvas, 20, kHead + 18, L"FlameKit v" + version + L" has been downloaded.", 90, 220, 110);
-        text.draw(canvas, 20, kHead + 44, restarting ? L"Closing the game; it starts again by itself..." : L"Restart the game to load it!",
+        text.draw(canvas, 20, kHead + 14, message, 90, 220, 110);
+        if (!message2.empty()) text.draw(canvas, 20, kHead + 36, message2, 90, 220, 110);
+        text.draw(canvas, 20, kHead + (message2.empty() ? 44 : 62), restarting ? L"Closing the game; it starts again by itself..." : L"Restart the game to load it!",
                   225, 225, 230);
         const int bw = 130, bh = 32, by = kH - bh - 14;
         restart_r = {kW - 16 - bw, by, kW - 16, by + bh};
