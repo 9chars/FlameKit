@@ -68,7 +68,7 @@ local SPOT_TRIES = 8
 -- from where it was STUCK_S seconds ago and no hit given or taken in that time): it is taken away and a new one comes
 -- at its node (at most RESPAWN_MAX per node in one raid, then it is only taken away).
 local SURFACE_UP = 12
-local STUCK_S = 30
+local STUCK_S = 5  -- (0.15.510, owner 16:13 "30 seconds is wayyy too long", "make it like 5"; was 30; looked at every 2 s)
 local STUCK_NEAR = 40          -- m: (0.15.496: 25 monsters were taken away as "stuck" at 14:43-14:46 while they only stood
                                -- waiting, the player more than 50 m away) only a monster with a player this near can be stuck
 local RESPAWN_MAX = 10

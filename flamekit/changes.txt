@@ -1,3 +1,6 @@
+0.15.510 Nov 23, 2026
+- Spawn Nodes: a stuck raid monster is moved next to the player after 5 s (was 30 s).
+
 0.15.509 Nov 23, 2026
 - Spawn Nodes: the raid's monsters are found surely: a new one still coming up (0 health) is asked about again, and every 10 s all the monsters made since the raid began are looked at again (some Undead came into the count only after a reload).
 
