@@ -1696,6 +1696,19 @@ restart_helper\signing\update.txt, "sign", update.sig -> emf.sig); tools/check_s
 Licences: EMF MIT, emf_content.dll (EML) GPL-3.0-or-later: licence files go along (emf/licenses), source = EMF's
 GitHub release. NOTE: build.cmd keeps the EMF 0.6.6 SDK on purpose: emf::init(api) refuses a core older than the SDK,
 so a DLL built with the 0.6.19 SDK would not load for players still on 0.6.6.
+18:41 owner "yes" (publish 0.15.454 + the EMF list to Development): dist-test 0.15.454 signed (8369ba5) and
+emf-dist-test EMF 0.6.19 (35 files, emf.sig good, the old updater's path rule checked on the new update.txt). The owner
+quit his game at 18:43:24 (normal shutdown, before the push), so nothing was fetched yet.
+**18:45 owner: "we need my mod to display the EMF version some place too, probably in the "About" tab? and probably add
+an option there also to "Keep Enshrouded Modding Framework (EMF) updated."".** 0.15.455 (59ad985, DLL md5
+09e09b612f6d4d423ff1dde1a8c14b38, EMF tests ALL PASSED): About tab second row "Enshrouded Modding Framework (EMF):
+v<running>" (+ "(v<x> at the next game start)"), button "Keep EMF updated: ON/OFF" (tooltip), setting emf_update
+(bool, default on, group "Updates": not in the Settings tab, shown in EMF's Mods tab as "Keep Enshrouded Modding
+Framework (EMF) updated"), click -> "opt b:emf_update" (features/settings.lua). Off: the updater skips EMF's list (logged
+once). Published to Development (dist-test 0.15.455 signed, replaces 0.15.454) and the local server (DLL renamed
+.old_453, Lua mod.json + changes.txt; hot reload fine 18:49:35). Next: the real test on the owner's game (put the game's
+EMF back to 0.6.6 from the .old_066 files, start: FlameKit updates to 0.15.455, restart: EMF update to 0.6.19, restart:
+check) - ASK before touching his game's EMF.
 
 ## Things learned the hard way
 
