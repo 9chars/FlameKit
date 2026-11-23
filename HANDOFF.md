@@ -1859,6 +1859,19 @@ while NetworkCursor names a cursor), on a 4 m grid, only while a building tool i
 change). Development + local server; NOT on G-Portal/Stable (they still have the 112 m box: G-Portal players should keep
 Free build off until 0.15.463 is tested and released). 21:50 owner "sure..." -> local server restarted 21:50-21:51:06,
 the helper starts his game at ~21:51:36 (his game was not running). Test: 5776 5232, Free build on, place blocks.
+**0.15.463 FAILED (owner 21:55 "I can't build outside a base anymore. says I need a flame alter near by"):** on the
+server NetworkCursor.cursorEntityId's CurrentTransform read 0 0 0, so the box sat at the map corner. Owner: "fuck me",
+"fix it".
+0.15.464 (6be7325, DLL md5 7b128517bfeb25f832b3f35d97e70374): the moving area = **24 m** (kAimHalf 12 m each way)
+around the player's own position (CurrentTransform of the player), on a 4 m grid (kAimStep: the box moves only when
+the player crosses a grid line), and ONLY while NetworkCursor.currentBuildingItemId != 0 (a building item selected;
+none: no box; logged on change). Told to the owner as 24 m. Development dist-test + local server; NOT on G-Portal /
+Stable (still the 112 m box: G-Portal players keep Free build off until released). 21:59 owner restarted his game
+(client on 0.15.464); 22:03 "its still fucked up" = the local server was still on 0.15.463 (started 21:50). 22:04
+owner "ok reboot..." -> server restart 22:06:10-22:07:38. Server log 22:08:41 "player 1 has a building item selected:
+a 24 m Free build area around them"; zone at 5803 825 5094. Performance local, in build mode (22:09-22:11): 3,598
+steps/min, 16.7 ms, max 16 ms (normal; was 33 ms locally and 48 ms on G-Portal with 112 m). **22:12 owner placed a
+block outside a base: 0.15.464 works locally.** Not yet tested on G-Portal (the one that overloaded).
 
 ## Things learned the hard way
 
