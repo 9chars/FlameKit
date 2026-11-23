@@ -1658,6 +1658,15 @@ existed in 0.6.6). EMF is MIT licensed; it has no updater of its own.
 18:08 owner asked whether FlameKit's updater updates EMF: no (web_update.hpp writes only emf\mods\flamekit and
 emf\mods\flamekit_native). **18:09 owner: "expecting players to manually install a new version is mostly
 unacceptable"** -> FlameKit's updater must also bring EMF up to the version FlameKit is tested with.
+18:14 owner: "yeah lets do that, we need a pathway to support the latest version of EMF with our mod so we can stay on
+top of things". Plan: (1) EMF 0.6.19 locally, (2) the EMF part of FlameKit's updater, tested 0.6.6 -> 0.6.19 in the
+helper's install test folder, (3) Development, Stable on the owner's word. Backup of both EMF 0.6.6 installs (emf folders,
+dinput8.dll, the client's dbghelp.dll = EML): C:\enshrouded mod shit\emf_backups\2026-11-22_EMF-0.6.6\{server,client}.
+18:15 EMF 0.6.19 files put in place while both ran (each changed file renamed to <name>.old_066, then the new one copied;
+md5 checked): client dinput8.dll, EMF.exe, emf_content.dll, emf_core.dll, emf_frametime.dll, ui\app.css, app.js,
+content.js, mods\lua\lua.dll + mod.json; server dinput8.dll, emf_core.dll, mods\lua\lua.dll + mod.json. Only EMF's own
+files, not its example mods. Renaming the running DLLs worked (the same way the updater would do it). Takes effect at the
+next start: waiting for the owner's yes to restart.
 
 ## Things learned the hard way
 
