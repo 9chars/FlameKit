@@ -1765,6 +1765,21 @@ server!"; he connected again 19:00:40 and was in at 19:01:20. So his game stoppe
 his network): the owner's guess is right. Side note: at the leave 0.15.423 logged "experimental: air cannot be kept
 full on this game version (...experimental.lua:1837: attempt to index a nil value)": Invincible Mode touched the leaving
 player's component; harmless noise, to guard later (check against the current experimental.lua).
+**19:41 owner "go ahead" (#5 research: Free build without a flame altar).** Why it needs one: FlameKit's zones went in
+from the game's addZone call for the first altar of each rebuild; no altar = no call. EMF 0.6.19's docs/ecs_programs.md
+names the programs: clear_buildzones (#120, server) / clear_buildzones_client (#121) empty the list, add_buildzones_server
+(#55) / add_buildzones_client (#54) add the altars; hook_program (in EMF since v2, FlameKit already uses it) can run code
+after a program. 0.15.459 (dfd1ce1) = a probe (logging only). 19:48 owner "sounds good, I figured we'd need a clean map to
+test on" -> restart 19:48:42 (server up 19:49:29, game 19:50:01). PROBE FACTS (both sides on the world thread): each step
+clear runs FIRST, then the no-build zones (addZone list 1, flag 0, owner kind 4 on both sides; list 2, flag 1, owner kind
+3 = creatures, in the game), then add_buildzones_* (called twice per step on the server: in parts). The game's flag for
+list 0 (altars) was not logged yet (the line budget went to list 1). -> 0.15.460 (350e12a, DLL md5
+c76ddcc1c2ece1b73b93292d83f40e5e): FlameKit's zones (spots + player boxes) go in right after clear (post hooks), once
+per rebuild, with or without an altar; altar_new_pass then too (so the altar list is also right when the last altar goes);
+the flag = the one the game used for an altar on that list (learned and logged "the game adds altars to zone list %p with
+flag %u"), 0 until one was seen; old way when the hooks fail or "fkbuild clear off". Published to Development + local
+server (DLL .old_459), NOT restarted yet. Next: restart, check Free build still works on this map and the logged flag;
+then the clean-map test (back up the world, ASK first).
 
 ## Things learned the hard way
 
