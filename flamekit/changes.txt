@@ -1,3 +1,6 @@
+0.15.501 Nov 23, 2026
+- Spawn Nodes: every monster that comes into a raid joins it, not only the nodes' own: one made during the raid within 100 m of its nodes that is hostile, or that fights a player there (the Undead's summons, the world's monsters). Joined monsters are counted, marked and watched, and the raid ends only when they are dead too.
+
 0.15.500 Nov 23, 2026
 - Spawn Nodes: a raid monster that gets up again after it was killed (the Undead do) counts as alive again, and a raid is over only when none of its monsters is alive for 10 s: no more "all defeated" while some still attack.
 - Spawn Nodes: the raid protection no longer drops for a moment while a stuck monster is replaced.

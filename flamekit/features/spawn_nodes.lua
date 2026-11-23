@@ -170,7 +170,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -524,7 +524,7 @@ local function persist()
   local token = nil
   pcall(function() token = emf.session_token() end)
   local out = { token = token, raid = {}, started = {}, runs = {} }
-  for gid, r in pairs(S.raid) do out.raid[tostring(gid)] = { place = r.place, spawned = r.spawned } end
+  for gid, r in pairs(S.raid) do out.raid[tostring(gid)] = { place = r.place, spawned = r.spawned, first_id = r.first_id } end
   for gid, at in pairs(S.started) do out.started[tostring(gid)] = at end
   for gid, run in pairs(S.runs) do
     out.runs[tostring(gid)] = { wave = run.wave, waves = run.waves, next_in = math.max(0, run.next_at - S.steps), by = run.by }
@@ -545,7 +545,7 @@ local function restore()
   for k, r in pairs(saved.raid or {}) do
     local gid = tonumber(k)
     if gid and group(gid) and type(r) == "table" then
-      S.raid[gid] = { place = r.place, spawned = tonumber(r.spawned) or 0 }
+      S.raid[gid] = { place = r.place, spawned = tonumber(r.spawned) or 0, first_id = tonumber(r.first_id) }
       n = n + 1
     end
   end
@@ -570,7 +570,92 @@ local function restore()
       end
     end
   end
+  for gid, r in pairs(S.raid) do  -- (0.15.501) a raid from before 0.15.501: its first monster = the lowest id it has
+    if not r.first_id then
+      for _, nd in ipairs(nodes_of(gid)) do
+        for _, set in ipairs({ S.alive[nd.id] or {}, S.dead[nd.id] or {} }) do
+          for id in pairs(set) do if not r.first_id or id < r.first_id then r.first_id = id end end
+        end
+      end
+    end
+  end
   emf.log(string.format("spawn nodes: after the reload: %d raid(s) and %d run(s) taken back", n, (function() local c = 0 for _ in pairs(S.runs) do c = c + 1 end return c end)()))
+end
+
+-- (0.15.501, owner 15:09 "the game has to accurately count monsters spawned and monsters killed to end the raid fix
+-- it": three monsters he killed at 15:07:54-57 were never the nodes' own: the Undead's summons or the world's) Every
+-- monster that comes into a raid joins it: counted, marked, watched, and the raid ends only when they are dead too.
+-- A monster joins a running raid when its entity id is higher than the raid's first monster's (it was made during the
+-- raid: the game numbers entities in order), it is within JOIN_R m of one of the raid's nodes, it is alive, it is not a
+-- player and its faction is a hostile one (not Environment 0, Wildlife 5, Player 7, AutomatedPlayer 8, PlayerAlly 11,
+-- FarmAnimal 12), or it hit a player or was hit by one (emf.on_hit). Found by a look at the new entities every
+-- JOIN_EVERY steps (only the ids above the highest one looked at before) and by every hit.
+local JOIN_R = 100
+local JOIN_EVERY = 120
+local FRIENDLY = { [0] = true, [5] = true, [7] = true, [8] = true, [11] = true, [12] = true }
+local function known(id)
+  for _, ids in pairs(S.alive) do if ids[id] then return true end end
+  for _, ids in pairs(S.dead) do if ids[id] then return true end end
+  return false
+end
+-- Group `gid`'s node nearest x, y, z within JOIN_R m, or nil.
+local function join_node(gid, x, y, z)
+  local best, nid = nil, nil
+  for _, n in ipairs(nodes_of(gid)) do
+    local d = dist2(x, y, z, n.x, n.y, n.z)
+    if d <= JOIN_R * JOIN_R and (not best or d < best) then best, nid = d, n.id end
+  end
+  return nid
+end
+-- Lets entity `id` join a running raid when it is a monster of it (see above); `engaged`: it hit or was hit by a player.
+local function try_join(world, id, engaged)
+  if not id or id == 0 or known(id) then return false end
+  for gid, r in pairs(S.raid) do
+    if r.first_id and id > r.first_id then
+      local okp, x, y, z = pcall(world.position, world, id)
+      local nid = okp and x and join_node(gid, x, y, z)
+      if nid then
+        local oka, acc = pcall(world.account, world, id)
+        if oka and acc then return false end  -- a player
+        local okh, cur = pcall(emf.health, world, id)
+        if not (okh and cur and cur > 0) then return false end
+        local okf, f = pcall(world.get, world, "Faction", id)
+        local faction = okf and f and tonumber(f.faction)
+        if engaged or (faction and not FRIENDLY[faction]) then
+          S.alive[nid] = S.alive[nid] or {}
+          S.alive[nid][id] = true
+          S.adopted[id] = true
+          r.spawned = r.spawned + 1
+          if (S.joined_said or 0) < 40 then
+            S.joined_said = (S.joined_said or 0) + 1
+            emf.log(string.format("spawn nodes: monster %s (faction %s%s) joined the raid at node %d: %.0f %.0f %.0f", tostring(id),
+              tostring(faction), engaged and ", in the fight" or "", nid, x, y, z))
+          end
+          return true
+        end
+      end
+    end
+  end
+  return false
+end
+local function join_tick(world)
+  if next(S.raid) == nil then S.join_seen = nil return end
+  local low = nil
+  for _, r in pairs(S.raid) do if r.first_id and (not low or r.first_id < low) then low = r.first_id end end
+  if not low then return end
+  local seen = S.join_seen or low
+  local ok, list = pcall(world.entities, world)
+  if not ok or type(list) ~= "table" then return end
+  local top = seen
+  for _, id in ipairs(list) do
+    if id > seen then
+      if id > top then top = id end
+      try_join(world, id, false)
+    end
+  end
+  S.join_seen = top
+  for id in pairs(S.join_hits) do try_join(world, id, true) end
+  S.join_hits = {}
 end
 
 -- (0.15.488) Every second: the count of monsters left, and the end of a raid (no waves to come, none alive, none
@@ -848,6 +933,7 @@ local function spawn_tick(world)
       if ok and id and id ~= 0 then
         local rq = qn0 and S.raid[qn0.g]
         if rq and not q.respawn then rq.spawned = rq.spawned + 1 end  -- (0.15.488); (0.15.493) a replacement is not one more
+        if rq and (not rq.first_id or id < rq.first_id) then rq.first_id = id end  -- (0.15.501) its first monster's id
         S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
         S.alive[q.node] = S.alive[q.node] or {}
         S.alive[q.node][id] = true
@@ -928,7 +1014,7 @@ local function stuck_tick(world)
           if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
           S.track[id], S.active_at[id] = nil, nil
           S.respawns[nid] = (S.respawns[nid] or 0) + 1
-          local again = S.respawns[nid] <= RESPAWN_MAX and data().nodes[tostring(nid)] ~= nil
+          local again = S.respawns[nid] <= RESPAWN_MAX and data().nodes[tostring(nid)] ~= nil and not S.adopted[id]  -- (0.15.501) a joined one is not replaced
           if again then
             local q = {}
             for k, v in pairs(t.q) do q[k] = v end
@@ -1425,12 +1511,14 @@ function F.tick(world)
     S.scan, S.scanned, S.miss, S.purge, S.raid, S.started = nil, false, {}, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
+    S.adopted, S.join_hits, S.join_seen = {}, {}, nil  -- (0.15.501)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)
+  if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
   ground.tick(world)
   spawn_tick(world)
   if S.steps % CLEAN_STEPS == 0 then clean_tick(world) stuck_tick(world) pcall(mark_tick, world) end  -- (0.15.493) stuck_tick, mark_tick
@@ -1761,6 +1849,14 @@ function F.setup(k)
       local now = os.time()
       for _, id in ipairs({ hit.attacker, hit.target }) do
         if id and S.track[id] then S.active_at[id] = now end
+      end
+      -- (0.15.501) a monster that hits a player or is hit by one may be in a raid: looked at in join_tick
+      if next(S.raid) ~= nil and hit.attacker and hit.target and hit.attacker ~= 0 and hit.target ~= 0 then
+        local oka = pcall(world.account, world, hit.target)
+        local _, at = pcall(world.account, world, hit.target)
+        local _, aa = pcall(world.account, world, hit.attacker)
+        if oka and at and not aa then S.join_hits[hit.attacker] = true
+        elseif aa and not at then S.join_hits[hit.target] = true end
       end
     end, "a hit (Spawn Nodes)"))
   end
