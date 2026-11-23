@@ -1,0 +1,8 @@
+{
+  "id": "lua",
+  "name": "Lua Scripts",
+  "version": "1.40.0",
+  "description": "Runs Lua mods (a folder with mod.json and main.lua) and reloads them when their files change. Console: lua.status, lua.reload.",
+  "authors": ["EMF"],
+  "emf": 20
+}

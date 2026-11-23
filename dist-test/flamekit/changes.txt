@@ -1,3 +1,31 @@
+0.15.454 Nov 22, 2026
+- Updates: FlameKit's updater now also keeps EMF (the modding framework FlameKit runs on) up to date, to the EMF version FlameKit was tested with. It never installs an older EMF, keeps the EMF from before the update in emf\flamekit_emf_backup, and the new EMF starts with the next game start. Your EMF settings and other mods are not touched.
+
+0.15.453 Nov 22, 2026
+- Building tab: new admin setting "Free build inside altar areas". While it is on, an admin's Free build also works inside flame altar areas, other players' bases included, so pieces there can be fixed or removed. Off by default; other players are not affected.
+- Building tab: a map without any flame altar now says so. Free build needs at least one flame altar somewhere on the map for now.
+- Free build: the size of a remembered spot's area is now set in one place, so the area and the tab's "nearest spot" always agree.
+- Free build: the files FlameKit and FlameKit Native share are now written whole and then put in place, so neither side can read half a file.
+- Free build: FlameKit Native reads the players' positions on the world's own step instead of inside the game's building code.
+
+0.15.452 Nov 22, 2026
+- New Building tab: Free build, Bigger altar areas and the remembered spots moved here from the Experimental tab. Your Free build setting carries over.
+
+0.15.451 Nov 22, 2026
+- Debug: /flamekit.water all [radius] lists every entity within a few metres of you with every component it has, to find what a water piece is made of.
+
+0.15.450 Nov 22, 2026
+- Debug: /flamekit.water [radius] (admins) lists the water pieces the game knows near you into the server's log, to find water left over from removed pieces. Nothing in the world changes.
+
+0.15.449 Nov 22, 2026
+- Free build: at most 100 remembered spots for now (was 2000). When the limit is reached, a player who builds a new spot is told that it is not kept.
+
+0.15.448 Nov 22, 2026
+- Free build: "Forget this spot" and "Forget all spots" are always shown in Experimental > Building, greyed out when they cannot be used (no spot near you, no spots, or not an admin).
+
+0.15.447 Nov 22, 2026
+- Free build: admins can forget every remembered spot at once ("Forget all spots" in Experimental > Building; click twice within 5 seconds). What was built in them is temporary again.
+
 0.15.446 Nov 22, 2026
 - Source documentation: every file and function of FlameKit now says what it does, for anyone reading the code. Nothing changes in the game.
 

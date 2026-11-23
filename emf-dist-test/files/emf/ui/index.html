@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Everything is local (https://emf.app/ is the ui folder next to EMF.exe); the host blocks every other request except
+     pictures from the hosts below (app/browse.cpp, image_hosts). Nexus data comes through the host, never from here.
+     style-src-attr: the checked inline styles of Nexus descriptions (src/nexus/bbcode.h); no <style> and no scripts. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: https://staticdelivery.nexusmods.com https://raw.githubusercontent.com https://user-images.githubusercontent.com https://i.imgur.com; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>EMF - Enshrouded mods</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="brand" aria-label="EMF">
+      <svg class="flame" viewBox="0 0 24 32" aria-hidden="true">
+        <path d="M12 1c1.2 5.4 7.8 8.7 7.8 17.1A7.9 7.9 0 0 1 12 31a7.9 7.9 0 0 1-7.8-7.9c0-4.6 2.6-6.9 3.9-9.9.7 2.8 2 4 3.4 4.6C10.6 12.3 10.7 6.4 12 1z"/>
+        <path class="core" d="M12 17.5c.6 2.8 3.6 4 3.6 7.1A3.6 3.6 0 0 1 12 28.2a3.6 3.6 0 0 1-3.6-3.6c0-2 1.2-3 1.9-4.4.5 1.1 1 1.6 1.6 1.8-.4-1.5-.4-3 .1-4.5z"/>
+      </svg>
+      <div class="brand-text">
+        <span class="wordmark">EMF</span>
+        <span class="tagline">Enshrouded mods</span>
+      </div>
+    </div>
+
+    <div class="folder">
+      <span class="eyebrow" id="folder-eyebrow">Game folder</span>
+      <div class="folder-line">
+        <select class="folder-switch" id="folder-switch" aria-label="The folder EMF shows: the game or a dedicated server" hidden></select>
+        <button class="path" id="folder-path" type="button" title="Show the game folder in Explorer">No folder chosen</button>
+        <button class="ghost small" id="change-folder" type="button">Change</button>
+      </div>
+    </div>
+
+    <div class="emf-chip" id="emf-chip" hidden></div>
+    <button class="nexus-chip" id="nexus-chip" type="button" title="Your Nexus Mods account in EMF" hidden>Nexus</button>
+
+    <div class="play-group" id="play-group">
+      <button class="play" id="play" type="button">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+        <span class="play-text"><span class="play-label" id="play-label">Play</span><span class="play-sub" id="play-sub">through Steam</span></span>
+      </button>
+      <button class="play-more" id="play-more" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="play-menu"
+              title="More ways to start the game: without EMF mods, or without any mods" aria-label="More ways to start the game">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6h9L8 10.5z"/></svg>
+      </button>
+      <div class="play-menu" id="play-menu" role="menu" aria-label="Start the game" hidden>
+        <button class="play-item" id="play-normal" role="menuitem" type="button">
+          <span class="play-item-label">Play</span><span class="play-item-sub">With your mods, as usual.</span>
+        </button>
+        <button class="play-item" id="play-no-emf" role="menuitem" type="button">
+          <span class="play-item-label">Play without EMF mods</span><span class="play-item-sub" id="play-no-emf-sub"></span>
+        </button>
+        <button class="play-item" id="play-no-mods" role="menuitem" type="button">
+          <span class="play-item-label">Play without any mods</span><span class="play-item-sub" id="play-no-mods-sub"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Pages">
+    <button class="tab" role="tab" data-tab="mods" aria-selected="true" type="button">Mods <span class="count" id="count-mods"></span></button>
+    <button class="tab" role="tab" data-tab="server" aria-selected="false" type="button" id="tab-server" hidden>Server</button>
+    <button class="tab" role="tab" data-tab="saves" aria-selected="false" type="button" title="Backups of your saves">Saves</button>
+    <button class="tab" role="tab" data-tab="warnings" aria-selected="false" type="button">Warnings <span class="count alert" id="count-warnings"></span></button>
+    <button class="tab" role="tab" data-tab="emf" aria-selected="false" type="button">EMF</button>
+    <button class="tab" role="tab" data-tab="browse" aria-selected="false" type="button" title="Mods on Nexus Mods" id="tab-browse" hidden>Browse</button>
+  </nav>
+</header>
+
+<div class="running" id="running" hidden role="status"></div>
+
+<main id="main">
+  <!-- Mods -->
+  <section class="page" id="page-mods" role="tabpanel">
+    <div class="mods-layout">
+      <div class="mods-list">
+        <div class="profiles-bar" id="profiles-bar" hidden aria-label="Mod profiles"></div>
+        <div class="list-tools">
+          <input class="filter" id="filter" type="search" placeholder="Filter mods" aria-label="Filter mods" autocomplete="off" spellcheck="false">
+          <p class="hint">Switches take effect the next time the game starts.</p>
+          <button class="ghost small install-file" id="mods-install" type="button" title="Install a mod archive (.zip, .7z, .rar) you downloaded">Install a downloaded file&hellip;</button>
+          <button class="ghost small" id="updates-check" type="button" title="Ask Nexus Mods whether your mods have newer files (only when you click)" hidden>Check for updates</button>
+        </div>
+        <div class="updates-bar" id="updates-bar" hidden role="status" aria-live="polite"></div>
+        <div id="groups"></div>
+      </div>
+      <aside class="details" id="details" aria-label="Mod details"></aside>
+    </div>
+  </section>
+
+  <!-- Server: a dedicated server's config, chat commands, start and stop, EMF in it, its logs (app.js, servers block) -->
+  <section class="page" id="page-server" role="tabpanel" hidden>
+    <div class="narrow" id="server-page"></div>
+  </section>
+
+  <!-- Browse: mods on Nexus Mods -->
+  <section class="page" id="page-browse" role="tabpanel" hidden>
+    <div class="browse-layout">
+      <div class="browse-list">
+        <div class="browse-tools">
+          <form class="search" id="browse-form" role="search">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 1.5a5.3 5.3 0 1 1 0 10.6 5.3 5.3 0 0 1 0-10.6zm0 1.6a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4zm4.6 7.9 3.3 3.3-1.1 1.1-3.3-3.3z"/></svg>
+            <input id="browse-text" type="search" placeholder="Search mods on Nexus" aria-label="Search mods on Nexus Mods" autocomplete="off" spellcheck="false" maxlength="100">
+            <button class="primary small" type="submit">Search</button>
+          </form>
+          <div class="segmented" role="radiogroup" aria-label="Sort by">
+            <button type="button" class="seg" role="radio" data-sort="downloads" aria-checked="true">Downloads</button>
+            <button type="button" class="seg" role="radio" data-sort="endorsements" aria-checked="false">Endorsements</button>
+            <button type="button" class="seg" role="radio" data-sort="updated" aria-checked="false">Updated</button>
+          </div>
+          <button class="ghost small install-file" id="browse-install" type="button" title="Install a mod archive (.zip, .7z, .rar) you downloaded">Install a downloaded file&hellip;</button>
+        </div>
+        <div class="browse-status" id="browse-status" role="status" aria-live="polite"></div>
+        <div class="cards" id="browse-cards"></div>
+        <nav class="pager" id="browse-pager" aria-label="Pages"></nav>
+        <p class="fineprint" id="browse-fineprint">Mods, pictures and descriptions come from Nexus Mods. Download a file on its Nexus page, then install it here: EMF checks it before anything is copied.</p>
+      </div>
+      <aside class="details" id="browse-details" aria-label="Mod on Nexus Mods"></aside>
+    </div>
+  </section>
+
+  <!-- Saves: backups of the game's saves (saves.js, app/bridge_saves.cpp) -->
+  <section class="page" id="page-saves" role="tabpanel" hidden>
+    <div class="narrow" id="saves-page"></div>
+  </section>
+
+  <!-- Warnings -->
+  <section class="page" id="page-warnings" role="tabpanel" hidden>
+    <div class="narrow">
+      <div class="title-row">
+        <h2 class="page-title">Warnings</h2>
+        <button class="ghost small" id="warnings-copy" type="button" title="Copy the warnings and the start-up report, for a bug report">Copy all</button>
+      </div>
+      <ul class="warnings" id="warnings"></ul>
+      <h3 class="section-title">EMF's start-up report</h3>
+      <p class="muted">What EMF writes to emf_core.log when the game starts: which tool owns each proxy DLL and what EMF started.</p>
+      <pre class="report" id="report"></pre>
+    </div>
+  </section>
+
+  <!-- EMF -->
+  <section class="page" id="page-emf" role="tabpanel" hidden>
+    <div class="narrow">
+      <h2 class="page-title">EMF</h2>
+      <div class="card install" id="install"></div>
+      <!-- EML content: who applies the EML mods' content at the next start, the last build, the copy (content.js) -->
+      <h3 class="section-title" id="content-title" hidden>EML content</h3>
+      <div class="card content-card" id="content-card" aria-labelledby="content-title" hidden></div>
+      <h3 class="section-title" id="account-title" hidden>Nexus account</h3>
+      <div class="card account" id="account" aria-labelledby="account-title" hidden></div>
+      <h3 class="section-title" id="nxm-title" hidden>Mod Manager Download links</h3>
+      <div class="card account" id="nxm-setting" aria-labelledby="nxm-title" hidden></div>
+      <div class="logs-head">
+        <h3 class="section-title">Logs</h3>
+        <div class="segmented" role="tablist" aria-label="Log file">
+          <button type="button" class="seg" data-log="core" aria-selected="true">emf_core.log</button>
+          <button type="button" class="seg" data-log="loader" aria-selected="false">emf_loader.log</button>
+          <button type="button" class="seg" data-log="content" aria-selected="false" title="What the last EML content build did">content.log</button>
+        </div>
+        <button class="ghost small" id="logs-refresh" type="button">Refresh</button>
+        <button class="ghost small" id="logs-copy" type="button" title="Copy this log, for a bug report">Copy</button>
+      </div>
+      <pre class="log" id="log" tabindex="0"></pre>
+    </div>
+  </section>
+
+  <!-- No game folder -->
+  <section class="page empty-state" id="page-nogame" hidden>
+    <div class="nogame">
+      <svg class="flame big" viewBox="0 0 24 32" aria-hidden="true">
+        <path d="M12 1c1.2 5.4 7.8 8.7 7.8 17.1A7.9 7.9 0 0 1 12 31a7.9 7.9 0 0 1-7.8-7.9c0-4.6 2.6-6.9 3.9-9.9.7 2.8 2 4 3.4 4.6C10.6 12.3 10.7 6.4 12 1z"/>
+      </svg>
+      <h2>Choose your Enshrouded folder</h2>
+      <p id="nogame-text">EMF could not find the game through Steam. Choose the folder that holds enshrouded.exe, or enshrouded_server.exe for a dedicated server.</p>
+      <button class="primary" id="nogame-pick" type="button">Choose folder</button>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+</div>
+
+<div class="modal" id="profile-modal" hidden>
+  <div class="sheet" id="profile-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-sheet-title" tabindex="-1"></div>
+</div>
+
+<div class="modal" id="saves-modal" hidden>
+  <div class="sheet" id="saves-sheet" role="dialog" aria-modal="true" aria-labelledby="saves-sheet-title" tabindex="-1"></div>
+</div>
+
+<div class="download-bar" id="download" hidden role="status" aria-live="polite"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="app.js"></script>
+<script src="saves.js"></script>
+<script src="content.js"></script>
+</body>
+</html>

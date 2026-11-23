@@ -39,11 +39,6 @@ local SWITCHES = {
   { "superbjump", "Super B Jump", nil, "Super B Jump" },  -- (0.15.209, owner: named after SuperB) core/leap.lua every server step
   { "fastdive", "Fast Dive", nil, "Fast Dive" },  -- (0.15.218, owner) core/dive.lua every server step
   { "glidersprint", "Glider Sprint", nil, "Glider Sprint" },  -- (0.15.258, owner) glide.apply: Sprint held while gliding
-  -- (0.15.415, owner 2026-11-21 18:38 "call it "Free build""; "make it player specific and put these settings under
-  -- the "Experimental" tab under a new section called "Building""): FlameKit Native (build_anywhere.cpp) lets the build
-  -- hammer work outside every flame altar's area for the players listed in free_build_server.txt (the server) /
-  -- free_build_client.txt (his own game); what is built is kept through remembered spots (FB.on_place)
-  { "freebuild", "Free build", nil, "Free build" },
 }
 
 -- Options that last only while the player is here: off again when they leave, or the server or the mod restarts.
@@ -82,51 +77,10 @@ local TIPS = {
   glidersprint = "Hold Sprint while gliding (the same key or button as running) to glide faster, also while climbing (back); let go for your normal glider speed. It multiplies your Glider speed and uses no stamina. How much faster is below. Off while you are in PvP. Everyone on the server is told when you switch it.",
   fastdive = "Two ways to dive. Without the glider: falling above your Free-fall Dive Minimum (an altitude, below) dives by itself. With the glider: tap forward twice quickly, at any height. Opening the glider, pulling up (back) or the updraft burst (jump) stops a dive; landing in water ends one. A free-fall landing kills you unless No Fall Damage is on; a glider dive is survived. The landing blasts a crater (choose below) that damages the monsters around it, more with bigger craters. Everyone is told when you switch it.",
   fly = "While gliding: hold S (back) to climb, and the updraft burst (Space) can be used again and again. On unless you switch it off.",
-  freebuild = "Build anywhere outside flame altar areas. What you build is remembered and kept through restarts. Inside an altar's area the game's normal building rules apply. Outside them the hammer uses only the materials in your bag. Needs FlameKit on the server too. Off while you are in PvP. Everyone on the server is told when you switch it.",  -- (0.15.445, owner 12:16 "change the tool tip")
 }
--- (0.15.415) Free build's bits in one table (the main chunk is at Lua's 200 locals): SECTION = switches shown under
--- their own heading in the tab, not in the list at the top; write = the players it is on for, to FlameKit Native in a
--- file beside the Lua part (one entity id a line; rewritten only when it changes): the server writes
--- free_build_server.txt, a player's own game free_build_client.txt (both in a game that hosts).
-local FB = { SECTION = { freebuild = "Building" }, STEPS = 30, written = {}, steps = 0 }
--- (0.15.422, owner 20:20 "1.5 seems safe so lets add an option for that"; 20:21 "Building, admins only"): Bigger
--- altar areas, one switch for the whole world (every altar's area is shared; the server decides what is kept; 0.15.423: on by default), only
--- FlameKit admins (core/admins.lua) may change it. Kept in experimental_world.json ({ bigaltars = true }); FlameKit
--- Native (build_anywhere.cpp) reads the factor from altar_size_server.txt (the server) / altar_size_client.txt (a
--- player's own game: the server's answer). 1.5x: the size tested on the local server (2x lost blocks in the outer ring
--- at restarts, 4x froze the server).
-FB.ALTAR_FACTOR = "1.5"
-FB.admins = require("core.admins")
-FB.world = nil  -- the world switch, loaded once
-function FB.world_on()
-  if FB.world == nil then
-    local ok, w = pcall(kit.store.load, "experimental_world", {})
-    FB.world = (ok and type(w) == "table") and w or {}
-  end
-  return FB.world.bigaltars ~= false  -- (0.15.423, owner 20:43 "can you default it on then?") on unless an admin switched it off
-end
--- Writes `text` to file `name` beside the Lua part for FlameKit Native, only when it changed.
-function FB.write_text(name, text)
-  if FB.written[name] == text then return end
-  local f = io.open(emf.dir .. "\\" .. name, "w")
-  if not f then return end
-  f:write(text, "\n")
-  f:close()
-  FB.written[name] = text
-  emf.log("experimental: bigger altar areas: " .. name .. " now " .. text)
-end
--- Writes the entity ids Free build is on for to free_build_<which>.txt (server or client), only when the list changed.
-function FB.write(which, ids)
-  table.sort(ids)
-  local text = table.concat(ids, "\n")
-  if FB.written[which] == text then return end
-  local f = io.open(emf.dir .. "\\free_build_" .. which .. ".txt", "w")
-  if not f then return end
-  f:write(text, text ~= "" and "\n" or "")
-  f:close()
-  FB.written[which] = text
-  emf.log("experimental: free build: " .. which .. " list now " .. (text ~= "" and text:gsub("\n", " ") or "(nobody)"))
-end
+-- (0.15.452) Free build and Bigger altar areas moved to features/building.lua (the Building tab); PvP is told to it
+-- through core/pvp_state.lua.
+local pvp_state = require("core.pvp_state")
 
 -- ---- the host's half ----
 
@@ -525,7 +479,9 @@ local function apply()
     if now - p.seen > GONE_AFTER then
       drop_rules(p)
       online[account] = nil
+      pvp_state.set(account, false)  -- (0.15.452) for features/building.lua
     else
+      pvp_state.set(account, wants(account, "pvp"))  -- (0.15.452) Free build is off in PvP (features/building.lua)
       for _, s in ipairs(SWITCHES) do
         local key = s[1]
         local wanted = is_on(account, key)
@@ -588,9 +544,7 @@ local function view(account)
               sbj_divespd = glide.sbj(account, "divespeed"), sbj_diveland = glide.sbj(account, "diveland"),
               sbj_divebase = glide.sbj(account, "divebase"),
               sbj_diveauto = glide.sbj(account, "diveauto"), sbj_sprint = glide.sbj(account, "sprint"),
-              damage_pvp = wants(account, "pvp") or nil,
-              bigaltars = FB.world_on() or nil,  -- (0.15.422) the world's switch
-              spot = FB.spot_info(account) }  -- (0.15.441) Free build's remembered spot where this player stands
+              damage_pvp = wants(account, "pvp") or nil }
   for _, s in ipairs(SWITCHES) do
     v[s[1]] = is_on(account, s[1])
     if held_by_pvp(account, s[1]) then v[s[1] .. "_pvp"] = true end
@@ -1426,9 +1380,6 @@ end
 -- A word from a player about their own switches. Returns the view to send back.
 local function handle(world, account, entity, msg, from)
   load_saved()
-  -- (0.15.442) the panel's spot needs the player's position from this message's own world: the world kept from
-  -- the last step gave no position here ("entity 1 at no position"), so no spot and no Forget button
-  if world and world.is_server and world:is_server() then FB.world_ref = world end
   account = tostring(account)
   seen(account, entity)
   online[account].kit = true  -- this player's game runs FlameKit: only then is the glider's burst note taken away
@@ -1544,38 +1495,6 @@ local function handle(world, account, entity, msg, from)
       emf.log(string.format("experimental: player %s set the glider speed to %s", tostring(entity), glide.label(f)))
     end
     return view(account)
-  end
-  if msg.op == "forget_spot" then  -- (0.15.441) Free build: forget the remembered spot where this admin stands
-    local v
-    if not FB.admins.is(account, from) then
-      v = view(account)
-      v.note = "Only FlameKit admins can forget Free build spots."
-      return v
-    end
-    local c = FB.forget_spot(world, entity)
-    v = view(account)
-    v.admin = true
-    v.note = c and string.format("Forgot the spot at %.0f, %.0f. What was built there is temporary again.", c[1], c[3])
-      or "There is no remembered spot within 64 m of you."
-    return v
-  end
-  if msg.op == "set" and msg.key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas: admins only
-    local v
-    if not FB.admins.is(account, from) then
-      v = view(account)
-      v.note = "Only FlameKit admins can switch Bigger altar areas."
-      return v
-    end
-    FB.world_on()
-    if msg.on == true then FB.world.bigaltars = nil else FB.world.bigaltars = false end  -- (0.15.423) only "off" is kept
-    kit.store.save("experimental_world", FB.world)
-    emf.log(string.format("experimental: player %s switched bigger altar areas %s", tostring(entity), msg.on == true and "on" or "off"))
-    local name = require("core.players").name(world, entity, "a player")
-    pcall(require("features.chat").announce, world, string.format("%s turned %s bigger altar areas.", name, msg.on == true and "ON" or "OFF"),
-      nil, { colour = "#ff9632", seconds = 10 })
-    v = view(account)
-    v.admin = true
-    return v
   end
   if msg.op == "set" and type(msg.key) == "string" then
     for _, s in ipairs(SWITCHES) do
@@ -2236,167 +2155,6 @@ local function pvp(world)
   end
 end
 
--- (0.15.440, owner 2026-11-22 09:50 "restart, if it fails we'll try to make it remember those areas") Free build's
--- remembered spots: every piece a player with Free build on places
--- (the server's BuildingPlaceEvent: position, ownerId) marks its 32 m grid cell (the same grid as the moving area). The
--- cells are kept in free_build_spots.json (kit.store) and handed to FlameKit Native in free_build_spots.txt ("x y z" of
--- each cell's centre in m, one a line), which adds a build zone over each remembered cell from the moment the server
--- starts, before the world loads: the save and the load treat them like altar areas (owner 10:22 "it worked"). At most
--- FB.SPOTS_MAX cells. A piece torn down leaves its cell; admins forget a spot with "Forget this spot" (FB.forget_spot).
-FB.SPOT_STEP, FB.SPOTS_MAX = 32, 2000
-FB.SPOT_EDGE = 2  -- (0.15.444) m kept free inside a spot's area edge for the piece itself
-function FB.spots_get()
-  if FB.spots == nil then
-    local ok, t = pcall(kit.store.load, "free_build_spots", {})
-    FB.spots = (ok and type(t) == "table") and t or {}
-  end
-  return FB.spots
-end
--- Writes the remembered spots' centres to free_build_spots.txt for FlameKit Native (when they changed); how many there are.
-function FB.spots_write()
-  local lines, n = {}, 0
-  for _, c in pairs(FB.spots_get()) do
-    n = n + 1
-    lines[n] = string.format("%.1f %.1f %.1f", c[1], c[2], c[3])
-  end
-  table.sort(lines)
-  local text = table.concat(lines, "\n")
-  if FB.written.spots == text then return n end
-  local f = io.open(emf.dir .. "\\free_build_spots.txt", "w")
-  if not f then return n end
-  f:write(text, n > 0 and "\n" or "")
-  f:close()
-  FB.written.spots = text
-  return n
-end
--- A BuildingPlaceEvent: for a player with Free build on, outside the altar areas and every remembered spot, the piece's 32 m cell becomes a remembered spot.
-function FB.on_place(world, e)
-  local owner = tonumber((pcall(function() return e.ownerId end) and e.ownerId) or 0) or 0
-  local account
-  for a, p in pairs(online) do
-    if p.entity == owner then account = a break end
-  end
-  if not account or not is_on(account, "freebuild") then return end
-  local x, y, z
-  pcall(function() local q = e.position x, y, z = tonumber(q.x), tonumber(q.y), tonumber(q.z) end)
-  if not (x and y and z) then
-    local okp, px, py, pz = pcall(world.position, world, owner)
-    if okp then x, y, z = px, py, pz end
-  end
-  if not (x and y and z) then return end
-  -- (0.15.443, owner 11:06 "free build mode should only happen and work when you're outside of the flame alters
-  -- boundries") a piece in an altar's area is the game's own: no spot. FlameKit Native writes the server's altar areas
-  -- (min xyz, max xyz in m, one a line) to altar_areas_server.txt.
-  local fa = io.open(emf.dir .. "\\altar_areas_server.txt", "r")
-  if fa then
-    for line in fa:lines() do
-      local a = {}
-      for v in line:gmatch("%-?[%d%.]+") do a[#a + 1] = tonumber(v) end
-      if #a == 6 and x >= a[1] and x <= a[4] and y >= a[2] and y <= a[5] and z >= a[3] and z <= a[6] then
-        fa:close()
-        emf.log(string.format("experimental: free build: placed by %d at %.1f %.1f %.1f, in an altar area: no spot", owner, x, y, z))
-        return
-      end
-    end
-    fa:close()
-  end
-  local st = FB.SPOT_STEP
-  local cx, cy, cz = math.floor(x / st), math.floor(y / st), math.floor(z / st)
-  local key = cx .. "," .. cy .. "," .. cz
-  local spots = FB.spots_get()
-  local inside = spots[key]
-  -- (0.15.444, owner 11:57 "there shouldn't be 4 locations... the blocks I placed were all very close to each other,
-  -- should be all within the same spot") a piece already inside a remembered spot's area (48 m, less FB.SPOT_EDGE m
-  -- for the piece's own size) makes no new spot, even when it is over a 32 m grid line
-  if not inside then
-    local lim = 24 - FB.SPOT_EDGE
-    for _, c in pairs(spots) do
-      if math.abs(x - c[1]) <= lim and math.abs(y - c[2]) <= lim and math.abs(z - c[3]) <= lim then inside = c break end
-    end
-  end
-  if inside then  -- (0.15.442) logged too, for debugging where blocks land
-    emf.log(string.format("experimental: free build: placed by %d at %.1f %.1f %.1f, in the remembered spot %.0f %.0f %.0f",
-      owner, x, y, z, inside[1], inside[2], inside[3]))
-    return
-  end
-  local n = 0
-  for _ in pairs(spots) do n = n + 1 end
-  if n >= FB.SPOTS_MAX then
-    emf.log("experimental: free build: remembered spots full (" .. n .. "), not kept: " .. key)
-    return
-  end
-  spots[key] = { cx * st + st / 2, cy * st + st / 2, cz * st + st / 2 }
-  pcall(kit.store.save, "free_build_spots", spots)
-  local total = FB.spots_write()
-  emf.log(string.format("experimental: free build: a spot remembered at %.0f %.0f %.0f (placed by %d at %.1f %.1f %.1f; %d spot(s))",
-    spots[key][1], spots[key][2], spots[key][3], owner, x, y, z, total))
-end
-
--- (0.15.441, owner 10:24 "we definitely need a way to remove the remember spots incase we have issues or theres too
--- many of them", 10:2x "it just has to be clear what spot im in that I'd be clearing out") the spot where a player
--- stands. (0.15.442, owner 10:32 "im literally standing right next to the block I put down", 10:34 "I walked to the
--- other side of the block. it still says in not in the right area ... it needs to work") a spot's box is centred on
--- its 32 m grid square, not on the block, so a player beside the block can stand outside it: now the nearest
--- remembered spot whose centre is within FB.SPOT_NEAR m across (and 48 m up or down), with how far its centre is.
-FB.SPOT_NEAR = 64
-function FB.spot_for(world, entity)
-  if not world or not entity then return nil end
-  local okp, x, y, z = pcall(world.position, world, entity)
-  if not okp or not x then
-    if FB.spot_err ~= tostring(x) then FB.spot_err = tostring(x) emf.log("experimental: free build: no position for " .. tostring(entity) .. ": " .. tostring(x)) end
-    return nil
-  end
-  local best, bk, bc = nil, nil, nil
-  for k, c in pairs(FB.spots_get()) do
-    local dx, dy, dz = x - c[1], y - c[2], z - c[3]
-    local d = math.sqrt(dx * dx + dz * dz)
-    if d <= FB.SPOT_NEAR and math.abs(dy) <= 48 and (not best or d < best) then best, bk, bc = d, k, c end
-  end
-  return bk, bc, best, x, y, z
-end
-FB.spot_said = {}
--- What the Building section shows a player: how many spots there are and the nearest one (its centre and distance); logged when it changes.
-function FB.spot_info(account)
-  local n = 0
-  for _ in pairs(FB.spots_get()) do n = n + 1 end
-  local info = { total = n }
-  local p = online[tostring(account)] or online[account]
-  local key, c, d, x, y, z = FB.spot_for(FB.world_ref, p and p.entity)
-  if key then
-    info.key, info.x, info.y, info.z = key, math.floor(c[1] + 0.5), math.floor(c[2] + 0.5), math.floor(c[3] + 0.5)
-    info.dist = math.floor(d + 0.5)
-  end
-  -- (0.15.442) logged when what this player's panel says changes (or their 8 m square changes), for debugging
-  local said = string.format("%s|%s|%s", tostring(key), tostring(info.dist), x and (math.floor(x / 8) .. "," .. math.floor(z / 8)) or "?")
-  if FB.spot_said[tostring(account)] ~= said then
-    FB.spot_said[tostring(account)] = said
-    emf.log(string.format("experimental: free build: panel spot for %s (entity %s at %s): %s",
-      tostring(account), tostring(p and p.entity), x and string.format("%.1f %.1f %.1f", x, y, z) or "no position",
-      key and string.format("%d %d %d, %d m", info.x, info.y, info.z, info.dist) or "none within " .. FB.SPOT_NEAR .. " m"))
-  end
-  return info
-end
--- Forgets the remembered spot nearest the player (what was built there is temporary again); its centre, or nil.
-function FB.forget_spot(world, entity)
-  local key, c = FB.spot_for(world, entity)
-  if not key then return nil end
-  FB.spots_get()[key] = nil
-  pcall(kit.store.save, "free_build_spots", FB.spots)
-  local total = FB.spots_write()
-  emf.log(string.format("experimental: free build: player %s forgot the spot at %.0f %.0f %.0f (%d left)", tostring(entity), c[1], c[2], c[3], total))
-  return c
-end
-
--- (0.15.415) the server's list for FlameKit Native: online players with Free build on. (0.15.432: defined here,
--- after `online` and `is_on`; above them both are nil.)
-function FB.server_list()
-  local ids = {}
-  for account, p in pairs(online) do
-    if p.entity and is_on(account, "freebuild") then ids[#ids + 1] = tostring(p.entity) end
-  end
-  FB.write("server", ids)
-end
-
 -- Every step of a world you host: test monsters, loot chests, Fast Dive, the players' switches and rules, the glider, PvP, Invincible Mode, Free build's files.
 function F.tick(world)
   fx_steps = fx_steps + 1
@@ -2411,11 +2169,6 @@ function F.tick(world)
   local account, player = me(world)
   if account then seen(account, player) end
   apply()
-  if world:is_server() then FB.world_ref = world end  -- (0.15.441) for FB.spot_info (view has no world)
-  if world:is_server() and fx_steps % FB.STEPS == 0 then  -- (0.15.415) Free build: who, for FlameKit Native
-    pcall(FB.server_list)
-    pcall(FB.write_text, "altar_size_server.txt", FB.world_on() and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
-  end
   keep_timer_full(world)
   keep_stamina_full(world)
   if account and online[account] then online[account].kit = true end  -- the host's own game has FlameKit
@@ -2495,7 +2248,7 @@ end
 -- tests only: put another player into (or out of) the online list, with PvP on or off
 function F._online_test(entity, account, pvp)
   if not account then
-    for acc, p in pairs(online) do if p.entity == entity then drop_rules(p); online[acc] = nil end end
+    for acc, p in pairs(online) do if p.entity == entity then drop_rules(p); online[acc] = nil; pvp_state.set(acc, false) end end
     return
   end
   online[account] = { entity = entity, rules = {}, seen = os.time() + 3600, pvp = pvp or nil }
@@ -2551,16 +2304,8 @@ local function ask(msg)
 end
 
 local my_view  -- (0.15.415) defined below, used by F.client_tick
--- Every step of the player's game: Free build's files for FlameKit Native, the waypoint and spire travel asked for, the keys the glider needs, and asking the server for his tab (every ASK_STEPS).
+-- Every step of the player's game: the waypoint and spire travel asked for, the keys the glider needs, and asking the server for his tab (every ASK_STEPS).
 function F.client_tick(world)
-  FB.steps = FB.steps + 1
-  if FB.steps % FB.STEPS == 0 then  -- (0.15.415) Free build: is it on for me (the server's answer), for FlameKit Native
-    local okv, v = pcall(my_view, world)
-    local me_id = emf.local_player()
-    local on = okv and v and v.freebuild == true and not v.freebuild_pvp and me_id and me_id ~= 0
-    pcall(FB.write, "client", on and { tostring(me_id) } or {})
-    pcall(FB.write_text, "altar_size_client.txt", (okv and v and v.bigaltars == true) and FB.ALTAR_FACTOR or "1")  -- (0.15.422)
-  end
   if want_waypoint then
     want_waypoint = false
     local ok, wp = pcall(world.get, world, "PlayerWaypoint", emf.local_player())
@@ -2722,37 +2467,7 @@ local function panel_rows(world)
       end
   end
   for _, s in ipairs(SWITCHES) do
-    if s[1] ~= "pvp" and not FB.SECTION[s[1]] then switch_row(s) end
-  end
-  do  -- (0.15.415) the sections: "Building" (Free build)
-    local done = {}
-    for _, s in ipairs(SWITCHES) do
-      local sec = FB.SECTION[s[1]]
-      if sec then
-        if not done[sec] then done[sec] = true rows[#rows + 1] = { heading = sec } end
-        switch_row(s)
-      end
-    end
-    -- (0.15.422) the world's Bigger altar areas, under Building: everyone sees it, only admins can switch it
-    local on, admin = v.bigaltars == true, v.admin == true or hosting(world)
-    rows[#rows + 1] = { button = "bigaltars", text = (on and "On    " or "Off   ") .. "Bigger altar areas (1.5x)" .. (admin and "" or " (admins only)"),
-      selected = on, disabled = (not admin) or nil,
-      tooltip = "Every flame altar's building area is 1.5 times as wide, high and deep; an altar's level still sets its size (40 m becomes 60 m, 160 m becomes 240 m). For the whole server: everyone's altars. What you build in the bigger area is kept like anything inside an altar's area. Players need this FlameKit version in their own game to see and use the bigger area. On unless an admin switches it off. Only FlameKit admins can switch it; everyone on the server is told." }
-    -- (0.15.441) Free build's remembered spots: how many, the one where you stand, and (admins) forget it
-    local sp = v.spot
-    if sp then
-      rows[#rows + 1] = { dim = true, text = string.format("Remembered Free build spots: %d", sp.total or 0),
-        tooltip = "Places where someone built with Free build. Each is a 32 m square of the world with a building area over it (48 m wide and high), so what was built there stays through restarts like inside an altar's area." }
-      if sp.key then  -- (0.15.442) the nearest spot within 64 m, with how far its centre is
-        rows[#rows + 1] = { dim = true, text = string.format("Nearest spot: %d, %d (height %d), centre %d m away", sp.x, sp.z, sp.y, sp.dist or 0) }
-        if admin then
-          rows[#rows + 1] = { button = "fbforget", text = "Forget this spot",
-            tooltip = string.format("Forgets the remembered spot at %d, %d. What was built in it is temporary again: the game removes it at the next restart or after about 30 minutes. Its border shows while your building tool is out.", sp.x, sp.z) }
-        end
-      else
-        rows[#rows + 1] = { dim = true, text = "No remembered spot within 64 m of you." }
-      end
-    end
+    if s[1] ~= "pvp" then switch_row(s) end
   end
   -- (0.15.261, owner: "lets move "Damage bonus" all the way to the top", "Glider Sprint speed needs to be moved below
   -- Glider speed so these two settings are together") the drop-downs: Damage bonus, then the glider's two, then Super B
@@ -3097,28 +2812,6 @@ function F.click(world, key)
     end
     return
   end
-  if key == "fbforget" then  -- (0.15.441) Free build: forget the spot where I stand (the server checks the admin)
-    if hosting(world) then
-      local account, player = me(world)
-      if not account then return end
-      load_saved()
-      note = handle(world, account, player, { op = "forget_spot" }, { is_local = true }).note
-    elseif shown then
-      ask({ op = "forget_spot" })
-    end
-    return
-  end
-  if key == "bigaltars" then  -- (0.15.422) the world's Bigger altar areas (the server checks the admin)
-    if hosting(world) then
-      local account, player = me(world)
-      if not account then return end
-      load_saved()
-      note = handle(world, account, player, { op = "set", key = "bigaltars", on = not FB.world_on() }, { is_local = true }).note
-    elseif shown then
-      ask({ op = "set", key = "bigaltars", on = not (shown.bigaltars == true) })
-    end
-    return
-  end
   if key:sub(1, 3) ~= "sw:" then return end
   local name = key:sub(4)
   if hosting(world) then
@@ -3134,14 +2827,9 @@ function F.click(world, key)
   end
 end
 
--- Listens for building pieces (Free build's spots), sets up the channel, keys, hit rules, events and commands.
+-- Sets up the channel, keys, hit rules, events and commands.
 function F.setup(k)
   kit = k
-  do  -- (0.15.440) Free build's remembered spots (the server world: events.on's default)
-    local okr = require("core.game_events").on("BuildingPlaceEvent", function(world, e) pcall(FB.on_place, world, e) end)
-    if not okr then emf.log("experimental: free build: BuildingPlaceEvent cannot be heard") end
-    pcall(FB.spots_write)
-  end
   -- A console test for PvP (server console or emf\commands.txt, output in emf_core.log), so it can be tried without a
   -- second player at the keyboard: "flamekit.pvptest <player entity>" switches PvP on for that player, makes them
   -- unable to die (an EMF hit rule, min_health 1: hits still land and show) and spawns a duelist 3 m in front of them;
@@ -3384,6 +3072,7 @@ function F.setup(k)
       end
       drop_rules(online[account])
       online[account] = nil
+      pvp_state.set(account, false)  -- (0.15.452)
     end
     drop_bodies_of(world, account, true)
     for i = #spawn_queue, 1, -1 do  -- (0.15.137) the rest of their spawn is not made
@@ -3452,7 +3141,6 @@ function F.setup(k)
       if type(msg) ~= "table" or not from or not from.player or from.player == 0 then return end
       local v = handle(world, from.account, from.player, msg, from)
       if not v then return end
-      v.admin = FB.admins.is(from.account, from) or nil  -- (0.15.422) may switch the world's options
       pcall(emf.net.send_to, world, from.player, CHANNEL, emf.json.encode(v))
     end, "a message from a player"),
     on_player = kit.guard(F, function(world, from, data)

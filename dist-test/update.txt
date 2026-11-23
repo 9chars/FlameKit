@@ -1,8 +1,8 @@
-0.15.446
+0.15.454
 2020 a354e5f1 flamekit/README.md
-128958 39a503a2 flamekit/changes.txt
-2292 1007d7bf flamekit/main.lua
-14583 8925ac4e flamekit/mod.json
+131288 2430dcba flamekit/changes.txt
+2531 e27d3f39 flamekit/main.lua
+14583 e26fb76b flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -29,17 +29,19 @@
 3769 efcada73 flamekit/core/pets.lua
 4034 f4b14a84 flamekit/core/player_prefs.lua
 2850 d9b70bb4 flamekit/core/players.lua
+775 971217ca flamekit/core/pvp_state.lua
 1580 fbbc6025 flamekit/core/skills.lua
 1628 4c6a2186 flamekit/core/store.lua
 3794 7588bc30 flamekit/core/test_players.lua
 629 1ebfa817 flamekit/core/test_tag.lua
 1682 c64d052f flamekit/features/_template.lua
 4660 5910a758 flamekit/features/build_anywhere.lua
+29123 4907d508 flamekit/features/building.lua
 2925 f31bcd0b flamekit/features/changes.lua
 7671 497c5ce2 flamekit/features/chat.lua
 8526 d675a1d5 flamekit/features/chest_overflow.lua
 2180 9ece9151 flamekit/features/companions.lua
-195790 fd5f96f7 flamekit/features/experimental.lua
+177687 09b73418 flamekit/features/experimental.lua
 10750 8e025f5a flamekit/features/leaderboard.lua
 12854 d7549406 flamekit/features/loose_loot.lua
 37795 460e5a01 flamekit/features/loot_drop.lua
@@ -53,6 +55,7 @@
 4581 f83117fb flamekit/features/server_version.lua
 11069 cb2dda6f flamekit/features/settings.lua
 6402 f83365e9 flamekit/features/travel_hide.lua
+6443 37b879dd flamekit/features/water_debug.lua
 4619 7bc42353 flamekit/features/companions/01_base.lua
 4110 3b3c2f03 flamekit/features/companions/02_fullrec.lua
 62567 6a4c60cb flamekit/features/companions/03_follow.lua
@@ -67,5 +70,5 @@
 15124 b576b343 flamekit/features/loot_filter/client.lua
 2368 5ff9c53d flamekit/features/loot_filter/init.lua
 19086 f0cf30bd flamekit/features/loot_filter/server.lua
-1030656 2e4d9b9b flamekit_native/flamekit_native.dll
-464 dc52967b flamekit_native/mod.json
+1079296 1c6c474c flamekit_native/flamekit_native.dll
+464 503308b8 flamekit_native/mod.json

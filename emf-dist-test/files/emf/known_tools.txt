@@ -1,0 +1,23 @@
+# Loaders and DLL mods EMF recognises next to the game. Read by the installer (a renamed dinput8.dll becomes
+# <word>.dll) and by EMF at start-up (emf_core.log says which tool owns each proxy DLL).
+#   word | name players see | text:<text inside its DLLs> | beside:<a file or folder of its own next to the exe>
+#        | same-loader:<another proxy name through which the same loader runs: its dinput8.dll copy is not started>
+#        | helper:<a proxy name of its own that does not start it alone (a helper of its loader)>
+#        | chain-as:<the name a renamed dinput8.dll of it gets instead of <word>.dll: it runs only under certain names>
+# A text counts as plain text or as UTF-16 (a DLL built with wide strings), case ignored.
+# The first line whose text a DLL contains wins: ShroudForge's DLLs contain EML's text too, so ShroudForge comes first.
+# ShroudForge's dinput8.dll is the same loader as its dbghelp.dll (same-loader: its copy is not started) and also its
+# "dinput8 chain host" (ShroudforgeSetDinput8Provider), which EMF's loader offers too (docs/modding/other_mods.md).
+# ModLoader Proxy: modloader-proxy.dll is the name its export table keeps after a rename (1.0.0, 1.1.0); its
+# chainloader.ini text is UTF-16.
+# Ultimate ASI Loader (10.0.2, its export IsUltimateASILoader) shows "This library isn't supported." and holds the game
+# under any name but its proxy names; the game imports none of them but dinput8.dll, so EMF chains it as
+# xinput9_1_0.dll, a name it accepts that nothing in the game loads (live, 2026-11-02: it loads its .asi plugins, also
+# on a start that builds EML content).
+shroudforge | ShroudForge | text:shroudforge | beside:shroudforge | same-loader:dbghelp.dll | helper:winmm.dll
+eml | EML (Enshrouded Mod Loader) | text:EML_LOG_FILE_PATH
+modloader-proxy | ModLoader Proxy | text:modloader-proxy.dll | text:chainloader.ini | beside:chainloader.ini
+shroudtopia | Shroudtopia (or its Shroudweave fork) | text:shroudtopia | beside:shroudtopia.json
+greeneye | Greeneye Loader | text:greeneye | beside:greeneye
+aldrich-modmenu | Aldrich Mod Menu | text:aldrich | beside:aldrich-modmenu
+ultimate-asi-loader | Ultimate ASI Loader | text:IsUltimateASILoader | chain-as:xinput9_1_0.dll
