@@ -1,3 +1,6 @@
+0.15.480 Nov 23, 2026
+- Spawn Nodes: Players cannot change bases now lasts until the last of the group's monsters is dead, not only while its waves run.
+
 0.15.479 Nov 23, 2026
 - Spawn Nodes: the raid switch is now Players cannot change bases during its waves: players near the group's nodes cannot build, dismantle or mine in bases while its waves run (the game's own base permission is taken away for that time), and hits on placed objects do nothing.
 

@@ -356,13 +356,25 @@ local function break_tick(world, spots)
   end
 end
 
--- (0.15.478) "Players cannot damage placed objects during its waves": while such a group runs, one EMF hit rule
+-- (0.15.478) "Players cannot damage placed objects during its waves": while such a group runs (0.15.480: or any of its
+-- monsters is alive), one EMF hit rule
 -- cancels every player's hits on placed objects (chests, stations, doors...: EMF's "objects"), everywhere on the
 -- server (EMF's rules have no area). Gone when no such group runs. Walls and floors are not hits: research.
 local function protect_tick(world, spots)
   local want = false
   local lock = {}
-  for gid in pairs(S.runs) do
+  -- (0.15.480, owner 12:25 "keep the player damage protection up until all the monsters are dead? even if it finished the
+  -- raid spawn waves") a protecting group counts while it runs AND while any monster of its nodes is still alive
+  local active = {}
+  for gid in pairs(S.runs) do active[gid] = true end
+  for _, g in ipairs(groups()) do
+    if not active[g.id] then
+      for _, n in ipairs(nodes_of(g.id)) do
+        if alive_count(n.id) > 0 then active[g.id] = true break end
+      end
+    end
+  end
+  for gid in pairs(active) do
     local g = group(gid)
     if g and g.protect then
       want = true
@@ -801,8 +813,8 @@ function F.panel(world)
       .. "flame altar's area what breaks stays broken. Needs EMF 0.6.19 on the server." }
   if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
   rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot change bases during its waves", selected = g.protect == true,
-    tooltip = "While its waves run: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
-      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when the waves end or they "
+    tooltip = "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
+      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
       .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
       .. "Admins too, for now." }
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
