@@ -1,3 +1,6 @@
+0.15.497 Nov 23, 2026
+- Spawn Nodes: a raid monster in water (0.8 m deep or more, by the game's own submerge depth) is taken away and comes again at its node, not where a monster was found in water before (4 m around). The 0.15.493 water check never worked: monsters have no swimming state.
+
 0.15.496 Nov 23, 2026
 - Spawn Nodes: a monster that only stands and waits because no player is near is no longer taken away as stuck: only a monster with a player within 40 m can be stuck.
 

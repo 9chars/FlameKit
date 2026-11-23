@@ -72,6 +72,8 @@ local STUCK_S = 30
 local STUCK_NEAR = 40          -- m: (0.15.496: 25 monsters were taken away as "stuck" at 14:43-14:46 while they only stood
                                -- waiting, the player more than 50 m away) only a monster with a player this near can be stuck
 local RESPAWN_MAX = 10
+local WATER_DEPTH = 0.8        -- m: (0.15.497) a monster this deep in water is taken away and comes again out of it
+local WET_R = 4                -- m: a spot this close to where a monster was found in water is not used again
 local SOLID_UP = { 1.5, 3.0 }
 local ACTIVE_DIST = 100        -- m: (0.15.491) now only how far a monster looks for the player to face
 local NEAR_LIST = 8            -- the tab lists this many nodes of the chosen group, nearest first
@@ -167,7 +169,7 @@ end
 
 local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -721,6 +723,12 @@ local function pick_spot(world, q, spread)
       end
       bad = solid
     end
+    if not bad then  -- (0.15.497) not where a monster was found in water
+      for _, w in ipairs(S.wet) do
+        local dx, dz = w[1] - x, w[2] - z
+        if dx * dx + dz * dz <= WET_R * WET_R then bad = true break end
+      end
+    end
     if not bad then
       local y = find_surface(world, x, q.y, z)  -- (0.15.493) its ground, or not this spot
       if y then return x, y, z end
@@ -793,9 +801,25 @@ local function stuck_tick(world)
         local why = nil
         if now - t.born >= 3 and solid_at(world, x, y + 0.6, z) and solid_at(world, x, y + 1.4, z) then why = "in the ground" end
         if not why then
-          local okm, move = pcall(world.get, world, "DynamicLocomotion", id)
-          local st = okm and move and tonumber(move.state)
-          if st == 9 or st == 10 then why = "in water" end
+          -- (0.15.497, owner 14:47 "you're code isn't working. monsters that end up in water need to respawn out of the
+          -- water") monsters have no swimming state (DynamicLocomotion is the players'); the game's submerge depth is
+          -- read instead: ServerSubmerge (the server's), else NetworkSubmerge. In water: WATER_DEPTH m or deeper.
+          local depth = nil
+          local oks, sub = pcall(world.get, world, "ServerSubmerge", id)
+          if oks and sub then depth = tonumber(sub.submergeDepth) end
+          if not depth then
+            local okn, nsub = pcall(world.get, world, "NetworkSubmerge", id)
+            if okn and nsub then depth = tonumber(nsub.submergeDepth) end
+          end
+          if depth and depth > 0 and not S.depth_said[id] then  -- the first wet reading of each monster, for the log
+            S.depth_said[id] = true
+            emf.log(string.format("spawn nodes: monster %s: submerge depth %.2f m at %.0f %.0f %.0f", tostring(id), depth, x, y, z))
+          end
+          if depth and depth >= WATER_DEPTH then
+            why = string.format("in water (%.1f m deep)", depth)
+            S.wet[#S.wet + 1] = { x, z }  -- (0.15.497) this place is not used for a spawn again
+            if #S.wet > 200 then table.remove(S.wet, 1) end
+          end
         end
         if not why then
           if dist2(x, y, z, t.x, t.y, t.z) >= 1 then
@@ -1298,6 +1322,7 @@ function F.tick(world)
     S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
     S.scan, S.scanned, S.miss, S.purge, S.raid, S.started = nil, false, {}, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
+    S.wet, S.depth_said = {}, {}  -- (0.15.497)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     scan_tick(world)
