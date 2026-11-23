@@ -2050,6 +2050,20 @@ server's own idle rate while no player is connected, not a problem (the speed lo
 17.0, 17.1, 16.8, 16.7, 16.7, 16.7 ms (3,516-3,586 steps), both areas on all of 10:27:42-10:31:57 (4+ minutes, past the old
 2-3 minute onset): NO slowdown (last night 48 ms). G-Portal's slowest step is ~200-260 ms every minute, also with no
 area on (minute 3: 217 ms): G-Portal itself, not Free build. Process CPU ~3.6 cores.
+10:35 owner: "looks good I'll test it out with a bigger base eventually". **NEW FEATURE (owner 10:53-11:08): SPAWN NODES**
+("place down nodes around the map that could be configured to spawn monsters", admins only, "maybe ... part of a larger
+raid type system for spawning monsters against peoples bases", "just go to the location I want and click add node",
+groups that fire together, monster type per group (foggers, vukah, scavengers, undead... or random), "all 5 of those
+triggers would be good ... lets go ahead and build it"). Defaults/limits told to the owner: 3 monsters per wave per node,
+spread 10 m, active only with a player within 100 m, most alive per node 6, markers only in admins' games.
+**0.15.476 (8600fe5; DLL unchanged = 0.15.475's): features/spawn_nodes.lua** (the Spawn Nodes tab; see its header) +
+**core/spawn.lua** (the ground queue and set_level moved out of experimental.lua, shared; experimental's queue keeps max
+40, the nodes' 20). Groups: name "Group N", on, family (core/monsters.lua groups: Ancients, Beasts, Drak, Scavengers,
+Shroud (Fell), Undead, Vukah, or Random; never bosses), trigger manual|timer|wire|time|raid, waves 3, wave_gap 30 s,
+per_wave 3, max_alive 6, cooldown 10 min, timer 10-20 min, wire 20 m, hour 20:00, raid 150 m; limits 200 nodes, 30
+groups. Channel flamekit/nodes v1 (max 16384). Saved: spawn_nodes.json (server), spawn_nodes_client.json (Show nodes).
+Lua checked only by a block-balance script (no Lua in the container/VM). Local server reloaded it 11:14 (22 features,
+no error); a new channel needs a server restart. Development only; not tested in game yet.
 ## Things learned the hard way
 
 - Copying files onto the owner's PC (device_commit_files): sending the same container path twice can deliver the OLD content. Use a fresh folder name per version (e.g. `outputs/v0_15_15/...`) and check the result by hash on the PC before building.
