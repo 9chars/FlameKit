@@ -27,6 +27,8 @@ run(1)
 M.ents[id].ai_state, M.ents[id].target = 6, 1
 run(1)
 run(11)
+M.ents[id].x = M.ents[id].x - 3
+run(1)
 local function has(p) return M.count(p) > 0 end
 ok(has("state 1, target 0, threat table [empty]"), "a line when its AI shows up")
 ok(has("threat table [1: 3 e1 f7 a55]"), "a line when the player comes into its threat table")
@@ -34,6 +36,8 @@ ok(has("state 6, target 1"), "a line when it fights the player")
 ok(has("spawn nodes: ai (10 s): monster"), "the 10 s line")
 ok(has("nearest player 1 "), "the distance to the player is in it")
 ok(has("; order 77 at player 1"), "the order is in the line")
+ok(has("first moved 1"), "the first move is logged with how long it stood")
+ok(M.count("ground teleport") >= 1 and M.count("ground move queued") == 0, "no ground teleport any more")
 ok(M.count("ai_tick: ") == 0 and M.count("hunt_tick: ") == 0, "no errors")
 for _, l in ipairs(M.logs) do if l:find("spawn nodes: ai", 1, true) then print("  " .. l) break end end
 print(fails == 0 and "ALL OK" or (fails .. " FAILED"))

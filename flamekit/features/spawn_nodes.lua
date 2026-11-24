@@ -16,7 +16,7 @@
 -- (when the game's clock passes `hour`), base raid (a player inside a flame altar area within `raid_r` m of one of the
 -- group's nodes). "Start now" works for every trigger and ignores the cooldown.
 -- (0.15.491: a group starts and its waves come only while a player is within its near_r of one of its nodes.) Before: a node spawned only while a player was within ACTIVE_DIST m of it (the game removes monsters far from every player);
--- the others skip that wave. Monsters spawn within SPREAD m of their node and are put on the ground (core/spawn.lua).
+-- the others skip that wave. Monsters spawn within SPREAD m of their node, on the ground found there (find_surface).
 -- Kept on the server in spawn_nodes.json (kit.store): groups and nodes. What runs (waves, monsters alive) is not kept:
 -- a restart or reload ends running waves; the game keeps or removes the monsters as it does any monster.
 --
@@ -36,7 +36,6 @@
 local admins = require("core.admins")
 local players = require("core.players")
 local monsters = require("core.monsters")
-local spawn = require("core.spawn")
 local threat = require("core.threat")  -- (0.15.522)
 
 local F = { id = "spawn_nodes", title = "Spawn Nodes" }
@@ -189,7 +188,6 @@ end
 local S = { data = nil, steps = 0, runs = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
             mon = {}, old_bodies = {}, scan = nil, scanned = false, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, threat_seen = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned; (0.15.488) raid; (0.15.526) mon, old_bodies: the roster (below)
-local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
 local function data()
@@ -1330,15 +1328,13 @@ local function do_spawn(world, q, x, sy, z)
     S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
     mon_add(id, qn0 and qn0.g or 0, q.node, true, false, q.respawn and "spawned again for a stuck one" or "spawned by its node")  -- (0.15.526)
     -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
-    -- (0.15.518, owner 17:11 "the monsters are literally just standing around? not fighting at all? something is wrong with
-  -- how they're getting spawned", 17:13 "um sure") the game's own move onto the ground after every spawn again, as until
-  -- 0.15.493. (0.15.526: the 0.15.518 reason "raids worked pretty well at 13:32" was a misquote: that was 12:25, about the
-  -- raid lock; and with the move back, 1 of 21 moved at 18:20. It stays: the owner did not ask to take it out.)
-  ground.add(id, x, sy, z, yaw)
-  if (S.ground_log or 0) < 40 then
-    S.ground_log = (S.ground_log or 0) + 1
-    emf.log(string.format("spawn nodes: node %s: monster %s spawned at %.1f %.1f %.1f, the game's ground move queued", tostring(q.node), tostring(id), x, sy, z))
-  end
+    -- (0.15.531, owner 20:16 "yes" to taking it out, rule 0n) NO teleport onto the ground after the spawn any more: the
+    -- spot is already on the ground (find_surface, 0.15.493), and the teleport put back in 0.15.518 (on a misquote) hung
+    -- on every node monster ("still has a Teleport 10 s after EMF's push", 48 times on 2026-11-23).
+    if (S.ground_log or 0) < 40 then
+      S.ground_log = (S.ground_log or 0) + 1
+      emf.log(string.format("spawn nodes: node %s: monster %s spawned at %.1f %.1f %.1f (no ground teleport)", tostring(q.node), tostring(id), x, sy, z))
+    end
   else
     emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
   end
@@ -1727,6 +1723,16 @@ local function ai_tick(world)
     local m = S.mon[id]
     local okp, x, y, z = pcall(world.position, world, id)
     if m and okp and x then
+      -- (0.15.531) the moment it first moves 0.5 m from where it was spawned (or found): how long it stood first
+      m.spawn_pos = m.spawn_pos or { x, y, z }
+      if not m.first_moved and dist2(x, y, z, m.spawn_pos[1], m.spawn_pos[2], m.spawn_pos[3]) >= 0.25 then
+        m.first_moved = now
+        local okt, tp = pcall(world.get, world, "Teleport", id)
+        S.ai_log = (S.ai_log or 0) + 1
+        emf.log(string.format("spawn nodes: ai: monster %s [%s] first moved %d s after it appeared (state %s, target %s; a Teleport on it: %s)",
+          tostring(id), mon_kind(world, id), now - m.born, tostring(select(2, pcall(threat.ai, world, id))), tostring(select(3, pcall(threat.ai, world, id))),
+          okt and tp ~= nil and "yes" or "no"))
+      end
       local oks, st, tgt = pcall(threat.ai, world, id)
       if not oks then st, tgt = "?", "?" end
       local okk, tk = pcall(threat.key, world, id)
@@ -2240,7 +2246,6 @@ function F.tick(world)
   if S.steps % FAST_STEPS == 4 then local okt, why = pcall(trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
   if S.verify then verify_tick(world) end  -- (0.15.505)
   if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
-  ground.tick(world)
   spawn_tick(world)
   -- (0.15.515, owner 16:42 "the nodes are spawning monsters too slowly? if a node spawns a monster and it gets killed it
   -- needs to immediately spawn another one": a death was seen only every 2 s (clean_tick) and the next one queued every

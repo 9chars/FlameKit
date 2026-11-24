@@ -1,3 +1,6 @@
+0.15.531 Nov 23, 2026
+- Spawn Nodes: no teleport onto the ground after a monster spawns any more. The spot is already on the ground, and that teleport never finished (EMF removed it after 10 s on every monster). The log says when each monster first moves ("first moved N s after it appeared").
+
 0.15.530 Nov 23, 2026
 - Spawn Nodes: the orders are on again (each raid monster is told to go for the nearest player within 120 m), together with the threat table write. The "spawn nodes: ai" lines say whether the monster has an order; the home and distance values of 0.15.529 are gone (they meant nothing).
 

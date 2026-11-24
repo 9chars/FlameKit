@@ -2346,3 +2346,14 @@ STUCK_ON off; ai lines carry "order <id> at player <p>". Not built, offered: Fla
 raid monsters if ordered hover/range types still stay.
 Owner 19:56: "#2 is based on the companions following me, not what the monsters would be doing" (the drive follows the player's own breadcrumb trail; a raid monster has no trail to him): the drive is NOT a raid-monster fix as it is.
 On the local server 19:56:46 (no raid; 22 features, no error).
+
+## 0.15.531 (Nov 23, 20:18) Spawn Nodes: ground teleport removed (owner 20:16 "yes")
+20:09 raid (Beasts; orders + threat on): every monster angry (state 6, target, order) 1-2 s after spawn, but the walkers
+moved 0.0 m for ~30 s: Scorpion Fire, Stinger, Giant Crab spawned 20:09:00, first moved between 20:09:27 and :37;
+Spider Ant Melee (20:09:39) still 0.0 m 38 s later. Owner 20:10 "theres a HUGE delay in monsters trying to attack me?".
+Every node monster: EMF "still has a Teleport 10 s after EMF's push: it is removed" (48x today) = core/spawn.lua ground
+move (0.15.518, put back on a misquote) that never finished. Owner 20:15 "why is it doing that?", 20:16 "ummm yes? if you
+think that its causing monsters not to move". Claude said: not proven to cause the freeze (EMF drops it at 12 s, they
+stood ~30 s), but it is a second mechanism for a job find_surface already does (rule 0n) -> removed from spawn_nodes
+(core/spawn.lua stays for experimental's test monsters). New log line "first moved N s after it appeared (... a Teleport
+on it: yes/no)".
