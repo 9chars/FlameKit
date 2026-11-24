@@ -2457,3 +2457,6 @@ present since server start. They're doing short 2-14 m walks in the base (x 6240
 They used ~109k search steps vs ~63k for all raid monsters. Raid requests (faction 6 enemy AI, 7-18 m to the target
 ~6298.8 948.5 5186.5) stayed at 0 iterations 54-89 s (request 68: 89 s, 81: 54 s, 91: 56 s); some were dropped
 unsearched after 45 s (73). The game's template name for those faction-0 creatures isn't logged yet.
+22:08 the console (emf\commands.txt, read only: inspect 1041/1050, ai 1041/1052) confirms they're tamed animals:
+IsTame + Wildlife + DynamicWildlife, faction Environment (0), "no creature AI", 92 components each. Owner 22:06 "yeah
+its probably pets and animals". Species not named yet (no console command gives a template name; near needs the player in the world).
