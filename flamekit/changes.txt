@@ -1,3 +1,6 @@
+0.15.529 Nov 23, 2026
+- Spawn Nodes: the threat table write is on again (every player within 50 m of a raid monster is put into its threat table). The "spawn nodes: ai" lines also show each monster's home spot, how far that is from the player, and the game's own distances for it (checkDistance, maxTargetDistanceToHomeZone, leashLength) (read only).
+
 0.15.528 Nov 23, 2026
 - Spawn Nodes (logging only): the "spawn nodes: ai" lines also name the monster (for example "Undead: Mage01").
 

@@ -2314,3 +2314,13 @@ anything: keep going from the logs, report what they show.
 fought at 6.7 m and came to 0.9 m (the only melee that fought); Elite Melee01 52073 at 16-25 m never noticed him;
 2 Elite Necromancer, Hollow Wisp, Skeleton Giant Lizard Hollow Wisp, Flying Skull fought from where they stood (0 m
 closer); 12 "type not known" = Necromancer summons, fought where they appeared (several 2-3 m up).
+
+## 0.15.529 (Nov 23, 19:43) Spawn Nodes: home/leash logging + THREAT_ON back on
+Owner 19:36 "anything over 15m pretty much ignores me or doesn't come over by me to attack" (log: 13 of 16 got angry at
+4.6-11.6 m; some never, even at 2.6 m), 19:39 "adding me to the threat table didn't make a shit of difference from what I
+saw", 19:40 "turn the threat table shit back on still if you must, to see that it does nothing". Lead: the game's own
+per-monster home and reach (fields known from the companion work, npc_fields.lua): DynamicEnemy01BehaviorState
+.homeZonePosition + combatData.isTargetInsideLeash, EnemySettings.checkDistance / maxTargetDistanceToHomeZone /
+leashLength. Now in every ai line (mon_reach, read only). THREAT_ON = true (HUNT_ON, STUCK_ON still false). Owner set
+Group 1 family = Beasts at 19:40:19 for the next raid. Next: read the real values; the fix idea (NOT built, not agreed):
+raid monsters' home = the nearest player and bigger reach.

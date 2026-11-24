@@ -1436,7 +1436,7 @@ end
 -- that") test switches: STUCK_ON (this whole stuck/ground/water/fall handling), HUNT_ON (the enemy orders), THREAT_ON
 -- (the threat table writes). All off: monsters are only spawned (with the game's ground move) and counted; the 10 s
 -- hunt summary still logs how many moved.
-local STUCK_ON, HUNT_ON, THREAT_ON = false, false, false
+local STUCK_ON, HUNT_ON, THREAT_ON = false, false, true  -- (0.15.529, owner 19:40 "turn the threat table shit back on still if you must, to see that it does nothing": THREAT_ON back on)
 local function stuck_tick(world)
   if not STUCK_ON then return end
   local now = os.time()
@@ -1705,6 +1705,36 @@ local AI_STEPS = 30
 -- (0.15.528, owner 19:30 "go ahead": which monster each one is) template GUID -> "Family: name" from core/monsters.lua
 local MON_NAME = {}
 for _, mm in ipairs(monsters) do MON_NAME[mm[3]] = mm[1] .. ": " .. mm[2] end
+-- (0.15.529, owner 19:40) the game's own home and reach of a monster, for the ai lines: its home spot
+-- (DynamicEnemy01BehaviorState.homeZonePosition), how far that is from the nearest player, EnemySettings.checkDistance,
+-- maxTargetDistanceToHomeZone and leashLength, and combatData.isTargetInsideLeash. Read only.
+local function num(v)
+  if type(v) == "table" then v = v.value end
+  local n = tonumber(tostring(v))
+  return n and string.format("%.1f", n) or tostring(v)
+end
+local function mon_reach(world, id, px, py, pz)
+  local parts = {}
+  local okb, ai = pcall(world.get, world, "DynamicEnemy01BehaviorState", id)
+  if okb and ai then
+    pcall(function()
+      local h = ai.homeZonePosition
+      local d = px and math.sqrt(dist2(h.x, h.y, h.z, px, py, pz)) or -1
+      parts[#parts + 1] = string.format("home %.1f %.1f %.1f (%.1f m from the player)", h.x, h.y, h.z, d)
+    end)
+    pcall(function() parts[#parts + 1] = "target inside leash " .. tostring(ai.combatData.isTargetInsideLeash) end)
+  end
+  local oke, es = pcall(world.get, world, "EnemySettings", id)
+  if oke and es then
+    pcall(function()
+      parts[#parts + 1] = string.format("checkDistance %s, maxTargetDistanceToHomeZone %s, leashLength %s",
+        num(es.checkDistance), num(es.maxTargetDistanceToHomeZone), num(es.leashLength))
+    end)
+  else
+    parts[#parts + 1] = "no EnemySettings"
+  end
+  return table.concat(parts, ", ")
+end
 local function mon_kind(world, id)
   local guid = S.track[id] and S.track[id].guid
   if not guid then
@@ -1741,10 +1771,10 @@ local function ai_tick(world)
         local moved = m.ai_pos and math.sqrt(dist2(x, y, z, m.ai_pos[1], m.ai_pos[2], m.ai_pos[3])) or 0
         local okl, line = pcall(threat.line, world, id)
         S.ai_log = (S.ai_log or 0) + 1
-        emf.log(string.format("spawn nodes: ai%s: monster %s [%s] (node %s, %s, %d s old) at %.1f %.1f %.1f: state %s, target %s, threat table [%s]; nearest player %s %.1f m away (%+.1f m height), moved %.1f m in %d s",
+        emf.log(string.format("spawn nodes: ai%s: monster %s [%s] (node %s, %s, %d s old) at %.1f %.1f %.1f: state %s, target %s, threat table [%s]; nearest player %s %.1f m away (%+.1f m height), moved %.1f m in %d s; %s",
           key ~= m.ai_key and "" or " (10 s)", tostring(id), mon_kind(world, id), tostring(m.n), m.own and "its own" or "counted apart", now - m.born, x, y, z,
           tostring(st), tostring(tgt), okl and line or "?", pl and tostring(pl[1]) or "none", best and math.sqrt(best) or -1,
-          pl and (pl[3] - y) or 0, moved, now - (m.ai_at or m.born)))
+          pl and (pl[3] - y) or 0, moved, now - (m.ai_at or m.born), mon_reach(world, id, pl and pl[2], pl and pl[3], pl and pl[4])))
         m.ai_key, m.ai_pos, m.ai_at = key, { x, y, z }, now
         if S.ai_log >= AI_LOG_MAX then emf.log("spawn nodes: ai: the log limit for this raid is reached (" .. AI_LOG_MAX .. " lines)") return end
       end
