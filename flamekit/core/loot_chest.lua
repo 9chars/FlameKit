@@ -212,7 +212,13 @@ end
 -- Whether a removed chest is really gone is checked 2 s later and logged. Call from a feature's server tick.
 local removed = {}  -- chest id -> os.time() it was destroyed
 -- Every server step: puts waiting loot in; every 120 steps takes chests away that are gone, emptied, never filled within 30 s, or KEEP_S after their last item.
+local last_tick = nil  -- (0.15.547) the world step last ticked: Experimental and core/reward_loot.lua both call it
 function M.tick(world, bag)
+  local okt, t = pcall(world.tick, world)
+  if okt and t ~= nil then
+    if t == last_tick then return end  -- (0.15.547) once per world step, however many callers
+    last_tick = t
+  end
   steps = steps + 1
   if not loaded then pcall(load, world) end
   if #pending > 0 then

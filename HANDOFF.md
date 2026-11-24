@@ -2667,3 +2667,27 @@ it have its own on/off feature button?" -> answered yes in my view (test probes 
 ai_tick logging, fullrec 90 s recordings; 28 ms step at 07:52); not built (not asked to).
 08:45 owner "yes" -> 0.15.546 (with 0.15.545) live (spawn_nodes.lua 918c31ae..., mod.json, changes.txt) on the server
 and the game; reloaded 08:45:35-36, no errors, no raid started by the reload. SPAWN NODES IS OPEN TO EVERY PLAYER NOW.
+
+**0.15.547 (owner 09:41 "I need to be able to set the starting level of the monsters per group. I also need to add a
+drop-down option that increases the level of the monsters with each new wave: 5, 10, 15, 20, 25, 30, 35, 45, 50, 60, 70,
+80, 90, 100 -- keep in mind that the max level of any monster can only be 100 ... I would also like to add in the "reward
+loot" system like we build for the test monsters and this should be configurable by group as well"; 09:45 "make it
+configurable. so I can do reward loot (exactly like how test monsters work), normal monster loot, and/or no loot. I should
+be able to choose any combination of the 3. of course if the player chooses no loot, it drops nothing....", "stop asking me
+questions. I told you exactly how I want it"; Lua only; NOT installed, asked):**
+- Per group (Monsters section): `start_level` (0 = Game's own, 1, 5..100 by 5; my choice, the owner did not answer),
+  `level_step` (0 = No increase, the owner's list + 40, taken for a slip; told him), `loot` ("normal" default, "reward",
+  "both", "none"). Level = start (or the monster's own) + level_step x (wave - 1), at most K.MAX_LEVEL 100; set at spawn
+  (K.level_spawned via core/spawn.lua set_level); the wave travels with each spawn request (q.wave: the last wave's last
+  monsters spawn after its run is over; found by tools/sntest/lv.lua). Log once per wave: "<group> wave N: its monsters at
+  level L (...)".
+- Loot at a death (mon_check -> K.on_death), only monsters a node spawned (m.sp), once each (m.looted): reward/both ->
+  core/reward_loot.lua give (the test monsters' drop_test_loot, copied into core: runes + legendary runes into the bag of
+  the last player who hit it (S.hitby from on_hit), a legendary item at its level into a loot chest by the body, twice for
+  Bosses); reward/none -> clear_game_loot (body emptied at 2, 3, 5 s; the game's loot pile removed at 2 s). Log
+  "spawn nodes: loot (<mode>): monster N: ...".
+- NEW core/reward_loot.lua (Experimental keeps its own copy of the same code for now). core/loot_chest.lua tick now runs
+  once per world step whoever calls it (Experimental and reward_loot both do).
+- spawn_nodes.lua was at 200 locals: the newer constants (MARK_BUDGET, MARK_OFF_TRIES, HOLD_FILE, HOLD_BEAT_S,
+  HOLD_MAX_S, LEFT_MIN_STEPS) + MAX_LEVEL, set_level, reward now live in one table `K` near the top.
+- Test tools/sntest/lv.lua (fake set_level/reward: 60,85,100 not 110; each loot mode; reward to the hitter); all 11 OK.
