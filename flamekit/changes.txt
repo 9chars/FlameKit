@@ -1,3 +1,6 @@
+0.15.530 Nov 23, 2026
+- Spawn Nodes: the orders are on again (each raid monster is told to go for the nearest player within 120 m), together with the threat table write. The "spawn nodes: ai" lines say whether the monster has an order; the home and distance values of 0.15.529 are gone (they meant nothing).
+
 0.15.529 Nov 23, 2026
 - Spawn Nodes: the threat table write is on again (every player within 50 m of a raid monster is put into its threat table). The "spawn nodes: ai" lines also show each monster's home spot, how far that is from the player, and the game's own distances for it (checkDistance, maxTargetDistanceToHomeZone, leashLength) (read only).
 

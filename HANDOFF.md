@@ -2334,3 +2334,13 @@ Group 1 family = Beasts at 19:40:19 for the next raid. Next: read the real value
 raid monsters' home = the nearest player and bigger reach.
 
 **19:47 (owner 19:46):** comments only, no version: HANDOFF "Following" section, 03_follow.lua, companions_server.cpp, npc_fields.lua now say companions use NO game AI (its fields are only borrowed slots) and npc_fields.lua is names only, untested. Not copied to the server or the game (nothing that runs changed); they go with the next install.
+
+## 0.15.530 (Nov 23, 19:57) Spawn Nodes: orders back on (owner 19:55)
+19:50 Beasts raid (threat write on): every monster it reached switched to fight within ~1 s even at 16-30 m (earlier
+raids: almost none past ~12 m). Came: Sabertooth 18.2->2.1 m, Snow Sabertooth 22.5->8.8, Stinger 19.5->8.1, Wolf Heavy
+24.7->12.1 (stopped). Stayed: Bats x2, Vulture (hover), Spider Ant Poison Ranger x2 (range), Giant Crab 0 m, Raven never
+angry. EnemySettings does not exist on monsters; the home field never changed -> those logs removed (0.15.530).
+Owner 19:54 "#1 is unacceptable": NO limiting of monster types (all types stay). Owner 19:55 "#1 turn this back on to see
+if the log says anything new?" -> HUNT_ON = true (EMF enemy_order at the nearest player within 120 m), THREAT_ON stays on,
+STUCK_ON off; ai lines carry "order <id> at player <p>". Not built, offered: FlameKit's own drive (companion C++) for
+raid monsters if ordered hover/range types still stay.

@@ -9,6 +9,8 @@ local W = M.world
 local fails = 0
 local function ok(c, what) if c then print("ok   " .. what) else fails = fails + 1 print("FAIL " .. what) end end
 local function run(sec) for _ = 1, math.floor(sec * 60) do F.tick(W) M.advance(1 / 60) end end
+emf.enemy_order = function() return 77 end
+emf.enemy_order_cancel = function() end
 M.player(1, 0, 0, 0)
 run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
@@ -31,7 +33,8 @@ ok(has("threat table [1: 3 e1 f7 a55]"), "a line when the player comes into its 
 ok(has("state 6, target 1"), "a line when it fights the player")
 ok(has("spawn nodes: ai (10 s): monster"), "the 10 s line")
 ok(has("nearest player 1 "), "the distance to the player is in it")
-ok(M.count("ai_tick: ") == 0, "no errors")
+ok(has("; order 77 at player 1"), "the order is in the line")
+ok(M.count("ai_tick: ") == 0 and M.count("hunt_tick: ") == 0, "no errors")
 for _, l in ipairs(M.logs) do if l:find("spawn nodes: ai", 1, true) then print("  " .. l) break end end
 print(fails == 0 and "ALL OK" or (fails .. " FAILED"))
 os.exit(fails == 0 and 0 or 1)
