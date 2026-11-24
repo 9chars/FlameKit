@@ -570,6 +570,13 @@ most sense"
 - Facing a target while attacking [C 18:38]; bite = attack 0 `0x63FE3237` (2 m), lunge = attack 1 `0xC34733A8` (4 m) [C].
 
 ### Following: the drive and the breadcrumb trail
+**READ THIS FIRST (owner 2026-11-23 19:43 "at no point does it use the built in AI for anything because it absolutely
+sucks", 19:46 "update whatever ... your reading wrong"):** companions use NO game AI for anything: not to move, not to
+fight, not its home zone, leash or notice range. The game's AI is switched off for good (enabled = false). FlameKit's
+own code does all of it: Lua keeps the breadcrumb trail; the C++ writes the movement input; the fight is FlameKit's
+(fight_step). The AI component's fields named below (movementTarget, homeZonePosition, combatData.prowlAngle /
+targetOfMyTarget / isTargetInsideLeash) are only BORROWED as slots to hand numbers from Lua to the C++; their game
+meaning is not used. (2026-11-23 19:40 Claude read "homeZonePosition" here as the game's home/leash rule: wrong.)
 - His AI off (`DynamicEnemy01BehaviorState.enabled = false`, route planner off). Lua writes the next crumb into
   movementTarget and the player's spot into homeZonePosition; the C++ hook right after the game's steering step
   writes his movement input (direction, look, Walk/Run/Sprint; nothing within 3 m) [L/C 15:42-16:05].
@@ -2325,3 +2332,5 @@ of that shit": right, companions only borrow homeZonePosition as a slot for the 
 leashLength. Now in every ai line (mon_reach, read only). THREAT_ON = true (HUNT_ON, STUCK_ON still false). Owner set
 Group 1 family = Beasts at 19:40:19 for the next raid. Next: read the real values; the fix idea (NOT built, not agreed):
 raid monsters' home = the nearest player and bigger reach.
+
+**19:47 (owner 19:46):** comments only, no version: HANDOFF "Following" section, 03_follow.lua, companions_server.cpp, npc_fields.lua now say companions use NO game AI (its fields are only borrowed slots) and npc_fields.lua is names only, untested. Not copied to the server or the game (nothing that runs changed); they go with the next install.

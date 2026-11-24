@@ -44,6 +44,8 @@ static_assert(sizeof(WorldTransform) == 56, "CurrentTransform is 56 bytes");
 constexpr double kFollowStop = 2.0;
 constexpr double kCatchUp = 6.0;  // (owner 2026-11-19 16:37) sprint when he is this far behind
 // ===== Option 2 (owner 15:58: "now that we've proven better bread crumbs work, get working on option 2") =========
+// NO GAME AI FOR ANYTHING (owner 2026-11-23 19:43): the fields read below (movementTarget, homeZonePosition, combatData.*)
+// are only borrowed as slots from Lua to here; their game meaning (home zone, leash...) is not used.
 // FlameKit's Lua picks where a driven NPC goes (his AI off): it writes the next breadcrumb into his AI data's
 // movementTarget and the player's position into homeZonePosition (the AI is off, so nothing else uses them). The game's
 // steering step writes "stand still" into his movement input every step, and Lua only runs after the step; so this hook

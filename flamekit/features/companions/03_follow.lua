@@ -31,6 +31,8 @@ F.SWIM_ENTER_SMALL, F.SWIM_DEPTH_SMALL = 0.25, 0.3  -- (owner 17:24) the same fo
 SWIM_MAX, SWIM_GAIN = 6, 1.2  -- swimming speed: 1 m/s past the stop distance, +1.2 m/s per metre, at most 6
 HOP_TICKS, HOP_HOLD, HOP_EVERY, HOP_MARGIN, HOP_FORWARD = 90, 40, 120, 0.7, 3  -- the climb-out hop, see drive_water
 -- ===== Following: the drive ============================================================================================
+-- NO GAME AI FOR ANYTHING (owner 2026-11-23 19:43): not to move, not to fight, not its home zone or leash. The fields
+-- of the switched-off AI named below are only borrowed as slots from Lua to the C++; their game meaning is not used.
 -- No game AI: his AI (DynamicEnemy01BehaviorState.enabled) and his route planner are off. FlameKit keeps the player's
 -- breadcrumb trail and writes the next crumb ahead of the hound into his AI data's movementTarget and the player's spot
 -- into homeZonePosition. The C++ server probe (fk_server_probe, after the game's steering step) turns that into his
