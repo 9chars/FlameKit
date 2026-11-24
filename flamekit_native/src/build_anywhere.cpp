@@ -743,7 +743,7 @@ bool has_faction(EmfWorld* w, uint32_t id) {  // a Faction other than Environmen
 }
 
 // (0.15.525, owner 18:32 "at what point did I ever fucking say to make is so monster cannot attack each other", 18:35
-// "fix the fuck up you made") A spawn node group's "Its monsters spare animals, pets and villagers": until 0.15.524 an
+// "fix the fuck up you made") A spawn node group's "Monsters spare animals, pets and villagers": until 0.15.524 an
 // EMF hit rule {from = monster, to = "creatures", cancel}, and EMF's creatures are every creature, so raid monsters
 // could not hurt other monsters either. Now spare_server.txt (features/spawn_nodes.lua: the ids of the living monsters
 // of every group with the switch on, one line) and spare_hit below: a listed monster's hit (it is the attacker: the

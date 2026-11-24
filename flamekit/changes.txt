@@ -1,3 +1,6 @@
+0.15.552 Nov 24, 2026
+- Spawn Nodes: the switch Its monsters spare animals, pets and villagers is now named Monsters spare animals, pets and villagers.
+
 0.15.551 Nov 24, 2026
 - Spawn Nodes: Players cannot damage base structures during raid now also keeps players from hurting pets and animals (tamed ones and farm animals). Needs FlameKit Native 0.15.551 on the server.
 

@@ -65,7 +65,7 @@
 -- ==== HISTORY NOTES (what each part was added for; the code below has the details) ====
 -- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and the protection (protect_tick);
 -- (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage to" and Remove "by node group ...
--- including the dead ones on the ground") "Its monsters spare animals, pets and villagers" (0.15.525: FlameKit Native's
+-- including the dead ones on the ground") "Monsters spare animals, pets and villagers" (0.15.525: FlameKit Native's
 -- spare list, spare_tick; until 0.15.524 an EMF hit rule that also kept them from hurting other monsters) and Remove takes
 -- the group's dead bodies too; (0.15.479) the players near its nodes lose the game's base editing permission while it runs
 -- (raid_lock_server.txt, FlameKit Native); (0.15.484, owner 12:50) its label "Players cannot damage base structures during raid".
@@ -2335,7 +2335,7 @@ end
 -- cancels every player's hits on placed objects (chests, stations, doors...: EMF's "objects"), everywhere on the
 -- server (EMF's rules have no area). Gone when no such group runs. Walls and floors are not hits: research.
 -- (0.15.525, owner 18:32 "at what point did I ever fucking say to make is so monster cannot attack each other", 18:35
--- "fix the fuck up you made") "Its monsters spare animals, pets and villagers": until 0.15.524 an EMF hit rule per
+-- "fix the fuck up you made") "Monsters spare animals, pets and villagers": until 0.15.524 an EMF hit rule per
 -- monster {from = it, to = "creatures", cancel}, and EMF's "creatures" are every creature, so raid monsters could hurt
 -- no other monster either. Now FlameKit Native (build_anywhere.cpp, spare_hit) cancels only a listed monster's hits on
 -- animals, pets and villagers (faction 5 Wildlife, 6 WildBeast, 11 PlayerAlly, 12 FarmAnimal, or a tame one); its
@@ -3012,7 +3012,7 @@ function F.panel(world)
   switch_row(rows, "mark", g.mark ~= false, "Mark its monsters",  -- (0.15.541, owner 07:58)
     "An orange Raid monster marker over each of its living monsters, with a health bar and an arrow at the screen's edge, and on the map, "
       .. "on every player's game. Off: no markers (switched off during a raid, the ones up come off).")
-  switch_row(rows, "spare", g.spare == true, "Its monsters spare animals, pets and villagers",
+  switch_row(rows, "spare", g.spare == true, "Monsters spare animals, pets and villagers",  -- (0.15.552, owner 12:26: "Its" taken off the label)
     "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
       .. "safe from them (other monsters too). Players are not covered: they can still be hit.")
   switch_row(rows, "protect", g.protect == true, "Players cannot damage base structures during raid",  -- (0.15.484, owner 12:50: the label)

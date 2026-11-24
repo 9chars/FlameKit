@@ -2903,3 +2903,8 @@ server and the game (old kept as flamekit_native.dll.old_550 in both), native mo
 changes.txt in both and in the work folder; serverstart, server up 12:17:21 ("raid protection: placed objects hook on",
 22 features, no errors), game "FlameKit v0.15.551 connected to server!" 12:19:00. See OPEN 7e.
 
+
+**0.15.552 (owner 12:26 "Remove "Its" from the setting named "Its monsters spare animals, pets and villagers""):**
+the label is now "Monsters spare animals, pets and villagers" (spawn_nodes.lua switch_row; the comments naming it in
+spawn_nodes.lua and build_anywhere.cpp too: a comment only, no DLL build). Nothing else. Live 12:26:48 on the server and
+the game, no errors.
