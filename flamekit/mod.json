@@ -431,7 +431,7 @@
       "type": "bool",
       "default": true,
       "label": "Raid sounds",
-      "help": "Plays a siren twice when a raid starts (the red \"Raid forces are pushing into ...\" notice), once at each new wave, and a short all-clear fanfare when the raid is over. They play at the Windows volume, not the game's.",
+      "help": "Plays a siren twice when a raid starts (the red \"Raid forces are pushing into ...\" notice), once at each new wave, and a short all-clear fanfare when all of a raid's monsters are defeated. They play at the Windows volume, not the game's.",
       "live": true,
       "group": "Messages"
     }

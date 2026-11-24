@@ -1463,7 +1463,7 @@ local function time_tick(world)
       local r = S.raid[gid]
       if r then
         raid_notice(world, gid, string.format("Time is up! The raid on %s is over%s.", r.place or "the area",
-          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S, nil, "raid_all_clear")  -- (0.15.549) over: the all-clear too
+          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S)  -- (no all-clear here: owner 11:55, only when the monsters are defeated)
         raid_notice(world, gid, "", true, 1, "left_" .. gid)
         S.raid[gid] = nil
       end

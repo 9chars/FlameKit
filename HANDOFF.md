@@ -2854,3 +2854,7 @@ setting raid_siren relabelled "Raid sounds" (its help said the start notice is o
 the all-clear). ct.lua checks the sound. Reloaded 11:47:22-23, no errors. The first copy of the .wav was corrupted by
 device_commit_files (Rule 0c2) and replaced 11:48 through base64 (the .b64.txt is kept in the work folder,
 flamekit_sounds_src\).
+11:55 owner: "It plays both when every monster is killed and when a raid's time runs out." this is absolutely the worst idea
+you've come up with yet. Once again adding shit I didn't ask for." -> the all-clear plays ONLY with "The raid on X is over:
+all N raid monsters defeated!"; taken off the time-is-up notice. changes.txt and the Raid sounds help say so. Live 11:55:45
+(server) / 11:55:46 (game), no errors. LESSON (again): build exactly what was asked; no extra cases.
