@@ -14,11 +14,11 @@ emf.enemy_order_cancel = function() end
 M.player(1, 0, 0, 0)
 run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
-for k, v in pairs({ per_wave = 1, max_alive = 1, waves = 1, duration = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
+for k, v in pairs({ per_wave = 1, max_alive = 1, waves = 1, duration = 0, start_delay = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
 M.ents[1].x = 20 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {})
 M.ents[1].x = 0
 F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})
-run(1)
+run(4)  -- (0.15.543) the first monsters come after the start notice (3 s in the mock)
 local id = nil for i, m in pairs(F._test_S.mon) do id = i end
 M.ents[id].ai_state = 1
 run(1)

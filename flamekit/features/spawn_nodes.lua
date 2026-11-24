@@ -166,11 +166,12 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
   duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
-  wave_dead = { 0, 50, 75, 90, 100 },  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
+  wave_dead = { 0, 50, 75, 90, 100 },
+  start_delay = { 0, 5, 10, 15, 20, 30, 60 },  -- (0.15.543) s from the start notice to the first monster  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
 }
-local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
+local UNIT = { start_delay = "s", wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
 local DEFAULTS = { announce = true, mark = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
-  cooldown = 10, wave_dead = 90, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
+  cooldown = 10, wave_dead = 90, start_delay = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
 -- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
@@ -889,7 +890,14 @@ local function raid_tick(world)
         local tot = r.total and string.format(" %d monsters are coming.", r.total) or ""  -- (0.15.514)
         -- (0.15.517, owner 17:02 "make the siren sound twice at the beginning of the raid and sound once at the beginning of
         -- every new wave") the start: twice (sounds/raid_siren_twice.wav: the siren two times, 16 s)
-        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren_twice")
+        -- (0.15.543, owner 08:16 "reduce it to just one siren warning from 2") the start: the siren once
+        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren")
+        local run = S.runs[gid]
+        local g = group(gid)
+        if run and run.hold_until then  -- (0.15.543) the first monsters after the notice
+          run.hold_until = S.steps + ((g and g.start_delay) or 0) * 60
+          emf.log(string.format("spawn nodes: %s: the start notice went out; its first monsters come in %d s", g and g.name or tostring(gid), (g and g.start_delay) or 0))
+        end
       end
     end
   end
@@ -1124,6 +1132,11 @@ local function wave(world, gid, spots)
   if not r and queued > 0 then
     r = { spawned = 0, total = run.waves * g.per_wave * #nodes_of(gid) }  -- (0.15.514) the raid's whole number
     S.raid[gid] = r
+    -- (0.15.543, owner 2026-11-24 08:16 "there needs to be a delay between when the raid notice goes out and when the
+    -- monsters actually spawn in.. default to like 10 seconds?") nothing of the first wave spawns before the start
+    -- notice has gone out and the group's "First monsters after the notice" time has passed (raid_tick sets the time
+    -- when it sends the notice; until then held, at most PLACE_WAIT + that time)
+    run.hold_until = S.steps + PLACE_WAIT + (g.start_delay or 0) * 60 + 60
     -- (0.15.490) the start notice waits (at most PLACE_WAIT steps) for the list of places from the player who started or
     -- triggered it, else the player nearest its nodes
     local by = run.by
@@ -1192,7 +1205,8 @@ local function trickle_tick(world)
   local spots = nil
   for gid, run in pairs(S.runs) do
     local g = group(gid)
-    if g and run.in_wave and run.owed then
+    if run.hold_until and S.steps >= run.hold_until then run.hold_until = nil end  -- (0.15.543)
+    if g and run.in_wave and run.owed and not run.hold_until then
       spots = spots or player_spots(world)
       if not group_near(spots, gid) then
         if not run.held then
@@ -2307,6 +2321,9 @@ local function status(gid)
     .. (bodies > 0 and string.format(" %d dead bod%s on the ground.", bodies, bodies == 1 and "y" or "ies") or "")
   if run then
     if run.wave == 0 then return "Running: the first wave starts now." .. a end
+    if run.hold_until then  -- (0.15.543)
+      return string.format("Running: its first monsters come in %d s.", math.max(0, math.floor((run.hold_until - S.steps) / 60))) .. a
+    end
     if run.wait_dead then  -- (0.15.542)
       return string.format("Running: wave %d of %d, the next once %d or fewer of its monsters are left alive.", run.wave, run.waves,
         math.floor(run.wait_dead * (100 - (g.wave_dead or 0)) / 100)) .. a
@@ -2838,6 +2855,8 @@ function F.panel(world)
   end
   choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
     .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
+  choice_row(rows, g, "start_delay", "First monsters after", "The time from the raid's start notice (and its siren) to its first monsters, "
+    .. "so players can get ready.")  -- (0.15.543, owner 08:16)
   choice_row(rows, g, "waves", "Waves", "How many waves one start brings.")
   choice_row(rows, g, "wave_dead", "Next wave after", "When the Between waves time starts: once the wave has spawned (the old way), or once "
     .. "this share of its monsters is dead (monsters left from earlier waves count as alive too). A monster that never dies holds the raid "

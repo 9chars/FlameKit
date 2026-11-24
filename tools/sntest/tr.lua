@@ -14,13 +14,13 @@ local function own_alive_at(S, nid) local n = 0 for _, m in pairs(S.mon) do if m
 M.player(1, 0, 0, 0)
 run(0.2)  -- the load scan
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
-for k, v in pairs({ per_wave = 3, max_alive = 1, waves = 2, wave_gap = 0, near_r = 50, duration = 0, wave_dead = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end  -- (0.15.542) wave_dead 0: the old timing this test was written for
+for k, v in pairs({ per_wave = 3, max_alive = 1, waves = 2, wave_gap = 0, near_r = 50, duration = 0, start_delay = 0, wave_dead = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end  -- (0.15.542) wave_dead 0: the old timing this test was written for
 M.ents[1].x = 10 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {})
 M.ents[1].x = -10 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {})
 M.ents[1].x = 0
 local S = F._test_S
 F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})
-run(1)
+run(4)  -- (0.15.543) the first monsters come after the start notice (the mock never answers the place: 3 s)
 ok(own_alive_at(S, 1) == 1 and own_alive_at(S, 2) == 1, "Most alive 1: one own monster per node after the start")
 local first = {} for id, m in pairs(S.mon) do first[m.n] = id end
 run(3)  -- the start notice waits up to 3 s for the place

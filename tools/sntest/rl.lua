@@ -14,7 +14,7 @@ local function run(sec) for _ = 1, math.floor(sec * 60) do F.tick(W) M.advance(1
 M.player(1, 0, 0, 0)
 run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
-for k, v in pairs({ per_wave = 3, max_alive = 2, waves = 2, wave_gap = 0, duration = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
+for k, v in pairs({ per_wave = 3, max_alive = 2, waves = 2, wave_gap = 0, duration = 0, start_delay = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
 M.ents[1].x = 10 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {})
 M.ents[1].x = 0
 F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})

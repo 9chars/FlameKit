@@ -2624,3 +2624,12 @@ NOTE: dist-test (Development channel) is still 0.15.525; nothing since was packa
 A Lua live reload forgets cooldowns (Group 1's trigger is "raid": it fires again if the owner is in the base).
 08:11 owner "yes" -> 0.15.542 live (spawn_nodes.lua e4d2665e..., mod.json, changes.txt) on the server and the game;
 both reloaded 08:11:53, no errors, no raid started by the reload this time.
+
+**0.15.543 (owner 08:16 "there needs to be a delay between when the raid notice goes out and when the monsters
+actually spawn in.. default to like 10 seconds? and reduce it to just one siren warning from 2"; Lua only; NOT
+installed, asked):** per-group `start_delay` (CHOICES 0, 5, 10, 15, 20, 30, 60 s; default 10), row "First monsters
+after" in When above Waves. Wave 1 sets run.hold_until (PLACE_WAIT + delay + 1 s at most); raid_tick, when it sends the
+start notice, sets it to now + delay; trickle_tick queues nothing while it holds. Status "Running: its first monsters
+come in N s." Log "spawn nodes: <group>: the start notice went out; its first monsters come in N s". The start
+siren: "raid_siren" (once) instead of "raid_siren_twice". Test tools/sntest/sd.lua; tr/ai/rl/wv set start_delay = 0
+(tr/ai also wait 4 s after the start: the mock never answers the place, so the notice goes after 3 s). All 8 tests OK.

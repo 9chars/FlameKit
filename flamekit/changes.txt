@@ -1,3 +1,7 @@
+0.15.543 Nov 24, 2026
+- Spawn Nodes: new setting First monsters after (in When, 10 s by default; 0, 5, 10, 15, 20, 30 or 60 s): a raid's first monsters come that long after its start notice, so players can get ready.
+- Spawn Nodes: the siren at a raid's start sounds once instead of twice.
+
 0.15.542 Nov 24, 2026
 - Spawn Nodes: new setting Next wave after (in When): the Between waves time starts only once this share of the last wave is dead: 90% of it (the default), 50%, 75%, all of it, or It has spawned (the old way: right when the wave has spawned). The group's status says how many may be left before the next wave.
 

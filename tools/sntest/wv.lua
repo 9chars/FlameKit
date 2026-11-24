@@ -17,7 +17,7 @@ local function kill(k) for id, m in pairs(S.mon) do if k <= 0 then break end if 
 M.player(1, 0, 0, 0)
 run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
-for k, v in pairs({ per_wave = 5, max_alive = 10, waves = 2, wave_gap = 5, duration = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
+for k, v in pairs({ per_wave = 5, max_alive = 10, waves = 2, wave_gap = 5, duration = 0, start_delay = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
 for k = 1, 2 do M.ents[1].x = 5 * k F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {}) end
 M.ents[1].x = 0
 ok(F._test_S and true, "set up")
