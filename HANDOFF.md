@@ -2975,4 +2975,5 @@ also update G-portal"):**
   README.md, changes.txt, mod.json, main.lua, core/{kit,loot_chest,loot_skip,reward_loot,spawn,threat}.lua,
   features/{experimental,loose_loot,loot_drop,native_ui,npc_fields,spawn_nodes}.lua, companions/{03_follow,09_setup}.lua,
   sounds/*.wav (3), _flamekit_native/{flamekit_native.dll,mod.json}. features/build_anywhere.lua stays on G-Portal
-  (removed in 0.15.553; main.lua no longer loads it). G-Portal must be STOPPED for the DLL upload: asked the owner.
+  (removed in 0.15.553; main.lua no longer loads it). 13:47 owner: G-Portal stopped -> upload 13:47:14-13:47:58: all 23
+  uploaded, DLL first, mod.json last; outbox empty. Waiting for the owner to start G-Portal, then helper "logs" to check.
