@@ -54,6 +54,10 @@ Keep this list current: strike an item only with the test or the owner's word th
 7e. 0.15.551 in the game: with a group's "Players cannot damage base structures during raid" on and its raid running,
    hit a tamed animal / pet in the base: no damage; log "raid protection: N player hit(s) on pets and animals cancelled".
    Placed objects and monsters as before. Which pets carry IsTame is not checked in the game yet.
+   12:25 owner "seems to test alright". Server log of that raid (12:20:03-12:23:12): only "N player hit(s) on placed
+   objects cancelled" lines (targets 10825, 20315, 20225, 10781, 20216), NO "on pets and animals cancelled" line; the
+   tamed animals' ids that raid were ~1041-1141 (tame path test list). So the new branch never fired in that test:
+   unknown whether an animal was hit. Still open until a log shows a pets-and-animals cancel.
 
 **Performance / leftovers:**
 8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
