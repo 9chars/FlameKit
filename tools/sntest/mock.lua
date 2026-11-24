@@ -78,7 +78,9 @@ package.preload["core.admins"] = function() return { is = function() return true
 package.preload["core.players"] = function() return { setup = function() end,
   ids = function() local l = {} for id, e in pairs(M.ents) do if e.account then l[#l+1] = id end end table.sort(l) return l end } end
 package.preload["core.monsters"] = function() return { { "Undead", "Skeleton", "guid-u1" }, { "Undead", "Skel2", "guid-u2" } } end
-package.preload["core.spawn"] = function() return { ground = function() return { add = function() end, tick = function() end } end } end
+-- (0.15.548) set_level: every node-spawned monster gets a level now (Starting level 1 by default); the fake keeps it in M.ents[id].level
+package.preload["core.spawn"] = function() return { ground = function() return { add = function() end, tick = function() end } end,
+  set_level = function(w, id, lvl) local e = M.ents[id] if not e then return false end e.level = lvl return true end } end
 package.preload["core.threat"] = function() return { alarm = function() return true end, event = function() return true end, line = function() return "" end } end
 M.player = function(id, x, y, z) M.ents[id] = { x = x, y = y, z = z, hp = 500, max = 500, faction = 7, account = "acc" .. id } end
 M.count = function(pat) local n = 0 for _, l in ipairs(M.logs) do if l:find(pat, 1, true) then n = n + 1 end end return n end

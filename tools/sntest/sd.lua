@@ -21,7 +21,8 @@ run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
 for k, v in pairs({ per_wave = 2, max_alive = 3, waves = 1, wave_gap = 0, duration = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
 M.ents[1].x = 5 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {}) M.ents[1].x = 0
-ok(S.data.groups["1"].start_delay == nil or S.data.groups["1"].start_delay == 10, "default: 10 s")
+ok(S.data.groups["1"].start_delay == 20, "(0.15.548) default: 20 s")
+F._handle(W, "acc1", 1, { op = "set", g = 1, key = "start_delay", value = 10 }, {})  -- the timing below is for 10 s
 F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})
 run(4)  -- the place answer never comes in the mock: the notice goes after PLACE_WAIT (3 s)
 local notice_seen = false for _, l in ipairs(M.logs) do if l:find("first monsters come in 10 s", 1, true) then notice_seen = true end end

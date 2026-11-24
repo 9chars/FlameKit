@@ -28,13 +28,17 @@ run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
 for k, v in pairs({ per_wave = 2, max_alive = 3, waves = 3, wave_gap = 0, duration = 0, start_delay = 0, wave_dead = 100 }) do set(k, v) end
 M.ents[1].x = 5 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {}) M.ents[1].x = 0
--- defaults: game's own level, normal loot: nothing touched
+-- (0.15.548) defaults: level 1, no increase; Reward loot. Then Normal monster loot: nothing given, nothing removed
 F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})
 run(5)
-ok(next(levels) == nil, "defaults: no level set (Game's own, No increase)")
-for _ = 1, 3 do kill_all() run(3) end
+local all1 = next(levels) ~= nil for _, l in pairs(levels) do if l ~= 1 then all1 = false end end
+ok(all1, "defaults: every monster set to level 1")
+ok(S.data.groups["1"].loot == "reward", "defaults: Loot is Reward loot")
+set("loot", "normal")
+for _ = 1, 10 do kill_all() run(3) end
 run(15)
-ok(#gives == 0 and #clears == 0, "defaults: normal loot: no reward, nothing removed")
+ok(#gives == 0 and #clears == 0, "Normal monster loot: no reward, nothing removed")
+levels = {}
 -- level 60, +25 each wave: 60, 85, 100 (not 110)
 set("start_level", 60) set("level_step", 25) set("loot", "reward")
 local mark = M.next_id
@@ -77,6 +81,8 @@ for _ = 1, 10 do kill_all() run(3) end run(15)
 -- a value off the list is refused; 110 is not on it
 set("start_level", 110)
 ok(S.data.groups["1"].start_level == 60, "a starting level of 110 is refused")
+set("start_level", 0)
+ok(S.data.groups["1"].start_level == 60, "(0.15.548) 0 (the old Game's own) is refused")
 local err = 0 for _, l in ipairs(M.logs) do if l:find("tick: ", 1, true) or l:find("attempt to", 1, true) or l:find("spawn nodes: loot: ", 1, true) and l:find("error", 1, true) then err = err + 1 print("  " .. l) end end
 ok(err == 0, "no errors in the log")
 for _, l in ipairs(M.logs) do if l:find("at level", 1, true) then print("  " .. l) end end

@@ -17,7 +17,7 @@
 --     nothing, while it runs), breaks + break_level (its monsters hit player-built blocks).
 --   Monsters: family (a monster group of core/monsters.lua, Random, or Bosses), face (which way a new monster faces),
 --     per_wave (monsters per node per wave, spawned one by one), max_alive (most alive per node at once),
---     start_level (0 = the game's own) + level_step (added per wave after the first; never above K.MAX_LEVEL 100),
+--     start_level (1-100, default 1) + level_step (added per wave after the first; never above K.MAX_LEVEL 100),
 --     loot (normal / reward / both / none: see K.on_death).
 --   When: trigger (manual = Start now only; timer = a random time between timer_min and timer_max minutes; wire = a
 --     player within wire_r m of its trip wire; time = the game's clock passes `hour`; raid = a player inside a flame
@@ -221,9 +221,11 @@ local CHOICES = {
   duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
   wave_dead = { 0, 50, 75, 90, 100 },  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
   start_delay = { 0, 5, 10, 15, 20, 30, 60 },  -- (0.15.543) s from the start notice to the first monster
-  -- (0.15.547, owner 09:41) the level of its monsters: start_level 0 = the game's own; level_step: added for each wave
-  -- after the first (owner's list; 40 added, taken for a slip: "... 30, 35, 45, 50 ..."); never above K.MAX_LEVEL (100)
-  start_level = { 0, 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100 },
+  -- (0.15.547, owner 09:41) the level of its monsters: start_level; level_step: added for each wave after the first
+  -- (owner's list; 40 added, taken for a slip: "... 30, 35, 45, 50 ..."); never above K.MAX_LEVEL (100).
+  -- (0.15.548, owner 11:38 "get rid of "Game's own" entry and just default it to 1"; 11:27 "I've never seen "the game"
+  -- ever spawn anything but a level 1 monster") no "Game's own" (0) any more: a saved 0 is read as 1 (group())
+  start_level = { 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100 },
   level_step = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100 },
   -- (0.15.547, owner 09:45 "reward loot (exactly like how test monsters work), normal monster loot, and/or no loot ...
   -- any combination"; 09:45 "if the player chooses no loot, it drops nothing") what its monsters drop: the game's own
@@ -232,7 +234,7 @@ local CHOICES = {
 }
 local UNIT = { start_delay = "s", wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
 local DEFAULTS = { announce = true, mark = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
-  cooldown = 10, wave_dead = 90, start_delay = 10, start_level = 0, level_step = 0, loot = "normal", timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
+  cooldown = 10, wave_dead = 90, start_delay = 20, start_level = 1, level_step = 0, loot = "reward", timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
 -- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
@@ -252,7 +254,7 @@ end
 local function label(key, v)
   if key == "hour" then return string.format("%02d:00", v) end
   if key == "duration" and v == 0 then return "No limit" end  -- (0.15.492)
-  if key == "start_level" then return v == 0 and "Game's own" or ("Level " .. v) end  -- (0.15.547)
+  if key == "start_level" then return "Level " .. tostring(v) end  -- (0.15.547; 0.15.548 no "Game's own")
   if key == "level_step" then return v == 0 and "No increase" or ("+" .. v .. " each wave") end
   if key == "loot" then return ({ normal = "Normal monster loot", reward = "Reward loot", both = "Reward + normal loot", none = "No loot" })[v] or tostring(v) end
   if key == "wave_dead" then return v == 0 and "It has spawned" or v == 100 and "All of it is dead" or (v .. "% of it is dead") end  -- (0.15.542)
@@ -289,6 +291,7 @@ local function group(gid)
   local g = data().groups[tostring(gid)]
   if not g then return nil end
   for k, v in pairs(DEFAULTS) do if g[k] == nil then g[k] = v end end
+  if g.start_level == 0 then g.start_level = 1 end  -- (0.15.548) "Game's own" (0) is gone: level 1
   return g
 end
 
@@ -477,8 +480,8 @@ end
 -- can only be 100 ... I would also like to add in the "reward loot" system like we build for the test monsters and this
 -- should be configurable by group as well", 09:45 "reward loot (exactly like how test monsters work), normal monster
 -- loot, and/or no loot ... if the player chooses no loot, it drops nothing") LEVEL AND LOOT, per group:
---   Starting level (start_level; 0 = the game's own) + Level per wave (level_step) x (wave - 1), at most K.MAX_LEVEL;
---   set on each monster its node spawns (core/spawn.lua set_level, as the test monsters). Both 0: left alone.
+--   Starting level (start_level, 1-100) + Level per wave (level_step) x (wave - 1), at most K.MAX_LEVEL; set on every
+--   monster its node spawns (core/spawn.lua set_level, as the test monsters).
 --   Loot (loot): "normal" the game's own; "reward" Reward loot by the test monsters' rule, in Spawn Nodes' own code (owner
 --   11:06: never connected to the test monsters' code) (core/reward_loot.lua give: runes and
 --   legendary runes into the bag of the last player who hit it (S.hitby), a legendary item at its level into a loot
@@ -489,15 +492,11 @@ end
 K.level_spawned = function(world, id, gid, q)
   local g = gid and group(gid)
   if not g then return end
-  local start, step = tonumber(g.start_level) or 0, tonumber(g.level_step) or 0
-  if start <= 0 and step <= 0 then return end
+  local start, step = math.max(1, tonumber(g.start_level) or 1), tonumber(g.level_step) or 0
   local run = S.runs[gid]
   -- the wave it was queued in (the last wave's last monsters spawn after its run is over)
   local wave = (q and tonumber(q.wave)) or ((run and run.wave and run.wave > 0) and run.wave) or 1
-  local own = nil
-  pcall(function() local lv = world:get("Level", id) own = lv and lv.dataStorage and lv.dataStorage[1] end)
-  local base = start > 0 and start or tonumber(own)
-  if not base then emf.log(string.format("spawn nodes: level: monster %s has no level to read: left alone", tostring(id))) return end
+  local base = start
   local lvl = math.min(K.MAX_LEVEL, math.max(1, math.floor(base + math.max(0, wave - 1) * step)))
   local ok, set = pcall(K.set_level, world, id, lvl)
   if S.mon[id] then S.mon[id].lvl = lvl end
@@ -505,9 +504,8 @@ K.level_spawned = function(world, id, gid, q)
   local key = tostring(gid) .. ":" .. tostring(wave) .. ":" .. tostring(S.started[gid] or 0)
   if not S.lvl_said[key] then
     S.lvl_said[key] = true
-    emf.log(string.format("spawn nodes: %s wave %d: its monsters at level %s (starting level %s, %s, at most %d)%s", g.name, wave,
-      start > 0 and tostring(lvl) or string.format("their own + %d, e.g. %d", math.max(0, wave - 1) * step, lvl),
-      start > 0 and tostring(start) or "the game's own", step > 0 and ("+" .. step .. " each wave") or "no increase", K.MAX_LEVEL,
+    emf.log(string.format("spawn nodes: %s wave %d: its monsters at level %d (starting level %d, %s, at most %d)%s", g.name, wave,
+      lvl, start, step > 0 and ("+" .. step .. " each wave") or "no increase", K.MAX_LEVEL,
       (ok and set) and "" or " (FAILED to set: " .. tostring(set) .. ")"))
   elseif not (ok and set) then
     emf.log(string.format("spawn nodes: level: monster %s: setting level %d failed (%s)", tostring(id), lvl, tostring(set)))
@@ -3032,10 +3030,9 @@ function F.panel(world)
     .. "The wave is over when every node has spawned all of them; then Between waves starts.")  -- (0.15.512)
   choice_row(rows, g, "max_alive", "Most alive per node", "At most this many of a node's monsters are alive at once: its next one comes when one of them dies. "
     .. "1: one at a time.")
-  choice_row(rows, g, "start_level", "Starting level", "The level of the first wave's monsters. Game's own: each keeps the level the game "
-    .. "gives it. Never above " .. K.MAX_LEVEL .. ".")  -- (0.15.547, owner 09:41)
-  choice_row(rows, g, "level_step", "Level per wave", "Added to the level for each wave after the first (with Game's own: to each "
-    .. "monster's own level). Wave 3 at Starting level 20 and +10 each wave: level 40. Never above " .. K.MAX_LEVEL .. ", whatever is set.")
+  choice_row(rows, g, "start_level", "Starting level", "The level of the first wave's monsters (1 to " .. K.MAX_LEVEL .. ").")  -- (0.15.547, owner 09:41; 0.15.548 no "Game's own")
+  choice_row(rows, g, "level_step", "Level per wave", "Added to the level for each wave after the first. Wave 3 at Starting level 20 "
+    .. "and +10 each wave: level 40. Never above " .. K.MAX_LEVEL .. ", whatever is set.")
   choice_row(rows, g, "loot", "Loot", "What its monsters drop. Normal monster loot: what the game gives. Reward loot: like the test "
     .. "monsters: runes and legendary runes into the bag of the last player who hit it, and a legendary item at its level in a "
     .. "loot chest by the body (twice for bosses); nothing of the game's own. Reward + normal loot: both. No loot: nothing at all.")

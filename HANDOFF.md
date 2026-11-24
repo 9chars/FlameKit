@@ -2822,3 +2822,19 @@ way); "for now"/"shared" wording in core/reward_loot.lua and spawn_nodes.lua rep
 core/loot_chest.lua, core/loot_skip.lua (new), features/spawn_nodes.lua, loot_drop.lua, loose_loot.lua, experimental.lua,
 mod.json, changes.txt; md5 checked against the repo). Reloaded 11:23:59 (server) and 11:24:02 (game): 22 features, no
 errors, no raid started. OPEN items 4-7 are now testable in the game.
+
+**0.15.548 (owner 11:27 "I've never seen "the game" ever spawn anything but a level 1 monster? what mechanism do you think
+the game has for picking the level"; 11:38 "get rid of "Game's own" entry and just default it to 1. Default "Monsters
+face" to "The nearest player" -- default "loot" to "Reward loot". Default "First monsters after" to 20 s. Default "Next
+wave after" to "90% of its dead". Would it be possible to add an "all clear" sound effect after the raid is over ... let me
+preview the sound first before you put it into the game."; NOT installed):** I had labelled start_level 0 "Game's own"
+without checking what the game gives a spawned monster (11:27 answered: no mechanism known; the code only read the
+level). Now CHOICES.start_level = 1, 5..100; DEFAULTS start_level 1, loot "reward", start_delay 20 (face "player" and
+wave_dead 90 were already the defaults); group() reads a saved 0 as 1; K.level_spawned always sets the level (start +
+step x (wave - 1), max 100). Existing groups keep their saved choices (only a saved start_level 0 becomes 1).
+tools/sntest/mock.lua: core/spawn set_level added (every spawn sets a level now); lv.lua (level 1 default, Reward loot
+default, 0 refused), sd.lua (20 s default), mk.lua (start_delay 0). All 14 OK.
+ALL CLEAR SOUND: two candidates made (numpy, 22050 Hz mono 16-bit like sounds/raid_siren.wav, which winds 120 -> 500 Hz
+over 3 s, holds, winds down): A all_clear_A_siren.wav (11 s: wind up 2.5 s, one steady 500 Hz tone 5 s, wind down 3.5 s:
+the traditional all-clear after a warning siren, the raid siren's own voice), B all_clear_B_horn.wav (2.7 s: G4 C5 E5 and
+a held G5 chord, brass-like). Sent to the owner to preview; nothing in the game until he picks.

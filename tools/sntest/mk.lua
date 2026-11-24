@@ -20,7 +20,7 @@ local function on_screen() local n = 0 for _ in pairs(screen) do n = n + 1 end r
 M.player(1, 0, 0, 0)
 run(0.2)
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
-for k, v in pairs({ per_wave = 15, max_alive = 20, waves = 1, wave_gap = 0, duration = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
+for k, v in pairs({ per_wave = 15, max_alive = 20, waves = 1, wave_gap = 0, duration = 0, start_delay = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
 for k = 1, 5 do M.ents[1].x = 5 * k F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {}) end
 M.ents[1].x = 0
 F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})
