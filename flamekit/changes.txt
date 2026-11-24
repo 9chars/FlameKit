@@ -1,3 +1,6 @@
+0.15.525 Nov 23, 2026
+- Spawn Nodes: "Its monsters spare animals, pets and villagers" now only does that. Until now it also stopped raid monsters from hurting other monsters. Their hits on other monsters and on players land again (done in FlameKit Native now, not with an EMF hit rule per monster).
+
 0.15.524 Nov 23, 2026
 - Spawn Nodes (test): monsters are only spawned and counted. No orders to go for players, no threat table writes, and no stuck, ground, water or fall handling (nothing is moved or taken away and spawned again). The log still says every 10 s how many moved.
 

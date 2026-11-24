@@ -79,6 +79,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -738,8 +739,85 @@ bool has_faction(EmfWorld* w, uint32_t id) {  // a Faction other than Environmen
     return f && *static_cast<const uint8_t*>(f) != 0;
 }
 
+// (0.15.525, owner 18:32 "at what point did I ever fucking say to make is so monster cannot attack each other", 18:35
+// "fix the fuck up you made") A spawn node group's "Its monsters spare animals, pets and villagers": until 0.15.524 an
+// EMF hit rule {from = monster, to = "creatures", cancel}, and EMF's creatures are every creature, so raid monsters
+// could not hurt other monsters either. Now spare_server.txt (features/spawn_nodes.lua: the ids of the living monsters
+// of every group with the switch on, one line) and spare_hit below: a listed monster's hit (it is the attacker: the
+// shooter of an arrow too) is cancelled only on an animal, a pet or a villager: faction 5 Wildlife, 6 WildBeast,
+// 11 PlayerAlly, 12 FarmAnimal, or a tame one (IsTame). Its hits on players and on other monsters land. Counted and
+// logged every 15 s while not 0; the list's size logged when it changes.
+std::mutex g_spare_mutex;
+std::unordered_set<uint32_t> g_spare_ids;
+std::atomic<bool> g_spare_any{false};
+std::atomic<uint32_t> g_spare_cancels{0};
+std::atomic<uint32_t> g_spare_last_attacker{0};
+std::atomic<uint32_t> g_spare_last_target{0};
+std::atomic<uint32_t> g_spare_last_faction{0};
+
+bool spare_target(EmfWorld* w, const EmfHit* hit) {
+    const uint8_t f = hit->target_faction;
+    if (f == 5 || f == 6 || f == 11 || f == 12) return true;
+    auto* a = emf::api();
+    return a->get_component(w, gen::ecs::IsTame::kHash, hit->target, nullptr) != nullptr;
+}
+
+void spare_hit(EmfWorld* w, EmfHit* hit) {
+    if (!g_spare_any.load(std::memory_order_relaxed)) return;
+    if (hit->kind != EMF_HIT_KIND_HIT || hit->cancel || (hit->flags & EMF_HIT_HEALING) || !hit->attacker) return;
+    {
+        std::lock_guard<std::mutex> lk(g_spare_mutex);
+        if (!g_spare_ids.count(hit->attacker)) return;
+    }
+    if (!spare_target(w, hit)) return;
+    hit->cancel = 1;
+    g_spare_cancels.fetch_add(1, std::memory_order_relaxed);
+    g_spare_last_attacker.store(hit->attacker, std::memory_order_relaxed);
+    g_spare_last_target.store(hit->target, std::memory_order_relaxed);
+    g_spare_last_faction.store(hit->target_faction, std::memory_order_relaxed);
+}
+
+void read_spare() {  // every 15 server steps, with read_raid_protect
+    std::string text;
+    if (FILE* f = _wfopen(lua_file(L"spare_server.txt").c_str(), L"r")) {
+        char buf[4096];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+        fclose(f);
+    }
+    static std::string last;
+    if (text != last) {
+        last = text;
+        std::unordered_set<uint32_t> ids;
+        const char* p = text.c_str();
+        while (*p) {
+            char* end = nullptr;
+            const unsigned long v = strtoul(p, &end, 10);
+            if (end == p) { ++p; continue; }
+            if (v) ids.insert(static_cast<uint32_t>(v));
+            p = end;
+        }
+        const size_t count = ids.size();
+        {
+            std::lock_guard<std::mutex> lk(g_spare_mutex);
+            g_spare_ids.swap(ids);
+        }
+        g_spare_any = count > 0;
+        EMF_LOG(kMod, "spare: %zu raid monster(s) listed: their hits on animals, pets and villagers are cancelled, on monsters and players they land%s", count,
+                g_protect_hook ? "" : " (NOT in force: EMF's on_hit_before is not available here)");
+    }
+    static uint32_t steps = 0;
+    if (++steps % 60 == 0) {  // every 15 s
+        const uint32_t n = g_spare_cancels.exchange(0);
+        if (n) EMF_LOG(kMod, "spare: %u raid monster hit(s) on animals, pets or villagers cancelled in the last 15 s (last: monster %u on entity %u, faction %u)", n,
+                       g_spare_last_attacker.load(), g_spare_last_target.load(), g_spare_last_faction.load());
+    }
+}
+
 void protect_hit(EmfWorld* w, EmfHit* hit, void*) {
-    if (!hit || !g_protect_objects.load(std::memory_order_relaxed)) return;
+    if (!hit) return;
+    spare_hit(w, hit);  // (0.15.525)
+    if (!g_protect_objects.load(std::memory_order_relaxed)) return;
     if (hit->kind != EMF_HIT_KIND_HIT || hit->cancel || (hit->flags & EMF_HIT_HEALING) || !hit->attacker) return;
     if (hit->target_faction != 0) return;  // a creature or a player: never
     auto* a = emf::api();
@@ -1411,6 +1489,7 @@ bool fk_build_anywhere_load(bool dedicated) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)
                 read_raid_protect();  // (0.15.486)
+                read_spare();  // (0.15.525)
                 static uint32_t places_n = 0;
                 if (places_n++ % 120 == 2) write_places(w);  // (0.15.488) every 30 s (120 x 15 steps), the first 0.5 s after the start
                 read_test_base();  // (0.15.470)

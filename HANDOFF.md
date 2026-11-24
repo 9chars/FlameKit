@@ -2148,3 +2148,12 @@ Owner 18:14: "and just spawn the monsters and see what happens.. no threat table
 spawn_nodes.lua switches STUCK_ON / HUNT_ON / THREAT_ON = false (PATH_CHECK already false since 0.15.523).
 Still on: spawning with the ground teleport, counting, trickle/waves, notices, siren, markers, revive check, summons joining,
 and the 10 s "hunt: N alive ... moved" summary in the log. Turn a switch back on only when the owner says so.
+
+## 0.15.525 (Nov 23, 18:40) "spare" switch fixed
+Owner 18:32 "at what point did I ever fucking say to make is so monster cannot attack each other", 18:35 "fix the fuck up you made".
+The 0.15.482 switch used EMF hit_rule {from=monster, to="creatures", cancel}; EMF's creatures = every creature, so raid
+monsters could not hurt other monsters. EMF's rules only have PLAYERS / CREATURES / OBJECTS or one entity (64 rules max).
+Now: spawn_nodes.lua spare_tick writes spare_server.txt (ids of living monsters of groups with spare on); native
+build_anywhere.cpp read_spare + spare_hit (inside protect_hit, on_hit_before) cancels a listed attacker's hit only on
+target_faction 5/6/11/12 or IsTame. Logs: "spawn nodes: spare: N raid monster(s) now spare ...", native "spare: N listed",
+"spare: N hit(s) cancelled in the last 15 s". LESSON: when an API can't do exactly what the owner asked, TELL HIM, don't pick a wider workaround.

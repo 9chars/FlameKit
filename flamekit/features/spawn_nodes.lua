@@ -1232,10 +1232,8 @@ local function do_spawn(world, q, x, sy, z)
     S.alive[q.node][id] = true
     local qn = data().nodes[tostring(q.node)]
     local qg = qn and group(qn.g)
-    if qg and qg.spare then  -- (0.15.482) it never hurts animals, pets or villagers
-      local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
-      if okr and rid then S.spare_rules[id] = rid end
-    end
+    -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
+    local _ = qg
     -- (0.15.518, owner 17:11 "the monsters are literally just standing around? not fighting at all? something is wrong with
   -- how they're getting spawned", 17:13 "um sure") the game's own move onto the ground after every spawn again, as until
   -- 0.15.493 (raids "worked pretty well", 13:32): since 0.15.493 dropped it, 11-15 monsters at a time stood with their
@@ -1664,10 +1662,7 @@ local function clean_tick(world)
           S.dead[nid][id] = true
         end
         if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      elseif g and g.spare and not S.spare_rules[id] then
-        local okr, rid = pcall(emf.hit_rule, { from = id, to = "creatures", cancel = true })
-        if okr and rid then S.spare_rules[id] = rid end
-      elseif g and not g.spare and S.spare_rules[id] then
+      elseif S.spare_rules[id] then  -- (0.15.525) an EMF rule from before: gone (spare_tick does it now)
         pcall(emf.hit_rule_remove, S.spare_rules[id])
         S.spare_rules[id] = nil
       end
@@ -1752,6 +1747,39 @@ end
 -- monsters is alive), one EMF hit rule
 -- cancels every player's hits on placed objects (chests, stations, doors...: EMF's "objects"), everywhere on the
 -- server (EMF's rules have no area). Gone when no such group runs. Walls and floors are not hits: research.
+-- (0.15.525, owner 18:32 "at what point did I ever fucking say to make is so monster cannot attack each other", 18:35
+-- "fix the fuck up you made") "Its monsters spare animals, pets and villagers": until 0.15.524 an EMF hit rule per
+-- monster {from = it, to = "creatures", cancel}, and EMF's "creatures" are every creature, so raid monsters could hurt
+-- no other monster either. Now FlameKit Native (build_anywhere.cpp, spare_hit) cancels only a listed monster's hits on
+-- animals, pets and villagers (faction 5 Wildlife, 6 WildBeast, 11 PlayerAlly, 12 FarmAnimal, or a tame one); its
+-- hits on players and on other monsters land. spare_server.txt: the ids of the living monsters of every group with the
+-- switch on, one line; written when the list changes (every 2 s at most), and its size logged.
+local function spare_tick()
+  local ids = {}
+  for nid, list in pairs(S.alive) do
+    local node = data().nodes[tostring(nid)]
+    local g = node and group(node.g)
+    if g and g.spare then
+      for id in pairs(list) do ids[#ids + 1] = math.floor(tonumber(id) or 0) end
+    end
+  end
+  table.sort(ids)
+  local text = table.concat(ids, " ")
+  if text == S.spare_text then return end
+  local f = io.open(emf.dir .. "\\spare_server.txt.tmp", "w")
+  if not f then return end
+  f:write(text, "\n")
+  f:close()
+  os.remove(emf.dir .. "\\spare_server.txt")
+  if os.rename(emf.dir .. "\\spare_server.txt.tmp", emf.dir .. "\\spare_server.txt") then
+    S.spare_text = text
+    if (S.spare_log or 0) < 200 then
+      S.spare_log = (S.spare_log or 0) + 1
+      emf.log(string.format("spawn nodes: spare: %d raid monster(s) now spare animals, pets and villagers (FlameKit Native); their hits on monsters and players land", #ids))
+    end
+  end
+end
+
 local function protect_tick(world, spots)
   local want = false
   local lock = {}
@@ -2133,6 +2161,7 @@ function F.tick(world)
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
     protect_tick(world, spots)
+    pcall(spare_tick)  -- (0.15.525)
     raid_tick(world)  -- (0.15.488)
     time_tick(world)  -- (0.15.492)
     pcall(persist)  -- (0.15.498)
