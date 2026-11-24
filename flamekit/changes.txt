@@ -1,3 +1,6 @@
+0.15.523 Nov 23, 2026
+- Spawn Nodes: the spot check on the game's path grid is switched off: it no longer answered and held every spawn back 0.75 s.
+
 0.15.522 Nov 23, 2026
 - Spawn Nodes: every player within 50 m of a raid monster is written straight into its threat table (one of its 6 slots, as alarmed, the way PvP players are), and kept there while he is that near; the game is also told he threatens it. No hits (the 0.15.520 and 0.15.521 hits of 1 are gone).
 

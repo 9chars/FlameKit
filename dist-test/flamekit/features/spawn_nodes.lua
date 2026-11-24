@@ -1256,6 +1256,9 @@ end
 -- HUNT_R m (else the node). A spot with no start on the grid (inside a fence or an object, in water) or from which the
 -- way gets nowhere (not PATH_GAIN m along it, or half the way) is not used (S.bad) and another is tried, PATH_TRIES in
 -- all; then the monster appears near that player (4-8 m, on the ground, nothing built between) or on the node.
+-- (0.15.523, owner 18:12 "definitely drop the spot check": from 18:05 on it never answered and every spawn waited its
+-- 0.75 s) switched off (kept, as debug tools are): spots are not checked on the path grid
+local PATH_CHECK = false
 local PATH_TRIES = 6
 local PATH_GAIN = 8
 local PATH_TARGET_R = 120      -- m: the player the way is asked to (as HUNT_R, below)
@@ -1288,7 +1291,7 @@ local function spawn_tick(world)
       if pl then tx, ty, tz = pl[2], pl[3], pl[4] end
       local far = math.sqrt(dist2(x, sy, z, tx, ty, tz))
       local asked = false
-      if emf.path_find and far > 3 then
+      if PATH_CHECK and emf.path_find and far > 3 then  -- (0.15.523) switched off
         q.tries = (q.tries or 0) + 1
         q.asked_at, q.sx, q.sy, q.sz = S.steps, x, sy, z  -- (0.15.515) for check_timeouts
         S.checks[q] = true
