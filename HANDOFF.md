@@ -22,7 +22,7 @@ Keep this list current: strike an item only with the test or the owner's word th
    ever. ONLY the special high level reward items". That is what drop_test_loot does (runes and legendary runes into the
    killer's bag, overflow to the chest; the legendary item into the chest). My 10:01-10:03 reading of his "The reward
    loot goes into a chest that spawns on the ground" as "all of it, runes too" was wrong: the comments, the tooltip and
-   core/reward_loot.lua were put back the same turn. core/reward_loot.lua (Spawn Nodes) = the same rule. Only these
+   core/reward_loot.lua were put back the same turn. core/reward_loot.lua (Spawn Nodes) = the same rule in its own code, kept separate (Rule 0t). Only these
    reward items are put into loot chests (checked: experimental.lua and core/reward_loot.lua are the only callers of
    core/loot_chest.lua put; the game's own loot is never put there).
 
@@ -36,9 +36,8 @@ Keep this list current: strike an item only with the test or the owner's word th
 7. A group's cooldown after a FlameKit reload and after a server restart (it is kept now): a Base raid group must not
    fire again at once.
 
-7a. Reward loot / No loot loose-drop removal (core/reward_loot.lua on_pickup) removes every NEW loose item within 6 m and
-   10 s of such a death except FlameKit's own (ground.is_own, is_mark): it cannot tell a monster's drop from an item a
-   player drops by hand on that spot in those 10 s. Watch for it in the game.
+7a. ~~Hand-dropped items near a Reward loot / No loot death are removed too~~ not a problem: owner 11:06 "if a player
+   dumps some shit to the ground who cares?".
 
 **Performance / leftovers:**
 8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
@@ -229,6 +228,16 @@ No exceptions, also for small changes, probes and test copies.
 "no stop trying to suggest changing things when I ask questions". When the owner asks a question, answer it and stop:
 no proposal to change anything, and no closing "Should I change/rename/build ...?" question. This overrides the old
 habit of ending every reply with a yes/no question: a reply to a question needs none.
+
+## Rule 0t: CORE DIRECTIVE, test monsters and Spawn Nodes stay separate (owner, 2026-11-24 11:06)
+
+"the monster test loot reward system should not be connected to or depend on the reward system for the spawn nodes
+system ... "test monsters" is experimental and the spawn nodes is an actual game feature so their functionality must
+remain separate. They can share code where it makes sense, but there could be new stuff tested in the "test monsters"
+code that could impact the "spawn nodes" feature and we cannot have that." Checked 11:06: features/experimental.lua does
+not require core/reward_loot.lua; core/reward_loot.lua requires nothing of Experimental; only Spawn Nodes requires it.
+Both use only plain core helpers (core/item_db, core/loot_chest, core/bag, core/spawn set_level, core/test_tag). Never
+merge their reward code; anything tried on the test monsters goes into experimental.lua only.
 
 ## Rule 0x: CORE DIRECTIVE, ASK before every restart (owner, 2026-11-22 16:45-16:47)
 
@@ -2806,3 +2815,6 @@ files. Found and fixed: (1) core/reward_loot.lua on_pickup would also have remov
 hand-dropped item there (OPEN 7a). (2) spawn_nodes.lua CHOICES: wave_dead's comment had ended up on the loot line. (3)
 flamekit/mod.json description listed only three features and said nothing about FlameKit Native on a server. Experimental:
 only one comment block differs from the installed file (code and tooltip identical). All 14 test files OK.
+11:06 owner: test monsters' reward and Spawn Nodes' reward must stay separate -> Rule 0t (checked: no dependency either
+way); "for now"/"shared" wording in core/reward_loot.lua and spawn_nodes.lua replaced; experimental.lua notes it; OPEN
+7a struck ("who cares").
