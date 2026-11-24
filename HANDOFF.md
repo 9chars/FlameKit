@@ -2450,3 +2450,10 @@ once, then theres nothing", 21:52 "yes go for it. I think you'll just find the g
 each request's owner (entry +0x8 = settings copy: +0x0 entity, +0x10 start, +0x1c target), its faction / enemy AI /
 villager, and every 10 s the owners that hit the step limit most. Built 21:54:29 (DLL 8f3d0c2a...). NOT installed:
 server restart asked.
+
+**22:00 raid with 0.15.536 installed (installed 21:57, owner "yes" 21:56):** the requests that keep hitting the 500-step
+limit belong to ~22 creatures with low entity ids (1041-1057 and a few more), faction 0, not enemy AI, not villager,
+present since server start. They're doing short 2-14 m walks in the base (x 6240-6380, z 5140-5240, y 933-948).
+They used ~109k search steps vs ~63k for all raid monsters. Raid requests (faction 6 enemy AI, 7-18 m to the target
+~6298.8 948.5 5186.5) stayed at 0 iterations 54-89 s (request 68: 89 s, 81: 54 s, 91: 56 s); some were dropped
+unsearched after 45 s (73). The game's template name for those faction-0 creatures isn't logged yet.
