@@ -2433,3 +2433,11 @@ running out: "PathGrid : Couldn't create cell because grounded data couldn't be 
 The game log (logs\enshrouded_server.log) has no PathGrid warnings (only "Path Grid Game Loaded State Changed : true").
 NOT FOUND YET: the scheduler that decides when the queued searches run (what gives the ~60 s batches). CORRECTION
 21:50: Claude first said "the create ignores the priority" - wrong: +0x120 is the state, the priority is in the params.
+
+## 0.15.535 (Nov 23, 21:48) path grid probe live (owner 21:37 "yes", 21:46 "go ahead" to the restart)
+Built 21:43:29 (helper "build": BUILD OK; DLL md5 ab611ce1a20e7786899572ede1708b58; the helper window had not been
+running until the owner started it 21:42:39 - a restart.request written while it is off does nothing). Server stop
+21:46:55 (world saved backup-1), server DLL replaced (old kept as flamekit_native.dll.old_525), both mod.json 0.15.535,
+serverstart 21:48:42 (client too). Log 21:47:25: "path grid probe: on (read only) (... path grid at storage+0x470,
+storage at world+0xe179c0)"; "path grid system at 00000208EFCC0048; the game's singleton "ecs::PathGridSystem" ... (the
+same)" -> offsets CONFIRMED; request list capacity 2048. Server-only: no Development/Stable change.
