@@ -14,7 +14,7 @@ local function own_alive_at(S, nid) local n = 0 for _, m in pairs(S.mon) do if m
 M.player(1, 0, 0, 0)
 run(0.2)  -- the load scan
 F._handle(W, "acc1", 1, { op = "new_group" }, {})
-for k, v in pairs({ per_wave = 3, max_alive = 1, waves = 2, wave_gap = 0, near_r = 50, duration = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end
+for k, v in pairs({ per_wave = 3, max_alive = 1, waves = 2, wave_gap = 0, near_r = 50, duration = 0, wave_dead = 0 }) do F._handle(W, "acc1", 1, { op = "set", g = 1, key = k, value = v }, {}) end  -- (0.15.542) wave_dead 0: the old timing this test was written for
 M.ents[1].x = 10 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {})
 M.ents[1].x = -10 F._handle(W, "acc1", 1, { op = "add_node", g = 1 }, {})
 M.ents[1].x = 0

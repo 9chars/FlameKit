@@ -1,3 +1,6 @@
+0.15.542 Nov 24, 2026
+- Spawn Nodes: new setting Next wave after (in When): the Between waves time starts only once this share of the last wave is dead: 90% of it (the default), 50%, 75%, all of it, or It has spawned (the old way: right when the wave has spawned). The group's status says how many may be left before the next wave.
+
 0.15.541 Nov 24, 2026
 - Spawn Nodes: Raid monster markers no longer stay on screen after Stop and Remove. EMF takes only about 39 marker messages at once and dropped the rest; FlameKit now sends at most 30 every 2 seconds (take-offs first) and tries a take-off again until EMF takes it. With 80+ monsters the markers come off over a few seconds.
 - Spawn Nodes (server log): every marker check logs what it sent, took off, and what EMF refused.

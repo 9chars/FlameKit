@@ -2608,3 +2608,17 @@ it puts the raid monster on or not"):** per-group switch `mark` (DEFAULTS mark =
 theirs come off through the take-off queue). mk.lua tests it (off: 0 markers; on mid-raid: marked; off again: all off).
 Installed 07:59 on the server and the game (DLL e988cca9..., old kept .old_539 in both; spawn_nodes.lua a7db489e...,
 mod.json, changes.txt in both). Up 08:02:02; game "22 feature(s) loaded", no errors.
+
+**08:06-08:08 waves (owner 08:06 "it sent a final wave right away..?"):** not a bug of the code: Group 1 was set to
+Waves 2, Monsters per node 1, Between waves 5 s, so wave 2 (the final one) came 5 s after wave 1 had spawned. Owner 08:08
+"well thats a wrong behavior. the next wave can't start until most of the first wave is dead", picked "90% dead",
+08:08 "make that an option" -> **0.15.542 (Lua only; NOT installed, asked):** per-group `wave_dead` (CHOICES 0, 50,
+75, 90, 100; default 90; 0 = "It has spawned" = the old way), row "Next wave after" in When above Between waves. A
+wave counts what it spawned (run.size); when it has spawned all, run.wait_dead = size; the runs loop starts Between
+waves (next_at) only when #mon_alive(gid) <= floor(size * (100 - wave_dead) / 100) (earlier waves' survivors count).
+Saved/restored with the run (wait_dead, size). Status: "Running: wave N of M, the next once K or fewer of its monsters
+are left alive." Logs: "... the next wave's N s start once 90% of its N monster(s) are dead (...)", "... N of its
+monsters left alive (K or fewer wanted): the next wave comes in N s". Test tools/sntest/wv.lua; tr.lua pinned to
+wave_dead = 0 (its old timing). All 7 tests OK. Both mod.json 0.15.542 in the repo; the DLL is unchanged (0.15.541).
+NOTE: dist-test (Development channel) is still 0.15.525; nothing since was packaged or signed.
+A Lua live reload forgets cooldowns (Group 1's trigger is "raid": it fires again if the owner is in the base).

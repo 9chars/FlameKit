@@ -166,10 +166,11 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
   duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
+  wave_dead = { 0, 50, 75, 90, 100 },  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
 local DEFAULTS = { announce = true, mark = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
-  cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
+  cooldown = 10, wave_dead = 90, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
 -- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
@@ -189,6 +190,7 @@ end
 local function label(key, v)
   if key == "hour" then return string.format("%02d:00", v) end
   if key == "duration" and v == 0 then return "No limit" end  -- (0.15.492)
+  if key == "wave_dead" then return v == 0 and "It has spawned" or v == 100 and "All of it is dead" or (v .. "% of it is dead") end  -- (0.15.542)
   return tostring(v) .. (UNIT[key] and (" " .. UNIT[key]) or "")
 end
 
@@ -721,7 +723,7 @@ local function persist()
     local owed = nil
     if run.owed then owed = {} for nid, v in pairs(run.owed) do owed[tostring(nid)] = v end end
     out.runs[tostring(gid)] = { wave = run.wave, waves = run.waves, next_in = math.max(0, run.next_at - S.steps), by = run.by,
-                                in_wave = run.in_wave or nil, owed = owed }  -- (0.15.512)
+                                in_wave = run.in_wave or nil, owed = owed, wait_dead = run.wait_dead, size = run.size }  -- (0.15.512); (0.15.542) wait_dead, size
   end
   local text = emf.json.encode(out)
   if text ~= S.persisted then
@@ -753,7 +755,8 @@ local function restore()
       local owed = nil
       if type(run.owed) == "table" then owed = {} for k2, v in pairs(run.owed) do if tonumber(k2) then owed[tonumber(k2)] = tonumber(v) or 0 end end end
       S.runs[gid] = { wave = tonumber(run.wave) or 0, waves = tonumber(run.waves) or 1, next_at = S.steps + (tonumber(run.next_in) or 0), by = run.by,
-                      in_wave = run.in_wave == true and owed ~= nil, owed = owed }  -- (0.15.512)
+                      in_wave = run.in_wave == true and owed ~= nil, owed = owed,  -- (0.15.512)
+                      wait_dead = tonumber(run.wait_dead), size = tonumber(run.size) }  -- (0.15.542)
     end
   end
   for _, g in ipairs(groups()) do  -- (0.15.500) its monsters live but its raid was over or not known: a raid again
@@ -1103,6 +1106,7 @@ local function wave(world, gid, spots)
   -- "Most alive per node" of the node's are alive; the wave is over when every node has spawned all of them, and only
   -- then "Between waves" starts. Nobody near: the wave waits.
   run.owed = {}
+  run.size = 0  -- (0.15.542)
   local _ = pool
   for _, n in ipairs(nodes_of(gid)) do
     if anyone then
@@ -1210,6 +1214,7 @@ local function trickle_tick(world)
                                         tx = tx, tz = tz, yaw = n.yaw }
               owed = owed - 1
               run.owed[nid] = owed
+              run.size = (run.size or 0) + 1  -- (0.15.542) how many this wave spawned
               if (S.trickle_log or 0) < 200 then
                 S.trickle_log = (S.trickle_log or 0) + 1
                 emf.log(string.format("spawn nodes: %s wave %d: node %d spawns its next monster (%d of %d; %d more to come, %d alive)", g.name,
@@ -1221,8 +1226,13 @@ local function trickle_tick(world)
         end
         if left == 0 then
           run.in_wave, run.owed = false, nil
-          emf.log(string.format("spawn nodes: %s wave %d of %d: every node has spawned its monsters", g.name, run.wave, run.waves))
-          if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
+          emf.log(string.format("spawn nodes: %s wave %d of %d: every node has spawned its monsters (%d)", g.name, run.wave, run.waves, run.size or 0))
+          if run.wave >= run.waves then finish(gid)
+          elseif (g.wave_dead or 0) > 0 and (run.size or 0) > 0 then  -- (0.15.542) Next wave after: its dead first
+            run.wait_dead = run.size
+            emf.log(string.format("spawn nodes: %s wave %d: the next wave's %d s start once %d%% of its %d monster(s) are dead (%d or fewer of the group's left alive)",
+              g.name, run.wave, g.wave_gap, g.wave_dead, run.size, math.floor(run.size * (100 - g.wave_dead) / 100)))
+          else run.next_at = S.steps + g.wave_gap * 60 end
         end
       end
     end
@@ -2297,6 +2307,10 @@ local function status(gid)
     .. (bodies > 0 and string.format(" %d dead bod%s on the ground.", bodies, bodies == 1 and "y" or "ies") or "")
   if run then
     if run.wave == 0 then return "Running: the first wave starts now." .. a end
+    if run.wait_dead then  -- (0.15.542)
+      return string.format("Running: wave %d of %d, the next once %d or fewer of its monsters are left alive.", run.wave, run.waves,
+        math.floor(run.wait_dead * (100 - (g.wave_dead or 0)) / 100)) .. a
+    end
     return string.format("Running: wave %d of %d done, the next in %d s.", run.wave, run.waves,
       math.max(0, math.floor((run.next_at - S.steps) / 60))) .. a
   end
@@ -2548,7 +2562,22 @@ function F.tick(world)
   if not need_spots then return end
   local spots = player_spots(world)
   for gid, run in pairs(S.runs) do
-    if S.steps >= run.next_at and not run.in_wave then wave(world, gid, spots) end  -- (0.15.512) not while a wave still spawns
+    -- (0.15.542, owner 2026-11-24 08:08 "the next wave can't start until most of the first wave is dead" (90%), "make
+    -- that an option": the group's "Next wave after") Between waves starts only when the group has no more than
+    -- (100 - wave_dead)% of the last wave's size alive (monsters of earlier waves still alive count too). A monster
+    -- that never dies holds the raid until "Raid lasts at most" ends it.
+    if run.wait_dead then
+      local g = group(gid)
+      local left = math.floor(run.wait_dead * (100 - ((g and g.wave_dead) or 0)) / 100)
+      local alive = #mon_alive(gid)
+      if alive <= left then
+        emf.log(string.format("spawn nodes: %s wave %d: %d of its monsters left alive (%d or fewer wanted): the next wave comes in %d s",
+          g and g.name or tostring(gid), run.wave, alive, left, g and g.wave_gap or 0))
+        run.wait_dead = nil
+        run.next_at = S.steps + ((g and g.wave_gap) or 0) * 60
+      end
+    end
+    if S.steps >= run.next_at and not run.in_wave and not run.wait_dead then wave(world, gid, spots) end  -- (0.15.512) not while a wave still spawns; (0.15.542) nor while its dead are awaited
   end
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
@@ -2810,7 +2839,10 @@ function F.panel(world)
   choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
     .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
   choice_row(rows, g, "waves", "Waves", "How many waves one start brings.")
-  choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves.")
+  choice_row(rows, g, "wave_dead", "Next wave after", "When the Between waves time starts: once the wave has spawned (the old way), or once "
+    .. "this share of its monsters is dead (monsters left from earlier waves count as alive too). A monster that never dies holds the raid "
+    .. "until Raid lasts at most ends it.")  -- (0.15.542, owner 08:08)
+  choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves (from Next wave after).")
   choice_row(rows, g, "duration", "Raid lasts at most", "From its start: when this time is up its raid ends, whatever is left: no more waves, its "
     .. "living monsters are taken away (and with them its protection), the bodies stay.")  -- (0.15.492)
   choice_row(rows, g, "cooldown", "Cooldown", "After its waves, the trigger cannot fire again for this long.")
