@@ -478,9 +478,10 @@ end
 -- loot, and/or no loot ... if the player chooses no loot, it drops nothing") LEVEL AND LOOT, per group:
 --   Starting level (start_level; 0 = the game's own) + Level per wave (level_step) x (wave - 1), at most K.MAX_LEVEL;
 --   set on each monster its node spawns (core/spawn.lua set_level, as the test monsters). Both 0: left alone.
---   Loot (loot): "normal" the game's own; "reward" the test monsters' Reward loot (core/reward_loot.lua give: a loot
---   chest on the ground by the body with runes, legendary runes and a legendary item at its level, twice for Bosses;
---   owner 10:01 "The reward loot goes into a chest that spawns on the ground") and its game loot removed; "both" the reward and its game loot; "none" its game loot removed, nothing
+--   Loot (loot): "normal" the game's own; "reward" the test monsters' Reward loot (core/reward_loot.lua give: runes and
+--   legendary runes into the bag of the last player who hit it (S.hitby), a legendary item at its level into a loot
+--   chest by the body, twice for Bosses; owner 10:47 "everything should end up in the chest except the runes ... regular
+--   monster loot should never end up in these chests ever") and its game loot removed (never into a chest); "both" the reward and its game loot; "none" its game loot removed, nothing
 --   given. Only monsters a node spawned (m.sp), once each (m.looted: one that gets up and dies again gives nothing more).
 -- ============================================================================================================
 K.level_spawned = function(world, id, gid, q)
@@ -3034,8 +3035,8 @@ function F.panel(world)
   choice_row(rows, g, "level_step", "Level per wave", "Added to the level for each wave after the first (with Game's own: to each "
     .. "monster's own level). Wave 3 at Starting level 20 and +10 each wave: level 40. Never above " .. K.MAX_LEVEL .. ", whatever is set.")
   choice_row(rows, g, "loot", "Loot", "What its monsters drop. Normal monster loot: what the game gives. Reward loot: like the test "
-    .. "monsters: a loot chest comes up on the ground by the body with runes, legendary runes and a legendary item at its level "
-    .. "(twice for bosses); nothing of the game's own. Reward + normal loot: both. No loot: nothing at all.")
+    .. "monsters: runes and legendary runes into the bag of the last player who hit it, and a legendary item at its level in a "
+    .. "loot chest by the body (twice for bosses); nothing of the game's own. Reward + normal loot: both. No loot: nothing at all.")
 
   rows[#rows + 1] = { heading = "When" }
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
@@ -3208,7 +3209,7 @@ function F.setup(k)
         local _, aa = pcall(world.account, world, hit.attacker)
         if oka and at and not aa then S.join_hits[hit.attacker] = true
         elseif aa and not at then S.join_hits[hit.target] = true end
-        if aa and S.mon[hit.target] then S.hitby[hit.target] = hit.attacker end  -- (0.15.547) the last player who hit it (named in the loot log)
+        if aa and S.mon[hit.target] then S.hitby[hit.target] = hit.attacker end  -- (0.15.547) Reward loot's runes go into the bag of the last player who hit it
       end
     end, "a hit (Spawn Nodes)"))
   end

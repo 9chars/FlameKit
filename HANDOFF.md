@@ -17,21 +17,20 @@ Keep this list current: strike an item only with the test or the owner's word th
    (attacker = raid monsters only), and returns at once for a hit already cancelled. Different attackers, and both only
    ever cancel (neither lets a cancelled hit land). Since 0.15.525 spare is not an EMF hit rule, so it no longer takes
    EMF's 64 rules either. My 10:08 entry listed it without having read guard_pets: wrong, struck.
-3. Experimental's test monster Reward loot: its code (drop_test_loot) puts the runes and legendary runes into the killer's
-   bag with emf.put (killer = the last player who hit it, else whoever spawned it; what the bag does not take goes into
-   the chest) and only the legendary item into the chest. The owner says all of it is in the chest (10:01). The production
-   server's log (production_stable_logs\emf_core.log, 00:44:36-00:45:05) has lines like "test monster 626677 loot: 15
-   runes and 10 legendary runes to player entity 1, armor ... legendary to the chest": that is the code saying it handed
-   the runes to emf.put for player 1; nothing logs whether the bag took them, and no "emf.put refused" line is there. So
-   whether they land in the bag is unproven either way. Test: note the rune count in the bag, kill one test monster with
-   Reward loot on, look at the bag and the chest. Experimental keeps its own copy of the reward code; core/reward_loot.lua
-   (Spawn Nodes) puts everything into the chest (the owner's word). Not merged.
+3. ~~Experimental's test monster Reward loot: bag or chest~~ SETTLED 2026-11-24 10:47 by the owner: "for reward loot:
+   everything should end up in the chest except the runes? regular monster loot should never end up in these chests
+   ever. ONLY the special high level reward items". That is what drop_test_loot does (runes and legendary runes into the
+   killer's bag, overflow to the chest; the legendary item into the chest). My 10:01-10:03 reading of his "The reward
+   loot goes into a chest that spawns on the ground" as "all of it, runes too" was wrong: the comments, the tooltip and
+   core/reward_loot.lua were put back the same turn. core/reward_loot.lua (Spawn Nodes) = the same rule. Only these
+   reward items are put into loot chests (checked: experimental.lua and core/reward_loot.lua are the only callers of
+   core/loot_chest.lua put; the game's own loot is never put there).
 
 **0.15.547 (Starting level, Level per wave, Loot, the fixes of 10:08) is not tested in the game yet:**
 4. Starting level / Level per wave: the monsters' health and damage really follow the set level (core/spawn.lua
    set_level, as the test monsters); the per-wave rise; never above 100.
-5. Loot "Reward loot": a loot chest by each body with runes, legendary runes and a legendary item at its level; nothing
-   of the game's own (body emptied, loot pile and loose drops gone). Kill with Auto Loot set to Main bag: nothing must
+5. Loot "Reward loot": runes and legendary runes in the killer's bag, a loot chest by each body with only the legendary
+   item at its level; nothing of the game's own anywhere (body emptied, loot pile and loose drops gone, none in a chest). Kill with Auto Loot set to Main bag: nothing must
    reach the bag. A Shroud Fog Nest drone (it throws Archaic Essence loose): nothing must stay on the ground.
 6. Loot "No loot": nothing at all, also with Auto Loot on. "Reward + normal loot": the chest and the game's own loot.
 7. A group's cooldown after a FlameKit reload and after a server restart (it is kept now): a Base raid group must not
@@ -416,9 +415,8 @@ systems.
   with a VFX_Altar_FlameEssence mark (`MARK_FX eb3633fc-...`, chosen by the owner) that follows a sliding item
   (0.15.197: a new mark when the item moved 0.6 m). Whether a body is a creature is read at the death (0.15.198: the
   Faction goes when the body fills; the queue no longer waits in order).
-- **Test monsters' reward loot** (experimental.lua, Experimental tab "Reward loot" switch, default off): [CORRECTED
-  2026-11-24, owner 10:01: in the game ALL of it goes into the loot chest, nothing into a bag; the code still tries
-  `emf.put` into the killer's bag first, which does not land; not investigated] runes and legendary runes, one legendary item (weapon, armour, ring,
+- **Test monsters' reward loot** (experimental.lua, Experimental tab "Reward loot" switch, default off): runes and
+  legendary runes into the killer's bag (`emf.put`, overflow to the chest), one legendary item (weapon, armour, ring,
   gem, cosmetic; rings and gems from `db.LEGENDARY_BY_TYPE`) into a spawned `Prop_Decoration_T5_Storage_40_Chest`
   (core/loot_chest.lua: nearest non-full chest within 50 m else a new one 2.5 m apart, a hit rule per chest so it takes
   no damage, a grave-flame glow, removed when emptied or 15 min after its last item; `flamekit.chests` lists them).
@@ -2741,9 +2739,9 @@ questions. I told you exactly how I want it"; Lua only; NOT installed, asked):**
   monsters spawn after its run is over; found by tools/sntest/lv.lua). Log once per wave: "<group> wave N: its monsters at
   level L (...)".
 - Loot at a death (mon_check -> K.on_death), only monsters a node spawned (m.sp), once each (m.looted): reward/both ->
-  core/reward_loot.lua give (the test monsters' drop_test_loot, copied into core; [CORRECTED 10:01] everything into a
-  loot chest by the body: runes, legendary runes, a legendary item at its level; twice for Bosses; S.hitby (from on_hit)
-  only names the last player who hit it in the log); reward/none -> clear_game_loot (body emptied at 2, 3, 5 s; the game's loot pile removed at 2 s). Log
+  core/reward_loot.lua give (the test monsters' drop_test_loot, copied into core: runes + legendary runes into the bag of
+  the last player who hit it (S.hitby from on_hit), a legendary item at its level into a loot chest by the body, twice for
+  Bosses; owner 10:47 confirmed this rule); reward/none -> clear_game_loot (body emptied at 2, 3, 5 s; the game's loot pile removed at 2 s). Log
   "spawn nodes: loot (<mode>): monster N: ...".
 - NEW core/reward_loot.lua (Experimental keeps its own copy of the same code for now). core/loot_chest.lua tick now runs
   once per world step whoever calls it (Experimental and reward_loot both do).
@@ -2791,3 +2789,9 @@ does now (it still said admins only, that running raids are lost at a reload, an
 features/loot_drop.lua and features/loose_loot.lua headers name core/loot_skip.lua; flamekit/README.md: the tabs
 (Building, Spawn Nodes, Settings, Windows, About were missing) and the server install (it said a dedicated server does
 not need flamekit_native: it does, for Free build and the raid parts).
+10:47 owner "for reward loot: everything should end up in the chest except the runes? regular monster loot should never
+end up in these chests ever. ONLY the special high level reward items which the reward system is designed for. not sure
+what you're problem is on this" -> I had misread 10:01. Put back: core/reward_loot.lua give (runes to the killer's bag,
+overflow and no-killer to the chest, the legendary item to the chest), experimental.lua's comments and Reward loot
+tooltip, spawn_nodes.lua's Loot tooltip and section note, changes.txt, README, rw.lua; OPEN item 3 settled. The 10:01
+entries above that say "all into the chest" are superseded by this one.

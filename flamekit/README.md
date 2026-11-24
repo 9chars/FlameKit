@@ -15,14 +15,14 @@ Press **F4** in the game for the FlameKit panel. Its tabs:
 - **Experimental**: options each player switches for themselves (the server tells everyone when you do):
   No Shroud Damage, No Fall Damage, Invincible Mode, Unlimited Stamina, Enhanced Glider Mode (hold S to climb while
   gliding, and the updraft burst can be used again and again), Fast Travel buttons (Nearest Flame Altar, Nearest
-  Ancient Spire), PvP (free-for-all) with its Leaderboard, and test monsters to spawn and fight (their Reward loot
-  goes into a loot chest on the ground).
+  Ancient Spire), PvP (free-for-all) with its Leaderboard, and test monsters to spawn and fight (with Reward loot on, a kill puts runes into your
+  bag and a legendary item into a loot chest on the ground).
 - **Building**: Free build (build outside flame altar areas; what you build there is remembered and saved), bigger
   flame altar areas, and the remembered spots.
 - **Spawn Nodes**: raids. Place nodes around the map in groups; a group's trigger (by hand, a timer, a trip wire, a time
   of day, or a player in a base near its nodes) sends waves of monsters from every node, with notices, sirens, a
   countdown of the monsters left and markers over them. Each group sets its monsters, their level (also rising each
-  wave, never above 100), their loot (normal, FlameKit's reward chest, both, or none), the waves and the raid's rules
+  wave, never above 100), their loot (the game's normal loot, FlameKit's Reward loot like the test monsters', both, or none), the waves and the raid's rules
   (protect bases, spare animals and pets). The Spawn Nodes window has what you need while walking the map (add, move
   and delete nodes, start and stop). For now every player can use it (a test).
 - **Settings**: Auto Loot (where loot from monsters you kill and what you chop or mine goes: your bag, your companion's

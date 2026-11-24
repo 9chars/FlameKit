@@ -3,14 +3,15 @@
 -- (exactly like how test monsters work), normal monster loot, and/or no loot ... if the player chooses no loot, it drops
 -- nothing"): the test monsters' Reward loot (features/experimental.lua drop_test_loot, 0.15.142-0.15.186) as shared core
 -- code, so Spawn Nodes can use it without reaching into another feature (HANDOFF rule 0b). Experimental keeps its own
--- copy for now, and they differ: Experimental's still tries the killer's bag first (which the owner says does not land
--- in the game: everything is in the chest there); this one puts everything into the chest. HANDOFF "OPEN" item 3.
+-- copy for now; the two do the same (runes into the killer's bag, the legendary item into the chest).
 --
---   reward.give(world, x, y, z, killer, level, boss)  a kill's reward, all of it in a loot chest that comes up on the
---        ground at x, y, z (core/loot_chest.lua): 10 or 15 runes and 5 or 10 legendary runes (twice for a boss) and one
---        legendary item (cosmetic, weapon, armor, ring or gem; gear at `level`). (0.15.547, owner 10:01 "The reward loot
---        goes into a chest that spawns on the ground": nothing goes into a bag; `killer` is only named in the log.)
---        Returns one line for the log.
+--   reward.give(world, x, y, z, killer, level, boss)  a kill's reward, as the test monsters': 10 or 15 runes and 5 or 10
+--        legendary runes (twice for a boss) into the killer's bag (player entity; what the bag does not take, and all of
+--        them when no killer is known, into the loot chest), and one legendary item (cosmetic, weapon, armor, ring or
+--        gem; gear at `level`) into a loot chest that comes up on the ground at x, y, z (core/loot_chest.lua).
+--        (owner 2026-11-24 10:47 "for reward loot: everything should end up in the chest except the runes? regular
+--        monster loot should never end up in these chests ever. ONLY the special high level reward items".) The game's
+--        own loot never goes into these chests: clear_game_loot throws it away. Returns one line for the log.
 --   reward.clear_game_loot(world, id, x, z, y)  the monster's own game loot goes: what is in its body is taken out and
 --        thrown away 2, 3 and 5 s after the death (the game puts it in 1.5-3 s after), a separate loot pile the game
 --        leaves where it died (core/loot_spots.lua) is removed 2 s after, and (0.15.547, found 10:08 cross-checking
@@ -81,8 +82,19 @@ function M.give(world, x, y, z, killer, level, boss)
   level = math.max(1, math.floor(tonumber(level) or 1))
   local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
   local key = killer or "nobody"
-  loot_chest.put(world, key, x, y, z, item_db.RUNE, runes, 0, 0)
-  loot_chest.put(world, key, x, y, z, item_db.LEGENDARY_RUNE, lrunes, 0, 0)
+  -- the runes into the killer's bag; what does not fit (or all of them, no killer known) into the chest
+  local function to_bag(item, n)
+    local iid = item
+    if type(iid) == "string" then local okn, v = pcall(emf.item, iid) iid = okn and v or nil end
+    if not killer or not iid then loot_chest.put(world, key, x, y, z, item, n, 0, 0) return end
+    local okp = pcall(emf.put, world, killer, iid, n, function(w, added)
+      added = tonumber(added) or 0
+      if added < n then loot_chest.put(w, key, x, y, z, iid, n - added, 0, 0) end  -- the bag is full: the rest in the chest
+    end)
+    if not okp then loot_chest.put(world, key, x, y, z, iid, n, 0, 0) end
+  end
+  to_bag(item_db.RUNE, runes)
+  to_bag(item_db.LEGENDARY_RUNE, lrunes)
   local kind, name
   for _ = 1, 20 do
     kind = M.KINDS[math.random(#M.KINDS)]
@@ -90,8 +102,8 @@ function M.give(world, x, y, z, killer, level, boss)
     if name and not not_legendary[name] then break end
   end
   if name then give_legendary(world, key, x, y, z, name, level, PICK_TRIES) end
-  return string.format("a loot chest on the ground: %d runes, %d legendary runes, %s %s level %d legendary (last hit by %s)", runes, lrunes,
-    tostring(kind), tostring(name), level, killer and ("player entity " .. tostring(killer)) or "nobody known")
+  return string.format("%d runes and %d legendary runes to %s, %s %s level %d legendary to the chest", runes, lrunes,
+    killer and ("player entity " .. tostring(killer) .. "'s bag") or "the chest (no killer known)", tostring(kind), tostring(name), level)
 end
 
 function M.clear_game_loot(world, id, x, z, y)

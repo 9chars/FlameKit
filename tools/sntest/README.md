@@ -29,7 +29,7 @@ Each prints `ok` / `FAIL` lines and ends with `ALL OK` or `N FAILED`.
 | lv.lua | Starting level and Level per wave (60, 85, 100, never 110), each Loot choice, the Auto Loot marks (core/loot_skip.lua) |
 | jn.lua | a world monster that comes into a raid joins it; a FlameKit test monster does not |
 | cd.lua | a group's cooldown survives a reload |
-| rw.lua | core/reward_loot.lua on its own: everything into the chest, none into a bag; loose drops near the death removed, far ones, late ones and FlameKit's own marks left (run from the repository root, no argument) |
+| rw.lua | core/reward_loot.lua on its own: runes into the killer's bag (the chest when no killer is known), the legendary item into the chest; loose drops near the death removed, far ones, late ones and FlameKit's own marks left (run from the repository root, no argument) |
 
 When a change makes an older test's assumption wrong, set that test's group to the old behaviour (as tr.lua does with
 `wave_dead = 0` and several do with `start_delay = 0`) and say so in a comment, so the test keeps checking what it was
