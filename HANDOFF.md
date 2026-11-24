@@ -2381,3 +2381,4 @@ once. ClearPathToTarget.hasHitSolidCollider true most of the time (something sol
 "I can easily see the monsters stand there for minutes and then eventually they'll come right in after me", 20:54 "no,
 that's just too much to test. I think the AI pathing in this game is broke" -> NOT measuring why the path search is slow
 (whole server vs into his built base). Nothing built after this; goal (19:33) still open.
+Owner 20:55: "we did the same exacts tests with the companion testing and it just didn't work it was slow, didnt respond" (the same slow game path search sank the game AI for companions; that is why companions use FlameKit's own drive).
