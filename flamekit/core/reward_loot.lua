@@ -17,7 +17,8 @@
 --        leaves where it died (core/loot_spots.lua) is removed 2 s after, and (0.15.547, found 10:08 cross-checking
 --        features/loose_loot.lua) what it throws loose on the ground (a Shroud Fog Nest drone's Archaic Essence) within
 --        DROP_R m and DROP_TICKS of the death is removed the moment the game makes it (core/loot_news.lua, the DLL's
---        news; FlameKit's own loot marks never).
+--        news; never FlameKit's own loose items or loot marks: core/ground_loot.lua is_own, is_mark). It cannot tell a
+--        monster's drop from an item a player drops by hand at that spot in those 10 s: that one goes too.
 --   reward.tick(world)  every server step (does its work once per world step, whoever calls it).
 
 local M = {}
@@ -42,7 +43,8 @@ local function on_pickup(world, pid, x, y, z, tick)
   for _, d in ipairs(deaths) do
     if (not tick or (tick >= d.from and tick <= d.till)) and (x - d.x) ^ 2 + (z - d.z) ^ 2 <= DROP_R * DROP_R
        and (not y or not d.y or math.abs(y - d.y) <= DROP_UP) then
-      if ground.is_mark(pid) then return end
+      -- never FlameKit's own: its loot marks, nor loose items it put down itself (Auto Loot "Ground", a junk drop: ground.drop)
+      if ground.is_mark(pid) or ground.is_own(pid) then return end
       local ok = pcall(emf.destroy, world, pid)
       emf.log(string.format("reward loot: monster %s: a loose drop (%s) removed%s", tostring(d.id), tostring(pid), ok and "" or " (FAILED)"))
       return

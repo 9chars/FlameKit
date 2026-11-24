@@ -36,6 +36,10 @@ Keep this list current: strike an item only with the test or the owner's word th
 7. A group's cooldown after a FlameKit reload and after a server restart (it is kept now): a Base raid group must not
    fire again at once.
 
+7a. Reward loot / No loot loose-drop removal (core/reward_loot.lua on_pickup) removes every NEW loose item within 6 m and
+   10 s of such a death except FlameKit's own (ground.is_own, is_mark): it cannot tell a monster's drop from an item a
+   player drops by hand on that spot in those 10 s. Watch for it in the game.
+
 **Performance / leftovers:**
 8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
    ai_tick logs, the 90 s full recordings, HUNT_ON, THREAT_ON). FlameKit took 28 ms in one server step at 07:52. Owner
@@ -2795,3 +2799,10 @@ what you're problem is on this" -> I had misread 10:01. Put back: core/reward_lo
 overflow and no-killer to the chest, the legendary item to the chest), experimental.lua's comments and Reward loot
 tooltip, spawn_nodes.lua's Loot tooltip and section note, changes.txt, README, rw.lua; OPEN item 3 settled. The 10:01
 entries above that say "all into the chest" are superseded by this one.
+10:51 owner "double check all of the code again and give me a complete review of what it does because I don't trust that
+you didn't fuck it all up" -> reviewed the whole 0.15.547 diff against what is installed (0.15.546, commit 418ad25): 10
+files. Found and fixed: (1) core/reward_loot.lua on_pickup would also have removed loose items FlameKit itself put down
+(Auto Loot "Ground", junk drops) near such a death: now skips ground.is_own too (rw.lua tests it); left: a player's
+hand-dropped item there (OPEN 7a). (2) spawn_nodes.lua CHOICES: wave_dead's comment had ended up on the loot line. (3)
+flamekit/mod.json description listed only three features and said nothing about FlameKit Native on a server. Experimental:
+only one comment block differs from the installed file (code and tooltip identical). All 14 test files OK.

@@ -12,7 +12,7 @@ package.loaded["core.item_db"] = { RUNE = "Rune", LEGENDARY_RUNE = "LegRune", pi
 package.loaded["core.bag"] = { entity_stacks = function() return {} end }
 package.loaded["core.loot_spots"] = { find = function() end, tick = function() end }
 package.loaded["core.loot_news"] = { on_pickup = function(fn) pickup_fn = fn end, tick = function() end }
-package.loaded["core.ground_loot"] = { is_mark = function(id) return id == 99 end }
+package.loaded["core.ground_loot"] = { is_mark = function(id) return id == 99 end, is_own = function(id) return id == 98 end }
 local R = require("core.reward_loot")
 local W = { tick = function() return 1000 end }
 R.give(W, 1, 2, 3, 5, 40, false)
@@ -32,6 +32,8 @@ pickup_fn(W, 42, 120, 50, 200, 1100)
 ok(#destroyed == 1, "one 20 m away is left")
 pickup_fn(W, 99, 100, 50, 200, 1100)
 ok(#destroyed == 1, "FlameKit's own loot mark is left")
+pickup_fn(W, 98, 101, 50, 200, 1100)
+ok(#destroyed == 1, "a loose item FlameKit put down itself is left")
 pickup_fn(W, 43, 100, 50, 200, 1000 + 60 * 11)
 ok(#destroyed == 1, "one made 11 s later is left")
 print(fails == 0 and "ALL OK" or (fails .. " FAILED"))

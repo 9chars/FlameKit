@@ -219,15 +219,16 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
   duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
-  wave_dead = { 0, 50, 75, 90, 100 },
+  wave_dead = { 0, 50, 75, 90, 100 },  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
   start_delay = { 0, 5, 10, 15, 20, 30, 60 },  -- (0.15.543) s from the start notice to the first monster
   -- (0.15.547, owner 09:41) the level of its monsters: start_level 0 = the game's own; level_step: added for each wave
   -- after the first (owner's list; 40 added, taken for a slip: "... 30, 35, 45, 50 ..."); never above K.MAX_LEVEL (100)
   start_level = { 0, 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100 },
   level_step = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100 },
   -- (0.15.547, owner 09:45 "reward loot (exactly like how test monsters work), normal monster loot, and/or no loot ...
-  -- any combination") what its monsters drop
-  loot = { "normal", "reward", "both", "none" },  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
+  -- any combination"; 09:45 "if the player chooses no loot, it drops nothing") what its monsters drop: the game's own
+  -- loot / Reward loot (runes to the killer's bag, a legendary item to a chest) / both / nothing (K.on_death)
+  loot = { "normal", "reward", "both", "none" },
 }
 local UNIT = { start_delay = "s", wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
 local DEFAULTS = { announce = true, mark = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
