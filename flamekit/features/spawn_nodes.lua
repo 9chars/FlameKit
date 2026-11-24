@@ -139,7 +139,7 @@ local NOTICE_COLOUR = "#ff9632"
 local NOTICE_DIST = 300
 local PLACE_WAIT = 180         -- steps (3 s): how long the start notice waits for the asked player's place
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
-local LEFT_MIN_GAP = 5         -- s: and changed at most this often when the count changes
+-- (0.15.544) LEFT_MIN_GAP (5 s) gone: LEFT_MIN_STEPS (0.5 s), next to count_notice
 local END_GRACE = 10           -- s: (0.15.500) a raid is over when none of its monsters is alive for this long
 local START_END_S = 60         -- s: (0.15.494, owner 14:35 "the beginning raid notice and the end raid notice needs to stay up
                                -- longer.. I never even saw the end raid notice") the start and end notices stay this long (was 15)
@@ -874,6 +874,63 @@ local function join_tick(world)
   S.join_hits = {}
 end
 
+-- (0.15.544, owner 2026-11-24 08:25 "a bit of a delay between when I kill the last monster and when the message in the
+-- notice disappears about their being 1 monster left to kill", 08:27 "it needs to update when a monster dies,
+-- otherwise, it looks like shit to the player") THE COUNTDOWN "Raid on X: N of TOTAL monsters left to kill" is worked
+-- out every FAST_STEPS (0.25 s, as deaths are seen: left_tick) and sent when it changed, at most every LEFT_MIN_STEPS
+-- (0.5 s, so a burst of kills cannot flood the players' channel); at least every LEFT_EVERY s. Until 0.15.543 it was
+-- changed at most every 5 s and not at all while nothing was alive (the END_GRACE wait): "1 of 24" stayed ~11 s after the
+-- last kill. Now the last kill shows "0 of 24" at once (zero = true while none is alive).
+local LEFT_MIN_STEPS = 30
+local function count_notice(world, gid, r, g, zero)
+  local text
+  local total = r.total
+  if zero then
+    text = string.format("Raid on %s: 0 of %d monsters left to kill.", r.place or "the area", total or 0)
+  else
+    -- (0.15.513, owner 16:31 "something is fucked with how it counts monsters left to kill": since 0.15.512 the nodes
+    -- spawn one by one, so alive + queued went 4, 3, 2, 1, 2, 1, 4) left = alive + queued + what the nodes still owe in
+    -- this wave + the waves to come (Monsters per node for every node)
+    -- (16:32 "the number keeps going up, you kill more it goes down, it spawns more, number goes up, thats absolutely
+    -- useless") so it only goes down: the monsters that joined (summons, the world's) are not in it while the nodes'
+    -- own are left; when only joined ones are left, it is their number
+    local own = #mon_alive(gid, nil, true)  -- (0.15.526) the roster: its own ones, and the ones counted apart
+    local joined = #mon_alive(gid) - own
+    local n = own + group_queued(gid)
+    local run = S.runs[gid]
+    if run then
+      for _, owed in pairs(run.owed or {}) do n = n + owed end
+      n = n + math.max(0, (run.waves or 0) - (run.wave or 0)) * (g.per_wave or 0) * #nodes_of(gid)
+    end
+    -- (0.15.514, owner 16:33 "you need to tell the player the TOTAL NUMBER of monsters for the entire raid, and count all
+    -- the way down to zero with its over") "N of TOTAL": TOTAL = every node's Monsters per node in every wave, fixed at
+    -- the start; N never above it; at 0 with summons still alive, those are named apart
+    total = total or n
+    if n > total then n = total end
+    if n == 0 and joined > 0 then
+      text = string.format("Raid on %s: 0 of %d monsters left. %d summoned monster%s still to kill.", r.place or "the area", total, joined, joined == 1 and "" or "s")
+    else
+      text = string.format("Raid on %s: %d of %d monsters left to kill.", r.place or "the area", n, total)
+    end
+  end
+  local now = os.time()
+  if (text ~= r.left_text and S.steps - (r.left_step or -1e9) >= LEFT_MIN_STEPS) or now - (r.left_at or 0) >= LEFT_EVERY then
+    r.left_text, r.left_at, r.left_step = text, now, S.steps
+    raid_notice(world, gid, text, true, LEFT_EVERY + 5, "left_" .. gid)
+  end
+end
+
+-- (0.15.544) every FAST_STEPS: the countdown of every raid past its start notice, as deaths are seen
+local function left_tick(world)
+  for gid, r in pairs(S.raid) do
+    local g = group(gid)
+    if g and not r.ask and r.left_text then
+      local alive, queued = group_alive(gid), group_queued(gid)
+      count_notice(world, gid, r, g, not S.runs[gid] and alive == 0 and queued == 0)
+    end
+  end
+end
+
 -- (0.15.488) Every second: the count of monsters left, and the end of a raid (no waves to come, none alive, none
 -- queued). S.raid[gid] = { place, spawned, left_at, left_n } from its first wave until its end.
 local function raid_tick(world)
@@ -910,6 +967,7 @@ local function raid_tick(world)
       -- the start notice comes first
     elseif not S.runs[gid] and alive == 0 and queued == 0 and not r.none_since then
       r.none_since = os.time()  -- (0.15.500) none left: over only when it stays so for END_GRACE s (one may get up again)
+      count_notice(world, gid, r, g, true)  -- (0.15.544) "0 of N" at once, not the last number until the end notice
     elseif not S.runs[gid] and alive == 0 and queued == 0 and os.time() - r.none_since < END_GRACE then
       -- waiting
     elseif not S.runs[gid] and alive == 0 and queued == 0 and not r.verified then
@@ -924,36 +982,7 @@ local function raid_tick(world)
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
       r.none_since, r.verified = nil, nil
-      local now = os.time()
-      -- (0.15.513, owner 16:31 "something is fucked with how it counts monsters left to kill": since 0.15.512 the nodes
-      -- spawn one by one, so alive + queued went 4, 3, 2, 1, 2, 1, 4) left = alive + queued + what the nodes still owe in
-      -- this wave + the waves to come (Monsters per node for every node)
-      -- (16:32 "the number keeps going up, you kill more it goes down, it spawns more, number goes up, thats absolutely
-      -- useless") so it only goes down: the monsters that joined (summons, the world's) are not in it while the nodes'
-      -- own are left; when only joined ones are left, it is their number
-      local own = #mon_alive(gid, nil, true)  -- (0.15.526) the roster: its own ones, and the ones counted apart
-      local joined = #mon_alive(gid) - own
-      local n = own + queued
-      local run = S.runs[gid]
-      if run then
-        for _, owed in pairs(run.owed or {}) do n = n + owed end
-        n = n + math.max(0, (run.waves or 0) - (run.wave or 0)) * (g.per_wave or 0) * #nodes_of(gid)
-      end
-      -- (0.15.514, owner 16:33 "you need to tell the player the TOTAL NUMBER of monsters for the entire raid, and count all
-      -- the way down to zero with its over") "N of TOTAL": TOTAL = every node's Monsters per node in every wave, fixed at
-      -- the start; N never above it; at 0 with summons still alive, those are named apart
-      local total = r.total or n
-      if n > total then n = total end
-      local text
-      if n == 0 and joined > 0 then
-        text = string.format("Raid on %s: 0 of %d monsters left. %d summoned monster%s still to kill.", r.place or "the area", total, joined, joined == 1 and "" or "s")
-      else
-        text = string.format("Raid on %s: %d of %d monsters left to kill.", r.place or "the area", n, total)
-      end
-      if (text ~= r.left_text and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
-        r.left_text, r.left_at = text, now
-        raid_notice(world, gid, text, true, LEFT_EVERY + 5, "left_" .. gid)
-      end
+      count_notice(world, gid, r, g, false)
     end
   end
 end
@@ -2566,6 +2595,7 @@ function F.tick(world)
   -- needs to immediately spawn another one": a death was seen only every 2 s (clean_tick) and the next one queued every
   -- 0.5 s (trickle_tick)) deaths are seen and the next monster queued every 0.25 s
   if S.steps % FAST_STEPS == 3 and S.steps % CLEAN_STEPS ~= 0 then clean_tick(world) end
+  if S.steps % FAST_STEPS == 3 then local okl, why = pcall(left_tick, world) if not okl then emf.log("spawn nodes: left_tick: " .. tostring(why)) end end  -- (0.15.544) the countdown as deaths are seen
   if S.steps % CLEAN_STEPS == 0 then
     clean_tick(world) stuck_tick(world) pcall(mark_tick, world)  -- (0.15.493) stuck_tick, mark_tick
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)

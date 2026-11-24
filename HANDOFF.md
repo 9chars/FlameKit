@@ -2635,3 +2635,10 @@ siren: "raid_siren" (once) instead of "raid_siren_twice". Test tools/sntest/sd.l
 (tr/ai also wait 4 s after the start: the mock never answers the place, so the notice goes after 3 s). All 8 tests OK.
 08:20 owner "yes" -> 0.15.543 live (spawn_nodes.lua b245eb69..., mod.json, changes.txt) on the server and the game;
 reloaded 08:20:34-35, no errors, no raid started by the reload.
+
+**0.15.544 (owner 08:25 the countdown stays "1 ... left to kill" after the last kill, 08:27 "yes, it needs to update when
+a monster dies, otherwise, it looks like shit to the player"; Lua only; NOT installed, asked):** count_notice (the
+countdown text, was inline in raid_tick) + left_tick every FAST_STEPS (0.25 s, right after the death check): sent when the
+text changed, at most every LEFT_MIN_STEPS (0.5 s; LEFT_MIN_GAP 5 s removed), still every LEFT_EVERY 30 s; when none is
+alive and nothing queued/running (the END_GRACE wait, the world search) it shows "0 of TOTAL" at once. Measured before
+(08:24): last kill 08:24:50, countdown stayed "1 of 24" until the end notice 08:25:01. Test tools/sntest/ct.lua; all 9 OK.

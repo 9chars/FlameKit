@@ -1,3 +1,6 @@
+0.15.544 Nov 24, 2026
+- Spawn Nodes: the raid's countdown (N of TOTAL monsters left to kill) changes as soon as a monster dies (within half a second) and shows 0 right after the last kill, instead of up to 5 s late and staying on 1 until the raid-over notice.
+
 0.15.543 Nov 24, 2026
 - Spawn Nodes: new setting First monsters after (in When, 10 s by default; 0, 5, 10, 15, 20, 30 or 60 s): a raid's first monsters come that long after its start notice, so players can get ready.
 - Spawn Nodes: the siren at a raid's start sounds once instead of twice.
