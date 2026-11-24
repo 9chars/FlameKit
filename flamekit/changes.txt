@@ -1,3 +1,6 @@
+0.15.538 Nov 23, 2026
+- Spawn Nodes: during every raid, from its start until its last monster is dead, tamed animals stand still. Their walks kept the game's path search so busy that raid monsters waited a minute or more before moving; with the animals held the monsters get their paths in a few seconds. The animals walk again when the raid is over (and after 30 minutes at most).
+
 0.15.537 Nov 23, 2026
 - Server (a test, off by default): the console command flamekit.tamepath off stops tamed animals from asking the game for walks (they stand still), to test whether their failing walk searches are what keeps raid monsters waiting; flamekit.tamepath on puts it back. The log says how many animals it found and how many of their searches it held.
 

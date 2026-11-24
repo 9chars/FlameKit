@@ -2,6 +2,37 @@
 
 Read this first when starting a new conversation about FlameKit. Updated 2026-11-23 18:45 (START HERE section first); before that 2026-11-17 07:25 (versions: "Where things stand" below). First written 2026-11-13.
 
+## !!! THE ANIMAL HOLD: WHY RAID MONSTERS STOOD AROUND, AND THE FIX (0.15.538, 2026-11-23 22:29) !!!
+
+**Owner 22:28 "before a raid starts it has to stop all the animals", 22:29 "can you build that into the system and note it heavily".**
+
+**The cause (measured, not guessed):** the game has ONE shared path search for every creature (the PathGridSystem,
+disassembled from the server exe 1287369; probe 0.15.535/536). The base's TAMED ANIMALS (IsTame + Wildlife template,
+faction Environment, no creature AI; ~22 of the world's 100 are at the main base) ask for short random 2-14 m walks.
+In a player-built base (walls, fences, floors) those walks often can't be reached: each search runs to the game's
+500-step limit, fails, and starts again ~every 0.5 s, forever. Raid monsters' path requests then sat UNSEARCHED for
+54-89 s (raid 22:00), some were dropped unsearched: "they stand there for minutes and then all come at once".
+Priority / enforceUpdate never helped (tested before): the game has no way to put a request first.
+
+**The proof:** raid 22:17 with the animals held by hand (0.15.537 `flamekit.tamepath off`): all 71 raid requests were
+searched at once, Spawn Nodes "path came" median 1 s, max 4 s; 1 step-limit hit in the whole raid.
+
+**The fix, automatic in every raid:**
+- `features/spawn_nodes.lua`: `hold_write` / `hold_tick` (search "THE ANIMAL HOLD"). From the raid's start (`fire`,
+  before its first wave) until it is over (the raid protection's rule: a group running, a raid not yet ended, or any
+  group monster alive) it writes `animal_hold_server.txt` = `1 <time>` and rewrites it every 5 s; `0` when over.
+  Let go after 30 min in one go at most (a monster that never dies can't freeze the animals forever).
+- `flamekit_native/src/build_anywhere.cpp`: `read_animal_hold` (every 15 server steps) sets `g_raid_hold`; a `1` not
+  rewritten for 30 s counts as `0` (a dead script never leaves the animals standing). While held, hooks on the game's
+  path request CREATE (0x1405fb550, kind 5, kPathCreateSig) and UPDATE (0x1405fc120, kind 6, kPathUpdateSig) give the
+  game's own failure answer (id 0 / false) when the request's owner (settings +0x0) is a tamed animal (list rebuilt
+  every 5 s while held). The animals just stand; nothing is saved; a restart starts free. Dedicated server only (the
+  hooks are installed on a dedicated server).
+- Console `flamekit.tamepath off|on` stays as a by-hand switch (off = held by hand; on = not by hand, raids still hold).
+- Logs: `spawn nodes: animal hold: ON/off (why)`, `[flamekit build] animal hold: ON/off (why)`, `tame path test: N tamed
+  animal(s): ids`, every 10 s `tame path test: ... held N create(s) ...`. Test: `tools/sntest/hd.lua`.
+- **Do not remove this or switch it off without the owner's word: without it raids go back to monsters standing around.**
+
 ## START HERE (written 2026-11-23 18:45; newest; the 2026-11-17 one below is older)
 
 **Versions:** 0.15.525 on Development (dist-test, signed, commit 2f9be45) and installed on the local server AND the
@@ -2476,3 +2507,7 @@ against 54-89 s at 22:00 with the animals walking. Spawn Nodes "path came": 29 m
 step-limit hit in the whole raid (a raid monster). Held ~4100-5200 animal creates per 10 s. Switch still OFF (animals
 standing) after the raid. CAUSE: tamed animals' walk searches that never succeed fill the game's path search; raid
 monsters' searches wait behind them.
+
+**0.15.538 (owner 22:28-22:29 "build that into the system and note it heavily"; built 22:32:54, DLL 17844c23...; NOT
+installed, restart asked):** THE ANIMAL HOLD, automatic in every raid; full notes in the "!!! THE ANIMAL HOLD" section
+at the top. Tests tr/rl/ai/hd all OK. The by-hand hold from 22:16:55 is still on in the running server (0.15.537).

@@ -31,6 +31,10 @@
 -- (0.15.525: FlameKit Native's spare list, spare_tick; until 0.15.524 an EMF hit rule that also kept them from hurting
 -- other monsters) and Remove takes the group's dead bodies too; (0.15.479) renamed "Players cannot change bases during its waves": also the
 -- players near its nodes lose the game's base editing permission while it runs (raid_lock_server.txt, FlameKit Native).
+-- (0.15.538) !!! THE ANIMAL HOLD, every raid, always on: from a raid's start until it is over, tamed animals ask the
+-- game for no walks and stand still (animal_hold_server.txt -> FlameKit Native). WITHOUT IT RAID MONSTERS STAND
+-- AROUND FOR A MINUTE OR MORE: the animals' failing walk searches fill the game's one path search (measured
+-- 2026-11-23: monsters unsearched 54-89 s with the animals walking, 0-4 s with them held). See hold_write. !!!
 -- Uses only core modules (HANDOFF rule 0b).
 
 local admins = require("core.admins")
@@ -1002,6 +1006,45 @@ local function verify_tick(world)
   S.verify = nil
 end
 
+-- ============================================================================================================
+-- (0.15.538, owner 2026-11-23 22:28 "before a raid starts it has to stop all the animals", 22:29 "build that into the
+-- system and note it heavily") THE ANIMAL HOLD. WHY: the 22:00 path grid probe (0.15.536) showed the base's tamed
+-- animals (IsTame + Wildlife, faction Environment, ~22 of the world's 100 near the player) asking the game for short
+-- 2-14 m walks that keep failing at the game's 500-step search limit and restart every ~0.5 s; the game's one shared
+-- path search then left the raid monsters' requests unsearched for 54-89 s (the "they stand there, then all come at
+-- once"). PROOF, 22:17 raid with the animals held by hand (0.15.537 flamekit.tamepath off): all 71 raid requests
+-- searched at once, "path came" median 1 s, max 4 s.
+-- WHAT: while a raid is active (the same rule as the raid protection: a group running, a raid not yet over, or any
+-- of a group's monsters alive), this writes animal_hold_server.txt = "1 <time>" and rewrites it every HOLD_BEAT_S;
+-- FlameKit Native (build_anywhere.cpp, "animal hold") then refuses every tamed animal's path request (the game's own
+-- failure answer), so the animals stand still and the raid monsters have the path search to themselves. Raid over:
+-- "0", the animals walk again. SAFETY: FlameKit Native lets go by itself if the file is not rewritten for 30 s (this
+-- script stopped, an error), and this side lets go after HOLD_MAX_S even if a monster never dies. Nothing is saved;
+-- a server restart always starts with the animals free. Logged: "spawn nodes: animal hold: ..." here and
+-- "[flamekit build] animal hold: ..." / "tame path test: ..." in FlameKit Native.
+-- ============================================================================================================
+local HOLD_FILE = "\\animal_hold_server.txt"
+local HOLD_BEAT_S = 5        -- rewritten this often while held (FlameKit Native lets go after 30 s without it)
+local HOLD_MAX_S = 30 * 60   -- never held longer than this in one go
+local function hold_write(on, why)
+  local f = io.open(emf.dir .. HOLD_FILE .. ".tmp", "w")
+  if not f then
+    if not S.hold_err then S.hold_err = true emf.log("spawn nodes: animal hold: could not write " .. HOLD_FILE) end
+    return
+  end
+  f:write(on and ("1 " .. tostring(os.time()) .. "\n") or "0\n")
+  f:close()
+  os.remove(emf.dir .. HOLD_FILE)
+  if not os.rename(emf.dir .. HOLD_FILE .. ".tmp", emf.dir .. HOLD_FILE) then return end
+  if on ~= S.hold_on then
+    emf.log(on and ("spawn nodes: animal hold: ON (" .. tostring(why) .. "): tamed animals stand still so the raid monsters get the game's path search")
+      or ("spawn nodes: animal hold: off (" .. tostring(why) .. "): the animals walk again"))
+    if on then S.hold_since = os.time() end
+  end
+  S.hold_on = on
+  S.hold_at = os.time()
+end
+
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
 -- (0.15.491) Never without a player within its near_r of one of its nodes: false, the reason, "nobody".
 local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player who started or triggered it
@@ -1016,6 +1059,8 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
     return false, string.format("Nobody is within %d m of its nodes: it does not start.", g.near_r or 50), "nobody"
   end
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
+  S.hold_capped = nil  -- (0.15.538) a new raid: the animal hold's time limit starts again
+  pcall(hold_write, true, "raid start: group " .. tostring(gid))  -- (0.15.538) the animal hold, before its first wave
   S.halted[gid] = nil  -- (0.15.514) a new start
   S.started[gid] = os.time()  -- (0.15.492) for its time limit
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
@@ -2084,6 +2129,31 @@ local function protect_tick(world, spots)
   end
 end
 
+-- (0.15.538) THE ANIMAL HOLD's every-second check (see hold_write): held while a raid is active, by the raid
+-- protection's rule; rewritten every HOLD_BEAT_S so FlameKit Native keeps holding; let go when the raid is over or
+-- after HOLD_MAX_S.
+local function hold_tick()
+  local active = next(S.runs) ~= nil or next(S.raid) ~= nil
+  if not active then
+    for _, g in ipairs(groups()) do
+      if #mon_alive(g.id) > 0 then active = true break end
+    end
+  end
+  local now = os.time()
+  if not active then S.hold_capped = nil end
+  if active and S.hold_capped then return end  -- let go at HOLD_MAX_S: stays free until this raid is over
+  if active and S.hold_on and S.hold_since and now - S.hold_since >= HOLD_MAX_S then
+    S.hold_capped = true
+    hold_write(false, string.format("held %d min, the longest it may", math.floor(HOLD_MAX_S / 60)))
+    return
+  end
+  if active then
+    if not S.hold_on or now - (S.hold_at or 0) >= HOLD_BEAT_S then hold_write(true, "a raid is active") end
+  elseif S.hold_on ~= false then
+    hold_write(false, S.hold_on == nil and "no raid at the script's start" or "the raid is over (no group running, no raid monster alive)")
+  end
+end
+
 -- The triggers of every group that is on and not running.
 local function trigger_tick(world, spots)
   local tod = nil
@@ -2404,6 +2474,8 @@ function F.tick(world)
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
     protect_tick(world, spots)
+    local okhd, whyhd = pcall(hold_tick)  -- (0.15.538) the animal hold
+    if not okhd then emf.log("spawn nodes: animal hold: " .. tostring(whyhd)) end
     pcall(spare_tick)  -- (0.15.525)
     raid_tick(world)  -- (0.15.488)
     time_tick(world)  -- (0.15.492)

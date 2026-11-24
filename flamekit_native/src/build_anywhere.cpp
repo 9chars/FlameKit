@@ -1540,7 +1540,8 @@ void path_probe(emf::World w) {
     }
 }
 
-// (0.15.537, owner 2026-11-23 22:10 "yes" to the test build) TAME PATH TEST SWITCH, off by default. The 22:00 probe:
+// (0.15.537, owner 2026-11-23 22:10 "yes" to the test build) TAME PATH TEST SWITCH, off by default. (0.15.538: also
+// THE ANIMAL HOLD during every raid, automatic: see g_raid_hold.) The 22:00 probe:
 // ~22 tamed animals in the base (IsTame + Wildlife, faction Environment, no creature AI; console 22:08) keep failing
 // their short walk searches at the 500-step limit, and raid requests wait 54-89 s unsearched. Test: with
 // "flamekit.tamepath off" the game's own create (0x1405fb550, kind 5) and update (0x1405fc120, kind 6) of a path
@@ -1555,7 +1556,52 @@ using PathCreateFn = uint32_t* (*)(void*, uint32_t*, const uint32_t*, uint64_t);
 using PathUpdateFn = bool (*)(void*, uint32_t, const uint32_t*, uint64_t);
 PathCreateFn g_path_create = nullptr;
 PathUpdateFn g_path_update = nullptr;
-std::atomic<bool> g_tame_hold{false};
+std::atomic<bool> g_tame_hold{false};  // the console switch (flamekit.tamepath off), a test by hand
+// ======================================================================================================================
+// (0.15.538, owner 2026-11-23 22:28 "before a raid starts it has to stop all the animals", 22:29 "build that into the
+// system and note it heavily") THE ANIMAL HOLD, automatic: g_raid_hold is set while Spawn Nodes says a raid is active
+// (features/spawn_nodes.lua hold_write / hold_tick -> animal_hold_server.txt "1 <time>", rewritten every 5 s; "0"
+// when the raid is over). Read by read_animal_hold every 15 server steps. While held, every tamed animal's path
+// request create/update gets the game's own failure answer (path_create_detour / path_update_detour below), so the
+// animals stand still and the raid monsters get the game's path search to themselves.
+// WHY (measured, HANDOFF 2026-11-23 22:00-22:21): the base's tamed animals ask for short walks that keep failing at
+// the game's 500-step search limit and restart every ~0.5 s; the game's one shared path search then left raid
+// monsters unsearched for 54-89 s. With the animals held: every raid request searched at once, paths in 0-4 s.
+// SAFETY: a "1" whose file was not rewritten for kHoldStaleS seconds counts as "0" (Spawn Nodes stopped or failed:
+// the animals are never left standing by a dead script); nothing is saved, a restart starts with the animals free.
+// Logged: "animal hold: ..." on every change; "tame path test: ..." the animals found and the held counts every 10 s.
+// ======================================================================================================================
+std::atomic<bool> g_raid_hold{false};
+constexpr int64_t kHoldStaleS = 30;
+bool holding() { return g_tame_hold.load(std::memory_order_relaxed) || g_raid_hold.load(std::memory_order_relaxed); }
+void read_animal_hold() {
+    const std::wstring file = lua_file(L"animal_hold_server.txt");
+    bool want = false;
+    const char* why = "Spawn Nodes says no raid is active";
+    WIN32_FILE_ATTRIBUTE_DATA fa{};
+    if (FILE* f = _wfopen(file.c_str(), L"r")) {
+        const int c = fgetc(f);
+        fclose(f);
+        if (c == '1') {
+            want = true;
+            why = "Spawn Nodes says a raid is active";
+            if (GetFileAttributesExW(file.c_str(), GetFileExInfoStandard, &fa)) {
+                FILETIME now{};
+                GetSystemTimeAsFileTime(&now);
+                const auto t = [](const FILETIME& x) { return (int64_t(x.dwHighDateTime) << 32) | x.dwLowDateTime; };
+                const int64_t age_s = (t(now) - t(fa.ftLastWriteTime)) / 10000000;
+                if (age_s > kHoldStaleS) {
+                    want = false;
+                    why = "the raid's hold file was not rewritten for 30 s (Spawn Nodes stopped?): let go to be safe";
+                }
+            }
+        }
+    }
+    if (want != g_raid_hold.load()) {
+        g_raid_hold = want;
+        EMF_LOG(kMod, "animal hold: %s (%s)", want ? "ON: tamed animals' path searches are held, they stand still" : "off: the animals walk again", why);
+    }
+}
 constexpr uint32_t kTameBits = 1u << 21;  // entity ids below 2M
 std::atomic<uint64_t> g_tame[kTameBits / 64];
 std::atomic<uint64_t> g_held_create{0}, g_held_update{0}, g_passed_create{0}, g_passed_update{0};
@@ -1563,7 +1609,7 @@ bool is_tame_bit(uint32_t id) {
     return id < kTameBits && (g_tame[id >> 6].load(std::memory_order_relaxed) >> (id & 63) & 1);
 }
 uint32_t* path_create_detour(void* ctx, uint32_t* out, const uint32_t* settings, uint64_t r9) {
-    if (g_tame_hold.load(std::memory_order_relaxed) && settings && is_tame_bit(settings[0])) {
+    if (holding() && settings && is_tame_bit(settings[0])) {
         g_held_create.fetch_add(1, std::memory_order_relaxed);
         *out = 0;
         return out;
@@ -1572,7 +1618,7 @@ uint32_t* path_create_detour(void* ctx, uint32_t* out, const uint32_t* settings,
     return g_path_create(ctx, out, settings, r9);
 }
 bool path_update_detour(void* ctx, uint32_t id, const uint32_t* settings, uint64_t r9) {
-    if (g_tame_hold.load(std::memory_order_relaxed) && settings && is_tame_bit(settings[0])) {
+    if (holding() && settings && is_tame_bit(settings[0])) {
         g_held_update.fetch_add(1, std::memory_order_relaxed);
         return false;
     }
@@ -1584,10 +1630,11 @@ void tame_tick(emf::World w) {
     static uint32_t steps = 0;
     static bool was = false;
     ++steps;
-    const bool hold = g_tame_hold.load();
+    const bool hold = holding();  // (0.15.538) the console switch or the raid
     if (hold != was) {
         was = hold;
-        EMF_LOG(kMod, "tame path test: %s", hold ? "ON: tamed animals' path searches are held (they stand still)" : "off: the game as it is");
+        EMF_LOG(kMod, "tame path test: %s (by hand %s, raid %s)", hold ? "ON: tamed animals' path searches are held (they stand still)" : "off: the game as it is",
+                g_tame_hold.load() ? "held" : "free", g_raid_hold.load() ? "held" : "free");
         if (!hold) for (auto& b : g_tame) b.store(0);
         steps = 0;
     }
@@ -1635,13 +1682,14 @@ bool fk_build_anywhere_load(bool dedicated) {
         EMF_LOG(kMod, "tame path test: hooks on create %s, update %s; the switch is off ('flamekit.tamepath off' holds the tamed animals' searches)",
                 c ? "installed" : "NOT installed", u ? "installed" : "NOT installed");
         if (c && u)
-            emf::add_command("flamekit.tamepath", "on|off: off = tamed animals ask the game for no walks (they stand still; a raid test); on = the game as it is",
+            emf::add_command("flamekit.tamepath", "on|off: off = tamed animals ask the game for no walks (they stand still) by hand; on = not by hand (raids still hold them)",
                              [](emf::World, const std::vector<std::string>& args) {
                 const std::string v = args.size() > 1 ? args[1] : "";
                 if (v == "off") g_tame_hold = true;
                 else if (v == "on") g_tame_hold = false;
                 EMF_LOG(kMod, "flamekit.tamepath %s", v.c_str());
-                EMF_REPLY("tamed animals' walks: %s", g_tame_hold.load() ? "OFF (held; they stand still)" : "on (the game as it is)");
+                EMF_REPLY("tamed animals' walks: by hand %s; raid hold %s (Spawn Nodes holds them during every raid)",
+                          g_tame_hold.load() ? "OFF (held; they stand still)" : "on (the game as it is)", g_raid_hold.load() ? "ON now" : "not now");
             });
     }
     if (dedicated && sampler_file_on()) {  // (0.15.469) the chunk counter: test servers only
@@ -1732,6 +1780,7 @@ bool fk_build_anywhere_load(bool dedicated) {
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)
+                read_animal_hold();  // (0.15.538) THE ANIMAL HOLD during raids (Spawn Nodes)
                 read_raid_protect();  // (0.15.486)
                 read_spare();  // (0.15.525)
                 static uint32_t places_n = 0;
