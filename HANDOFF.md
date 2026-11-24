@@ -32,6 +32,10 @@ searched at once, Spawn Nodes "path came" median 1 s, max 4 s; 1 step-limit hit 
 - Logs: `spawn nodes: animal hold: ON/off (why)`, `[flamekit build] animal hold: ON/off (why)`, `tame path test: N tamed
   animal(s): ids`, every 10 s `tame path test: ... held N create(s) ...`. Test: `tools/sntest/hd.lua`.
 - **Do not remove this or switch it off without the owner's word: without it raids go back to monsters standing around.**
+- **Companions too (owner 22:34):** "this is the same reason the companions ai pathing failed as well because it was
+  tested in the same area". The same base, the same one shared path search, and the same "slow, didn't respond"
+  symptom when companions used the game's AI pathing. Not measured (the companion tests were before the probe existed):
+  the probe would show it in seconds if companions ever go back to the game's path search.
 
 ## START HERE (written 2026-11-23 18:45; newest; the 2026-11-17 one below is older)
 
@@ -2511,3 +2515,5 @@ monsters' searches wait behind them.
 **0.15.538 (owner 22:28-22:29 "build that into the system and note it heavily"; built 22:32:54, DLL 17844c23...; NOT
 installed, restart asked):** THE ANIMAL HOLD, automatic in every raid; full notes in the "!!! THE ANIMAL HOLD" section
 at the top. Tests tr/rl/ai/hd all OK. The by-hand hold from 22:16:55 is still on in the running server (0.15.537).
+
+22:34 owner: the companions' game-AI pathing failed for the same reason (same base area); noted in the ANIMAL HOLD section.
