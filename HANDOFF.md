@@ -2307,3 +2307,10 @@ not run.
 On the local server 19:31:37 (owner 19:31 "i stopped the raid.. go ahead and update it"; 22 features, no error).
 
 **GOAL (owner 2026-11-23 19:33, verbatim):** "they need to be aggressively attacking is the goal. they should flood to me. not just wander around".
+**RULE (owner 19:34-19:35):** 19:34 "NO CHECK YOUR FUCKING LOGGING AND GO OFF OF THAT", 19:35 "im telling you the end goal,
+not to stop everything and do some retarded threat table shit". A goal he states is NOT a request to build or switch
+anything: keep going from the logs, report what they show.
+**19:33 raid by type (0.15.528 ai lines):** almost all went to fight (state 6) at 0-4 s, 5-16 m. Elite Melee01 52072
+fought at 6.7 m and came to 0.9 m (the only melee that fought); Elite Melee01 52073 at 16-25 m never noticed him;
+2 Elite Necromancer, Hollow Wisp, Skeleton Giant Lizard Hollow Wisp, Flying Skull fought from where they stood (0 m
+closer); 12 "type not known" = Necromancer summons, fought where they appeared (several 2-3 m up).
