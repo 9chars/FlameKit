@@ -1047,7 +1047,13 @@ give_legendary = function(world, key, x, y, z, name, level, tries)
   end)
 end
 
--- A test monster's loot: runes into the killer's bag (the rest and a legendary item into a chest beside the body); doubled for a boss.
+-- A test monster's loot, doubled for a boss: the runes and legendary runes into the killer's bag (what the bag does not
+-- take into the chest), the legendary item into the loot chest beside the body. Only these reward items ever go into
+-- the chests, never the monster's own game loot (owner 2026-11-24 10:47 "everything should end up in the chest except
+-- the runes ... regular monster loot should never end up in these chests ever. ONLY the special high level reward
+-- items"). (A 10:01-10:03 misreading of mine had rewritten this comment to "all into the chest": put back.)
+-- This is the test monsters' own code: Spawn Nodes has its own (core/reward_loot.lua) and the two must stay separate
+-- (owner 2026-11-24 11:06): a change tried here must never reach Spawn Nodes.
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
   if not ok or not x then return "no position" end

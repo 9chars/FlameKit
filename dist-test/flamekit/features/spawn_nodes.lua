@@ -1,44 +1,105 @@
--- features/spawn_nodes.lua (0.15.476, owner 2026-11-23 10:53 "I'd like a way to place down "nodes" around the map that
--- could be configured to spawn monsters periodically based on how I set it up", 10:53 admins only, "maybe it would be
--- used as part a larger "raid" type system for spawning monsters against peoples bases", 11:03 "just go to the location
--- I want and click add node", 11:06 "can you group the nodes together also such that when a trigger is activated, all
--- the nodes work together? ... control the monster group type ... (foggers, vukah, scavengers, undead, etc) ... set it
--- to random ... multiple different groups with multiple different nodes", 11:08 "all 5 of those triggers would be good
--- ... lets go ahead and build it"): the Spawn Nodes tab, for FlameKit admins.
+-- features/spawn_nodes.lua: the Spawn Nodes system (raids). Started 0.15.476 (owner 2026-11-23 10:53 "I'd like a way to
+-- place down "nodes" around the map that could be configured to spawn monsters periodically based on how I set it up",
+-- 11:06 "can you group the nodes together ... multiple different groups with multiple different nodes", 11:08 "all 5 of
+-- those triggers would be good ... lets go ahead and build it"); monster tracking rewritten 0.15.526.
 --
--- A NODE is only a saved place (x, y, z) that belongs to a GROUP; nothing of it is in the game world, so players cannot
--- see or touch it. Only the monsters it spawns are real (ordinary monsters of the game, not test monsters).
--- A GROUP has: a name ("Group 1"), on/off, a monster type (one of core/monsters.lua's groups, Random, or (0.15.477) Bosses),
--- a trigger, and a run: `waves` waves `wave_gap` seconds apart, each wave `per_wave` monsters at every node of the
--- group, never more than `max_alive` alive from one node; then `cooldown` minutes before the trigger can fire again.
--- TRIGGERS: manual ("Start now" only), timer (every `timer_min` to `timer_max` minutes, a random time in between),
--- trip wire (a player within `wire_r` m of the group's trip wire point, set with "Put trip wire here"), time of day
--- (when the game's clock passes `hour`), base raid (a player inside a flame altar area within `raid_r` m of one of the
--- group's nodes). "Start now" works for every trigger and ignores the cooldown.
--- (0.15.491: a group starts and its waves come only while a player is within its near_r of one of its nodes.) Before: a node spawned only while a player was within ACTIVE_DIST m of it (the game removes monsters far from every player);
--- the others skip that wave. Monsters spawn within SPREAD m of their node and are put on the ground (core/spawn.lua).
--- Kept on the server in spawn_nodes.json (kit.store): groups and nodes. What runs (waves, monsters alive) is not kept:
--- a restart or reload ends running waves; the game keeps or removes the monsters as it does any monster.
+-- ==== WHAT IT IS (as the code works in 0.15.547; the sections below hold the details and the owner's words) ====
+-- A NODE is only a saved place (x, y, z, facing, its own "Spawn within" distance) that belongs to a GROUP; nothing of it
+-- is in the game world. Only the monsters it spawns are real: ordinary monsters of the game (not FlameKit's test
+-- monsters), each tagged with its group in a ScaleComponent (TAG_BASE - group * TAG_STEP: 0.996, 0.99598, ...; the test
+-- monsters' tag is 0.999) so a reload or restart finds them again (scan_tick).
+-- At most MAX_GROUPS (30) groups and MAX_NODES (200) nodes on the server, all groups together.
 --
--- ADMINS ONLY: every change and the node list go only to FlameKit admins (core/admins.lua). An admin's own game shows
--- the nodes and trip wires as markers (emf.marker: over the 3D view and on the map; only in that game, EMF Lua 1.25+),
--- while "Show nodes" is on (this game's own switch, spawn_nodes_client.json). Other players' games never get the list.
--- The channel "nodes": a player's game asks with {op = "get"}; the server answers {op = "state", admin, groups, nodes,
--- status, note}; an admin's clicks send {op = ...} (below). In a game that hosts the world everything is done right here.
--- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and "Players cannot damage placed
--- objects during its waves" (protect_tick); (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage
--- to" and Remove "by node group ... including the dead ones on the ground") "Its monsters spare animals, pets and villagers"
--- (a hit rule per monster: from it to "creatures", cancel) and Remove takes the group's dead bodies too; (0.15.479) renamed "Players cannot change bases during its waves": also the
--- players near its nodes lose the game's base editing permission while it runs (raid_lock_server.txt, FlameKit Native).
+-- A GROUP's settings (DEFAULTS; the drop-down choices in CHOICES), by the tab's sections:
+--   Raid rules: on (Group on: off = its trigger never fires; Start now still works), announce (the notices), mark (Raid
+--     monster markers), spare (its monsters' hits on anything but players do nothing: FlameKit Native's spare list),
+--     protect (players near its nodes lose the game's base editing permission and players' hits on placed objects do
+--     nothing, while it runs), breaks + break_level (its monsters hit player-built blocks).
+--   Monsters: family (a monster group of core/monsters.lua, Random, or Bosses), face (which way a new monster faces),
+--     per_wave (monsters per node per wave, spawned one by one), max_alive (most alive per node at once),
+--     start_level (1-100, default 1) + level_step (added per wave after the first; never above K.MAX_LEVEL 100),
+--     loot (normal / reward / both / none: see K.on_death).
+--   When: trigger (manual = Start now only; timer = a random time between timer_min and timer_max minutes; wire = a
+--     player within wire_r m of its trip wire; time = the game's clock passes `hour`; raid = a player inside a flame
+--     altar area whose middle is within raid_r m of one of its nodes), start_delay (the first monsters come this long
+--     after the start notice), near_r (a group starts, and its waves come, only while a player is within this of one of
+--     its nodes), waves, wave_dead (the Between waves time starts only when this share of the last wave is dead; 0 = when
+--     it has spawned), wave_gap (Between waves, s), duration (the raid ends after this many minutes, its living monsters
+--     taken away; 0 = no limit), cooldown (minutes before its trigger can fire again; Start now ignores it).
+--
+-- A RAID: fire() starts a run (waves); wave() gives each node per_wave monsters to spawn; trickle_tick queues them one by
+-- one while fewer than max_alive of the node's are alive; spawn_tick spawns them (on the ground within the node's
+-- distance, find_surface). The roster S.mon (mon_add / mon_check every 0.25 s) is the only count of who is alive: its
+-- own monsters, and "counted apart" ones (summons and monsters of the world that come into the raid: join_tick /
+-- try_join; never players, FlameKit's test monsters or loot chests). raid_tick sends the notices (the red start notice
+-- with the place from the starter's minimap, wave notices, "N of TOTAL monsters left to kill" from the first monster on,
+-- updated as they die (left_tick), the end) and ends the raid when nothing of it is alive for END_GRACE s and a search of
+-- the whole world found none (verify_tick). Stop ends the waves; Remove takes the group's monsters and bodies away.
+-- While a raid runs: THE ANIMAL HOLD (below), Raid monster markers on every player's game (mark_tick, at most
+-- K.MARK_BUDGET messages per check), the raid lock / protection / spare files for FlameKit Native.
+--
+-- WHO: since 0.15.546 (owner 2026-11-24 08:43 "remove all the admin restrictions ... so other players can test it out")
+-- EVERY PLAYER counts as an admin here (is_admin returns true; admins.is is named there to restrict it again).
+-- WHERE IT IS SHOWN: the Spawn Nodes tab (F.panel: the group's settings) and, since 0.15.539, the Spawn Nodes window
+-- (F.window_rows: group, Start / Stop / Remove, Add node here, Show nodes, Put trip wire here, the nearest nodes), drawn by
+-- FlameKit Native from features/native_ui.lua. "Show nodes" (this game's own switch, spawn_nodes_client.json) shows
+-- every node and trip wire as markers in that game only.
+-- THE CHANNEL "nodes": a player's game asks {op = "get"}; the server answers {op = "state", admin, groups, nodes, status,
+-- note, ...}; clicks send {op = new_group, delete_group, set, start, stop, remove, add_node, move_node, delete_node,
+-- node_spread, wire_here}; the server sends {op = notice} (a raid notice and its siren) and {op = place_ask} (where are
+-- you, by your minimap), answered {op = place}. In a game that hosts the world everything is done right here.
+--
+-- KEPT (kit.store, on the server): spawn_nodes.json = the groups (with each group's last raid end: its cooldown, since
+-- 0.15.547) and nodes; spawn_nodes_raid.json = the running raids and runs, taken back after a FlameKit reload in the same
+-- world run (restore; a server restart ends them: another session token). Files for FlameKit Native in this folder:
+-- raid_lock_server.txt, raid_protect_server.txt, spare_server.txt, animal_hold_server.txt (and it reads
+-- altar_areas_server.txt, base_names_server.txt, where_now.txt).
+--
+-- (0.15.553, owner 12:33 "clean these up") the 2026-11-23 path investigation's test code is gone: the path census, the
+-- AI log (ai_tick), the full recordings (core/fullrec.lua) and the path push. HUNT_ON and THREAT_ON stay on: they are
+-- what sends each raid monster at the nearest player (hunt_tick), not logging. STUCK_ON stays off.
+-- This file is at Lua's 200 top-level locals: newer constants and modules are in the table K.
+--
+-- ==== HISTORY NOTES (what each part was added for; the code below has the details) ====
+-- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and the protection (protect_tick);
+-- (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage to" and Remove "by node group ...
+-- including the dead ones on the ground") "Monsters spare animals, pets and villagers" (0.15.525: FlameKit Native's
+-- spare list, spare_tick; until 0.15.524 an EMF hit rule that also kept them from hurting other monsters) and Remove takes
+-- the group's dead bodies too; (0.15.479) the players near its nodes lose the game's base editing permission while it runs
+-- (raid_lock_server.txt, FlameKit Native); (0.15.484, owner 12:50) its label "Players cannot damage base structures during raid".
+-- (0.15.538) !!! THE ANIMAL HOLD, every raid, always on: from a raid's start until it is over, tamed animals ask the
+-- game for no walks and stand still (animal_hold_server.txt -> FlameKit Native). WITHOUT IT RAID MONSTERS STAND
+-- AROUND FOR A MINUTE OR MORE: the animals' failing walk searches fill the game's one path search (measured
+-- 2026-11-23: monsters unsearched 54-89 s with the animals walking, 0-4 s with them held). See hold_write. !!!
 -- Uses only core modules (HANDOFF rule 0b).
 
 local admins = require("core.admins")
 local players = require("core.players")
 local monsters = require("core.monsters")
-local spawn = require("core.spawn")
 local threat = require("core.threat")  -- (0.15.522)
+-- (0.15.547) this file is at Lua's 200 top-level locals: newer constants and modules go in K
+local K = {
+  MARK_BUDGET = 30,      -- (0.15.541) marker messages per check (07:52: 32 in one check all arrived, the 40th and later did not)
+  MARK_OFF_TRIES = 15,   -- (0.15.541) a marker take-off is tried this many checks (30 s) at most
+  HOLD_FILE = "\\animal_hold_server.txt",  -- (0.15.538) the animal hold (see hold_write)
+  HOLD_BEAT_S = 5,       -- rewritten this often while held (FlameKit Native lets go after 30 s without it)
+  HOLD_MAX_S = 30 * 60,  -- never held longer than this in one go
+  LEFT_MIN_STEPS = 30,   -- (0.15.544) the countdown changes at most every 0.5 s
+  MAX_LEVEL = 100,       -- (0.15.547, owner 09:41 "the max level of any monster can only be 100")
+  set_level = require("core.spawn").set_level,  -- (0.15.547) a monster's level (shared with the test monsters)
+  reward = require("core.reward_loot"),         -- (0.15.547) Spawn Nodes' own Reward loot (the test monsters have their own: kept separate)
+  skip = require("core.loot_skip"),             -- (0.15.547) tells Auto Loot (loot_drop) to leave a body alone
+  test_tag = require("core.test_tag"),          -- (0.15.547) FlameKit's test monsters: never join a raid
+  chests = require("core.loot_chest"),          -- (0.15.547) FlameKit's loot chests: never join a raid
+}
 
-local F = { id = "spawn_nodes", title = "Spawn Nodes" }
+-- (0.15.550, owner 12:04) enabled_setting "sn_enabled": the "Spawn Nodes" switch in the Settings tab's Features section.
+-- Off in a player's game: no Spawn Nodes tab or window there, and none of its notices or sounds. Off on the server
+-- (sn_enabled=0, see below): no raid starts and nothing of it
+-- runs; F.switched_off ends the running raids and lets go of the files FlameKit Native reads (see there). The server
+-- has no Settings tab: its value is the default (on) unless set in its own copy of FlameKit's settings (the game keeps
+-- them in emf\config\flamekit.ini; that the server reads the same file there is NOT tried yet).
+local F = { id = "spawn_nodes", title = "Spawn Nodes", enabled_setting = "sn_enabled" }
 local kit
 
 local CHANNEL = "nodes"
@@ -126,11 +187,11 @@ if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = ni
 -- the Messages window), per group switch "announce" (on by default). The start, the end and a Remove go to every player;
 -- the waves and the count of monsters left to the players within NOTICE_DIST m of one of the group's nodes. The place:
 -- see raid_place (the minimap's place of the player who started or triggered it).
-local NOTICE_COLOUR = "#ff9632"
+local NOTICE_COLOUR = "#ff9632"  -- (0.15.545: the start notice is red, "#ff4040" in raid_tick; this file is at Lua's 200 locals)
 local NOTICE_DIST = 300
 local PLACE_WAIT = 180         -- steps (3 s): how long the start notice waits for the asked player's place
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
-local LEFT_MIN_GAP = 5         -- s: and changed at most this often when the count changes
+-- (0.15.544) LEFT_MIN_GAP (5 s) gone: K.LEFT_MIN_STEPS (0.5 s), next to count_notice
 local END_GRACE = 10           -- s: (0.15.500) a raid is over when none of its monsters is alive for this long
 local START_END_S = 60         -- s: (0.15.494, owner 14:35 "the beginning raid notice and the end raid notice needs to stay up
                                -- longer.. I never even saw the end raid notice") the start and end notices stay this long (was 15)
@@ -157,10 +218,22 @@ local CHOICES = {
   raid_r = { 50, 100, 150, 250, 400 },
   near_r = { 20, 30, 50, 75, 100 },  -- (0.15.491)
   duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
+  wave_dead = { 0, 50, 75, 90, 100 },  -- (0.15.542) % of a wave dead before Between waves starts; 0 = when it has spawned
+  start_delay = { 0, 5, 10, 15, 20, 30, 60 },  -- (0.15.543) s from the start notice to the first monster
+  -- (0.15.547, owner 09:41) the level of its monsters: start_level; level_step: added for each wave after the first
+  -- (owner's list; 40 added, taken for a slip: "... 30, 35, 45, 50 ..."); never above K.MAX_LEVEL (100).
+  -- (0.15.548, owner 11:38 "get rid of "Game's own" entry and just default it to 1"; 11:27 "I've never seen "the game"
+  -- ever spawn anything but a level 1 monster") no "Game's own" (0) any more: a saved 0 is read as 1 (group())
+  start_level = { 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100 },
+  level_step = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100 },
+  -- (0.15.547, owner 09:45 "reward loot (exactly like how test monsters work), normal monster loot, and/or no loot ...
+  -- any combination"; 09:45 "if the player chooses no loot, it drops nothing") what its monsters drop: the game's own
+  -- loot / Reward loot (runes to the killer's bag, a legendary item to a chest) / both / nothing (K.on_death)
+  loot = { "normal", "reward", "both", "none" },
 }
-local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
-local DEFAULTS = { announce = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
-  cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
+local UNIT = { start_delay = "s", wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
+local DEFAULTS = { announce = true, mark = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+  cooldown = 10, wave_dead = 90, start_delay = 20, start_level = 1, level_step = 0, loot = "reward", timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
 -- The monsters of each type (no bosses), from core/monsters.lua: type -> { template GUID, ... }; "Random": all of
@@ -180,15 +253,18 @@ end
 local function label(key, v)
   if key == "hour" then return string.format("%02d:00", v) end
   if key == "duration" and v == 0 then return "No limit" end  -- (0.15.492)
+  if key == "start_level" then return "Level " .. tostring(v) end  -- (0.15.547; 0.15.548 no "Game's own")
+  if key == "level_step" then return v == 0 and "No increase" or ("+" .. v .. " each wave") end
+  if key == "loot" then return ({ normal = "Normal monster loot", reward = "Reward loot", both = "Reward + normal loot", none = "No loot" })[v] or tostring(v) end
+  if key == "wave_dead" then return v == 0 and "It has spawned" or v == 100 and "All of it is dead" or (v .. "% of it is dead") end  -- (0.15.542)
   return tostring(v) .. (UNIT[key] and (" " .. UNIT[key]) or "")
 end
 
 -- ---- the server's half ----
 
-local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
+local S = { data = nil, steps = 0, runs = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, threat_seen = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
-local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
+            mon = {}, old_bodies = {}, scan = nil, scanned = false, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, threat_seen = {}, hitby = {} }  -- (0.15.547) hitby: monster -> the last player who hit it  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned; (0.15.488) raid; (0.15.526) mon, old_bodies: the roster (below)
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
 local function data()
@@ -214,6 +290,7 @@ local function group(gid)
   local g = data().groups[tostring(gid)]
   if not g then return nil end
   for k, v in pairs(DEFAULTS) do if g[k] == nil then g[k] = v end end
+  if g.start_level == 0 then g.start_level = 1 end  -- (0.15.548) "Game's own" (0) is gone: level 1
   return g
 end
 
@@ -310,11 +387,209 @@ local function altar_boxes()
   return boxes
 end
 
--- How many monsters of node `nid` are alive.
+-- ---- (0.15.526) THE ROSTER: the one place that knows the raids' monsters ----
+-- (owner 2026-11-23 18:59 "yes": rewrite the monster tracking. Until 0.15.525 six things each decided on their own
+-- whether a monster was a raid's (S.alive per node, S.dead, S.adopted, the scale tag, the area test, the end check) and
+-- they disagreed: at 18:51:24 seven bodies "got up again" with 4-6 health and the count went 1 -> 8 of 60, and for a
+-- minute (18:47:43-18:48:43) no node spawned because "Most alive per node" counted bodies that got up and monsters that
+-- had joined.) Now every monster of a raid is one entry S.mon[id] = { g = group, n = node, own, dead, born, seen,
+-- lost_at, miss }:
+--   own   = its node spawned it in this raid: it holds that node's "Most alive per node" place and is in "N of TOTAL";
+--   not own = it joined (a summon, a monster of the world that came in), it got up again after it died, or it is left
+--           from an earlier raid: it never holds a node's place and never raises N, but the raid ends only when it is
+--           dead too ("... summoned monsters still to kill").
+-- mon_check (every 0.25 s) is the only thing that reads their health and moves an entry between alive and dead.
+-- Bodies of an earlier raid of the group are never looked at again (S.old_bodies: only Remove takes them away).
+local RISE_S = 10      -- s: an own monster that has not had health yet (an Undead coming up) counts alive this long
+local LOST_S = 10      -- s: a monster whose health can't be read is counted this long, then it is forgotten (logged)
+local MISSES = 3       -- checks in a row with neither health nor position: gone, forgotten
+
+-- Adds monster `id` to group `gid`'s raid at node `nid`. `why`: for the log.
+local function mon_add(id, gid, nid, own, dead, why)
+  if not id or S.mon[id] then return end
+  S.mon[id] = { g = gid, n = nid, own = own == true, dead = dead == true, born = os.time(), seen = false, miss = 0 }
+  if (S.mon_log or 0) < 300 then
+    S.mon_log = (S.mon_log or 0) + 1
+    emf.log(string.format("spawn nodes: roster: monster %s in group %d's raid at node %s: %s, %s (%s)", tostring(id), gid,
+      tostring(nid), own and "its own" or "counted apart", dead and "dead" or "alive", tostring(why)))
+  end
+end
+
+-- Forgets monster `id` (and what the off switches kept about it).
+local function mon_drop(id)
+  S.mon[id] = nil
+  S.track[id], S.active_at[id], S.orders[id], S.threat_seen[id], S.hunt_pos[id] = nil, nil, nil, nil, nil
+  if S.hitby then S.hitby[id] = nil end  -- (0.15.547)
+  K.skip.set(id, false)  -- (0.15.547)
+end
+
+-- The ids of the living monsters, in id order: of group `gid` (nil: every group), of node `nid` (nil: every node),
+-- only its own ones when `own_only`.
+local function mon_alive(gid, nid, own_only)
+  local list = {}
+  for id, m in pairs(S.mon) do
+    if not m.dead and (not gid or m.g == gid) and (not nid or m.n == nid) and (not own_only or m.own) then list[#list + 1] = id end
+  end
+  table.sort(list)
+  return list
+end
+
+-- How many of node `nid`'s OWN monsters are alive: what "Most alive per node" counts.
 local function alive_count(nid)
-  local n = 0
-  for _ in pairs(S.alive[nid] or {}) do n = n + 1 end
-  return n
+  return #mon_alive(nil, nid, true)
+end
+
+-- The dead bodies of group `gid` (this raid's and earlier ones'): for Remove and the tab.
+local function mon_bodies(gid)
+  local list = {}
+  for id, m in pairs(S.mon) do if m.dead and m.g == gid then list[#list + 1] = id end end
+  for id, g in pairs(S.old_bodies) do if g == gid then list[#list + 1] = id end end
+  table.sort(list)
+  return list
+end
+
+-- Whether monster `id` is known (in a raid, or a body of an earlier one).
+local function known(id)
+  return S.mon[id] ~= nil or S.old_bodies[id] ~= nil
+end
+
+-- (0.15.526) A new raid of group `gid` starts: the bodies of its earlier raids are put aside (never counted, never
+-- looked at for getting up again: 18:22:44 eighteen of them "got up" and were counted back in), and any of its monsters
+-- still alive from before is counted apart.
+local function mon_new_raid(gid)
+  local bodies, left = 0, 0
+  for id, m in pairs(S.mon) do
+    if m.g == gid then
+      if m.dead then
+        S.old_bodies[id] = gid
+        mon_drop(id)
+        bodies = bodies + 1
+      elseif m.own then
+        m.own = false
+        left = left + 1
+      end
+    end
+  end
+  emf.log(string.format("spawn nodes: roster: group %d's new raid: %d bod(ies) of its earlier raids put aside, %d monster(s) still alive from before counted apart", gid, bodies, left))
+end
+
+-- ============================================================================================================
+-- (0.15.547, owner 2026-11-24 09:41 "I need to be able to set the starting level of the monsters per group. I also need
+-- to add a drop-down option that increases the level of the monsters with each new wave ... the max level of any monster
+-- can only be 100 ... I would also like to add in the "reward loot" system like we build for the test monsters and this
+-- should be configurable by group as well", 09:45 "reward loot (exactly like how test monsters work), normal monster
+-- loot, and/or no loot ... if the player chooses no loot, it drops nothing") LEVEL AND LOOT, per group:
+--   Starting level (start_level, 1-100) + Level per wave (level_step) x (wave - 1), at most K.MAX_LEVEL; set on every
+--   monster its node spawns (core/spawn.lua set_level, as the test monsters).
+--   Loot (loot): "normal" the game's own; "reward" Reward loot by the test monsters' rule, in Spawn Nodes' own code (owner
+--   11:06: never connected to the test monsters' code) (core/reward_loot.lua give: runes and
+--   legendary runes into the bag of the last player who hit it (S.hitby), a legendary item at its level into a loot
+--   chest by the body, twice for Bosses; owner 10:47 "everything should end up in the chest except the runes ... regular
+--   monster loot should never end up in these chests ever") and its game loot removed (never into a chest); "both" the reward and its game loot; "none" its game loot removed, nothing
+--   given. Only monsters a node spawned (m.sp), once each (m.looted: one that gets up and dies again gives nothing more).
+-- ============================================================================================================
+K.level_spawned = function(world, id, gid, q)
+  local g = gid and group(gid)
+  if not g then return end
+  local start, step = math.max(1, tonumber(g.start_level) or 1), tonumber(g.level_step) or 0
+  local run = S.runs[gid]
+  -- the wave it was queued in (the last wave's last monsters spawn after its run is over)
+  local wave = (q and tonumber(q.wave)) or ((run and run.wave and run.wave > 0) and run.wave) or 1
+  local base = start
+  local lvl = math.min(K.MAX_LEVEL, math.max(1, math.floor(base + math.max(0, wave - 1) * step)))
+  local ok, set = pcall(K.set_level, world, id, lvl)
+  if S.mon[id] then S.mon[id].lvl = lvl end
+  S.lvl_said = S.lvl_said or {}
+  local key = tostring(gid) .. ":" .. tostring(wave) .. ":" .. tostring(S.started[gid] or 0)
+  if not S.lvl_said[key] then
+    S.lvl_said[key] = true
+    emf.log(string.format("spawn nodes: %s wave %d: its monsters at level %d (starting level %d, %s, at most %d)%s", g.name, wave,
+      lvl, start, step > 0 and ("+" .. step .. " each wave") or "no increase", K.MAX_LEVEL,
+      (ok and set) and "" or " (FAILED to set: " .. tostring(set) .. ")"))
+  elseif not (ok and set) then
+    emf.log(string.format("spawn nodes: level: monster %s: setting level %d failed (%s)", tostring(id), lvl, tostring(set)))
+  end
+end
+-- (0.15.547, owner 10:08 "fix that bug") marks monster `id` of group `gid` for Auto Loot (core/loot_skip.lua) when its
+-- group's Loot removes the game loot itself (Reward loot, No loot): Auto Loot's first look (0.5 s after the death) came
+-- before Spawn Nodes' removal (2 s) and moved the loot to a killer with Auto Loot on. Marked at the spawn, and again
+-- for every living one when the group's Loot is changed.
+K.mark_loot = function(id, gid)
+  local g = gid and group(gid)
+  local mode = g and g.loot or "normal"
+  K.skip.set(id, mode == "reward" or mode == "none")
+end
+K.on_death = function(world, id, m)
+  if not m.sp or m.looted then return end
+  m.looted = true
+  local g = group(m.g)
+  local mode = g and g.loot or "normal"
+  if mode == "normal" then return end
+  local okp, x, y, z = pcall(world.position, world, id)
+  if not (okp and x) then return end
+  local said = {}
+  if mode == "reward" or mode == "both" then
+    local lvl = m.lvl
+    if not lvl then pcall(function() local lv = world:get("Level", id) lvl = lv and lv.dataStorage and lv.dataStorage[1] end) end
+    local ok, what = pcall(K.reward.give, world, x, y, z, S.hitby and S.hitby[id], lvl, g.family == "Bosses")
+    said[#said + 1] = ok and tostring(what) or ("reward error: " .. tostring(what))
+  end
+  if mode == "reward" or mode == "none" then
+    K.reward.clear_game_loot(world, id, x, z, y)
+    said[#said + 1] = "its game loot removed"
+  end
+  S.loot_log = (S.loot_log or 0) + 1
+  if S.loot_log <= 200 then emf.log(string.format("spawn nodes: loot (%s): monster %s: %s", mode, tostring(id), table.concat(said, "; "))) end
+end
+
+-- Every 0.25 s: each monster's health, read once. Health > 0: alive (a body that gets up again is counted apart from
+-- now on); 0: dead (an own monster that never had health yet counts alive for RISE_S s: still coming up); not readable:
+-- counted for LOST_S s, then forgotten; neither health nor position MISSES times in a row: gone.
+local function mon_check(world)
+  local now = os.time()
+  for id, m in pairs(S.mon) do
+    local okh, cur = pcall(emf.health, world, id)
+    if not okh then cur = nil end
+    if cur == nil then
+      local okp, px = pcall(world.position, world, id)
+      if not (okp and px) then
+        m.miss = m.miss + 1
+        if m.miss >= MISSES then
+          if (S.mon_log or 0) < 300 then S.mon_log = (S.mon_log or 0) + 1 emf.log(string.format("spawn nodes: roster: monster %s gone from the world: forgotten", tostring(id))) end
+          mon_drop(id)
+        end
+      else
+        m.miss = 0
+        m.lost_at = m.lost_at or now
+        if now - m.lost_at >= LOST_S then
+          emf.log(string.format("spawn nodes: roster: monster %s: its health could not be read for %d s: forgotten", tostring(id), LOST_S))
+          mon_drop(id)
+        end
+      end
+    else
+      m.miss, m.lost_at = 0, nil
+      if cur > 0 then
+        if m.dead then
+          m.dead, m.own = false, false
+          emf.log(string.format("spawn nodes: roster: monster %s got up again (health %s): alive, counted apart (it does not hold node %s's place)", tostring(id), tostring(cur), tostring(m.n)))
+        end
+        m.seen = true
+      elseif not m.dead then
+        if m.own and not m.seen and now - m.born < RISE_S then
+          -- still coming up out of the ground: alive
+        else
+          m.dead = true
+          local okd, why = pcall(K.on_death, world, id, m)  -- (0.15.547) its loot, by the group's Loot
+          if not okd then emf.log("spawn nodes: loot: " .. tostring(why)) end
+          if (S.mon_log or 0) < 300 then
+            S.mon_log = (S.mon_log or 0) + 1
+            emf.log(string.format("spawn nodes: roster: monster %s died (%s, node %s)%s", tostring(id), m.own and "its own" or "counted apart", tostring(m.n),
+              m.seen and "" or string.format(": never had health in %d s", RISE_S)))
+          end
+        end
+      end
+    end
+  end
 end
 
 -- (0.15.483) The tag of group `gid`, and the group a tag names (nil: not one of ours).
@@ -327,7 +602,7 @@ local function group_of_tag(v)
 end
 
 -- (0.15.483) One step of the world scan that finds the nodes' monsters again: each one tagged with a group that still
--- has nodes goes to that group's nearest node, alive (S.alive) or dead (S.dead). True when the scan is done.
+-- has nodes goes to that group's nearest node: alive into the roster, dead into S.old_bodies. True when the scan is done.
 local function scan_tick(world)
   if not S.scan then
     -- the protection stays as it was meanwhile: the raid lock file is kept, and if it names players the rule against
@@ -361,30 +636,6 @@ local function scan_tick(world)
     local oks, scl = pcall(world.get, world, "ScaleComponent", id)
     local gid = oks and scl and group_of_tag(scl.uniformScale)
     local nodes = gid and nodes_of(gid)
-    -- (0.15.506, owner 15:56 "the left over monsters were definitely spawned from the nodes ... look at the problem"):
-    -- a census at every load: each living creature within 150 m of any node, with its tag (scale), faction and
-    -- template, so the leftovers can be told what they are
-    if (S.census_n or 0) < 60 then
-      local okp, cx, cy, cz = pcall(world.position, world, id)
-      if okp and cx then
-        local near = nil
-        for _, n in pairs(data().nodes) do
-          if dist2(cx, cy, cz, n.x, n.y, n.z) <= 150 * 150 then near = n break end
-        end
-        if near then
-          local okh, cur = pcall(emf.health, world, id)
-          local oka, acc = pcall(world.account, world, id)
-          if okh and cur and cur > 0 and not (oka and acc) then
-            local okf, f = pcall(world.get, world, "Faction", id)
-            local okg, guid = pcall(emf.template, world, id)
-            S.census_n = (S.census_n or 0) + 1
-            emf.log(string.format("spawn nodes: census: entity %s alive at %.0f %.0f %.0f (node %d %.0f m), health %s, scale %s, tag group %s, faction %s, template %s",
-              tostring(id), cx, cy, cz, near.id, math.sqrt(dist2(cx, cy, cz, near.x, near.y, near.z)), tostring(cur),
-              oks and scl and tostring(scl.uniformScale) or "none", tostring(gid), okf and f and tostring(f.faction) or "?", okg and tostring(guid) or "?"))
-          end
-        end
-      end
-    end
     if nodes and #nodes > 0 then
       local okp, x, y, z = pcall(world.position, world, id)
       local best, nid = nil, nodes[1].id
@@ -396,11 +647,9 @@ local function scan_tick(world)
       end
       local okh, cur = pcall(emf.health, world, id)
       if okh and cur and cur > 0 then
-        S.alive[nid] = S.alive[nid] or {}
-        S.alive[nid][id] = true
+        mon_add(id, gid, nid, true, false, "found again after a reload")  -- (0.15.526) the roster
       elseif okh and cur then
-        S.dead[nid] = S.dead[nid] or {}
-        S.dead[nid][id] = true
+        S.old_bodies[id] = gid  -- (0.15.526) a body: only Remove takes it away
       end
       sc.found = sc.found + 1
     end
@@ -410,9 +659,7 @@ local function scan_tick(world)
   S.scan, S.scanned = nil, true
   -- (0.15.492) a raid found again after a reload: its time limit counts from now (its real start is not known)
   for _, g in ipairs(groups()) do
-    for _, n in ipairs(nodes_of(g.id)) do
-      if alive_count(n.id) > 0 then S.started[g.id] = S.started[g.id] or os.time() break end
-    end
+    if #mon_alive(g.id) > 0 then S.started[g.id] = S.started[g.id] or os.time() end
   end
   return true
 end
@@ -467,9 +714,8 @@ local function purge_tick(world)
     end
     if gid and pg.gids[gid] then
       if pcall(emf.destroy, world, id) then pg.n = pg.n + 1 end
-      if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      for _, ids in pairs(S.alive) do ids[id] = nil end
-      for _, ids in pairs(S.dead) do ids[id] = nil end
+      mon_drop(id)  -- (0.15.526)
+      S.old_bodies[id] = nil
     end
   end
   if pg.i <= #pg.list then return end
@@ -534,11 +780,11 @@ local function play_sound(name)
   if f then f:write(string.format("%d %s.wav\n", os.time() * 100 + S.sound_n % 100, name)) f:close() end
 end
 
-local function notice_to(world, pid, text, seconds, tag, sound)
+local function notice_to(world, pid, text, seconds, tag, sound, colour)
   S.notice_n = S.notice_n + 1
-  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n), snd = sound }
+  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n), snd = sound, c = colour }  -- (0.15.545) c: its colour
   if pid == emf.local_player() and kit.is_host() then
-    kit.notice("nodes_" .. msg.tag, text, NOTICE_COLOUR, msg.s)
+    kit.notice("nodes_" .. msg.tag, text, colour or NOTICE_COLOUR, msg.s)
     if sound then play_sound(sound) end
   else
     pcall(emf.net.send_to, world, pid, CHANNEL, emf.json.encode(msg))
@@ -546,7 +792,7 @@ local function notice_to(world, pid, text, seconds, tag, sound)
 end
 
 -- (0.15.488) To every player (near = nil) or to the players within NOTICE_DIST m of group `near`'s nodes.
-local function raid_notice(world, gid, text, near, seconds, tag, sound)
+local function raid_notice(world, gid, text, near, seconds, tag, sound, colour)  -- (0.15.545) colour: "#rrggbb", else orange
   local g = group(gid)
   if not g or g.announce == false then return end
   emf.log("spawn nodes: notice: " .. text)
@@ -557,15 +803,13 @@ local function raid_notice(world, gid, text, near, seconds, tag, sound)
         if dist2(p[2], p[3], p[4], n.x, n.y, n.z) <= NOTICE_DIST * NOTICE_DIST then ok = true break end
       end
     end
-    if ok then notice_to(world, p[1], text, seconds, tag, sound) end
+    if ok then notice_to(world, p[1], text, seconds, tag, sound, colour) end
   end
 end
 
--- (0.15.488) How many monsters of group `gid` are alive (and still to come from the queue).
+-- (0.15.488) How many monsters of group `gid` are alive, its own and those counted apart (0.15.526: the roster).
 local function group_alive(gid)
-  local n = 0
-  for _, node in ipairs(nodes_of(gid)) do n = n + alive_count(node.id) end
-  return n
+  return #mon_alive(gid)
 end
 local function group_queued(gid)
   local n = 0
@@ -595,7 +839,7 @@ local function persist()
     local owed = nil
     if run.owed then owed = {} for nid, v in pairs(run.owed) do owed[tostring(nid)] = v end end
     out.runs[tostring(gid)] = { wave = run.wave, waves = run.waves, next_in = math.max(0, run.next_at - S.steps), by = run.by,
-                                in_wave = run.in_wave or nil, owed = owed }  -- (0.15.512)
+                                in_wave = run.in_wave or nil, owed = owed, wait_dead = run.wait_dead, size = run.size }  -- (0.15.512); (0.15.542) wait_dead, size
   end
   local text = emf.json.encode(out)
   if text ~= S.persisted then
@@ -604,6 +848,9 @@ local function persist()
   end
 end
 local function restore()
+  for _, g in ipairs(groups()) do  -- (0.15.547) the cooldowns, kept with the groups (finish)
+    if tonumber(g.last_end) and not S.last_end[g.id] then S.last_end[g.id] = tonumber(g.last_end) end
+  end
   local ok, saved = pcall(kit.store.load, "spawn_nodes_raid", nil)
   if not ok or type(saved) ~= "table" then saved = {} end
   local token = nil
@@ -627,13 +874,13 @@ local function restore()
       local owed = nil
       if type(run.owed) == "table" then owed = {} for k2, v in pairs(run.owed) do if tonumber(k2) then owed[tonumber(k2)] = tonumber(v) or 0 end end end
       S.runs[gid] = { wave = tonumber(run.wave) or 0, waves = tonumber(run.waves) or 1, next_at = S.steps + (tonumber(run.next_in) or 0), by = run.by,
-                      in_wave = run.in_wave == true and owed ~= nil, owed = owed }  -- (0.15.512)
+                      in_wave = run.in_wave == true and owed ~= nil, owed = owed,  -- (0.15.512)
+                      wait_dead = tonumber(run.wait_dead), size = tonumber(run.size) }  -- (0.15.542)
     end
   end
   for _, g in ipairs(groups()) do  -- (0.15.500) its monsters live but its raid was over or not known: a raid again
     if not S.raid[g.id] then
-      local alive = 0
-      for _, nd in ipairs(nodes_of(g.id)) do alive = alive + alive_count(nd.id) end
+      local alive = #mon_alive(g.id)  -- (0.15.526)
       if alive > 0 then
         S.raid[g.id] = { place = raid_place(g.id, nil), spawned = alive }
         S.started[g.id] = S.started[g.id] or os.time()
@@ -643,11 +890,7 @@ local function restore()
   end
   for gid, r in pairs(S.raid) do  -- (0.15.501) a raid from before 0.15.501: its first monster = the lowest id it has
     if not r.first_id then
-      for _, nd in ipairs(nodes_of(gid)) do
-        for _, set in ipairs({ S.alive[nd.id] or {}, S.dead[nd.id] or {} }) do
-          for id in pairs(set) do if not r.first_id or id < r.first_id then r.first_id = id end end
-        end
-      end
+      for _, id in ipairs(mon_alive(gid)) do if not r.first_id or id < r.first_id then r.first_id = id end end  -- (0.15.526)
     end
   end
   emf.log(string.format("spawn nodes: after the reload: %d raid(s) and %d run(s) taken back", n, (function() local c = 0 for _ in pairs(S.runs) do c = c + 1 end return c end)()))
@@ -665,11 +908,6 @@ local JOIN_R = 100
 local JOIN_EVERY = 120
 local JOIN_FULL = 5            -- (0.15.509) every 5th look (10 s): all ids since the raid's first monster
 local FRIENDLY = { [0] = true, [5] = true, [7] = true, [8] = true, [11] = true, [12] = true }
-local function known(id)
-  for _, ids in pairs(S.alive) do if ids[id] then return true end end
-  for _, ids in pairs(S.dead) do if ids[id] then return true end end
-  return false
-end
 -- Group `gid`'s node nearest x, y, z within JOIN_R m, or nil.
 local function join_node(gid, x, y, z)
   local best, nid = nil, nil
@@ -690,6 +928,10 @@ raid_monster = function(world, gid, first_id, id, engaged)
   if not nid then return nil end
   local oka, acc = pcall(world.account, world, id)
   if oka and acc then return nil end  -- a player
+  -- (0.15.547, found 10:08 cross-checking the features) never FlameKit's own: a test monster spawned near a raid joined
+  -- it (hostile faction) and held it open until it died; a loot chest (Reward loot puts one at each body) made during
+  -- the raid and hit by a player joined as a "monster" (engaged skips the faction check)
+  if K.test_tag.is(world, id) or K.chests.is(id) then return nil end
   local okh, cur = pcall(emf.health, world, id)
   if not (okh and cur) then return nil, "wait" end
   local okf, f = pcall(world.get, world, "Faction", id)
@@ -712,15 +954,9 @@ local function try_join(world, id, engaged)
       if nid and cur == 0 then wait = true end  -- (0.15.509) 0 health: still coming up out of the ground (the Undead), asked again
       if nid and type(cur) == "number" and cur > 0 then
         do
-          S.alive[nid] = S.alive[nid] or {}
-          S.alive[nid][id] = true
-          S.adopted[id] = true
+          mon_add(id, gid, nid, false, false, string.format("joined: faction %s%s, at %.0f %.0f %.0f", tostring(faction),
+            engaged and ", in the fight" or "", x, y, z))  -- (0.15.526) counted apart
           r.spawned = r.spawned + 1
-          if (S.joined_said or 0) < 40 then
-            S.joined_said = (S.joined_said or 0) + 1
-            emf.log(string.format("spawn nodes: monster %s (faction %s%s) joined the raid at node %d: %.0f %.0f %.0f", tostring(id),
-              tostring(faction), engaged and ", in the fight" or "", nid, x, y, z))
-          end
           return true
         end
       end
@@ -760,6 +996,65 @@ local function join_tick(world)
   S.join_hits = {}
 end
 
+-- (0.15.544, owner 2026-11-24 08:25 "a bit of a delay between when I kill the last monster and when the message in the
+-- notice disappears about their being 1 monster left to kill", 08:27 "it needs to update when a monster dies,
+-- otherwise, it looks like shit to the player") THE COUNTDOWN "Raid on X: N of TOTAL monsters left to kill" is worked
+-- out every FAST_STEPS (0.25 s, as deaths are seen: left_tick) and sent when it changed, at most every K.LEFT_MIN_STEPS
+-- (0.5 s, so a burst of kills cannot flood the players' channel); at least every LEFT_EVERY s. Until 0.15.543 it was
+-- changed at most every 5 s and not at all while nothing was alive (the END_GRACE wait): "1 of 24" stayed ~11 s after the
+-- last kill. Now the last kill shows "0 of 24" at once (zero = true while none is alive).
+local function count_notice(world, gid, r, g, zero)
+  -- (0.15.545, owner 08:36 "The "Raid on base: N of N monsters left to kill" should NOT appear until the first wave of
+  -- monsters comes in") nothing before the raid's first monster has spawned
+  if (r.spawned or 0) == 0 then return end
+  local text
+  local total = r.total
+  if zero then
+    text = string.format("Raid on %s: 0 of %d monsters left to kill.", r.place or "the area", total or 0)
+  else
+    -- (0.15.513, owner 16:31 "something is fucked with how it counts monsters left to kill": since 0.15.512 the nodes
+    -- spawn one by one, so alive + queued went 4, 3, 2, 1, 2, 1, 4) left = alive + queued + what the nodes still owe in
+    -- this wave + the waves to come (Monsters per node for every node)
+    -- (16:32 "the number keeps going up, you kill more it goes down, it spawns more, number goes up, thats absolutely
+    -- useless") so it only goes down: the monsters that joined (summons, the world's) are not in it while the nodes'
+    -- own are left; when only joined ones are left, it is their number
+    local own = #mon_alive(gid, nil, true)  -- (0.15.526) the roster: its own ones, and the ones counted apart
+    local joined = #mon_alive(gid) - own
+    local n = own + group_queued(gid)
+    local run = S.runs[gid]
+    if run then
+      for _, owed in pairs(run.owed or {}) do n = n + owed end
+      n = n + math.max(0, (run.waves or 0) - (run.wave or 0)) * (g.per_wave or 0) * #nodes_of(gid)
+    end
+    -- (0.15.514, owner 16:33 "you need to tell the player the TOTAL NUMBER of monsters for the entire raid, and count all
+    -- the way down to zero with its over") "N of TOTAL": TOTAL = every node's Monsters per node in every wave, fixed at
+    -- the start; N never above it; at 0 with summons still alive, those are named apart
+    total = total or n
+    if n > total then n = total end
+    if n == 0 and joined > 0 then
+      text = string.format("Raid on %s: 0 of %d monsters left. %d summoned monster%s still to kill.", r.place or "the area", total, joined, joined == 1 and "" or "s")
+    else
+      text = string.format("Raid on %s: %d of %d monsters left to kill.", r.place or "the area", n, total)
+    end
+  end
+  local now = os.time()
+  if (text ~= r.left_text and S.steps - (r.left_step or -1e9) >= K.LEFT_MIN_STEPS) or now - (r.left_at or 0) >= LEFT_EVERY then
+    r.left_text, r.left_at, r.left_step = text, now, S.steps
+    raid_notice(world, gid, text, true, LEFT_EVERY + 5, "left_" .. gid)
+  end
+end
+
+-- (0.15.544) every FAST_STEPS: the countdown of every raid past its start notice, as deaths are seen
+local function left_tick(world)
+  for gid, r in pairs(S.raid) do
+    local g = group(gid)
+    if g and not r.ask and r.left_text then
+      local alive, queued = group_alive(gid), group_queued(gid)
+      count_notice(world, gid, r, g, not S.runs[gid] and alive == 0 and queued == 0)
+    end
+  end
+end
+
 -- (0.15.488) Every second: the count of monsters left, and the end of a raid (no waves to come, none alive, none
 -- queued). S.raid[gid] = { place, spawned, left_at, left_n } from its first wave until its end.
 local function raid_tick(world)
@@ -773,10 +1068,17 @@ local function raid_tick(world)
           answer and string.format("player %s's minimap: place '%s', region '%s'", tostring(r.ask.by), tostring(answer.place), tostring(answer.region))
           or "no answer came: the nearest flame altar"))
         r.ask = nil
-        local tot = r.total and string.format(" %d monsters are coming.", r.total) or ""  -- (0.15.514)
-        -- (0.15.517, owner 17:02 "make the siren sound twice at the beginning of the raid and sound once at the beginning of
-        -- every new wave") the start: twice (sounds/raid_siren_twice.wav: the siren two times, 16 s)
-        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren_twice")
+        -- (0.15.545, owner 2026-11-24 08:36 "The first "Raid forces are pushing into" message should show up in red and the
+        -- "N monster are coming." message can be removed from the end of that line ... Also bring back the second siren on
+        -- the first notice of the raid forces notice") red, no count, the siren twice again (as 0.15.517-0.15.542)
+        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, START_END_S, nil,
+          "raid_siren_twice", "#ff4040")
+        local run = S.runs[gid]
+        local g = group(gid)
+        if run and run.hold_until then  -- (0.15.543) the first monsters after the notice
+          run.hold_until = S.steps + ((g and g.start_delay) or 0) * 60
+          emf.log(string.format("spawn nodes: %s: the start notice went out; its first monsters come in %d s", g and g.name or tostring(gid), (g and g.start_delay) or 0))
+        end
       end
     end
   end
@@ -789,6 +1091,7 @@ local function raid_tick(world)
       -- the start notice comes first
     elseif not S.runs[gid] and alive == 0 and queued == 0 and not r.none_since then
       r.none_since = os.time()  -- (0.15.500) none left: over only when it stays so for END_GRACE s (one may get up again)
+      count_notice(world, gid, r, g, true)  -- (0.15.544) "0 of N" at once, not the last number until the end notice
     elseif not S.runs[gid] and alive == 0 and queued == 0 and os.time() - r.none_since < END_GRACE then
       -- waiting
     elseif not S.runs[gid] and alive == 0 and queued == 0 and not r.verified then
@@ -799,42 +1102,13 @@ local function raid_tick(world)
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       S.started[gid] = nil
-      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.total or r.spawned), nil, START_END_S)
+      -- (0.15.549, owner 11:38 "add an "all clear" sound effect after the raid is over", 11:46 "yeah go with that one":
+      -- sounds/raid_all_clear.wav, a short brass "da-da-da DAAA", 1.2 s) the all-clear with the end notice
+      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.total or r.spawned), nil, START_END_S, nil, "raid_all_clear")
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
       r.none_since, r.verified = nil, nil
-      local now = os.time()
-      -- (0.15.513, owner 16:31 "something is fucked with how it counts monsters left to kill": since 0.15.512 the nodes
-      -- spawn one by one, so alive + queued went 4, 3, 2, 1, 2, 1, 4) left = alive + queued + what the nodes still owe in
-      -- this wave + the waves to come (Monsters per node for every node)
-      -- (16:32 "the number keeps going up, you kill more it goes down, it spawns more, number goes up, thats absolutely
-      -- useless") so it only goes down: the monsters that joined (summons, the world's) are not in it while the nodes'
-      -- own are left; when only joined ones are left, it is their number
-      local own, joined = 0, 0
-      for _, nd in ipairs(nodes_of(gid)) do
-        for id in pairs(S.alive[nd.id] or {}) do if S.adopted[id] then joined = joined + 1 else own = own + 1 end end
-      end
-      local n = own + queued
-      local run = S.runs[gid]
-      if run then
-        for _, owed in pairs(run.owed or {}) do n = n + owed end
-        n = n + math.max(0, (run.waves or 0) - (run.wave or 0)) * (g.per_wave or 0) * #nodes_of(gid)
-      end
-      -- (0.15.514, owner 16:33 "you need to tell the player the TOTAL NUMBER of monsters for the entire raid, and count all
-      -- the way down to zero with its over") "N of TOTAL": TOTAL = every node's Monsters per node in every wave, fixed at
-      -- the start; N never above it; at 0 with summons still alive, those are named apart
-      local total = r.total or n
-      if n > total then n = total end
-      local text
-      if n == 0 and joined > 0 then
-        text = string.format("Raid on %s: 0 of %d monsters left. %d summoned monster%s still to kill.", r.place or "the area", total, joined, joined == 1 and "" or "s")
-      else
-        text = string.format("Raid on %s: %d of %d monsters left to kill.", r.place or "the area", n, total)
-      end
-      if (text ~= r.left_text and now - (r.left_at or 0) >= LEFT_MIN_GAP) or now - (r.left_at or 0) >= LEFT_EVERY then
-        r.left_text, r.left_at = text, now
-        raid_notice(world, gid, text, true, LEFT_EVERY + 5, "left_" .. gid)
-      end
+      count_notice(world, gid, r, g, false)
     end
   end
 end
@@ -870,13 +1144,10 @@ local function verify_tick(world)
     if not mine and r.first_id then  -- (0.15.507) or a monster of its raid area without the tag (a summon)
       local nid0, cur0 = raid_monster(world, v.gid, r.first_id, id, false)
       mine = nid0 ~= nil and type(cur0) == "number" and cur0 > 0
-      if mine then S.adopted[id] = true end
     end
-    if mine then
+    if mine and not known(id) then  -- (0.15.526) one the roster has is mon_check's; a body of an earlier raid is never counted
       local okh, cur = pcall(emf.health, world, id)
-      local known = false
-      for _, ids in pairs(S.alive) do if ids[id] then known = true break end end
-      if okh and cur and cur > 0 and not known then
+      if okh and cur and cur > 0 then
         local okp, x, y, z = pcall(world.position, world, id)
         local nodes = nodes_of(v.gid)
         local best, nid = nil, nodes[1] and nodes[1].id
@@ -885,9 +1156,7 @@ local function verify_tick(world)
           if not best or d < best then best, nid = d, n.id end
         end
         if nid then
-          S.alive[nid] = S.alive[nid] or {}
-          S.alive[nid][id] = true
-          for _, ids in pairs(S.dead) do ids[id] = nil end
+          mon_add(id, v.gid, nid, false, false, "found alive by the search before the end notice")  -- (0.15.526) counted apart
           v.found = v.found + 1
         end
       end
@@ -901,6 +1170,42 @@ local function verify_tick(world)
     r.verified = true
   end
   S.verify = nil
+end
+
+-- ============================================================================================================
+-- (0.15.538, owner 2026-11-23 22:28 "before a raid starts it has to stop all the animals", 22:29 "build that into the
+-- system and note it heavily") THE ANIMAL HOLD. WHY: the 22:00 path grid probe (0.15.536) showed the base's tamed
+-- animals (IsTame + Wildlife, faction Environment, ~22 of the world's 100 near the player) asking the game for short
+-- 2-14 m walks that keep failing at the game's 500-step search limit and restart every ~0.5 s; the game's one shared
+-- path search then left the raid monsters' requests unsearched for 54-89 s (the "they stand there, then all come at
+-- once"). PROOF, 22:17 raid with the animals held by hand (0.15.537 flamekit.tamepath off): all 71 raid requests
+-- searched at once, "path came" median 1 s, max 4 s.
+-- WHAT: while a raid is active (the same rule as the raid protection: a group running, a raid not yet over, or any
+-- of a group's monsters alive), this writes animal_hold_server.txt = "1 <time>" and rewrites it every K.HOLD_BEAT_S;
+-- FlameKit Native (build_anywhere.cpp, "animal hold") then refuses every tamed animal's path request (the game's own
+-- failure answer), so the animals stand still and the raid monsters have the path search to themselves. Raid over:
+-- "0", the animals walk again. SAFETY: FlameKit Native lets go by itself if the file is not rewritten for 30 s (this
+-- script stopped, an error), and this side lets go after K.HOLD_MAX_S even if a monster never dies. Nothing is saved;
+-- a server restart always starts with the animals free. Logged: "spawn nodes: animal hold: ..." here and
+-- "[flamekit build] animal hold: ..." / "tame path test: ..." in FlameKit Native.
+-- ============================================================================================================
+local function hold_write(on, why)
+  local f = io.open(emf.dir .. K.HOLD_FILE .. ".tmp", "w")
+  if not f then
+    if not S.hold_err then S.hold_err = true emf.log("spawn nodes: animal hold: could not write " .. K.HOLD_FILE) end
+    return
+  end
+  f:write(on and ("1 " .. tostring(os.time()) .. "\n") or "0\n")
+  f:close()
+  os.remove(emf.dir .. K.HOLD_FILE)
+  if not os.rename(emf.dir .. K.HOLD_FILE .. ".tmp", emf.dir .. K.HOLD_FILE) then return end
+  if on ~= S.hold_on then
+    emf.log(on and ("spawn nodes: animal hold: ON (" .. tostring(why) .. "): tamed animals stand still so the raid monsters get the game's path search")
+      or ("spawn nodes: animal hold: off (" .. tostring(why) .. "): the animals walk again"))
+    if on then S.hold_since = os.time() end
+  end
+  S.hold_on = on
+  S.hold_at = os.time()
 end
 
 -- Starts a run of group `gid` (its waves). `why`: what fired it (for the log). Manual starts ignore the cooldown.
@@ -917,12 +1222,20 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
     return false, string.format("Nobody is within %d m of its nodes: it does not start.", g.near_r or 50), "nobody"
   end
   S.runs[gid] = { wave = 0, waves = g.waves, next_at = S.steps, by = by }
+  S.hold_capped = nil  -- (0.15.538) a new raid: the animal hold's time limit starts again
+  pcall(hold_write, true, "raid start: group " .. tostring(gid))  -- (0.15.538) the animal hold, before its first wave
   S.halted[gid] = nil  -- (0.15.514) a new start
   S.started[gid] = os.time()  -- (0.15.492) for its time limit
   for _, n in ipairs(nodes_of(gid)) do S.respawns[n.id] = nil end  -- (0.15.493) a new raid: its own count
   S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
   S.trickle_log = nil  -- (0.15.512)
   S.ground_log, S.threat_log = nil, nil  -- (0.15.518); (0.15.522)
+  S.mon_log = nil  -- (0.15.526)
+  mon_new_raid(gid)  -- (0.15.526) the bodies of its earlier raids put aside, monsters left from before counted apart
+  if S.raid[gid] then  -- (0.15.526) an earlier raid of it was not over yet (stopped, monsters left): this one has its own count
+    emf.log(string.format("spawn nodes: %s: its earlier raid was not over yet: this start begins a new raid (a new count)", g.name))
+    S.raid[gid] = nil
+  end
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -932,6 +1245,11 @@ local function finish(gid)
   S.runs[gid] = nil
   S.last_end[gid] = os.time()
   S.next_timer[gid] = nil  -- the timer picks its next time from now
+  -- (0.15.547, found 10:08 cross-checking: a Lua reload or a server restart forgot every cooldown, and a "Base raid"
+  -- group fired again at once: the 07:52 raid that started 1 s after a live reload) kept with the group in
+  -- spawn_nodes.json; restore() takes it back
+  local g = group(gid)
+  if g then g.last_end = S.last_end[gid] save() end
 end
 
 -- One wave of group `gid`: monsters queued at every node, (0.15.491) while a player is within its near_r of any of
@@ -950,6 +1268,7 @@ local function wave(world, gid, spots)
   -- "Most alive per node" of the node's are alive; the wave is over when every node has spawned all of them, and only
   -- then "Between waves" starts. Nobody near: the wave waits.
   run.owed = {}
+  run.size = 0  -- (0.15.542)
   local _ = pool
   for _, n in ipairs(nodes_of(gid)) do
     if anyone then
@@ -967,6 +1286,11 @@ local function wave(world, gid, spots)
   if not r and queued > 0 then
     r = { spawned = 0, total = run.waves * g.per_wave * #nodes_of(gid) }  -- (0.15.514) the raid's whole number
     S.raid[gid] = r
+    -- (0.15.543, owner 2026-11-24 08:16 "there needs to be a delay between when the raid notice goes out and when the
+    -- monsters actually spawn in.. default to like 10 seconds?") nothing of the first wave spawns before the start
+    -- notice has gone out and the group's "First monsters after the notice" time has passed (raid_tick sets the time
+    -- when it sends the notice; until then held, at most PLACE_WAIT + that time)
+    run.hold_until = S.steps + PLACE_WAIT + (g.start_delay or 0) * 60 + 60
     -- (0.15.490) the start notice waits (at most PLACE_WAIT steps) for the list of places from the player who started or
     -- triggered it, else the player nearest its nodes
     local by = run.by
@@ -1035,7 +1359,8 @@ local function trickle_tick(world)
   local spots = nil
   for gid, run in pairs(S.runs) do
     local g = group(gid)
-    if g and run.in_wave and run.owed then
+    if run.hold_until and S.steps >= run.hold_until then run.hold_until = nil end  -- (0.15.543)
+    if g and run.in_wave and run.owed and not run.hold_until then
       spots = spots or player_spots(world)
       if not group_near(spots, gid) then
         if not run.held then
@@ -1054,9 +1379,10 @@ local function trickle_tick(world)
             if alive_count(nid) + node_pending(nid) < g.max_alive then
               local tx, tz = nearest_player(spots, n.x, n.y, n.z, ACTIVE_DIST)  -- (0.15.477) for "face the nearest player"
               S.queue[#S.queue + 1] = { node = nid, x = n.x, y = n.y, z = n.z, guid = pool[math.random(#pool)], face = g.face,
-                                        tx = tx, tz = tz, yaw = n.yaw }
+                                        tx = tx, tz = tz, yaw = n.yaw, wave = run.wave }  -- (0.15.547) wave: for its level
               owed = owed - 1
               run.owed[nid] = owed
+              run.size = (run.size or 0) + 1  -- (0.15.542) how many this wave spawned
               if (S.trickle_log or 0) < 200 then
                 S.trickle_log = (S.trickle_log or 0) + 1
                 emf.log(string.format("spawn nodes: %s wave %d: node %d spawns its next monster (%d of %d; %d more to come, %d alive)", g.name,
@@ -1068,8 +1394,13 @@ local function trickle_tick(world)
         end
         if left == 0 then
           run.in_wave, run.owed = false, nil
-          emf.log(string.format("spawn nodes: %s wave %d of %d: every node has spawned its monsters", g.name, run.wave, run.waves))
-          if run.wave >= run.waves then finish(gid) else run.next_at = S.steps + g.wave_gap * 60 end
+          emf.log(string.format("spawn nodes: %s wave %d of %d: every node has spawned its monsters (%d)", g.name, run.wave, run.waves, run.size or 0))
+          if run.wave >= run.waves then finish(gid)
+          elseif (g.wave_dead or 0) > 0 and (run.size or 0) > 0 then  -- (0.15.542) Next wave after: its dead first
+            run.wait_dead = run.size
+            emf.log(string.format("spawn nodes: %s wave %d: the next wave's %d s start once %d%% of its %d monster(s) are dead (%d or fewer of the group's left alive)",
+              g.name, run.wave, g.wave_gap, g.wave_dead, run.size, math.floor(run.size * (100 - g.wave_dead) / 100)))
+          else run.next_at = S.steps + g.wave_gap * 60 end
         end
       end
     end
@@ -1096,18 +1427,15 @@ local function time_tick(world)
         if qn and qn.g == gid then table.remove(S.queue, i) end
       end
       local n = 0
-      for _, node in ipairs(nodes_of(gid)) do
-        for id in pairs(S.alive[node.id] or {}) do
-          if pcall(emf.destroy, world, id) then n = n + 1 end
-          if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-        end
-        S.alive[node.id] = nil
+      for _, id in ipairs(mon_alive(gid)) do  -- (0.15.526) the roster: its own ones and those counted apart
+        if pcall(emf.destroy, world, id) then n = n + 1 end
+        mon_drop(id)
       end
       emf.log(string.format("spawn nodes: %s: its time is up (%d min): its raid ends, %d living monster(s) taken away", g.name, g.duration, n))
       local r = S.raid[gid]
       if r then
         raid_notice(world, gid, string.format("Time is up! The raid on %s is over%s.", r.place or "the area",
-          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S)
+          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S)  -- (no all-clear here: owner 11:55, only when the monsters are defeated)
         raid_notice(world, gid, "", true, 1, "left_" .. gid)
         S.raid[gid] = nil
       end
@@ -1228,21 +1556,19 @@ local function do_spawn(world, q, x, sy, z)
       if gq then gq.last_first_id = id save() end  -- (0.15.507) kept: Remove and the end check use it
     end
     S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
-    S.alive[q.node] = S.alive[q.node] or {}
-    S.alive[q.node][id] = true
-    local qn = data().nodes[tostring(q.node)]
-    local qg = qn and group(qn.g)
+    mon_add(id, qn0 and qn0.g or 0, q.node, true, false, q.respawn and "spawned again for a stuck one" or "spawned by its node")  -- (0.15.526)
+    if S.mon[id] then S.mon[id].sp = true end  -- (0.15.547) spawned by a node: its loot follows the group's Loot
+    pcall(K.mark_loot, id, qn0 and qn0.g)  -- (0.15.547) Reward loot / No loot: Auto Loot leaves its body alone
+    local okl, whyl = pcall(K.level_spawned, world, id, qn0 and qn0.g, q)  -- (0.15.547) the group's level
+    if not okl then emf.log("spawn nodes: level: " .. tostring(whyl)) end
     -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
-    local _ = qg
-    -- (0.15.518, owner 17:11 "the monsters are literally just standing around? not fighting at all? something is wrong with
-  -- how they're getting spawned", 17:13 "um sure") the game's own move onto the ground after every spawn again, as until
-  -- 0.15.493 (raids "worked pretty well", 13:32): since 0.15.493 dropped it, 11-15 monsters at a time stood with their
-  -- order and 0 moved (17:11). It starts from the ground found here (no monster starts inside the ground).
-  ground.add(id, x, sy, z, yaw)
-  if (S.ground_log or 0) < 40 then
-    S.ground_log = (S.ground_log or 0) + 1
-    emf.log(string.format("spawn nodes: node %s: monster %s spawned at %.1f %.1f %.1f, the game's ground move queued", tostring(q.node), tostring(id), x, sy, z))
-  end
+    -- (0.15.531, owner 20:16 "yes" to taking it out, rule 0n) NO teleport onto the ground after the spawn any more: the
+    -- spot is already on the ground (find_surface, 0.15.493), and the teleport put back in 0.15.518 (on a misquote) hung
+    -- on every node monster ("still has a Teleport 10 s after EMF's push", 48 times on 2026-11-23).
+    if (S.ground_log or 0) < 40 then
+      S.ground_log = (S.ground_log or 0) + 1
+      emf.log(string.format("spawn nodes: node %s: monster %s spawned at %.1f %.1f %.1f (no ground teleport)", tostring(q.node), tostring(id), x, sy, z))
+    end
   else
     emf.log("spawn nodes: the game refused a spawn at node " .. tostring(q.node) .. " (" .. tostring(id) .. ")")
   end
@@ -1340,13 +1666,15 @@ end
 -- that") test switches: STUCK_ON (this whole stuck/ground/water/fall handling), HUNT_ON (the enemy orders), THREAT_ON
 -- (the threat table writes). All off: monsters are only spawned (with the game's ground move) and counted; the 10 s
 -- hunt summary still logs how many moved.
-local STUCK_ON, HUNT_ON, THREAT_ON = false, false, false
+local STUCK_ON, HUNT_ON, THREAT_ON = false, true, true  -- (owner 2026-11-24 13:19: STUCK_ON code is still needed, kept off for now: HANDOFF OPEN #16; do not remove) (0.15.529, owner 19:40 "turn the threat table shit back on still if you must, to see that it does nothing": THREAT_ON back on); (0.15.530, owner 19:55 "turn this back on to see if the log says anything new": HUNT_ON, the enemy orders)
 local function stuck_tick(world)
   if not STUCK_ON then return end
   local now = os.time()
   local spots = player_spots(world)
-  for nid, ids in pairs(S.alive) do
-    for id in pairs(ids) do
+  -- (0.15.526) only the nodes' own monsters (the roster): one counted apart is never taken away as stuck
+  for _, id in ipairs(mon_alive(nil, nil, true)) do
+    local nid = S.mon[id].n
+    do
       local t = S.track[id]
       local okp, x, y, z = pcall(world.position, world, id)
       local node = data().nodes[tostring(nid)]
@@ -1469,12 +1797,10 @@ local function stuck_tick(world)
         if why then
           local okd, gone = pcall(emf.destroy, world, id)
           if not (okd and gone) then emf.log(string.format("spawn nodes: monster %s: EMF did not take it away (%s)", tostring(id), tostring(gone))) end  -- (0.15.499)
-          ids[id] = nil
-          if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-          S.track[id], S.active_at[id] = nil, nil
+          mon_drop(id)  -- (0.15.526)
           S.respawns[nid] = (S.respawns[nid] or 0) + 1
           local nd0 = data().nodes[tostring(nid)]
-          local again = S.respawns[nid] <= RESPAWN_MAX and nd0 ~= nil and not S.adopted[id]  -- (0.15.501) a joined one is not replaced
+          local again = S.respawns[nid] <= RESPAWN_MAX and nd0 ~= nil
             and not S.halted[nd0.g]  -- (0.15.514) nor one of a stopped or removed group
           if again then
             local q = {}
@@ -1489,9 +1815,7 @@ local function stuck_tick(world)
     end
   end
   for id in pairs(S.track) do  -- dead or gone: no longer watched
-    local alive = false
-    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
-    if not alive then S.track[id], S.active_at[id] = nil, nil end
+    if not (S.mon[id] and not S.mon[id].dead) then S.track[id], S.active_at[id] = nil, nil end  -- (0.15.526)
   end
 end
 
@@ -1506,8 +1830,8 @@ local THREAT_R = 50            -- m: (0.15.521, owner 17:21) every player this n
 local function hunt_tick(world)
   local spots = player_spots(world)
   local now0 = os.time()
-  for _, ids in pairs(S.alive) do
-    for id in pairs(ids) do
+  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+    do
       -- (0.15.522, owner 17:21 "any player near like 50 m gets automatically added to the monsters threat table, one of
       -- their 5 or 6 slots", 17:22 "no hitting for +1 damage. I asked you to put me directly into their threat table.
       -- you've done this before") every player within THREAT_R m of a raid monster is written straight into its threat
@@ -1568,8 +1892,8 @@ local function hunt_tick(world)
   S.hunt_n = (S.hunt_n or 0) + 1
   if S.hunt_n % 5 == 0 then
     local n, ordered, going, moved = 0, 0, 0, 0
-    for _, ids in pairs(S.alive) do
-      for id in pairs(ids) do
+    for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+      do
         n = n + 1
         local o = S.orders[id]
         if o and o.id then ordered = ordered + 1 end
@@ -1590,12 +1914,12 @@ local function hunt_tick(world)
   end
   for id in pairs(S.orders) do  -- dead or gone: forgotten
     local alive = false
-    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
+    if S.mon[id] and not S.mon[id].dead then alive = true end  -- (0.15.526)
     if not alive then S.orders[id] = nil end
   end
   for id in pairs(S.threat_seen) do  -- (0.15.522)
     local alive = false
-    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
+    if S.mon[id] and not S.mon[id].dead then alive = true end  -- (0.15.526)
     if not alive then S.threat_seen[id] = nil end
   end
 end
@@ -1610,81 +1934,114 @@ local function mark_spec(id, share)
   return { entity = id, height = 2.6, text = "Raid monster", colour = MARK_COLOUR, shape = "diamond", edge_arrow = true,
            game_map = true, max_distance = NOTICE_DIST, bar = share }
 end
+-- (0.15.541, owner 2026-11-24 07:48 "the monsters are tagged with "Raid monster" when I stop the raid and remove the
+-- monsters, I see a lot of these still on the screen"; 07:55 "yeah" to the fix) MARKERS STAY UNDER EMF's LIMIT AND
+-- TAKE-OFFS ARE REPEATED. PROVEN 07:52 with the 0.15.540 marker log: EMF takes only ~39 marker messages in one go;
+-- the rest answer 0 ("went to 0 players") and are dropped. 83 take-offs at once: 39 came off, 44 stayed on the
+-- owner's screen, and the old code forgot them. Now each check (every 2 s) sends at most K.MARK_BUDGET messages, in this
+-- order: take-offs, new markers, health bar updates, the 15 s resends (oldest first). A take-off is kept in S.unmark
+-- and tried again every check until EMF answers 1 or more (K.MARK_OFF_TRIES at most: with nobody online it answers 0);
+-- a new marker or bar update that answered 0 is tried again too. Logged per check: "spawn nodes: markers: ...".
+local function delivered(ok, n) return ok and (type(n) ~= "number" or n >= 1) end
 local function mark_tick(world)
   if not emf.send_marker then return end
   local now = os.time()
-  local resend = now - (S.mark_sent_at or 0) >= MARK_RESEND
-  if resend then S.mark_sent_at = now end
-  local living = {}
-  for _, ids in pairs(S.alive) do
-    for id in pairs(ids) do
-      living[id] = true
-      local share = nil
-      local okh, cur, max = pcall(emf.health, world, id)
-      if okh and cur and max and max > 0 then share = math.max(0, math.min(1, cur / max)) end
-      local was = S.marked[id]
-      if resend or not was or (share and math.abs(share - (was.share or 1)) >= 0.05) then
-        local ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, share))
-        if not ok then ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, nil)) end  -- an older EMF: no bar
-        if ok then S.marked[id] = { share = share or 1 } end
+  S.unmark = S.unmark or {}
+  -- (0.15.541, owner 07:58 "I would like to add an option to control whether it puts the raid monster on or not")
+  -- only the monsters of groups whose "Mark its monsters" is on; switched off mid-raid: theirs are taken off
+  local living, order = {}, {}
+  for _, id in ipairs(mon_alive()) do
+    local m = S.mon[id]
+    local g = m and group(m.g)
+    if not (g and g.mark == false) then order[#order + 1] = id living[id] = true end
+  end
+  for id in pairs(S.marked) do  -- gone from the roster: to be taken off
+    if not living[id] then S.unmark[id] = S.unmark[id] or 0 S.marked[id] = nil end
+  end
+  local budget = K.MARK_BUDGET
+  local c = { new = 0, bar = 0, again = 0, off = 0, zero = 0, errs = 0, retry = 0, gave = 0, off_ids = {}, new_ids = {} }
+  -- 1. take-offs (also the ones EMF refused before)
+  for id, tries in pairs(S.unmark) do
+    if living[id] then S.unmark[id] = nil  -- back in the roster (got up): marked again below
+    elseif budget > 0 then
+      budget = budget - 1
+      local ok, ans = pcall(emf.unsend_marker, nil, "m" .. id)
+      if delivered(ok, ans) then
+        S.unmark[id] = nil
+        c.off = c.off + 1
+        if #c.off_ids < 6 then c.off_ids[#c.off_ids + 1] = id end
+      else
+        if not ok then c.errs = c.errs + 1 if c.errs <= 5 then emf.log("spawn nodes: markers: taking off the marker of monster " .. tostring(id) .. " failed: " .. tostring(ans)) end end
+        if tries + 1 >= K.MARK_OFF_TRIES then
+          S.unmark[id] = nil
+          c.gave = c.gave + 1
+        else
+          S.unmark[id] = tries + 1
+          c.retry = c.retry + 1
+        end
       end
     end
   end
-  for id in pairs(S.marked) do
-    if not living[id] then
-      pcall(emf.unsend_marker, nil, "m" .. id)
-      S.marked[id] = nil
+  -- 2. new markers, 3. bar updates, 4. resends (oldest first)
+  local function send(id, share)
+    budget = budget - 1
+    local ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, share))
+    if not ok then ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, nil)) end  -- an older EMF: no bar
+    if not ok then c.errs = c.errs + 1 if c.errs <= 5 then emf.log("spawn nodes: markers: sending the marker of monster " .. tostring(id) .. " failed: " .. tostring(n)) end end
+    if ok and not delivered(ok, n) then c.zero = c.zero + 1 end
+    return delivered(ok, n)
+  end
+  local shares = {}
+  for _, id in ipairs(order) do
+    local okh, cur, max = pcall(emf.health, world, id)
+    if okh and cur and max and max > 0 then shares[id] = math.max(0, math.min(1, cur / max)) end
+  end
+  for _, id in ipairs(order) do
+    if budget <= 0 then break end
+    if not S.marked[id] and send(id, shares[id]) then
+      S.marked[id] = { share = shares[id] or 1, at = now }
+      c.new = c.new + 1
+      if #c.new_ids < 6 then c.new_ids[#c.new_ids + 1] = id end
     end
+  end
+  for _, id in ipairs(order) do
+    if budget <= 0 then break end
+    local m = S.marked[id]
+    if m and shares[id] and math.abs(shares[id] - (m.share or 1)) >= 0.05 and send(id, shares[id]) then
+      m.share, m.at = shares[id], now
+      c.bar = c.bar + 1
+    end
+  end
+  if budget > 0 then
+    local old = {}
+    for _, id in ipairs(order) do
+      local m = S.marked[id]
+      if m and now - (m.at or 0) >= MARK_RESEND then old[#old + 1] = id end
+    end
+    table.sort(old, function(x, y) return (S.marked[x].at or 0) < (S.marked[y].at or 0) end)
+    for _, id in ipairs(old) do
+      if budget <= 0 then break end
+      if send(id, shares[id]) then S.marked[id].at = now c.again = c.again + 1 end
+    end
+  end
+  local waiting_new = 0
+  for _, id in ipairs(order) do if not S.marked[id] then waiting_new = waiting_new + 1 end end
+  local waiting_off = 0 for _ in pairs(S.unmark) do waiting_off = waiting_off + 1 end
+  if c.new + c.bar + c.again + c.off + c.zero + c.errs + c.retry + c.gave > 0 then
+    local function ids(t) local o = {} for _, v in ipairs(t) do o[#o + 1] = tostring(v) end return table.concat(o, " ") end
+    local marked = 0 for _ in pairs(S.marked) do marked = marked + 1 end
+    emf.log(string.format("spawn nodes: markers: %d sent of %d at most: %d new%s, %d bar update(s), %d sent again, %d answered 0 (again next check); "
+      .. "%d taken off%s, %d refused (again next check), %d given up after %d tries; %d error(s); marked now %d, waiting: %d to mark, %d to take off",
+      K.MARK_BUDGET - budget, K.MARK_BUDGET, c.new, c.new > 0 and (" [" .. ids(c.new_ids) .. (c.new > #c.new_ids and " ..." or "") .. "]") or "",
+      c.bar, c.again, c.zero, c.off, c.off > 0 and (" [" .. ids(c.off_ids) .. (c.off > #c.off_ids and " ..." or "") .. "]") or "",
+      c.retry, c.gave, K.MARK_OFF_TRIES, c.errs, marked, waiting_new, waiting_off))
   end
 end
 
--- Forgets monsters that died or are gone.
--- (0.15.482) A monster that died stays known as a body (S.dead) until its group's Remove takes it away; one that is
--- gone from the world is forgotten. Its "spare" hit rule goes when it dies. The rules follow the group's switch.
+-- (0.15.526) Was the old tracking's health read (alive -> body, body -> alive again, spare rules); now the roster's
+-- mon_check is the only one (above). Kept under its name: F.tick calls it.
 local function clean_tick(world)
-  for nid, ids in pairs(S.alive) do
-    local node = data().nodes[tostring(nid)]
-    local g = node and group(node.g)
-    for id in pairs(ids) do
-      local ok, cur = pcall(emf.health, world, id)
-      if not ok or cur == nil then  -- (0.15.487) health not readable: still in the world? then it is still alive for us
-        local okp, px = pcall(world.position, world, id)
-        if okp and px then ok, cur = true, 1 end
-      end
-      S.miss[id] = (not ok or cur == nil) and ((S.miss[id] or 0) + 1) or nil
-      if S.miss[id] and S.miss[id] < MISSES then
-        -- (0.15.483) not read this time: still counted alive (and still protecting) until MISSES checks in a row
-      elseif not ok or not cur or cur <= 0 then
-        ids[id] = nil
-        S.miss[id] = nil
-        if ok and cur then  -- dead, the body still there
-          S.dead[nid] = S.dead[nid] or {}
-          S.dead[nid][id] = true
-        end
-        if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      elseif S.spare_rules[id] then  -- (0.15.525) an EMF rule from before: gone (spare_tick does it now)
-        pcall(emf.hit_rule_remove, S.spare_rules[id])
-        S.spare_rules[id] = nil
-      end
-    end
-    if next(ids) == nil then S.alive[nid] = nil end
-  end
-  for nid, ids in pairs(S.dead) do  -- bodies the game took away
-    for id in pairs(ids) do
-      local ok, cur = pcall(emf.health, world, id)
-      if not ok or cur == nil then ids[id] = nil
-      elseif cur > 0 then
-        -- (0.15.500, owner 15:05 "it said all 41 raid monsters were defeated yet there were still a couple attacking
-        -- me?": monsters 41049, 41050 and 42749 were killed by him at 15:04:57-15:05:08, after the end at 15:04:54:
-        -- they had been counted dead) a body with health again got up (the Undead do): alive again
-        ids[id] = nil
-        S.alive[nid] = S.alive[nid] or {}
-        S.alive[nid][id] = true
-        emf.log(string.format("spawn nodes: node %s: monster %s got up again (health %s): alive again", tostring(nid), tostring(id), tostring(cur)))
-      end
-    end
-    if next(ids) == nil then S.dead[nid] = nil end
-  end
+  mon_check(world)
 end
 
 -- (0.15.478) "Monsters damage buildings": each monster of such a group looks along the line to the nearest player within
@@ -1704,8 +2061,8 @@ local function break_tick(world, spots)
     if g.breaks and S.steps % lv.every == 0 then
       local damage = {}
       for i, d in ipairs(PICKAXE) do damage[i] = math.floor(d * lv.mult) end
-      for _, n in ipairs(nodes_of(g.id)) do
-        for id in pairs(S.alive[n.id] or {}) do
+      for _, id in ipairs(mon_alive(g.id)) do  -- (0.15.526) the roster
+        do
           if hits >= BREAK_MAX then return end
           local ok, x, y, z = pcall(world.position, world, id)
           if ok and x then
@@ -1748,7 +2105,7 @@ end
 -- cancels every player's hits on placed objects (chests, stations, doors...: EMF's "objects"), everywhere on the
 -- server (EMF's rules have no area). Gone when no such group runs. Walls and floors are not hits: research.
 -- (0.15.525, owner 18:32 "at what point did I ever fucking say to make is so monster cannot attack each other", 18:35
--- "fix the fuck up you made") "Its monsters spare animals, pets and villagers": until 0.15.524 an EMF hit rule per
+-- "fix the fuck up you made") "Monsters spare animals, pets and villagers": until 0.15.524 an EMF hit rule per
 -- monster {from = it, to = "creatures", cancel}, and EMF's "creatures" are every creature, so raid monsters could hurt
 -- no other monster either. Now FlameKit Native (build_anywhere.cpp, spare_hit) cancels only a listed monster's hits on
 -- animals, pets and villagers (faction 5 Wildlife, 6 WildBeast, 11 PlayerAlly, 12 FarmAnimal, or a tame one); its
@@ -1756,12 +2113,9 @@ end
 -- switch on, one line; written when the list changes (every 2 s at most), and its size logged.
 local function spare_tick()
   local ids = {}
-  for nid, list in pairs(S.alive) do
-    local node = data().nodes[tostring(nid)]
-    local g = node and group(node.g)
-    if g and g.spare then
-      for id in pairs(list) do ids[#ids + 1] = math.floor(tonumber(id) or 0) end
-    end
+  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+    local g = group(S.mon[id].g)
+    if g and g.spare then ids[#ids + 1] = math.floor(tonumber(id) or 0) end
   end
   table.sort(ids)
   local text = table.concat(ids, " ")
@@ -1789,11 +2143,7 @@ local function protect_tick(world, spots)
   for gid in pairs(S.runs) do active[gid] = true end
   for gid in pairs(S.raid) do active[gid] = true end  -- (0.15.500) until its end notice (no gap while a replacement comes)
   for _, g in ipairs(groups()) do
-    if not active[g.id] then
-      for _, n in ipairs(nodes_of(g.id)) do
-        if alive_count(n.id) > 0 then active[g.id] = true break end
-      end
-    end
+    if not active[g.id] and #mon_alive(g.id) > 0 then active[g.id] = true end  -- (0.15.526) any of its monsters (the roster)
   end
   for gid in pairs(active) do
     local g = group(gid)
@@ -1826,6 +2176,8 @@ local function protect_tick(world, spots)
   -- (0.15.486, owner 13:05: the Undead could not be killed) players' hits on placed objects are cancelled by FlameKit
   -- Native (build_anywhere.cpp, protect_hit), which spares every creature; no EMF hit rule any more (EMF's "objects"
   -- class takes in monsters the game marks breakable). raid_protect_server.txt: "1" while wanted.
+  -- (0.15.551, owner 12:12) the same file also makes FlameKit Native cancel players' hits on pets and animals (a tame
+  -- one, or faction 12 FarmAnimal); nothing else changed here.
   if want ~= S.protect_on then
     local f = io.open(emf.dir .. "\\raid_protect_server.txt.tmp", "w")
     if f then
@@ -1838,6 +2190,31 @@ local function protect_tick(world, spots)
           or "spawn nodes: no raid with protection runs: players can hit placed objects again")
       end
     end
+  end
+end
+
+-- (0.15.538) THE ANIMAL HOLD's every-second check (see hold_write): held while a raid is active, by the raid
+-- protection's rule; rewritten every K.HOLD_BEAT_S so FlameKit Native keeps holding; let go when the raid is over or
+-- after K.HOLD_MAX_S.
+local function hold_tick()
+  local active = next(S.runs) ~= nil or next(S.raid) ~= nil
+  if not active then
+    for _, g in ipairs(groups()) do
+      if #mon_alive(g.id) > 0 then active = true break end
+    end
+  end
+  local now = os.time()
+  if not active then S.hold_capped = nil end
+  if active and S.hold_capped then return end  -- let go at K.HOLD_MAX_S: stays free until this raid is over
+  if active and S.hold_on and S.hold_since and now - S.hold_since >= K.HOLD_MAX_S then
+    S.hold_capped = true
+    hold_write(false, string.format("held %d min, the longest it may", math.floor(K.HOLD_MAX_S / 60)))
+    return
+  end
+  if active then
+    if not S.hold_on or now - (S.hold_at or 0) >= K.HOLD_BEAT_S then hold_write(true, "a raid is active") end
+  elseif S.hold_on ~= false then
+    hold_write(false, S.hold_on == nil and "no raid at the script's start" or "the raid is over (no group running, no raid monster alive)")
   end
 end
 
@@ -1899,17 +2276,20 @@ local function status(gid)
   local g = group(gid)
   if not g then return "" end
   local run = S.runs[gid]
-  local alive = 0
-  local bodies = 0
-  for _, n in ipairs(nodes_of(gid)) do
-    alive = alive + alive_count(n.id)
-    for _ in pairs(S.dead[n.id] or {}) do bodies = bodies + 1 end
-  end
+  local alive = #mon_alive(gid)  -- (0.15.526) the roster: its own ones and those counted apart
+  local bodies = #mon_bodies(gid)
   local a = (alive > 0 and string.format(" %d of its monsters alive.", alive) or "")
     .. ((S.broke[gid] or 0) > 0 and string.format(" Blocks they broke: %d.", S.broke[gid]) or "")
     .. (bodies > 0 and string.format(" %d dead bod%s on the ground.", bodies, bodies == 1 and "y" or "ies") or "")
   if run then
     if run.wave == 0 then return "Running: the first wave starts now." .. a end
+    if run.hold_until then  -- (0.15.543)
+      return string.format("Running: its first monsters come in %d s.", math.max(0, math.floor((run.hold_until - S.steps) / 60))) .. a
+    end
+    if run.wait_dead then  -- (0.15.542)
+      return string.format("Running: wave %d of %d, the next once %d or fewer of its monsters are left alive.", run.wave, run.waves,
+        math.floor(run.wait_dead * (100 - (g.wave_dead or 0)) / 100)) .. a
+    end
     return string.format("Running: wave %d of %d done, the next in %d s.", run.wave, run.waves,
       math.max(0, math.floor((run.next_at - S.steps) / 60))) .. a
   end
@@ -1925,8 +2305,12 @@ local function status(gid)
 end
 
 -- Whether this player is an admin (core/admins: EMF's admins, the host, npc_admins.json).
+-- (0.15.546, owner 2026-11-24 08:43 "lets remove all the admin restrictions on the Spawn Nodes system for now so other
+-- players can test it out") EVERY PLAYER COUNTS AS AN ADMIN HERE FOR NOW: they all get the groups and nodes, the tab, the
+-- window and every action. To restrict it again: return admins.is(account, from) == true (the line below).
 local function is_admin(account, from)
-  return admins.is(account, from) == true
+  local _ = admins.is  -- kept for when it is restricted again
+  return true
 end
 
 -- The state for one player's game: the groups and nodes only for an admin.
@@ -2006,10 +2390,11 @@ local function handle(world, account, entity, msg, from)
     note(string.format("Deleted %s and its %d node(s).", g.name, n))
   elseif msg.op == "set" and g then
     local key, v = tostring(msg.key), msg.value
-    if key == "on" or key == "breaks" or key == "protect" or key == "spare" or key == "announce" then  -- (0.15.488) announce  -- (0.15.478) the raid switches; (0.15.482) spare
+    if key == "on" or key == "breaks" or key == "protect" or key == "spare" or key == "announce" or key == "mark" then  -- (0.15.541) mark  -- (0.15.488) announce  -- (0.15.478) the raid switches; (0.15.482) spare
       g[key] = v == true
     elseif allowed(key, v) then
       g[key] = v
+      if key == "loot" then for _, mid in ipairs(mon_alive(gid)) do if S.mon[mid] and S.mon[mid].sp then pcall(K.mark_loot, mid, gid) end end end  -- (0.15.547)
       if key == "trigger" or key == "timer_min" or key == "timer_max" then S.next_timer[gid] = nil end
     else
       note("That setting was refused.")
@@ -2032,7 +2417,7 @@ local function handle(world, account, entity, msg, from)
     if not n then note("That node is gone.") return state(world, account, from) end
     if msg.op == "delete_node" then
       d.nodes[tostring(n.id)] = nil
-      S.alive[n.id] = nil
+      for id, m in pairs(S.mon) do if m.n == n.id then mon_drop(id) end end  -- (0.15.526) as before: its monsters forgotten
       note(string.format("Node %d deleted.", n.id))
       emf.log(string.format("spawn nodes: player %s deleted node %d", who, n.id))
     else
@@ -2080,14 +2465,15 @@ local function handle(world, account, entity, msg, from)
     note(g.name .. " stopped: no more monsters come (its cooldown starts now). Remove its monsters takes away the ones still alive.")
   elseif msg.op == "remove" and g then
     local n, bodies = 0, 0
-    for _, node in ipairs(nodes_of(gid)) do
-      for id in pairs(S.alive[node.id] or {}) do
-        if pcall(emf.destroy, world, id) then n = n + 1 end
-        if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      end
-      S.alive[node.id] = nil
-      for id in pairs(S.dead[node.id] or {}) do if pcall(emf.destroy, world, id) then bodies = bodies + 1 end end  -- (0.15.482)
-      S.dead[node.id] = nil
+    -- (0.15.526) the roster: its living monsters (its own and those counted apart), then its bodies of every raid
+    for _, id in ipairs(mon_alive(gid)) do
+      if pcall(emf.destroy, world, id) then n = n + 1 end
+      mon_drop(id)
+    end
+    for _, id in ipairs(mon_bodies(gid)) do  -- (0.15.482)
+      if pcall(emf.destroy, world, id) then bodies = bodies + 1 end
+      mon_drop(id)
+      S.old_bodies[id] = nil
     end
     for i = #S.queue, 1, -1 do
       local q = S.queue[i]
@@ -2117,12 +2503,13 @@ function F.tick(world)
   S.steps = S.steps + 1
   local session = emf.session()
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
-    for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
-    S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
-    S.scan, S.scanned, S.miss, S.purge, S.raid, S.started = nil, false, {}, nil, {}, {}
+    S.session, S.queue, S.runs = session, {}, {}
+    S.mon, S.old_bodies = {}, {}  -- (0.15.526) the roster
+    S.scan, S.scanned, S.purge, S.raid, S.started = nil, false, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
+    S.unmark = {}  -- (0.15.541) take-offs EMF has not taken yet
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
-    S.adopted, S.join_hits, S.join_seen = {}, {}, nil  -- (0.15.501)
+    S.join_hits, S.join_seen = {}, nil  -- (0.15.501)
     S.orders = {}  -- (0.15.503)
     S.bad, S.verify = {}, nil  -- (0.15.505)
     S.join_wait = {}  -- (0.15.507)
@@ -2130,22 +2517,24 @@ function F.tick(world)
     S.hunt_pos = {}  -- (0.15.511)
     S.halted = {}  -- (0.15.514)
     S.threat_seen = {}  -- (0.15.522)
+    S.hitby, S.lvl_said = {}, {}  -- (0.15.547)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
     if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)
+  pcall(K.reward.tick, world)  -- (0.15.547) Reward loot's chests and the game loot it removes (once per world step)
   if S.steps % FAST_STEPS == 5 then check_timeouts(world) end  -- (0.15.515)
   if S.steps % FAST_STEPS == 4 then local okt, why = pcall(trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
   if S.verify then verify_tick(world) end  -- (0.15.505)
   if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
-  ground.tick(world)
   spawn_tick(world)
   -- (0.15.515, owner 16:42 "the nodes are spawning monsters too slowly? if a node spawns a monster and it gets killed it
   -- needs to immediately spawn another one": a death was seen only every 2 s (clean_tick) and the next one queued every
   -- 0.5 s (trickle_tick)) deaths are seen and the next monster queued every 0.25 s
   if S.steps % FAST_STEPS == 3 and S.steps % CLEAN_STEPS ~= 0 then clean_tick(world) end
+  if S.steps % FAST_STEPS == 3 then local okl, why = pcall(left_tick, world) if not okl then emf.log("spawn nodes: left_tick: " .. tostring(why)) end end  -- (0.15.544) the countdown as deaths are seen
   if S.steps % CLEAN_STEPS == 0 then
     clean_tick(world) stuck_tick(world) pcall(mark_tick, world)  -- (0.15.493) stuck_tick, mark_tick
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
@@ -2156,11 +2545,28 @@ function F.tick(world)
   if not need_spots then return end
   local spots = player_spots(world)
   for gid, run in pairs(S.runs) do
-    if S.steps >= run.next_at and not run.in_wave then wave(world, gid, spots) end  -- (0.15.512) not while a wave still spawns
+    -- (0.15.542, owner 2026-11-24 08:08 "the next wave can't start until most of the first wave is dead" (90%), "make
+    -- that an option": the group's "Next wave after") Between waves starts only when the group has no more than
+    -- (100 - wave_dead)% of the last wave's size alive (monsters of earlier waves still alive count too). A monster
+    -- that never dies holds the raid until "Raid lasts at most" ends it.
+    if run.wait_dead then
+      local g = group(gid)
+      local left = math.floor(run.wait_dead * (100 - ((g and g.wave_dead) or 0)) / 100)
+      local alive = #mon_alive(gid)
+      if alive <= left then
+        emf.log(string.format("spawn nodes: %s wave %d: %d of its monsters left alive (%d or fewer wanted): the next wave comes in %d s",
+          g and g.name or tostring(gid), run.wave, alive, left, g and g.wave_gap or 0))
+        run.wait_dead = nil
+        run.next_at = S.steps + ((g and g.wave_gap) or 0) * 60
+      end
+    end
+    if S.steps >= run.next_at and not run.in_wave and not run.wait_dead then wave(world, gid, spots) end  -- (0.15.512) not while a wave still spawns; (0.15.542) nor while its dead are awaited
   end
   if S.steps % CHECK_STEPS == 0 then
     trigger_tick(world, spots)
     protect_tick(world, spots)
+    local okhd, whyhd = pcall(hold_tick)  -- (0.15.538) the animal hold
+    if not okhd then emf.log("spawn nodes: animal hold: " .. tostring(whyhd)) end
     pcall(spare_tick)  -- (0.15.525)
     raid_tick(world)  -- (0.15.488)
     time_tick(world)  -- (0.15.492)
@@ -2292,6 +2698,47 @@ local function choice_row(rows, g, key, title, tip, list, show)
   rows[#rows + 1] = { options = opts, text = show and show(g[key]) or label(key, g[key]), same_line = true, tooltip = tip }
 end
 
+-- ============================================================================================================
+-- (0.15.539, owner 2026-11-24 07:13 "cleaning up the UI you made. it looks awful", 07:16 "We need to move a lot of
+-- this out to its own window so its easier to create and manage nodes as I'm moving around the map") THE TAB and THE
+-- SPAWN NODES WINDOW. The tab keeps the group's setup (Groups / Raid rules / Monsters / When); the window (FlameKit
+-- Native's third Experimental-style window, rows in ui_nodes.dat via features/native_ui.lua, clicks "nod ...", shown
+-- and hidden by ui_nodes_toggle.request) has what is used out on the map: the group, Start / Stop / Remove, Add node
+-- here, Show nodes, Put trip wire here, and the nearest nodes one line each. Both share the chosen group (C.sel) and
+-- F.click. Labels followed by a drop-down line up in a column (FlameKit Native's form alignment, 0.15.539).
+-- ============================================================================================================
+
+-- The group shown (C.sel, else the first) and the group list.
+local function shown_group(v)
+  local list = v.groups or {}
+  local g = nil
+  for _, x in ipairs(list) do if x.id == C.sel then g = x end end
+  if not g then g = list[1] C.sel = g and g.id or nil end
+  return g, list
+end
+
+-- The group drop-down row (label + drop-down).
+local function group_row(rows, g, list)
+  local opts = {}
+  for _, x in ipairs(list) do
+    opts[#opts + 1] = { key = "sel:" .. x.id, text = x.name .. (x.on and "" or " (off)") .. (x.running and " (running)" or ""), selected = x.id == g.id }
+  end
+  rows[#rows + 1] = { label = true, text = "Group" }
+  rows[#rows + 1] = { options = opts, text = g.name .. (g.running and " (running)" or ""), same_line = true, tooltip = "The group these settings and nodes belong to." }
+end
+
+-- An on/off switch row.
+local function switch_row(rows, key, on, text, tip)
+  rows[#rows + 1] = { button = key, text = (on and "On    " or "Off   ") .. text, selected = on or nil, tooltip = tip }
+end
+
+-- Opens or closes the Spawn Nodes window (FlameKit Native shows or hides it when this file appears).
+local function toggle_window()
+  local f = emf.dir and io.open(emf.dir .. "\\ui_nodes_toggle.request", "w")
+  if f then f:write("toggle\n") f:close() end
+end
+
+-- The tab: the group's setup.
 function F.panel(world)
   local v = my_state(world)
   if not v then
@@ -2305,89 +2752,144 @@ function F.panel(world)
     rows[#rows + 1] = { dim = true, text = "Only FlameKit admins can set up spawn nodes." }
     return rows
   end
-  local list = v.groups or {}
-  local g = nil
-  for _, x in ipairs(list) do if x.id == C.sel then g = x end end
-  if not g then g = list[1] C.sel = g and g.id or nil end
-  rows[#rows + 1] = { heading = "Groups" }
+  local g, list = shown_group(v)
+  -- (0.15.554, owner 13:19 "The "Nodes" section on the "Spawn Nodes" tab needs to get moved all the way to the top so
+  -- users do not have to scroll all the way to the bottom to find it") the Nodes section first (it was last)
   if g then
-    local opts = {}
-    for _, x in ipairs(list) do
-      opts[#opts + 1] = { key = "sel:" .. x.id, text = x.name .. (x.on and "" or " (off)") .. (x.running and " (running)" or ""), selected = x.id == g.id }
-    end
-    rows[#rows + 1] = { label = true, text = "Group" }
-    rows[#rows + 1] = { options = opts, text = g.name, same_line = true, tooltip = "The group these settings and nodes belong to." }
-  else
-    rows[#rows + 1] = { dim = true, text = "No groups yet: make one with New group." }
+    local n_nodes = 0
+    for _, n in ipairs(v.nodes or {}) do if n[2] == g.id then n_nodes = n_nodes + 1 end end
+    rows[#rows + 1] = { heading = "Nodes" }
+    rows[#rows + 1] = { dim = true, text = string.format("%s has %d node%s. Add, move and delete them in the Spawn Nodes window.", g.name, n_nodes, n_nodes == 1 and "" or "s") }
+    rows[#rows + 1] = { button = "window", text = "Spawn Nodes window",
+      tooltip = "Opens or closes the Spawn Nodes window." }
   end
+  rows[#rows + 1] = { heading = "Groups" }
+  if g then group_row(rows, g, list)
+  else rows[#rows + 1] = { dim = true, text = "No groups yet: make one with New group." } end
   rows[#rows + 1] = { button = "new", text = "New group", disabled = (#list >= (v.max_groups or MAX_GROUPS)) or nil,
     tooltip = "Makes a new group with the default settings: Random monsters, started by hand, 3 waves 30 s apart, 3 monsters per node in each wave." }
+  if g then
+    local asked = C.del_asked and C.del_asked.g == g.id and os.time() - C.del_asked.at <= 5
+    rows[#rows + 1] = { button = "delgroup", same_line = true, selected = asked or nil,
+      text = asked and "Click again to delete" or "Delete group",
+      tooltip = "Deletes " .. g.name .. " and all its nodes. Click twice within 5 seconds." }
+  end
+  rows[#rows + 1] = { button = "window", same_line = true, text = "Spawn Nodes window",
+    tooltip = "Opens or closes the Spawn Nodes window: the group, Start / Stop, Add node here and its nodes, to use while you move around the map." }
   if not g then return rows end
-  local asked = C.del_asked and C.del_asked.g == g.id and os.time() - C.del_asked.at <= 5
-  rows[#rows + 1] = { button = "delgroup", same_line = true, selected = asked or nil,
-    text = asked and "Click again to delete" or "Delete group",
-    tooltip = "Deletes " .. g.name .. " and all its nodes. Click twice within 5 seconds." }
-  rows[#rows + 1] = { dim = true, text = (v.status or {})[tostring(g.id)] or "" }
+  local status = (v.status or {})[tostring(g.id)]
+  if status and status ~= "" then rows[#rows + 1] = { dim = true, text = status } end
 
-  rows[#rows + 1] = { heading = g.name }
-  rows[#rows + 1] = { button = "on", text = (g.on and "On    " or "Off   ") .. "Group on", selected = g.on == true,
-    tooltip = "Off: its trigger never fires (Start now still works)." }
-  rows[#rows + 1] = { button = "start", text = "Start now", same_line = true, disabled = g.running or nil,
-    tooltip = "Starts its waves now, whatever its trigger, also during its cooldown, when a player is within its Player within distance of one of its nodes." }
-  rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
-  rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
-    tooltip = "Removes this group's monsters only, alive or dead (their bodies on the ground too); other groups' and the world's "
-      .. "own monsters stay. Only the ones spawned since the server last started or reloaded FlameKit." }
-  choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, Random (any kind, no bosses) or Bosses (any boss: set Monsters per node to 1 for one boss).",
-    FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
-  choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
-    .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
-  rows[#rows + 1] = { button = "announce", text = (g.announce ~= false and "On    " or "Off   ") .. "Announce the raid to players", selected = g.announce ~= false,  -- (0.15.488)
-    tooltip = "Orange FlameKit notices: when it starts (to every player, with the name of the nearest flame altar), each new wave and how "
-      .. "many monsters are left (to the players within " .. NOTICE_DIST .. " m of its nodes), and when it is over." }
-  rows[#rows + 1] = { button = "spare", text = (g.spare and "On    " or "Off   ") .. "Its monsters spare animals, pets and villagers", selected = g.spare == true,
-    tooltip = "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
-      .. "safe from them (other monsters too). Players are not covered: they can still be hit." }
-  rows[#rows + 1] = { button = "breaks", text = (g.breaks and "On    " or "Off   ") .. "Monsters damage buildings", selected = g.breaks == true,
-    tooltip = "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "
+  rows[#rows + 1] = { heading = "Raid rules" }
+  switch_row(rows, "on", g.on == true, "Group on", "Off: its trigger never fires (Start now still works).")
+  switch_row(rows, "announce", g.announce ~= false, "Announce the raid to players",  -- (0.15.488)
+    "Orange FlameKit notices: when it starts (to every player, with the name of the nearest flame altar), each new wave and how "
+      .. "many monsters are left (to the players within " .. NOTICE_DIST .. " m of its nodes), and when it is over.")
+  switch_row(rows, "mark", g.mark ~= false, "Mark its monsters",  -- (0.15.541, owner 07:58)
+    "An orange Raid monster marker over each of its living monsters, with a health bar and an arrow at the screen's edge, and on the map, "
+      .. "on every player's game. Off: no markers (switched off during a raid, the ones up come off).")
+  switch_row(rows, "spare", g.spare == true, "Monsters spare animals, pets and villagers",  -- (0.15.552, owner 12:26: "Its" taken off the label)
+    "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
+      .. "safe from them (other monsters too). Players are not covered: they can still be hit.")
+  switch_row(rows, "protect", g.protect == true, "Players cannot damage base structures during raid",  -- (0.15.484, owner 12:50: the label)
+    "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
+      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
+      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server; "
+      .. "and players' hits on pets and animals (tamed ones and farm animals) do nothing, on the whole server. "
+      .. "Admins too, for now.")
+  switch_row(rows, "breaks", g.breaks == true, "Monsters damage buildings",
+    "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "
       .. "Building damage below. Never the ground or the world's own ruins. Inside a flame altar's area what breaks stays broken. "
-      .. "Needs EMF 0.6.19 on the server." }
+      .. "Needs EMF 0.6.19 on the server.")
   if g.breaks then
     choice_row(rows, g, "break_level", "Building damage", "Low: a hit every 3 s like a top pickaxe, blocks within 4 m. Medium: every 1.5 s, "
       .. "twice as hard, 5 m. High: every 1 s, 4 times as hard, 6 m, 1.5 m holes. Extreme: every 0.5 s, 8 times as hard, 6 m, 1.5 m holes. "
       .. "Stone takes about 22 top-pickaxe hits.", BREAK_LEVELS, function(l) return (BREAK_LEVEL[l] or {}).label or l end)
+    if v.no_break then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
   end
-  if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
-  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot damage base structures during raid", selected = g.protect == true,  -- (0.15.484, owner 12:50: the label)
-    tooltip = "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
-      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
-      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
-      .. "Admins too, for now." }
-  choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
-    .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
+
+  rows[#rows + 1] = { heading = "Monsters" }
+  choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, Random (any kind, no bosses) or Bosses (any boss: set Monsters per node to 1 for one boss).",
+    FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
+  choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
+    .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
+  choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave, one after another (see Most alive per node). "
+    .. "The wave is over when every node has spawned all of them; then Between waves starts.")  -- (0.15.512)
+  choice_row(rows, g, "max_alive", "Most alive per node", "At most this many of a node's monsters are alive at once: its next one comes when one of them dies. "
+    .. "1: one at a time.")
+  choice_row(rows, g, "start_level", "Starting level", "The level of the first wave's monsters (1 to " .. K.MAX_LEVEL .. ").")  -- (0.15.547, owner 09:41; 0.15.548 no "Game's own")
+  choice_row(rows, g, "level_step", "Level per wave", "Added to the level for each wave after the first. Wave 3 at Starting level 20 "
+    .. "and +10 each wave: level 40. Never above " .. K.MAX_LEVEL .. ", whatever is set.")
+  choice_row(rows, g, "loot", "Loot", "What its monsters drop. Normal monster loot: what the game gives. Reward loot: like the test "
+    .. "monsters: runes and legendary runes into the bag of the last player who hit it, and a legendary item at its level in a "
+    .. "loot chest by the body (twice for bosses); nothing of the game's own. Reward + normal loot: both. No loot: nothing at all.")
+
+  rows[#rows + 1] = { heading = "When" }
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
   if g.trigger == "timer" then
     choice_row(rows, g, "timer_min", "Timer from", "The timer fires at a random time between these two (after the cooldown).")
-    choice_row(rows, g, "timer_max", "to", "The timer fires at a random time between these two (after the cooldown).")
+    choice_row(rows, g, "timer_max", "Timer to", "The timer fires at a random time between these two (after the cooldown).")
   elseif g.trigger == "wire" then
     choice_row(rows, g, "wire_r", "Trip wire size", "A player this close to the trip wire's spot fires it.")
-    rows[#rows + 1] = { button = "wire", text = "Put trip wire here",
-      tooltip = g.wire and string.format("Moves the trip wire to where you stand (now at %.0f, %.0f).", g.wire.x, g.wire.z)
-        or "Puts the trip wire where you stand." }
   elseif g.trigger == "time" then
     choice_row(rows, g, "hour", "At", "Fires when the game's clock passes this hour.")
   elseif g.trigger == "raid" then
     choice_row(rows, g, "raid_r", "Base within", "Fires when a player is inside a flame altar's area whose middle is this close to one of the group's nodes.")
   end
+  choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
+    .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
+  choice_row(rows, g, "start_delay", "First monsters after", "The time from the raid's start notice (and its siren) to its first monsters, "
+    .. "so players can get ready.")  -- (0.15.543, owner 08:16)
   choice_row(rows, g, "waves", "Waves", "How many waves one start brings.")
-  choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves.")
-  choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave, one after another (see Most alive per node). "
-    .. "The wave is over when every node has spawned all of them; then Between waves starts.")  -- (0.15.512)
-  choice_row(rows, g, "max_alive", "Most alive per node", "At most this many of a node's monsters are alive at once: its next one comes when one of them dies. "
-    .. "1: one at a time.")
+  choice_row(rows, g, "wave_dead", "Next wave after", "When the Between waves time starts: once the wave has spawned (the old way), or once "
+    .. "this share of its monsters is dead (monsters left from earlier waves count as alive too). A monster that never dies holds the raid "
+    .. "until Raid lasts at most ends it.")  -- (0.15.542, owner 08:08)
+  choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves (from Next wave after).")
   choice_row(rows, g, "duration", "Raid lasts at most", "From its start: when this time is up its raid ends, whatever is left: no more waves, its "
     .. "living monsters are taken away (and with them its protection), the bodies stay.")  -- (0.15.492)
   choice_row(rows, g, "cooldown", "Cooldown", "After its waves, the trigger cannot fire again for this long.")
+  if g.trigger == "wire" and g.wire then
+    rows[#rows + 1] = { dim = true, text = string.format("Trip wire at %.0f, %.0f: move it with Put trip wire here in the Spawn Nodes window.", g.wire.x, g.wire.z) }
+  end
+  return rows
+end
+
+-- The Spawn Nodes window: what is used out on the map.
+function F.window_rows(world)
+  local v = my_state(world)
+  if not v then return { { dim = true, text = "Asking the server..." } } end
+  local rows = {}
+  local note = C.note or v.note
+  if note then rows[#rows + 1] = { color = "#ffb060", text = note } end
+  if not v.admin then
+    rows[#rows + 1] = { dim = true, text = "Only FlameKit admins can set up spawn nodes." }
+    return rows
+  end
+  local g, list = shown_group(v)
+  if not g then
+    rows[#rows + 1] = { dim = true, text = "No groups yet: make one in the Spawn Nodes tab (F4)." }
+    return rows
+  end
+  group_row(rows, g, list)
+  local status = (v.status or {})[tostring(g.id)]
+  if status and status ~= "" then rows[#rows + 1] = { dim = true, text = status } end
+  rows[#rows + 1] = { button = "start", text = "Start now", disabled = g.running or nil,
+    tooltip = "Starts its waves now, whatever its trigger, also during its cooldown, when a player is within its Player within distance of one of its nodes." }
+  rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
+  rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
+    tooltip = "Removes this group's monsters only, alive or dead (their bodies on the ground too); other groups' and the world's "
+      .. "own monsters stay. Only the ones spawned since the server last started or reloaded FlameKit." }
+  rows[#rows + 1] = { button = "add", text = "Add node here", disabled = (#(v.nodes or {}) >= (v.max_nodes or MAX_NODES)) or nil,
+    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Its monsters spawn within " .. SPREAD .. " m of it (change it on its line below)." }
+  switch_row(rows, "show", show_on(), "Show nodes",
+    "Shows every node and trip wire as a marker over the world and on the map, only in your game. Other players never see them.")
+  rows[#rows].same_line = true
+  if g.trigger == "wire" then
+    rows[#rows + 1] = { button = "wire", text = "Put trip wire here", same_line = true,
+      tooltip = g.wire and string.format("Moves the trip wire to where you stand (now at %.0f, %.0f).", g.wire.x, g.wire.z)
+        or "Puts the trip wire where you stand." }
+  end
+  if C.no_markers then rows[#rows + 1] = { color = "#ffb060", text = "Your EMF cannot draw markers yet: let FlameKit update EMF (About tab)." } end
 
   local mine = {}
   for _, n in ipairs(v.nodes or {}) do if n[2] == g.id then mine[#mine + 1] = n end end
@@ -2396,33 +2898,29 @@ function F.panel(world)
   pcall(function() px, py, pz = world:position(me) end)
   for _, n in ipairs(mine) do n.d = px and math.sqrt(dist2(px, py, pz, n[3], n[4], n[5])) or nil end
   table.sort(mine, function(a, b) return (a.d or 1e9) < (b.d or 1e9) end)
-  rows[#rows + 1] = { heading = string.format("Nodes of %s (%d)", g.name, #mine) }
-  rows[#rows + 1] = { button = "add", text = "Add node here", disabled = (#(v.nodes or {}) >= (v.max_nodes or MAX_NODES)) or nil,
-    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Its monsters spawn within " .. SPREAD .. " m of it (change it with Spawn within)." }
+  rows[#rows + 1] = { heading = string.format("Nodes of %s (%d), nearest first", g.name, #mine) }
+  if #mine == 0 then rows[#rows + 1] = { dim = true, text = "None yet: stand where monsters should come from and click Add node here." } end
   for i = 1, math.min(#mine, NEAR_LIST) do
     local n = mine[i]
-    rows[#rows + 1] = { dim = true, text = string.format("Node %d: %.0f, %.0f%s", n[1], n[3], n[5], n.d and string.format(", %d m away", math.floor(n.d)) or "") }
-    rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand, facing the way you face." }
-    rows[#rows + 1] = { button = "del:" .. n[1], text = "Delete", same_line = true, tooltip = "Deletes node " .. n[1] .. "." }
-    -- (0.15.485) its own spawn distance
     local sp = tonumber(n[6]) or SPREAD
     local opts = {}
     for _, c in ipairs(SPREADS) do
-      opts[#opts + 1] = { key = "spread:" .. n[1] .. ":" .. c, text = c == 0 and "On the node" or (c .. " m"), selected = sp == c }
+      opts[#opts + 1] = { key = "spread:" .. n[1] .. ":" .. c, text = c == 0 and "On the node" or ("Within " .. c .. " m"), selected = sp == c }
     end
-    rows[#rows + 1] = { label = true, text = "    Spawn within" }
-    rows[#rows + 1] = { options = opts, text = sp == 0 and "On the node" or (sp .. " m"), same_line = true,
+    rows[#rows + 1] = { label = true, text = string.format("Node %d%s", n[1], n.d and string.format(", %d m", math.floor(n.d)) or ""),
+      tooltip = string.format("Node %d at %.0f, %.0f.", n[1], n[3], n[5]) }
+    rows[#rows + 1] = { options = opts, text = sp == 0 and "On the node" or ("Within " .. sp .. " m"), same_line = true,
       tooltip = "How far from node " .. n[1] .. " its monsters may appear. A spot behind a wall, inside a building or inside rock is not used: "
         .. "FlameKit tries " .. SPOT_TRIES .. " spots, then uses the node itself. Chests and other placed objects are not seen." }
+    rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand, facing the way you face." }
+    rows[#rows + 1] = { button = "del:" .. n[1], text = "Delete", same_line = true, tooltip = "Deletes node " .. n[1] .. "." }
   end
   if #mine > NEAR_LIST then rows[#rows + 1] = { dim = true, text = string.format("(%d more further away)", #mine - NEAR_LIST) } end
-
-  rows[#rows + 1] = { heading = "Markers" }
-  rows[#rows + 1] = { button = "show", text = (show_on() and "On    " or "Off   ") .. "Show nodes", selected = show_on(),
-    tooltip = "Shows every node and trip wire as a marker over the world and on the map, only in your game. Other players never see them." }
-  if C.no_markers then rows[#rows + 1] = { color = "#ffb060", text = "Your EMF cannot draw markers yet: let FlameKit update EMF (About tab)." } end
   return rows
 end
+
+-- A click in the Spawn Nodes window: the same keys as the tab's.
+function F.window_click(world, key) return F.click(world, key) end
 
 function F.click(world, key)
   C.note = nil
@@ -2432,6 +2930,7 @@ function F.click(world, key)
   local sel = key:match("^sel:(%d+)$")
   if sel then C.sel = tonumber(sel) return end
   if key == "new" then act(world, { op = "new_group" }) return end
+  if key == "window" then toggle_window() return end  -- (0.15.539) the Spawn Nodes window
   if key == "show" then
     C.show = not show_on()
     pcall(kit.store.save, "spawn_nodes_client", { show = C.show })
@@ -2450,6 +2949,7 @@ function F.click(world, key)
   elseif key == "breaks" then act(world, { op = "set", g = gid, key = "breaks", value = not g.breaks })
   elseif key == "spare" then act(world, { op = "set", g = gid, key = "spare", value = not g.spare })
   elseif key == "announce" then act(world, { op = "set", g = gid, key = "announce", value = g.announce == false })  -- (0.15.488)
+  elseif key == "mark" then act(world, { op = "set", g = gid, key = "mark", value = g.mark == false })  -- (0.15.541)
   elseif key == "protect" then act(world, { op = "set", g = gid, key = "protect", value = not g.protect })
   elseif key == "start" then act(world, { op = "start", g = gid })
   elseif key == "stop" then act(world, { op = "stop", g = gid })
@@ -2489,6 +2989,7 @@ function F.setup(k)
         local _, aa = pcall(world.account, world, hit.attacker)
         if oka and at and not aa then S.join_hits[hit.attacker] = true
         elseif aa and not at then S.join_hits[hit.target] = true end
+        if aa and S.mon[hit.target] then S.hitby[hit.target] = hit.attacker end  -- (0.15.547) Reward loot's runes go into the bag of the last player who hit it
       end
     end, "a hit (Spawn Nodes)"))
   end
@@ -2516,8 +3017,9 @@ function F.setup(k)
       end
       if okd and type(msg) == "table" and msg.op == "notice" and type(msg.t) == "string" and type(msg.tag) == "string" then  -- (0.15.488)
         local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
-        if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), NOTICE_COLOUR, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
-        if msg.snd == "raid_siren" or msg.snd == "raid_siren_twice" then play_sound(msg.snd) end  -- (0.15.502); (0.15.517) twice
+        local colour = type(msg.c) == "string" and msg.c:match("^#%x%x%x%x%x%x$") and msg.c or NOTICE_COLOUR  -- (0.15.545)
+        if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), colour, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
+        if msg.snd == "raid_siren" or msg.snd == "raid_siren_twice" or msg.snd == "raid_all_clear" then play_sound(msg.snd) end  -- (0.15.502); (0.15.517) twice; (0.15.549) the all-clear
         return
       end
       if okd and type(msg) == "table" and msg.op == "state" then
@@ -2530,6 +3032,40 @@ function F.setup(k)
   if not ok then emf.log("spawn nodes: the channel flamekit/nodes was refused: the Spawn Nodes tab cannot reach the server") end
 end
 
+-- (0.15.550) Spawn Nodes switched off (kit.lua calls this once when "sn_enabled" turns off, and at load if it is off).
+-- Nothing of it runs while off (kit skips its tick), so what it left active is let go of here:
+--   * every running group is stopped as its Stop button does (its waves end, its cooldown starts, its queued monsters
+--     are dropped); the raids' counts are forgotten (no "monsters left" notice; the last one shown fades by itself);
+--   * the files FlameKit Native reads are set to "nothing": the animal hold "0" (the animals walk again), the raid lock
+--     empty (players may change bases), the protection "0" (players can hit placed objects), spare empty. Only files
+--     that are there are written (a player's own game has none of them).
+-- The raid monsters still alive stay in the world as they are (Remove takes them away once it is on again); while off,
+-- their deaths are not seen, so the game's own loot drops for them. Switched on again: everything runs as before; any
+-- of its monsters still alive count again for the protection.
+function F.switched_off()
+  S.halted = S.halted or {}
+  for gid in pairs(S.runs or {}) do
+    finish(gid)
+    S.halted[gid] = true
+    cancel_checks(gid)
+  end
+  S.runs, S.queue, S.raid = {}, {}, {}
+  local function put(name, text)
+    local f = io.open(emf.dir .. name, "r")
+    if not f then return false end
+    f:close()
+    f = io.open(emf.dir .. name, "w")
+    if f then f:write(text) f:close() end
+    return true
+  end
+  local any = false
+  if put(K.HOLD_FILE, "0\n") then any = true S.hold_on = false end
+  if put("\\raid_lock_server.txt", "") then any = true S.lock_text = "" end
+  if put("\\raid_protect_server.txt", "0\n") then any = true S.protect_on = false end
+  if put("\\spare_server.txt", "\n") then any = true S.spare_text = "" end
+  emf.log("spawn nodes: switched off (sn_enabled): no raid runs" .. (any and "; the animal hold, raid lock, protection and spare files are let go of" or ""))
+end
+
 -- tests only
 F._handle = function(world, account, entity, msg, from) return handle(world, account, entity, msg, from) end
 F._test_set_shown = function(st) C.shown = st end  -- (0.15.504)
@@ -2538,6 +3074,10 @@ F._test_S = S  -- (0.15.507)
 F._test_spawn_tick = function(w) spawn_tick(w) end  -- (0.15.508)
 F._test_trickle = function(w) trickle_tick(w) end  -- (0.15.512)
 F._test_hunt = function(w) hunt_tick(w) end  -- (0.15.521)
-F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
+F._reset = function() S.data, S.runs, S.mon, S.old_bodies, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {}, {} end
+F._test_mon_check = function(w) mon_check(w) end  -- (0.15.526)
+F._test_raid_tick = function(w) raid_tick(w) end  -- (0.15.526)
+F._test_fire = function(w, gid) return fire(w, gid, "test", true, nil) end  -- (0.15.526)
+F._test_wave = function(w, gid, spots) wave(w, gid, spots) end  -- (0.15.526)
 
 return F

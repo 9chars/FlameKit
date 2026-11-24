@@ -63,6 +63,30 @@ function M.event(monster, player)
   return emf.emit("server", "AddThreatTargetEvent", { attackerId = monster, targetId = player, threatValue = M.THREAT }) ~= false
 end
 
+-- (0.15.527) What a monster's AI does, for the log: its behaviour state (DynamicEnemy01BehaviorState.state, the raw
+-- number: 0.15.68 measured 6 = in a fight) or nil (no enemy AI), and its target (SelectedTargets slot 1) or nil.
+function M.ai(world, id)
+  local ai = world:get("DynamicEnemy01BehaviorState", id)
+  local st = world:get("SelectedTargets", id)
+  local t = st and st.targets and st.targets[1] and st.targets[1].targetEntityId
+  if type(t) == "table" then t = t.id end
+  return ai and tonumber(tostring(ai.state)) or nil, t
+end
+
+-- (0.15.527) The threat table without the aggro values ("state:entity" of the slots in use): changes only when a
+-- slot's candidate or state changes, not every time the aggro moves.
+function M.key(world, id)
+  local ag = world:get("DynamicAggro", id)
+  if not ag then return "none" end
+  local parts = {}
+  for i = 1, 6 do
+    local t = ag.targets[i]
+    local st = tonumber(tostring(t.state)) or -1
+    if st ~= 0 then parts[#parts + 1] = st .. ":" .. tostring(eid(t.entityId)) end
+  end
+  return table.concat(parts, ",")
+end
+
 -- A threat table for the log: "slot: state entity faction aggro" for the slots in use.
 function M.line(world, id)
   local ag = world:get("DynamicAggro", id)

@@ -94,7 +94,6 @@ function F.setup(k)
     local okl, errl = pcall(roster_loaded, world, text)
     if not okl then log("roster: load failed: " .. tostring(errl)) end
   end)
-  emf.log("[flamekit] npc probe: loaded (companion test: flamekit.npc)")
   pcall(F.set_debug, (store.load("companion_debug", {}) or {}).on == true)  -- (18:11) the debug log as last switched
   pcall(emf.command, "npc", "debug on|off | roster ... | drive <npc> <player>|stop | fullrec <entity> [s] | look <entity> | near <x> <y> <z> [r] | remove <entity>: companion test",
     function(world, args)

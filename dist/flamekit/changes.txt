@@ -1,3 +1,260 @@
+0.15.554 Nov 24, 2026
+- Spawn Nodes tab: the Nodes section is now at the top.
+
+0.15.553 Nov 24, 2026
+- Clean-up before release: the test logging from the raid investigation is gone (Spawn Nodes' path census, AI log, monster recordings and path push; FlameKit Native's path search probe and tamed animal counts; the Free build debug log and probe). Raids, the animal hold and Free build work as before. Needs FlameKit Native 0.15.553 on the server.
+
+0.15.552 Nov 24, 2026
+- Spawn Nodes: the switch Its monsters spare animals, pets and villagers is now named Monsters spare animals, pets and villagers.
+
+0.15.551 Nov 24, 2026
+- Spawn Nodes: Players cannot damage base structures during raid now also keeps players from hurting pets and animals (tamed ones and farm animals). Needs FlameKit Native 0.15.551 on the server.
+
+0.15.550 Nov 24, 2026
+- Spawn Nodes has its own on/off switch in the Settings tab (Features). Off: no Spawn Nodes tab or window, and none of its raid notices or sounds.
+
+0.15.549 Nov 24, 2026
+- Spawn Nodes: a short all-clear fanfare plays with the raid-over notice when all its monsters are defeated. The Raid siren setting is now Raid sounds and covers it.
+
+0.15.548 Nov 24, 2026
+- Spawn Nodes: Starting level no longer has "Game's own": it is 1 to 100, level 1 by default (a group set to Game's own is now level 1). New groups start with Reward loot and 20 s before the first monsters.
+
+0.15.547 Nov 24, 2026
+- Spawn Nodes: three new settings per group, in Monsters. Starting level: the level of the first wave's monsters (Game's own, or 1 to 100). Level per wave: added for each wave after the first (+5 to +100). No monster ever goes above level 100. Loot: Normal monster loot, Reward loot (like the test monsters: runes and legendary runes into the bag of the last player who hit it, a legendary item in a loot chest by the body; twice for bosses; the game's own loot never goes into that chest), Reward + normal loot, or No loot. With Reward loot or No loot, the monster's own game loot goes completely, also what it throws loose on the ground, and Auto Loot leaves those monsters alone.
+- Spawn Nodes: a group's cooldown is kept when FlameKit reloads or the server restarts (a Base raid group no longer fires again at once).
+- Spawn Nodes: FlameKit's test monsters and loot chests never join a raid.
+
+0.15.546 Nov 24, 2026
+- Spawn Nodes: open to every player for testing (no longer FlameKit admins only).
+
+0.15.545 Nov 24, 2026
+- Spawn Nodes: the raid's start notice (Raid forces are pushing into ...!) is red and no longer ends with how many monsters are coming; its siren sounds twice again.
+- Spawn Nodes: the countdown (N of TOTAL monsters left to kill) appears only once the first monsters have come.
+
+0.15.544 Nov 24, 2026
+- Spawn Nodes: the raid's countdown (N of TOTAL monsters left to kill) changes as soon as a monster dies (within half a second) and shows 0 right after the last kill, instead of up to 5 s late and staying on 1 until the raid-over notice.
+
+0.15.543 Nov 24, 2026
+- Spawn Nodes: new setting First monsters after (in When, 10 s by default; 0, 5, 10, 15, 20, 30 or 60 s): a raid's first monsters come that long after its start notice, so players can get ready.
+- Spawn Nodes: the siren at a raid's start sounds once instead of twice.
+
+0.15.542 Nov 24, 2026
+- Spawn Nodes: new setting Next wave after (in When): the Between waves time starts only once this share of the last wave is dead: 90% of it (the default), 50%, 75%, all of it, or It has spawned (the old way: right when the wave has spawned). The group's status says how many may be left before the next wave.
+
+0.15.541 Nov 24, 2026
+- Spawn Nodes: Raid monster markers no longer stay on screen after Stop and Remove. EMF takes only about 39 marker messages at once and dropped the rest; FlameKit now sends at most 30 every 2 seconds (take-offs first) and tries a take-off again until EMF takes it. With 80+ monsters the markers come off over a few seconds.
+- Spawn Nodes (server log): every marker check logs what it sent, took off, and what EMF refused.
+- Spawn Nodes: new switch in Raid rules, Mark its monsters (on by default): off, the group's raids put no Raid monster markers up (switched off during a raid, the ones up come off).
+
+0.15.540 Nov 24, 2026
+- FlameKit's separate windows (Spawn Nodes, Experimental, Companion Roster): a drop-down is only as wide as its longest entry needs (the Spawn Nodes window's Within 2 m boxes were much wider than their text).
+
+0.15.539 Nov 24, 2026
+- Spawn Nodes: a new Spawn Nodes window for working on the map: the group, Start now, Stop, Remove its monsters, Add node here, Show nodes, Put trip wire here, and the nearest nodes one line each (Spawn within, Move here, Delete). Open it with the Spawn Nodes window button in the Spawn Nodes tab.
+- Spawn Nodes tab: tidied into Groups, Raid rules, Monsters and When.
+- FlameKit's window and its other windows: a label with a drop-down beside it now lines up with the others in its section, so the drop-downs form one column.
+
+0.15.538 Nov 23, 2026
+- Spawn Nodes: during every raid, from its start until its last monster is dead, tamed animals stand still. Their walks kept the game's path search so busy that raid monsters waited a minute or more before moving; with the animals held the monsters get their paths in a few seconds. The animals walk again when the raid is over (and after 30 minutes at most).
+
+0.15.537 Nov 23, 2026
+- Server (a test, off by default): the console command flamekit.tamepath off stops tamed animals from asking the game for walks (they stand still), to test whether their failing walk searches are what keeps raid monsters waiting; flamekit.tamepath on puts it back. The log says how many animals it found and how many of their searches it held.
+
+0.15.536 Nov 23, 2026
+- Server (logging only): the path grid probe also names who each path search belongs to (the creature, its faction, enemy or villager) and where it goes from and to, and every 10 s which ones ran into the game's step limit the most.
+
+0.15.535 Nov 23, 2026
+- Server (logging only): FlameKit Native reads the game's own list of path searches on the server every half second and logs how many there are, what state each is in, and every change ("path grid probe: ..."), to find out why monsters wait so long for a path.
+
+0.15.534 Nov 23, 2026
+- Spawn Nodes (logging only): a path census every 10 s in the server log: how many entities in the world use the game's path search, how many asked for a new path, how many have none, and which kinds of creatures ask the most. The priority push of 0.15.533 is off again (it made no difference).
+
+0.15.533 Nov 23, 2026
+- Spawn Nodes (a test): each raid monster's path search is asked for at the highest priority and forced to update, from its spawn until the game has given it a path. The log says how long each monster waited for its path ("path came N s after it appeared").
+
+0.15.532 Nov 23, 2026
+- Spawn Nodes (logging only): in each raid the first monster of each node is fully recorded for 90 s (every value the game keeps on it, every half second, only what changed) into its own file on the server (spawn_nodes_rec_<monster>_<time>.txt), with Spawn Nodes' own events in between (it got angry, its order, the threat write, its first move). For finding out what holds raid monsters back before they move. New shared module core/fullrec.lua.
+
+0.15.531 Nov 23, 2026
+- Spawn Nodes: no teleport onto the ground after a monster spawns any more. The spot is already on the ground, and that teleport never finished (EMF removed it after 10 s on every monster). The log says when each monster first moves ("first moved N s after it appeared").
+
+0.15.530 Nov 23, 2026
+- Spawn Nodes: the orders are on again (each raid monster is told to go for the nearest player within 120 m), together with the threat table write. The "spawn nodes: ai" lines say whether the monster has an order; the home and distance values of 0.15.529 are gone (they meant nothing).
+
+0.15.529 Nov 23, 2026
+- Spawn Nodes: the threat table write is on again (every player within 50 m of a raid monster is put into its threat table). The "spawn nodes: ai" lines also show each monster's home spot, how far that is from the player, and the game's own distances for it (checkDistance, maxTargetDistanceToHomeZone, leashLength) (read only).
+
+0.15.528 Nov 23, 2026
+- Spawn Nodes (logging only): the "spawn nodes: ai" lines also name the monster (for example "Undead: Mage01").
+
+0.15.527 Nov 23, 2026
+- Spawn Nodes (logging only, nothing changes for the monsters): the server log shows, for each raid monster, what its AI is doing (its state, its target and who is in its threat table) whenever that changes, and every 10 s anyway, with how far the nearest player is and how far it moved. Lines start with "spawn nodes: ai".
+
+0.15.526 Nov 23, 2026
+- Spawn Nodes: the raid's monsters are kept track of in one place. "Most alive per node" counts only the monsters that node spawned, so a body that got up again or a summon no longer holds a node back. A body that gets up again is still to kill but no longer raises the count of monsters left. Bodies from earlier raids are never counted in a new raid. A monster whose health cannot be read is no longer counted alive forever (10 s, then dropped). Every change is logged ("spawn nodes: roster: ...").
+
+0.15.525 Nov 23, 2026
+- Spawn Nodes: "Its monsters spare animals, pets and villagers" now only does that. Until now it also stopped raid monsters from hurting other monsters. Their hits on other monsters and on players land again (done in FlameKit Native now, not with an EMF hit rule per monster).
+
+0.15.524 Nov 23, 2026
+- Spawn Nodes (test): monsters are only spawned and counted. No orders to go for players, no threat table writes, and no stuck, ground, water or fall handling (nothing is moved or taken away and spawned again). The log still says every 10 s how many moved.
+
+0.15.523 Nov 23, 2026
+- Spawn Nodes: the spot check on the game's path grid is switched off: it no longer answered and held every spawn back 0.75 s.
+
+0.15.522 Nov 23, 2026
+- Spawn Nodes: every player within 50 m of a raid monster is written straight into its threat table (one of its 6 slots, as alarmed, the way PvP players are), and kept there while he is that near; the game is also told he threatens it. No hits (the 0.15.520 and 0.15.521 hits of 1 are gone).
+
+0.15.521 Nov 23, 2026
+- Spawn Nodes: every player within 50 m of a raid monster is put on its threat list (a hit of 1 in his name), 3 s after it appears; a player who comes within 50 m later is added when he does, and all again every 5 s while the monster does not move.
+
+0.15.520 Nov 23, 2026
+- Spawn Nodes: raid monsters go after the players: 3 s after a monster appears, it takes a hit of 1 in the name of the nearest player (within 120 m), and again every 5 s while it does not move.
+
+0.15.519 Nov 23, 2026
+- Spawn Nodes: Between waves can be 0 s or 5 s too.
+
+0.15.518 Nov 23, 2026
+- Spawn Nodes: every raid monster is moved onto the ground by the game's own move 2 s after it appears again, as before 0.15.493: without it the monsters stood and did not fight.
+
+0.15.517 Nov 23, 2026
+- Spawn Nodes: the siren sounds twice when a raid starts and once at the start of every new wave (for the players within 300 m of the nodes, as the wave notice).
+
+0.15.516 Nov 23, 2026
+- Spawn Nodes: a stuck monster is moved after 5 s also right after it appears (0.15.513 had made that 10 s).
+
+0.15.515 Nov 23, 2026
+- Spawn Nodes: a node's next monster comes right after one dies: deaths are seen every 0.25 s (was 2 s) and the next monster queued every 0.25 s (was 0.5 s). A spot check that gives no answer within 0.75 s, or an unclear answer, no longer holds the monster back (some answers took 10 s).
+
+0.15.514 Nov 23, 2026
+- Spawn Nodes: the raid's whole number: the start notice says how many monsters are coming, and the count shows "N of TOTAL monsters left to kill" from TOTAL down to 0 (every node's Monsters per node in every wave). Summons still alive when it reaches 0 are named apart.
+- Spawn Nodes: Stop now stops everything coming: the waves, the monsters queued or having their spot checked, and the replacing of stuck monsters (Remove and the time limit too). The monsters alive stay until Remove.
+
+0.15.513 Nov 23, 2026
+- Spawn Nodes: "monsters left to kill" only goes down: it counts every monster the raid's nodes still have to spawn (this wave and the waves to come) and the ones alive; summons and other monsters that joined are counted only when nothing else is left.
+- Spawn Nodes: Remove and the time limit also stop the monsters whose spots were still being checked (after a Remove 3 more came).
+- Spawn Nodes: a monster is not taken for stuck in its first 10 s (the Undead climb out of the ground first).
+
+0.15.512 Nov 23, 2026
+- Spawn Nodes: Monsters per node and Most alive per node work together: in a wave each node spawns its Monsters per node one after another, never more alive at once than Most alive per node (the next one comes when one dies), and the wave is over only when every node has spawned all of its monsters; then Between waves starts. Before, a node spawned only what fit under Most alive per node and the rest of the wave was lost.
+
+0.15.511 Nov 23, 2026
+- Spawn Nodes: more in the server's log during a raid: each order a monster gets (at which player, how far), every 10 s how many monsters have an order, go for their player and moved, and for each stuck one its order, what it goes for and whether the game has a way from it to the player.
+
+0.15.510 Nov 23, 2026
+- Spawn Nodes: a stuck raid monster is moved next to the player after 5 s (was 30 s).
+
+0.15.509 Nov 23, 2026
+- Spawn Nodes: the raid's monsters are found surely: a new one still coming up (0 health) is asked about again, and every 10 s all the monsters made since the raid began are looked at again (some Undead came into the count only after a reload).
+
+0.15.508 Nov 23, 2026
+- Spawn Nodes: before a monster appears, the game's own path grid is asked for a way from its spot to the nearest player: a spot inside a fence, an object or water, or one it cannot get out of, is not used (6 tries, then next to the player). FlameKit's own check saw only building blocks and terrain.
+- Spawn Nodes: Remove's log no longer lists the summons it takes away as "not one of its monsters".
+
+0.15.507 Nov 23, 2026
+- Spawn Nodes: monsters the raid's monsters make (the Undead's summons) are counted now: a new monster is looked at again until the game has given it its health and faction (before, the ones not ready in the step they were made were never counted). The end check and Remove its monsters take in every hostile monster made since the raid's first one within 100 m of the group's nodes, not only the nodes' own.
+
+0.15.506 Nov 23, 2026
+- Spawn Nodes: logging to find the raid monsters that are left over: a census of the living creatures near the nodes at every load, and every monster spawned without its group's tag.
+
+0.15.505 Nov 23, 2026
+- Spawn Nodes: a monster that falls more than 4 m under its node (into water or a drop) with no player down there, or gets stuck (behind a fence or an object), in the ground or in water, is first moved next to the nearest player (4-8 m from him, on the ground, nothing built between), up to 3 times, before it is replaced. A spot where one got stuck is not used for a spawn again.
+- Spawn Nodes: before the end notice the whole world is searched for the raid's monsters; any still alive is counted again and the raid goes on.
+
+0.15.504 Nov 23, 2026
+- Spawn Nodes: fixed the tab stopping with an error in 0.15.503 (the Cooldown and Timer from choices were lost).
+
+0.15.503 Nov 23, 2026
+- Spawn Nodes: raid monsters no longer stand around their node: each one is sent at the player nearest it (within 120 m), walks up and attacks; when that player dies or leaves, the next nearest.
+- Spawn Nodes: Most alive per node can be 1 or 2 too.
+- Spawn Nodes: a new siren: an air-raid siren's slow wail (8 s) in place of the short beeping one.
+
+0.15.502 Nov 23, 2026
+- Spawn Nodes: a siren plays when a raid starts (with the "Raid forces are pushing into ..." notice). Each player can turn it off: setting Raid siren (Messages). It plays at the Windows volume.
+
+0.15.501 Nov 23, 2026
+- Spawn Nodes: every monster that comes into a raid joins it, not only the nodes' own: one made during the raid within 100 m of its nodes that is hostile, or that fights a player there (the Undead's summons, the world's monsters). Joined monsters are counted, marked and watched, and the raid ends only when they are dead too.
+
+0.15.500 Nov 23, 2026
+- Spawn Nodes: a raid monster that gets up again after it was killed (the Undead do) counts as alive again, and a raid is over only when none of its monsters is alive for 10 s: no more "all defeated" while some still attack.
+- Spawn Nodes: the raid protection no longer drops for a moment while a stuck monster is replaced.
+
+0.15.499 Nov 23, 2026
+- Spawn Nodes: Remove its monsters writes into the server's log every living creature near the group's nodes that is not one of its monsters (to find out what it leaves behind).
+
+0.15.498 Nov 23, 2026
+- Spawn Nodes: a reload of FlameKit on the server during a raid no longer loses the raid: its count of monsters left, its end notice, its remaining waves and its time limit go on (spawn_nodes_raid.json).
+
+0.15.497 Nov 23, 2026
+- Spawn Nodes: a raid monster in water (0.8 m deep or more, by the game's own submerge depth) is taken away and comes again at its node, not where a monster was found in water before (4 m around). The 0.15.493 water check never worked: monsters have no swimming state.
+
+0.15.496 Nov 23, 2026
+- Spawn Nodes: a monster that only stands and waits because no player is near is no longer taken away as stuck: only a monster with a player within 40 m can be stuck.
+
+0.15.495 Nov 23, 2026
+- Spawn Nodes: the wave notices no longer say which wave and how many monsters.
+
+0.15.494 Nov 23, 2026
+- Spawn Nodes: the raid's start and end notices (also Time is up and called off) stay up for 60 s instead of 15 s.
+
+0.15.493 Nov 23, 2026
+- Spawn Nodes: monsters appear on the ground: each spot's ground is found first (a spot without ground is not used), so none starts inside the ground any more.
+- Spawn Nodes: a raid monster that ends up in the ground, in water, or stuck (not moved 1 m in 30 s, no hit given or taken) is taken away and a new one comes at its node (at most 10 times per node in a raid).
+- Spawn Nodes: every raid monster has an orange marker with its health bar for every player: over the world within 300 m (an arrow at the screen's edge points to it) and on the map at any distance.
+
+0.15.492 Nov 23, 2026
+- Spawn Nodes: Raid lasts at most (10, 15, 20, 30, 45, 60 or 90 min, or no limit; 30 min by default): when the time from its start is up the raid ends: no more waves, its living monsters are taken away (and its protection ends with them), the bodies stay, and everyone is told "Time is up!".
+
+0.15.491 Nov 23, 2026
+- Spawn Nodes: a group starts only when a player is within its new Player within distance of one of its nodes (20, 30, 50, 75 or 100 m; 50 m by default), whatever its trigger, also Start now; its waves come only while one is, and then at all its nodes. A timer that is due waits for a player; a time of day with nobody near is skipped that day.
+
+0.15.490 Nov 23, 2026
+- Spawn Nodes: the raid's place is now what the minimap shows as where the player who started or triggered the raid is (the nearest named place, a flame altar by its name too, else the region); his game sends it to the server when the raid starts. For a timer or a time of day it is the player nearest the raid. Needs FlameKit 0.15.490 in that player's game; else the name of the flame altar nearest the raid.
+
+0.15.489 Nov 23, 2026
+- Spawn Nodes: the raid's place in its announcements is always the map marker nearest the raid, however far: a flame altar by the name a player gave it, or the game's name of any other place.
+
+0.15.488 Nov 23, 2026
+- Spawn Nodes: raid announcements as orange FlameKit notices (switch Announce the raid to players, on by default): "Raid forces are pushing into <place>!" to everyone when it starts, "New incoming wave at <place>!" and "Final wave incoming" with the wave and its monsters, how many monsters are left (kept up to date), and when the raid is over or called off. The waves and the count go to the players within 300 m of the group's nodes. The place is the name of the nearest flame altar (within 200 m), else the nearest named place on the map (within 500 m).
+
+0.15.487 Nov 23, 2026
+- Spawn Nodes: Remove its monsters also searches the whole world for the group's monsters and bodies that FlameKit lost track of, and takes them away too. A monster whose health cannot be read but is still in the world stays counted as alive.
+
+0.15.486 Nov 23, 2026
+- Spawn Nodes: monsters can be hurt again during a raid with Players cannot damage base structures on. The protection of placed objects (chests, stations, doors) now spares every creature: some monsters, the Undead among them, counted as placed objects and took no damage. Needs FlameKit Native 0.15.486 on the server.
+
+0.15.485 Nov 23, 2026
+- Spawn Nodes: each node has its own Spawn within (on the node, 2, 5, 10, 15, 20 or 30 m; 10 m as before).
+- Spawn Nodes: monsters no longer appear behind or inside walls or inside rock: a spot with a building block or placed terrain between it and the node, a building block at it, or solid rock is not used (8 tries, then the node itself). Placed objects such as chests are not seen.
+
+0.15.484 Nov 23, 2026
+- Spawn Nodes: the raid switch is now named Players cannot damage base structures during raid.
+
+0.15.483 Nov 23, 2026
+- Spawn Nodes: the raid protection (players cannot change or damage bases) now holds while any of the raid's monsters is alive, also when FlameKit reloads on the server mid-raid: each node monster carries its group, and after a reload FlameKit finds them again before it changes the protection. A monster is no longer forgotten on one failed health check.
+
+0.15.482 Nov 23, 2026
+- Spawn Nodes: Its monsters spare animals, pets and villagers (on by default): a group's monsters cannot hurt anything that is not a player. Remove its monsters now also takes the group's dead bodies off the ground, and only that group's.
+
+0.15.481 Nov 23, 2026
+- Spawn Nodes: Building damage levels for raids (Low, Medium, High, Extreme; High by default): how often and how hard the monsters hit, how far they reach and how big the holes are. Monsters with no player in reach hit building blocks right beside them.
+
+0.15.480 Nov 23, 2026
+- Spawn Nodes: Players cannot change bases now lasts until the last of the group's monsters is dead, not only while its waves run.
+
+0.15.479 Nov 23, 2026
+- Spawn Nodes: the raid switch is now Players cannot change bases during its waves: players near the group's nodes cannot build, dismantle or mine in bases while its waves run (the game's own base permission is taken away for that time), and hits on placed objects do nothing.
+
+0.15.478 Nov 23, 2026
+- Spawn Nodes: two switches per group for raids: Monsters damage buildings (they hit player-built blocks near them, like a pickaxe; needs EMF 0.6.19 on the server), and Players cannot damage placed objects during its waves.
+
+0.15.477 Nov 23, 2026
+- Spawn Nodes: a monster type Bosses (any boss), so a node can spawn a boss.
+- Spawn Nodes: choose which way the monsters face when they appear: the nearest player, the node's direction (the way you faced when you added or moved it), or random.
+
+0.15.476 Nov 23, 2026
+- New tab Spawn Nodes, for FlameKit admins: put down spawn nodes where you stand, in groups. When a group's trigger fires, all its nodes spawn monsters of the group's kind (Ancients, Beasts, Drak, Scavengers, Shroud, Undead, Vukah or Random) in waves. Triggers: by hand (Start now), a timer, a trip wire, a time of day, or a player in a base near the group's nodes. Nodes and trip wires show as markers only in admins' games; other players never see them.
+
 0.15.475 Nov 23, 2026
 - Free build: the area around you is 24 m (12 m each way) while you have a building piece selected (it was 16 m).
 

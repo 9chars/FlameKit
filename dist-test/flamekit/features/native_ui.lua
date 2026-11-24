@@ -244,6 +244,34 @@ local function write_ros(world)
   kit.debug("debug", "native ui: ui_roster.dat: %d row(s), generation %d", #rows, ros_gen)
 end
 
+-- (0.15.539, owner 2026-11-24 07:16 "We need to move a lot of this out to its own window so its easier to create and
+-- manage nodes as I'm moving around the map") the Spawn Nodes window: the same kind of window as the Companion Roster,
+-- its rows from features/spawn_nodes.lua F.window_rows in ui_nodes.dat; a click comes back as "nod <generation>/<button
+-- number>" and goes to F.window_click(world, key). The DLL shows and hides it when ui_nodes_toggle.request appears
+-- (the Spawn Nodes tab's "Spawn Nodes window" button).
+local nod_gen, nod_keys, last_nod, nod_now = 0, {}, nil, true
+-- Writes ui_nodes.dat: the Spawn Nodes window's rows, when they changed.
+local function write_nod(world)
+  local f = feature("spawn_nodes")
+  local rows = f and kit.enabled(f) and f.window_rows and kit.call(f, "window_rows", world)
+  if type(rows) ~= "table" then rows = {} end
+  local text, map = rows_lines(rows)
+  if text == last_nod then return end
+  last_nod = text
+  nod_gen = nod_gen + 1
+  nod_keys[nod_gen] = map
+  nod_keys[nod_gen - 3] = nil
+  local out = io.open(emf.dir .. "\\ui_nodes.dat", "w")
+  if not out then
+    kit.debug("warn", "native ui: ui_nodes.dat could not be written")
+    last_nod = nil
+    return
+  end
+  out:write("gen\t" .. nod_gen .. "\n" .. text .. (text ~= "" and "\n" or "") .. "end\n")
+  out:close()
+  kit.debug("debug", "native ui: ui_nodes.dat: %d row(s), generation %d", #rows, nod_gen)
+end
+
 -- Text from hex digits (what a player typed, sent by FlameKit Native).
 local function unhex(h)
   return (tostring(h or ""):gsub("%x%x", function(c) return string.char(tonumber(c, 16)) end))
@@ -301,6 +329,18 @@ local function act(world, what, arg)
       kit.debug("info", "native ui: a click in the Companion Roster window on %s was dropped (it changed before it arrived)", tostring(arg))
     end
     ros_now = true
+  elseif what == "nod" then  -- (0.15.539) a click in the Spawn Nodes window
+    local gen, number = tostring(arg):match("^(%d+)/(%d+)")
+    local map = gen and nod_keys[tonumber(gen)]
+    local key = map and map[tonumber(number)]
+    local f = feature("spawn_nodes")
+    if f and key and f.window_click then
+      kit.call(f, "window_click", world, key)
+    else
+      kit.debug("info", "native ui: a click in the Spawn Nodes window on %s was dropped (it changed before it arrived)", tostring(arg))
+    end
+    nod_now = true
+    tabs_now = true
   elseif what == "key" then  -- a key pressed in the window: the setting waiting for a key (any tab's Change) takes it
     local settings = feature("settings")
     if settings and require("features.settings").capturing() then
@@ -339,7 +379,7 @@ local function read_actions(world)
   if first or highest > done then done = highest end
 end
 
--- Every step of the player's game: reads the clicks, and writes the list, tabs, Experimental and roster files in turn (each every 10 steps, or at once when asked).
+-- Every step of the player's game: reads the clicks, and writes the list, tabs, Experimental, roster and Spawn Nodes files in turn (each every 10 steps, or at once when asked).
 function F.client_tick(world)
   steps = steps + 1
   if steps % 3 == 0 then read_actions(world) end
@@ -355,6 +395,10 @@ function F.client_tick(world)
   if steps % 10 == 3 or ros_now then
     ros_now = false
     write_ros(world)
+  end
+  if steps % 10 == 9 or nod_now then  -- (0.15.539) the Spawn Nodes window
+    nod_now = false
+    write_nod(world)
   end
 end
 

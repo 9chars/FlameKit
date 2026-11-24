@@ -892,19 +892,9 @@ local function guard_duelists(world)
 end
 
 -- Returns nil, or why there is no body now.
--- A body's level (console only: flamekit.duelist <player> <level>). EMF re_companion_orders.md: writing
--- Level.dataStorage and DynamicEnemyScaling.nextUpdateTime = 0 makes the game's next scaling update use it (level 10:
--- health 119 -> 417, hits 48 -> 156). Levels above the world's range were never tried.
-local function set_level(world, id, level)
-  local lv = world:get("Level", id)
-  if not lv then return false end
-  lv.dataStorage[1] = level
-  local sc = world:get("DynamicEnemyScaling", id)
-  if sc then
-    if type(sc.nextUpdateTime) == "table" then sc.nextUpdateTime.value = 0 else sc.nextUpdateTime = 0 end
-  end
-  return true
-end
+-- A body's level (console only: flamekit.duelist <player> <level>): core/spawn.lua's set_level (0.15.476: shared with
+-- the spawn nodes).
+local set_level = require("core.spawn").set_level
 
 local SPAWN_PER_STEP = 20
 local scatter  -- below
@@ -915,39 +905,11 @@ local scatter  -- below
 -- where it is). The wait: EMF refuses a creature spawned a moment ago (it reads as dead until the game sets its
 -- health). At most GROUND_MAX at once (EMF allows 64 teleports under way for all of FlameKit; the rest for players).
 -- Untested in game.
-local GROUND_WAIT_STEPS, GROUND_MAX, GROUND_GIVEUP_STEPS = 120, 40, 900
-local ground_q, ground_head, ground_busy, ground_step = {}, 1, {}, 0
-local ground_n = 0  -- how many in ground_busy
-local function to_ground(id, x, y, z)
-  ground_q[#ground_q + 1] = { id = id, x = x, y = y, z = z, at = ground_step + GROUND_WAIT_STEPS }
-end
--- Moves waiting spawned monsters to the ground (emf.teleport with the ground search) once GROUND_WAIT_STEPS have passed, at most GROUND_MAX at once.
-local function ground_tick(world)
-  ground_step = ground_step + 1
-  if ground_n > 0 and ground_step % 60 == 0 then  -- an answer that never came (a reload): not counted any more
-    for id, at in pairs(ground_busy) do
-      if ground_step - at > GROUND_GIVEUP_STEPS then ground_busy[id], ground_n = nil, ground_n - 1 end
-    end
-  end
-  while ground_head <= #ground_q and ground_n < GROUND_MAX do
-    local g = ground_q[ground_head]
-    if g.at > ground_step then break end
-    ground_head = ground_head + 1  -- (entries stay until the queue is empty: # of a table with holes is not reliable)
-    if bodies[g.id] and not ground_busy[g.id] then
-      local x, z = g.x, g.z
-      pcall(function()  -- where it is now (it may have walked a little), at the height it was given
-        local px, _, pz = world:position(g.id)
-        if px and pz then x, z = px, pz end
-      end)
-      local id = g.id
-      local okt, queued = pcall(emf.teleport, world, id, x, g.y, z, { ground = true }, function()
-        if ground_busy[id] then ground_busy[id], ground_n = nil, ground_n - 1 end
-      end)
-      if okt and queued then ground_busy[id], ground_n = ground_step, ground_n + 1 end
-    end
-  end
-  if ground_head > #ground_q then ground_q, ground_head = {}, 1 end
-end
+-- (0.15.476) the queue itself is core/spawn.lua's (shared with the spawn nodes); this one: at most 40 teleports at once,
+-- only for test monsters still known (bodies).
+local ground_q = require("core.spawn").ground({ max = 40, keep = function(id) return bodies[id] ~= nil end })
+local function to_ground(id, x, y, z) ground_q.add(id, x, y, z) end
+local function ground_tick(world) ground_q.tick(world) end
 -- (0.15.139, owner: "I don't want the dummy to attack me back") Since 0.15.134 the dummy has the monsters' faction so
 -- anyone can hit it, and so its AI goes for players: it swung but did no damage. Before (faction 7) it stood still.
 -- Now its threat table (DynamicAggro) and its target (SelectedTargets) are emptied every server step: with no Alarmed
@@ -1085,7 +1047,13 @@ give_legendary = function(world, key, x, y, z, name, level, tries)
   end)
 end
 
--- A test monster's loot: runes into the killer's bag (the rest and a legendary item into a chest beside the body); doubled for a boss.
+-- A test monster's loot, doubled for a boss: the runes and legendary runes into the killer's bag (what the bag does not
+-- take into the chest), the legendary item into the loot chest beside the body. Only these reward items ever go into
+-- the chests, never the monster's own game loot (owner 2026-11-24 10:47 "everything should end up in the chest except
+-- the runes ... regular monster loot should never end up in these chests ever. ONLY the special high level reward
+-- items"). (A 10:01-10:03 misreading of mine had rewritten this comment to "all into the chest": put back.)
+-- This is the test monsters' own code: Spawn Nodes has its own (core/reward_loot.lua) and the two must stay separate
+-- (owner 2026-11-24 11:06): a change tried here must never reach Spawn Nodes.
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
   if not ok or not x then return "no position" end
@@ -2245,7 +2213,7 @@ F._marker_ids = marker_ids
 -- tests only: the most entities one scan looks at
 function F._scan_max(n) SCAN_MAX = n end
 -- Tests only: how many spawned monsters are on the way to the ground, and how many wait.
-function F._ground() return ground_n, #ground_q - ground_head + 1 end
+function F._ground() return ground_q.n, #ground_q.list - ground_q.head + 1 end
 
 -- tests only: end a player's PvP cool-down
 function F._pvp_hit_reset(account)

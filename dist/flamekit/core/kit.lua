@@ -12,6 +12,7 @@
 --   click(world, key)  a click on one of its rows' buttons
 --   key(world, name) a key pressed in FlameKit's window while its tab shows (the key's name as EMF's settings write it)
 --   setting_changed(key)
+--   switched_off()   once when its enabled_setting turns off, and at load if it is off (runs although it is off)
 --   connected(world) false while this feature cannot reach its server half on a joined server (then no older-server notice is shown)
 -- Every call is protected: a feature that raises an error is switched off until the next reload, the others go on.
 
@@ -460,6 +461,19 @@ local function each(method, ...)
   for _, f in ipairs(kit.features) do kit.call(f, method, ...) end
 end
 
+-- (0.15.550) switched_off(): called once when a feature's enabled_setting turns off (and at load for a feature that is
+-- off), so it can let go of what it left active. Runs although the feature is off (kit.call would skip it).
+-- `key`: the setting that changed, or nil at load (every feature that is off).
+local function switched_off(key)
+  for _, f in ipairs(kit.features) do
+    if f.switched_off and f.enabled_setting and (key == nil or key == f.enabled_setting)
+      and emf.setting(f.enabled_setting) == false then
+      local ok, err = pcall(f.switched_off)
+      if not ok then emf.log("feature " .. tostring(f.id) .. ": switched_off: " .. tostring(err)) end
+    end
+  end
+end
+
 -- Loads the features (module names as require takes them) and wires up the game's callbacks.
 function kit.start(modules)
   read_manifest()
@@ -492,7 +506,9 @@ function kit.start(modules)
 
   emf.on_setting_changed(function(key)
     each("setting_changed", key)
+    switched_off(key)
   end)
+  switched_off(nil)
 
   emf.log(string.format("%d feature(s) loaded", #kit.features))
 end
