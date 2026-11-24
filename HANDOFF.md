@@ -2977,3 +2977,8 @@ also update G-portal"):**
   sounds/*.wav (3), _flamekit_native/{flamekit_native.dll,mod.json}. features/build_anywhere.lua stays on G-Portal
   (removed in 0.15.553; main.lua no longer loads it). 13:47 owner: G-Portal stopped -> upload 13:47:14-13:47:58: all 23
   uploaded, DLL first, mod.json last; outbox empty. Waiting for the owner to start G-Portal, then helper "logs" to check.
+- G-Portal 0.15.554 RUNNING (owner started it 13:51; helper "logs" 15:09): 13:51:16 all FlameKit Native hooks installed
+  (bigger altar areas, animal hold create/update, free build zones, raid protection), 21 features loaded, running, no
+  errors; players on it (fast dive, free build lines 15:09). "slow: flamekit_native.dll took ~200 ms in one world step"
+  once a minute (78 times 13:51-15:08): the SAME as on 0.15.475 (Nov 23 10:21-10:31: 188-245 ms once a minute), i.e. the
+  known once-a-minute G-Portal step (see the 0.15.475 G-Portal test note), not new in this release.
