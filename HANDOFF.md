@@ -2358,3 +2358,16 @@ stood ~30 s), but it is a second mechanism for a job find_surface already does (
 (core/spawn.lua stays for experimental's test monsters). New log line "first moved N s after it appeared (... a Teleport
 on it: yes/no)".
 On the local server 20:18:17 (owner 20:18 "i ended the raid"; 22 features, no error).
+
+## 0.15.532 (Nov 23, 20:46) Spawn Nodes: full recording of raid monsters (owner 20:42)
+20:40 raid (0.15.531, no ground teleport; orders + threat on): Sabertooth x2 + Stinger angry at him (state 6, target 1,
+order, aggro 100) for up to 67 s at 10-14 m and moved 0.0 m; Wolf Heavy moved 3 m. => the teleport was NOT the freeze.
+Owner 20:41 "when monsters were fighting monsters, they moved around A LOT more", "i feel like thats part of the
+problem"; 20:42 "theres a long delay before monsters move in on me, there had to be a way to find out what the delay is";
+20:42 "its all player built base" (the walkway/floor he stands on at Melissa's Hideaway, and the nodes at 948.5).
+Built: core/fullrec.lua (the companions' 02_fullrec.lua recorder as a shared module; companions keep their own copy =
+rule 0b debt, not moved unasked): first monster of each node per raid (max 4), 90 s, every field of every component
+(features/npc_fields.lua names) every 0.5 s, changes only, into emf.dir\spawn_nodes_rec_<id>_<HHMMSS>.txt, with EVENT
+lines (ai state/target/threat changes, ORDER, THREAT write, FIRST MOVE). Look at DynamicPathWalker (state,
+lastPathfindingResult, stuckTime, standingDuration), DynamicPathFinder, DynamicEnemy01BehaviorState.combatData.* at the
+moment of FIRST MOVE. Tests tools/sntest tr/rl/ai ALL OK (also with every switch on).

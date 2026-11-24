@@ -37,6 +37,11 @@ local admins = require("core.admins")
 local players = require("core.players")
 local monsters = require("core.monsters")
 local threat = require("core.threat")  -- (0.15.522)
+local fullrec = require("core.fullrec")  -- (0.15.532) the full recorder (owner 20:42 "there had to be a way to find out what the delay is")
+-- (0.15.532) In each raid the first monster of each node (REC_NODES nodes at most) is recorded for REC_S seconds: every
+-- field of every component every half second (only the changes) into emf.dir\spawn_nodes_rec_<id>_<time>.txt, with
+-- Spawn Nodes' own events (AI state/target/threat changes, its order, the threat writes, its first move) in between.
+local REC_NODES, REC_S = 4, 90
 
 local F = { id = "spawn_nodes", title = "Spawn Nodes" }
 local kit
@@ -1019,6 +1024,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.ground_log, S.threat_log = nil, nil  -- (0.15.518); (0.15.522)
   S.mon_log = nil  -- (0.15.526)
   S.ai_log = nil  -- (0.15.527)
+  S.rec_nodes, S.rec_n = {}, 0  -- (0.15.532) a new raid records its first monsters again
   mon_new_raid(gid)  -- (0.15.526) the bodies of its earlier raids put aside, monsters left from before counted apart
   if S.raid[gid] then  -- (0.15.526) an earlier raid of it was not over yet (stopped, monsters left): this one has its own count
     emf.log(string.format("spawn nodes: %s: its earlier raid was not over yet: this start begins a new raid (a new count)", g.name))
@@ -1327,6 +1333,18 @@ local function do_spawn(world, q, x, sy, z)
     end
     S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
     mon_add(id, qn0 and qn0.g or 0, q.node, true, false, q.respawn and "spawned again for a stuck one" or "spawned by its node")  -- (0.15.526)
+    S.rec_nodes = S.rec_nodes or {}
+    if not S.rec_nodes[q.node] and (S.rec_n or 0) < REC_NODES then  -- (0.15.532) the full recording of its first monster
+      local kind = tostring(q.guid)
+      for _, mm in ipairs(monsters) do if mm[3] == q.guid then kind = mm[1] .. ": " .. mm[2] break end end
+      local okr, file = pcall(fullrec.start, world, id, REC_S, "spawn_nodes_rec", string.format("%s, node %s, spawned at %.1f %.1f %.1f", kind, tostring(q.node), x, sy, z))
+      if okr and file then
+        S.rec_nodes[q.node], S.rec_n = id, (S.rec_n or 0) + 1
+        emf.log(string.format("spawn nodes: recording monster %s [%s] of node %s for %d s into %s", tostring(id), kind, tostring(q.node), REC_S, file))
+      else
+        emf.log(string.format("spawn nodes: the recording of monster %s could not start (%s)", tostring(id), tostring(file)))
+      end
+    end
     -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
     -- (0.15.531, owner 20:16 "yes" to taking it out, rule 0n) NO teleport onto the ground after the spawn any more: the
     -- spot is already on the ground (find_surface, 0.15.493), and the teleport put back in 0.15.518 (on a misquote) hung
@@ -1611,6 +1629,7 @@ local function hunt_tick(world)
           local d = dist2(px0, py0, pz0, p[2], p[3], p[4])
           if d <= THREAT_R * THREAT_R then
             local oka, res = pcall(threat.alarm, world, id, p[1], math.sqrt(d))
+            if fullrec.on(id) and res ~= "kept" then pcall(fullrec.event, world, id, string.format("THREAT write: player %s (%.0f m): %s", tostring(p[1]), math.sqrt(d), oka and tostring(res) or ("error " .. tostring(res)))) end
             if not seen[p[1]] then
               seen[p[1]] = true
               local oke, sent = pcall(threat.event, id, p[1])
@@ -1639,6 +1658,7 @@ local function hunt_tick(world)
           if pid then
             if o and o.id then pcall(emf.enemy_order_cancel, o.id) end
             local ok, oid, why = pcall(emf.enemy_order, world, id, pid)
+            pcall(fullrec.event, world, id, string.format("ORDER to go for player %s (%.0f m): %s", tostring(pid), math.sqrt(best), ok and tostring(oid) or ("error " .. tostring(oid))))
             S.orders[id] = { id = ok and oid or nil, target = pid, at = os.time(), n = ((o and o.n) or 0) + 1 }
             if ok and oid and (S.order_log or 0) < 80 then  -- (0.15.511, owner 16:17 "of course add the fucking logging")
               S.order_log = (S.order_log or 0) + 1
@@ -1727,6 +1747,7 @@ local function ai_tick(world)
       m.spawn_pos = m.spawn_pos or { x, y, z }
       if not m.first_moved and dist2(x, y, z, m.spawn_pos[1], m.spawn_pos[2], m.spawn_pos[3]) >= 0.25 then
         m.first_moved = now
+        pcall(fullrec.event, world, id, string.format("FIRST MOVE %.1f m from where it appeared", math.sqrt(dist2(x, y, z, m.spawn_pos[1], m.spawn_pos[2], m.spawn_pos[3]))))
         local okt, tp = pcall(world.get, world, "Teleport", id)
         S.ai_log = (S.ai_log or 0) + 1
         emf.log(string.format("spawn nodes: ai: monster %s [%s] first moved %d s after it appeared (state %s, target %s; a Teleport on it: %s)",
@@ -1752,6 +1773,7 @@ local function ai_tick(world)
           tostring(st), tostring(tgt), okl and line or "?", pl and tostring(pl[1]) or "none", best and math.sqrt(best) or -1,
           pl and (pl[3] - y) or 0, moved, now - (m.ai_at or m.born),
           S.orders[id] and S.orders[id].id and string.format("%s at player %s", tostring(S.orders[id].id), tostring(S.orders[id].target)) or "none"))  -- (0.15.530) instead of the 0.15.529 home values (no EnemySettings on monsters, home never changed)
+        if key ~= m.ai_key then pcall(fullrec.event, world, id, string.format("ai state %s, target %s, threat [%s], nearest player %.1f m", tostring(st), tostring(tgt), okl and line or "?", best and math.sqrt(best) or -1)) end
         m.ai_key, m.ai_pos, m.ai_at = key, { x, y, z }, now
         if S.ai_log >= AI_LOG_MAX then emf.log("spawn nodes: ai: the log limit for this raid is reached (" .. AI_LOG_MAX .. " lines)") return end
       end
@@ -2225,6 +2247,7 @@ function F.tick(world)
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     S.session, S.queue, S.runs = session, {}, {}
     S.mon, S.old_bodies = {}, {}  -- (0.15.526) the roster
+    pcall(fullrec.stop_all, "a new world or a reload")  -- (0.15.532)
     S.scan, S.scanned, S.purge, S.raid, S.started = nil, false, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
@@ -2256,6 +2279,7 @@ function F.tick(world)
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
     if not okh then emf.log("spawn nodes: hunt_tick: " .. tostring(why)) end
   end
+  if S.steps % AI_STEPS == 13 and fullrec.count() > 0 then local okr, why = pcall(fullrec.tick, world) if not okr then emf.log("spawn nodes: fullrec: " .. tostring(why)) end end  -- (0.15.532)
   if S.steps % AI_STEPS == 11 then local oka, why = pcall(ai_tick, world) if not oka then emf.log("spawn nodes: ai_tick: " .. tostring(why)) end end  -- (0.15.527)
   local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end

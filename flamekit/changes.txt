@@ -1,3 +1,6 @@
+0.15.532 Nov 23, 2026
+- Spawn Nodes (logging only): in each raid the first monster of each node is fully recorded for 90 s (every value the game keeps on it, every half second, only what changed) into its own file on the server (spawn_nodes_rec_<monster>_<time>.txt), with Spawn Nodes' own events in between (it got angry, its order, the threat write, its first move). For finding out what holds raid monsters back before they move. New shared module core/fullrec.lua.
+
 0.15.531 Nov 23, 2026
 - Spawn Nodes: no teleport onto the ground after a monster spawns any more. The spot is already on the ground, and that teleport never finished (EMF removed it after 10 s on every monster). The log says when each monster first moves ("first moved N s after it appeared").
 

@@ -1,6 +1,8 @@
 -- usage: texlua tools/sntest/tr.lua flamekit/features/spawn_nodes.lua (rl.lua the same): a fake world, no game needed
 package.path = (arg[0]:match("(.*/)") or "./") .. "?.lua;" .. package.path
+package.path = (arg[1]:match("(.*/)features/") or "./") .. "?.lua;" .. package.path  -- the real core modules (0.15.532: core/fullrec.lua)
 local M = require("mock")
+package.preload["core.threat"] = package.preload["core.threat"]
 local F = dofile(arg[1])
 F.setup(M.kit)
 local W = M.world
