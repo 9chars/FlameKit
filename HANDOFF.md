@@ -2655,3 +2655,13 @@ players' games use it when it is "#rrggbb", an older FlameKit shows orange); the
 spawn_nodes.lua is at Lua's 200-locals limit, a new top-level local does not compile), text without " N monsters are
 coming.", sound "raid_siren_twice" again. count_notice returns while r.spawned == 0 (no countdown before the first
 monster). sd.lua updated (double siren, red, no count, no countdown before the first monster); all 9 tests OK.
+
+**0.15.546 (owner 08:43 "lets remove all the admin restrictions on the Spawn Nodes system for now so other players can
+test it out"; Lua only; NOT installed, asked together with 0.15.545):** is_admin returns true for every player (the old
+`admins.is(account, from) == true` named in its comment, to restrict it again). So every player gets the groups, nodes,
+tab, window and every action. Test tools/sntest/op.lua (core.admins says nobody is an admin: still allowed); all 10 OK.
+Other players' games run whatever FlameKit they have (dist-test is 0.15.525: the old tab, no Spawn Nodes window).
+Owner 08:42-08:43 questions answered: Spawn Nodes is its own feature (features/spawn_nodes.lua, one file ~3100 lines, no
+enabled_setting); the 200-locals limit is a code-layout limit (fix = split into parts like companions); asked "should
+it have its own on/off feature button?" -> answered yes in my view (test probes still run on the server: PATH_CENSUS,
+ai_tick logging, fullrec 90 s recordings; 28 ms step at 07:52); not built (not asked to).

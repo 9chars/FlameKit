@@ -20,7 +20,8 @@
 -- Kept on the server in spawn_nodes.json (kit.store): groups and nodes. What runs (waves, monsters alive) is not kept:
 -- a restart or reload ends running waves; the game keeps or removes the monsters as it does any monster.
 --
--- ADMINS ONLY: every change and the node list go only to FlameKit admins (core/admins.lua). An admin's own game shows
+-- ADMINS ONLY (until 0.15.545; since 0.15.546, owner 2026-11-24 08:43, OPEN TO EVERY PLAYER for testing: is_admin):
+-- every change and the node list go only to FlameKit admins (core/admins.lua). An admin's own game shows
 -- the nodes and trip wires as markers (emf.marker: over the 3D view and on the map; only in that game, EMF Lua 1.25+),
 -- while "Show nodes" is on (this game's own switch, spawn_nodes_client.json). Other players' games never get the list.
 -- The channel "nodes": a player's game asks with {op = "get"}; the server answers {op = "state", admin, groups, nodes,
@@ -2375,8 +2376,12 @@ local function status(gid)
 end
 
 -- Whether this player is an admin (core/admins: EMF's admins, the host, npc_admins.json).
+-- (0.15.546, owner 2026-11-24 08:43 "lets remove all the admin restrictions on the Spawn Nodes system for now so other
+-- players can test it out") EVERY PLAYER COUNTS AS AN ADMIN HERE FOR NOW: they all get the groups and nodes, the tab, the
+-- window and every action. To restrict it again: return admins.is(account, from) == true (the line below).
 local function is_admin(account, from)
-  return admins.is(account, from) == true
+  local _ = admins.is  -- kept for when it is restricted again
+  return true
 end
 
 -- The state for one player's game: the groups and nodes only for an admin.
