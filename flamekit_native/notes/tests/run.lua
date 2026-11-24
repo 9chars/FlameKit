@@ -77,7 +77,7 @@ end
 local SW, CW = make_world(true), make_world(false)
 local side = "client"  -- whose code runs now (joined mode)
 
-local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", map_show = true, show_label = true, lf_enabled = true, lf_auto = true,
+local settings = { ui_hide_build = true, lf_show_all = false, open_on_start = false, window_key = "F4", pointer_key = "right_alt", map_clock = true, map_size = 300, map_toggle_key = "F10", map_show = true, sn_enabled = true, show_label = true, lf_enabled = true, lf_auto = true,
   lf_action = "delete", lf_dump_key = "", lf_keep_hotbar = true, map_hide = "-", auto_loot = "game" }
 local ticks, events, keys, commands, notes, replies, pending, tells = {}, {}, {}, {}, {}, {}, {}, {}
 local to_server, to_client, channel, pdata, sender = {}, {}, nil, {}, nil

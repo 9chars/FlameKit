@@ -1,3 +1,6 @@
+0.15.553 Nov 24, 2026
+- Clean-up before release: the test logging from the raid investigation is gone (Spawn Nodes' path census, AI log, monster recordings and path push; FlameKit Native's path search probe and tamed animal counts; the Free build debug log and probe). Raids, the animal hold and Free build work as before. Needs FlameKit Native 0.15.553 on the server.
+
 0.15.552 Nov 24, 2026
 - Spawn Nodes: the switch Its monsters spare animals, pets and villagers is now named Monsters spare animals, pets and villagers.
 

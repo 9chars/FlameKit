@@ -557,19 +557,10 @@ void add_player_boxes(void* bzs, uint8_t flag, uint32_t altar_entity, bool from_
 }
 
 // (0.15.459, #5 "is there a way to make free build mode not require a flame alter?", owner 19:41 "go ahead": research)
-// A probe, logging only: the game empties the zone list each step in its programs clear_buildzones (server) and
-// clear_buildzones_client (EMF 0.6.19's docs/ecs_programs.md #120, #121) and fills it in add_buildzones_server /
-// add_buildzones_client (#55, #54). If our zones went in right after the clear (EMF hook_program, post), they would
-// not need an altar's addZone call. The probe logs, for the first steps, the order these run in, their threads, and
-// the flag the game passes to addZone for an altar (needed to add our zones without an altar's call).
-std::atomic<uint32_t> g_probe_seq{0};
-// One probe line, the first 10 of each kind (`said` counts them).
-void probe(std::atomic<int>& said, const char* what) {
-    if (said.fetch_add(1) >= 10) return;
-    EMF_LOG(kMod, "free build probe #%u: %s (step %llu, thread %lu)", g_probe_seq.fetch_add(1), what,
-            (unsigned long long)g_steps.load(), GetCurrentThreadId());
-}
-std::atomic<int> g_said_cs{0}, g_said_cc{0}, g_said_as{0}, g_said_ac{0}, g_said_zone{0};
+// The game empties the zone list each step in its programs clear_buildzones (server) and clear_buildzones_client (EMF
+// 0.6.19's docs/ecs_programs.md #120, #121) and fills it in add_buildzones_server / add_buildzones_client (#55, #54).
+// FlameKit's zones go in right after the clear (EMF hook_program, post), so they need no altar's addZone call. (0.15.553,
+// owner 2026-11-24 12:33 "clean these up": the 0.15.459 probe's log lines and its two add_buildzones hooks are gone.)
 // (0.15.460, #5) right after the game emptied zone list `bzs`: FlameKit's zones go in first, with or without an altar.
 void after_clear(void* bzs, const char* side) {
     if (!bzs || !g_clear_path.load()) return;
@@ -588,26 +579,14 @@ void after_clear(void* bzs, const char* side) {
     add_player_boxes(bzs, uint8_t(known == kFlagUnknown ? 0 : known), 0, true);
 }
 void probe_clear_server(void*, void*) {
-    probe(g_said_cs, "clear_buildzones done (server)");
     if (emf::World ws = emf::server_world()) after_clear(ws.singleton("BuildZoneSystem"), "server");
 }
 void probe_clear_client(void*, void*) {
-    probe(g_said_cc, "clear_buildzones_client done (this game)");
     if (emf::World wc = emf::client_world()) after_clear(wc.singleton("BuildZoneSystem"), "this game");
 }
-void probe_add_server(void*, void*) { probe(g_said_as, "add_buildzones_server starts"); }
-void probe_add_client(void*, void*) { probe(g_said_ac, "add_buildzones_client starts"); }
 
 uint64_t add_zone_detour(void* bzs, uint8_t list, uint8_t flag, uint8_t owner, int64_t* box, uint32_t entity,
                          uint8_t abandoned, void* base_id) {
-    {  // (0.15.459, probe) what the game passes
-        if (g_said_zone.load() < 10) {
-            char line[200];
-            snprintf(line, sizeof line, "addZone(list %u, flag %u, owner kind %u, entity %u, abandoned %u, zone list %p)", list, flag, owner,
-                     entity, abandoned, bzs);
-            probe(g_said_zone, line);
-        }
-    }
     if (box && list == 0 && owner == 0 && entity != 0 && base_id) {  // (0.15.470) a real altar's values, for the base data test
         AltarInfo ai;
         ai.cx = box[0] / 2 + box[3] / 2;
@@ -1416,168 +1395,21 @@ void speed_tick() {
 }  // namespace
 
 // called by flamekit_native's emf_mod_load in every process (a dedicated server, a player's game)
-// (0.15.535, owner 2026-11-23 21:37 "yes" to the path grid probe; 21:28 "actually go look at the problem") THE PATH GRID
-// PROBE, read only. Disassembly of the server exe (build 1287369, HANDOFF 2026-11-23 21:28-21:50): every creature's path
-// request becomes an entry (0x1a0 bytes) in the PATH GRID SYSTEM (storage+0x470; the game's command executor:
-// kPathSiteSig, its +28 = 0x470): a slot list at pg+0x138 (+0x8 used-bits, +0x10 capacity, +0x40 the entries; checked
-// with kPathListSig, which is the game's own create code). Entry +0x0 the request id, +0x120 its state, +0x190 a flag,
-// +0x191 the search state, +0x198 the search's iteration count. Every PROBE_STEPS server steps all used entries are read
-// (ReadProcessMemory: a bad pointer gives nothing, never a crash): one summary line when the mix of states changes (at
-// most every second) and every 10 s, and a line for each request's state change (PROBE_LINES a minute at most). Also
-// whether the game's own singleton "ecs::PathGridSystem" is the same pointer.
-constexpr const char* kPathSiteSig = "41 0F B6 85 20 01 00 00 49 8D 75 0C 44 8B 06 4D 8D 4D 10 41 0F B7 55 04 49 8B 8C 24 ?? ?? 00 00 88 44 24 20 E8";
-constexpr int kPathSiteImm = 28;
-constexpr const char* kPathListSig = "4C 8B A1 30 01 00 00 4C 89 6C 24 28 4C 89 7C 24 20 4D 85 E4 0F 84 ?? ?? ?? ?? 48 8D A9 38 01 00 00 48 8B CD 48 8D 54 24 70 E8 ?? ?? ?? ?? 48 8B D0 48 3B 45 10 0F 83 ?? ?? ?? ?? 4C 8B 55 08 4C 8B C0 48 8B C8 49 C1 E8 06 48 69 F2 A0 01 00 00 4F 8B 0C C2 83 E1 3F 48 03 75 40";
-constexpr uint32_t PROBE_STEPS = 30, PROBE_LINES = 400, PROBE_MAX = 4096;
-struct PathReq { uint8_t state, flag, search; uint32_t iter; uint32_t seen_step, change_step; uint32_t owner; float sx, sy, sz, tx, ty, tz; };
-// (0.15.536, owner 21:52 "yes go for it") who a request belongs to: the entry's copied settings start at +0x8 (0x140610dc0
-// copies them byte for byte); their +0x0 is the entity (the program slice's current entity, 0x14065b870), +0x10 the
-// start (3 floats), +0x1c the target (3 floats). What the owner is: its faction (entity or template) and whether it has
-// the enemy AI or the villager state.
-std::string owner_kind(EmfWorld* w, uint32_t id) {
-    auto* a = emf::api();
-    uint64_t size = 0;
-    const void* f = a->get_component(w, gen::ecs::Faction::kHash, id, &size);
-    if (!f && a->get_template_component) f = a->get_template_component(w, gen::ecs::Faction::kHash, id, &size);
-    const bool enemy = a->get_component(w, gen::ecs::DynamicEnemy01BehaviorState::kHash, id, &size) != nullptr;
-    const bool npc = a->get_component(w, gen::ecs::DynamicActiveNpcState::kHash, id, &size) != nullptr;
-    char b[64];
-    snprintf(b, sizeof b, "faction %d%s%s", f ? int(*static_cast<const uint8_t*>(f)) : -1, enemy ? ", enemy AI" : "", npc ? ", villager" : "");
-    return b;
-}
-void path_probe(emf::World w) {
-    static int ok = -1;
-    static uint32_t pg_off = 0, steps = 0, minute_lines = 0, minute_at = 0, last_summary = 0;
-    static std::unordered_map<uint32_t, PathReq> reqs;
-    struct Cap { uint32_t n = 0, iter = 0; float sx = 0, sy = 0, sz = 0, tx = 0, ty = 0, tz = 0; };
-    static std::unordered_map<uint32_t, Cap> caps;  // (0.15.536) owner -> step-limit hits since the last 10 s summary
-    static uint32_t caps_at = 0;
-    static std::string last_mix;
-    ++steps;
-    if (ok < 0) {
-        const uintptr_t a = emf::find_pattern(kPathSiteSig, kPathSiteImm), b = emf::find_pattern(kPathListSig, 0);
-        pg_off = a ? *reinterpret_cast<const uint32_t*>(a) : 0;
-        ok = (a && b && pg_off == 0x470 && owner_setup(w) && g_storage_off.load() != 0) ? 1 : 0;
-        EMF_LOG(kMod, "path grid probe: %s (executor site %s, request list code %s, path grid at storage+0x%x, storage at world+0x%x)",
-                ok ? "on (read only)" : "OFF: the game's code does not match this build", a ? "found" : "not found", b ? "found" : "not found",
-                pg_off, g_storage_off.load());
-    }
-    if (ok != 1 || steps % PROBE_STEPS) return;
-    if (steps - minute_at >= 3600) minute_at = steps, minute_lines = 0;
-    const uint64_t storage = uint64_t(reinterpret_cast<uintptr_t>(w.raw())) + g_storage_off.load();
-    uint64_t pg = 0, sched = 0, bits = 0, cap = 0, entries = 0;
-    if (!read_mem(storage + pg_off, &pg, 8) || !pg) return;
-    static bool said_single = false;
-    if (!said_single) {
-        said_single = true;
-        void* single = w.singleton("ecs::PathGridSystem");
-        EMF_LOG(kMod, "path grid probe: path grid system at %p; the game's singleton \"ecs::PathGridSystem\" %p (%s)", reinterpret_cast<void*>(pg),
-                single, single == reinterpret_cast<void*>(pg) ? "the same" : "NOT the same: the probe reads storage+0x470");
-    }
-    read_mem(pg + 0x130, &sched, 8);
-    if (!read_mem(pg + 0x138 + 0x8, &bits, 8) || !read_mem(pg + 0x138 + 0x10, &cap, 8) || !read_mem(pg + 0x138 + 0x40, &entries, 8)) return;
-    if (!bits || !entries || cap == 0 || cap > PROBE_MAX) {
-        static uint64_t said_cap = ~0ull;
-        if (said_cap != cap) { said_cap = cap; EMF_LOG(kMod, "path grid probe: request list not readable (capacity %llu, bits %p, entries %p)", (unsigned long long)cap, (void*)bits, (void*)entries); }
-        return;
-    }
-    std::vector<uint64_t> used((cap + 63) / 64);
-    if (!read_mem(bits, used.data(), used.size() * 8)) return;
-    std::unordered_map<uint32_t, PathReq> now;
-    std::map<std::string, int> mix;
-    std::vector<uint8_t> e(0x1a0);
-    for (uint64_t i = 0; i < cap; ++i) {
-        if (!((used[i >> 6] >> (i & 63)) & 1)) continue;
-        if (!read_mem(entries + i * 0x1a0, e.data(), e.size())) continue;
-        const uint32_t id = *reinterpret_cast<const uint32_t*>(&e[0]);
-        auto fl = [&](size_t o) { return *reinterpret_cast<const float*>(&e[o]); };
-        PathReq r{e[0x120], e[0x190], e[0x191], *reinterpret_cast<const uint32_t*>(&e[0x198]), steps, steps,
-                  *reinterpret_cast<const uint32_t*>(&e[0x8]), fl(0x18), fl(0x1c), fl(0x20), fl(0x24), fl(0x28), fl(0x2c)};
-        char key[32];
-        snprintf(key, sizeof key, "%u/%u%s", r.state, r.search, r.flag ? "f" : "");
-        mix[key]++;
-        auto it = reqs.find(id);
-        if (it == reqs.end()) {
-            if (minute_lines < PROBE_LINES) {
-                ++minute_lines;
-                EMF_LOG(kMod, "path grid probe: request %u new: owner %u (%s) from %.1f %.1f %.1f to %.1f %.1f %.1f (%.1f m); state %u, search %u, flag %u, iterations %u",
-                        id, r.owner, owner_kind(w.raw(), r.owner).c_str(), r.sx, r.sy, r.sz, r.tx, r.ty, r.tz,
-                        std::sqrt((r.tx - r.sx) * (r.tx - r.sx) + (r.ty - r.sy) * (r.ty - r.sy) + (r.tz - r.sz) * (r.tz - r.sz)), r.state, r.search, r.flag, r.iter);
-            }
-        } else {
-            r.seen_step = it->second.seen_step;
-            r.change_step = it->second.change_step;
-            if (r.search == 7 && it->second.search != 7) {  // (0.15.536) ran into the step limit: counted per owner
-                auto& c = caps[r.owner];
-                c.n++;
-                c.sx = r.sx, c.sy = r.sy, c.sz = r.sz, c.tx = r.tx, c.ty = r.ty, c.tz = r.tz, c.iter = r.iter;
-            }
-            if (it->second.state != r.state || it->second.search != r.search || it->second.flag != r.flag) {
-                if (minute_lines < PROBE_LINES) {
-                    ++minute_lines;
-                    EMF_LOG(kMod, "path grid probe: request %u (owner %u): state %u -> %u, search %u -> %u, flag %u -> %u, iterations %u -> %u (%.1f s in the last state, %.1f s since it came)",
-                            id, r.owner, it->second.state, r.state, it->second.search, r.search, it->second.flag, r.flag, it->second.iter, r.iter,
-                            (steps - it->second.change_step) / 60.0, (steps - it->second.seen_step) / 60.0);
-                }
-                r.change_step = steps;
-            }
-        }
-        now[id] = r;
-    }
-    for (auto& kv : reqs) {
-        if (!now.count(kv.first) && minute_lines < PROBE_LINES) {
-            ++minute_lines;
-            EMF_LOG(kMod, "path grid probe: request %u gone (last: state %u, search %u, iterations %u; it lived %.1f s)", kv.first, kv.second.state,
-                    kv.second.search, kv.second.iter, (steps - kv.second.seen_step) / 60.0);
-        }
-    }
-    reqs.swap(now);
-    if (steps - caps_at >= 600) {  // (0.15.536) every 10 s: who ran into the step limit, most first
-        caps_at = steps;
-        if (!caps.empty()) {
-            std::vector<std::pair<uint32_t, Cap>> v(caps.begin(), caps.end());
-            std::sort(v.begin(), v.end(), [](auto& a, auto& b) { return a.second.n > b.second.n; });
-            std::string t;
-            for (size_t i = 0; i < v.size() && i < 8; ++i) {
-                char b[200];
-                snprintf(b, sizeof b, "%s owner %u (%s) x%u, from %.0f %.0f %.0f to %.0f %.0f %.0f", i ? ";" : "", v[i].first,
-                         owner_kind(w.raw(), v[i].first).c_str(), v[i].second.n, v[i].second.sx, v[i].second.sy, v[i].second.sz,
-                         v[i].second.tx, v[i].second.ty, v[i].second.tz);
-                t += b;
-            }
-            EMF_LOG(kMod, "path grid probe: in the last 10 s these ran into the game's step limit (search 7):%s", t.c_str());
-            caps.clear();
-        }
-    }
-    std::string m;
-    for (auto& kv : mix) m += " " + kv.first + " x" + std::to_string(kv.second);
-    if ((m != last_mix && steps - last_summary >= 60) || steps - last_summary >= 600) {
-        last_summary = steps;
-        last_mix = m;
-        uint32_t live = 0;
-        read_mem(pg + 0x138 + 0x54, &live, 4);
-        EMF_LOG(kMod, "path grid probe: %zu request(s) (live count %u, capacity %llu, scheduler %p); state/search:%s", reqs.size(), live,
-                (unsigned long long)cap, (void*)sched, m.empty() ? " none" : m.c_str());
-    }
-}
-
-// (0.15.537, owner 2026-11-23 22:10 "yes" to the test build) TAME PATH TEST SWITCH, off by default. (0.15.538: also
-// THE ANIMAL HOLD during every raid, automatic: see g_raid_hold.) The 22:00 probe:
+// (0.15.537, owner 2026-11-23 22:10 "yes" to the test build) the hooks of THE ANIMAL HOLD (see g_raid_hold). (0.15.553,
+// owner 2026-11-24 12:33 "clean these up": the console switch "flamekit.tamepath", its counts and the test log lines are
+// gone; the hold during raids is unchanged.) The 22:00 probe (removed too):
 // ~22 tamed animals in the base (IsTame + Wildlife, faction Environment, no creature AI; console 22:08) keep failing
-// their short walk searches at the 500-step limit, and raid requests wait 54-89 s unsearched. Test: with
-// "flamekit.tamepath off" the game's own create (0x1405fb550, kind 5) and update (0x1405fc120, kind 6) of a path
+// their short walk searches at the 500-step limit, and raid requests wait 54-89 s unsearched. While held,
+// the game's own create (0x1405fb550, kind 5) and update (0x1405fc120, kind 6) of a path
 // request return their own failure answer (id 0 / false, as when the command buffer is full; the pathfinding program
 // 0x140203ab0 then keeps id 0 and asks again later; the update's answer is not read) when the request's owner
-// (settings +0x0) is a tamed animal. The animals then stand still. "flamekit.tamepath on" (the default) = the game as
-// it is. Nothing else changes; nothing is saved. Logged: the switch, the animals found, and every 10 s how many
-// creates/updates were held.
+// (settings +0x0) is a tamed animal. The animals then stand still. Nothing else changes; nothing is saved.
 constexpr const char* kPathCreateSig = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 30 41 8B 00 49 8B D8 48 8B FA 89 44 24 20 48 8D 51 10 41 B0 05 41 B9 28 01 00";
 constexpr const char* kPathUpdateSig = "48 89 5C 24 08 57 48 83 EC 30 41 8B 00 49 8B F8 8B DA 89 44 24 20 48 8D 51 10 41 B0 06 41 B9 28 01 00 00 E8";
 using PathCreateFn = uint32_t* (*)(void*, uint32_t*, const uint32_t*, uint64_t);
 using PathUpdateFn = bool (*)(void*, uint32_t, const uint32_t*, uint64_t);
 PathCreateFn g_path_create = nullptr;
 PathUpdateFn g_path_update = nullptr;
-std::atomic<bool> g_tame_hold{false};  // the console switch (flamekit.tamepath off), a test by hand
 // ======================================================================================================================
 // (0.15.538, owner 2026-11-23 22:28 "before a raid starts it has to stop all the animals", 22:29 "build that into the
 // system and note it heavily") THE ANIMAL HOLD, automatic: g_raid_hold is set while Spawn Nodes says a raid is active
@@ -1590,11 +1422,11 @@ std::atomic<bool> g_tame_hold{false};  // the console switch (flamekit.tamepath 
 // monsters unsearched for 54-89 s. With the animals held: every raid request searched at once, paths in 0-4 s.
 // SAFETY: a "1" whose file was not rewritten for kHoldStaleS seconds counts as "0" (Spawn Nodes stopped or failed:
 // the animals are never left standing by a dead script); nothing is saved, a restart starts with the animals free.
-// Logged: "animal hold: ..." on every change; "tame path test: ..." the animals found and the held counts every 10 s.
+// Logged: "animal hold: ..." on every change.
 // ======================================================================================================================
 std::atomic<bool> g_raid_hold{false};
 constexpr int64_t kHoldStaleS = 30;
-bool holding() { return g_tame_hold.load(std::memory_order_relaxed) || g_raid_hold.load(std::memory_order_relaxed); }
+bool holding() { return g_raid_hold.load(std::memory_order_relaxed); }
 void read_animal_hold() {
     const std::wstring file = lua_file(L"animal_hold_server.txt");
     bool want = false;
@@ -1625,25 +1457,18 @@ void read_animal_hold() {
 }
 constexpr uint32_t kTameBits = 1u << 21;  // entity ids below 2M
 std::atomic<uint64_t> g_tame[kTameBits / 64];
-std::atomic<uint64_t> g_held_create{0}, g_held_update{0}, g_passed_create{0}, g_passed_update{0};
 bool is_tame_bit(uint32_t id) {
     return id < kTameBits && (g_tame[id >> 6].load(std::memory_order_relaxed) >> (id & 63) & 1);
 }
 uint32_t* path_create_detour(void* ctx, uint32_t* out, const uint32_t* settings, uint64_t r9) {
     if (holding() && settings && is_tame_bit(settings[0])) {
-        g_held_create.fetch_add(1, std::memory_order_relaxed);
         *out = 0;
         return out;
     }
-    g_passed_create.fetch_add(1, std::memory_order_relaxed);
     return g_path_create(ctx, out, settings, r9);
 }
 bool path_update_detour(void* ctx, uint32_t id, const uint32_t* settings, uint64_t r9) {
-    if (holding() && settings && is_tame_bit(settings[0])) {
-        g_held_update.fetch_add(1, std::memory_order_relaxed);
-        return false;
-    }
-    g_passed_update.fetch_add(1, std::memory_order_relaxed);
+    if (holding() && settings && is_tame_bit(settings[0])) return false;
     return g_path_update(ctx, id, settings, r9);
 }
 // on the server world's steps: every 5 s while held, the tamed animals (IsTame + the Wildlife template) into the bits
@@ -1651,11 +1476,9 @@ void tame_tick(emf::World w) {
     static uint32_t steps = 0;
     static bool was = false;
     ++steps;
-    const bool hold = holding();  // (0.15.538) the console switch or the raid
+    const bool hold = holding();  // (0.15.538) the raid
     if (hold != was) {
         was = hold;
-        EMF_LOG(kMod, "tame path test: %s (by hand %s, raid %s)", hold ? "ON: tamed animals' path searches are held (they stand still)" : "off: the game as it is",
-                g_tame_hold.load() ? "held" : "free", g_raid_hold.load() ? "held" : "free");
         if (!hold) for (auto& b : g_tame) b.store(0);
         steps = 0;
     }
@@ -1669,21 +1492,10 @@ void tame_tick(emf::World w) {
                 a->get_template_component && a->get_template_component(w.raw(), gen::ecs::Wildlife::kHash, id, &sz))
                 ids.push_back(id);
         });
-        static std::vector<uint32_t> last;
         for (auto& b : g_tame) b.store(0);
         for (uint32_t id : ids)
             if (id < kTameBits) g_tame[id >> 6].fetch_or(uint64_t(1) << (id & 63));
-        if (ids != last) {
-            last = ids;
-            std::string t;
-            for (size_t i = 0; i < ids.size() && i < 60; ++i) t += " " + std::to_string(ids[i]);
-            EMF_LOG(kMod, "tame path test: %zu tamed animal(s):%s", ids.size(), t.c_str());
-        }
     }
-    if (steps % 600 == 0)
-        EMF_LOG(kMod, "tame path test: in the last 10 s held %llu create(s) and %llu update(s) of tamed animals; passed %llu create(s) and %llu update(s) of others",
-                (unsigned long long)g_held_create.exchange(0), (unsigned long long)g_held_update.exchange(0),
-                (unsigned long long)g_passed_create.exchange(0), (unsigned long long)g_passed_update.exchange(0));
 }
 
 bool fk_build_anywhere_load(bool dedicated) {
@@ -1695,23 +1507,12 @@ bool fk_build_anywhere_load(bool dedicated) {
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
     EMF_LOG(kMod, "free build and bigger altar areas (up to x%.1f, the world's option): hook on addZone %s", kMaxFactor,
             al ? "installed" : "NOT installed");
-    if (dedicated) {  // (0.15.537) the tame path test switch (off until "flamekit.tamepath off")
-        const bool c = emf::hook_pattern("flamekit: path request create (tame test)", kPathCreateSig, reinterpret_cast<void*>(&path_create_detour),
+    if (dedicated) {  // (0.15.537) the animal hold's hooks (see g_raid_hold)
+        const bool c = emf::hook_pattern("flamekit: path request create (animal hold)", kPathCreateSig, reinterpret_cast<void*>(&path_create_detour),
                                          reinterpret_cast<void**>(&g_path_create));
-        const bool u = c && emf::hook_pattern("flamekit: path request update (tame test)", kPathUpdateSig, reinterpret_cast<void*>(&path_update_detour),
+        const bool u = c && emf::hook_pattern("flamekit: path request update (animal hold)", kPathUpdateSig, reinterpret_cast<void*>(&path_update_detour),
                                               reinterpret_cast<void**>(&g_path_update));
-        EMF_LOG(kMod, "tame path test: hooks on create %s, update %s; the switch is off ('flamekit.tamepath off' holds the tamed animals' searches)",
-                c ? "installed" : "NOT installed", u ? "installed" : "NOT installed");
-        if (c && u)
-            emf::add_command("flamekit.tamepath", "on|off: off = tamed animals ask the game for no walks (they stand still) by hand; on = not by hand (raids still hold them)",
-                             [](emf::World, const std::vector<std::string>& args) {
-                const std::string v = args.size() > 1 ? args[1] : "";
-                if (v == "off") g_tame_hold = true;
-                else if (v == "on") g_tame_hold = false;
-                EMF_LOG(kMod, "flamekit.tamepath %s", v.c_str());
-                EMF_REPLY("tamed animals' walks: by hand %s; raid hold %s (Spawn Nodes holds them during every raid)",
-                          g_tame_hold.load() ? "OFF (held; they stand still)" : "on (the game as it is)", g_raid_hold.load() ? "ON now" : "not now");
-            });
+        EMF_LOG(kMod, "animal hold: hooks on path create %s, update %s", c ? "installed" : "NOT installed", u ? "installed" : "NOT installed");
     }
     if (dedicated && sampler_file_on()) {  // (0.15.469) the chunk counter: test servers only
         const bool u = emf::hook_pattern("flamekit: terrain chunk unpack (counter)", kUnpackSig, reinterpret_cast<void*>(&unpack_detour),
@@ -1719,13 +1520,9 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (!u) g_unpack = nullptr;
         EMF_LOG(kMod, "server speed: the terrain chunk counter is %s", u ? "on" : "NOT on (the game's function was not found)");
     }
-    if (emf::api()->hook_program) {  // (0.15.459, #5 research) the probe: logging only
+    if (emf::api()->hook_program) {  // (0.15.460) FlameKit's zones right after the game empties its zone list
         const bool a = emf::api()->hook_program("clear_buildzones", nullptr, probe_clear_server, nullptr);
         const bool b = emf::api()->hook_program("clear_buildzones_client", nullptr, probe_clear_client, nullptr);
-        const bool c = emf::api()->hook_program("add_buildzones_server", probe_add_server, nullptr, nullptr);
-        const bool d = emf::api()->hook_program("add_buildzones_client", probe_add_client, nullptr, nullptr);
-        EMF_LOG(kMod, "free build probe: program hooks clear_buildzones %s, clear_buildzones_client %s, add_buildzones_server %s, add_buildzones_client %s",
-                a ? "on" : "NOT on", b ? "on" : "NOT on", c ? "on" : "NOT on", d ? "on" : "NOT on");
         g_clear_path = a && b;  // (0.15.460) both needed, else the old way
     } else {
         g_clear_path = false;
@@ -1787,17 +1584,9 @@ bool fk_build_anywhere_load(bool dedicated) {
                 else g_pos.erase(side_bit | id);
             }
         }
-        if (w.is_server() || w.is_client()) {  // (0.15.459, probe) once more 10 s into the running world: the steady order
-            static uint32_t probe_steps = 0;
-            if (++probe_steps == 1200) {
-                EMF_LOG(kMod, "free build probe: again, 10 s into the running world(s)");
-                g_said_cs = 0, g_said_cc = 0, g_said_as = 0, g_said_ac = 0, g_said_zone = 0;
-            }
-        }
         if (w.is_server()) {
             speed_tick();  // (0.15.466)
-            path_probe(w);  // (0.15.535) read only
-            tame_tick(w);  // (0.15.537) the tame path test switch
+            tame_tick(w);  // (0.15.537) the tamed animals for the animal hold
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)

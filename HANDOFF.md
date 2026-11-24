@@ -60,14 +60,15 @@ Keep this list current: strike an item only with the test or the owner's word th
    unknown whether an animal was hit. Still open until a log shows a pets-and-animals cancel.
 
 **Performance / leftovers:**
-8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
-   ai_tick logs, the 90 s full recordings, HUNT_ON, THREAT_ON). FlameKit took 28 ms in one server step at 07:52. Owner
-   to decide whether it goes.
+8. ~~The 2026-11-23 path investigation's test logging still runs on the server~~ DONE 0.15.553 (owner 12:33 "clean these
+   up"): path census, ai_tick, full recordings (core/fullrec.lua deleted), path push gone. HUNT_ON and THREAT_ON KEPT:
+   they are raid behaviour (hunt_tick sends each monster at the nearest player), not logging; my 12:27 list called them
+   test code: wrong.
 9. features/spawn_nodes.lua is at Lua's 200 top-level locals (newer things in the table K). The lasting fix is splitting
    it into parts like the companions (features/companions/*.lua). Not asked for.
 10. Spawn Nodes is open to every player (0.15.546, "for now ... so other players can test it out"): restrict again with
     the line named in is_admin.
-11. An old features/chop_loot.lua is in the local server's mods folder; main.lua does not load it.
+11. ~~An old features/chop_loot.lua is in the local server's mods folder~~ deleted 2026-11-24 12:40 (owner 12:33).
 
 **Raids, measured but not solved:**
 12. Oversized raids (79 monsters at once, 22:44): even with the animals held the game's path search fell behind (median
@@ -2908,3 +2909,31 @@ changes.txt in both and in the work folder; serverstart, server up 12:17:21 ("ra
 the label is now "Monsters spare animals, pets and villagers" (spawn_nodes.lua switch_row; the comments naming it in
 spawn_nodes.lua and build_anywhere.cpp too: a comment only, no DLL build). Nothing else. Live 12:26:48 on the server and
 the game, no errors.
+
+**2026-11-24 12:27 owner asked for a list to evaluate before Stable; 12:33 answers:** "#1, 2, 3, 4 -- clean these up,
+remove as needed #5 leave it alone [Spawn Nodes open to all] #6 appears to work [levels] #7 works from what I tested
+[loot] #8 not test [cooldown after reload/restart] #9 not worried about testing that right now [Free build vs raid lock]
+#10 seems to work [sn_enabled switch] #11 seems to work [pets protection] #12 seems to work [markers 80+] #13 not tested
+[raid at another base] #16 can anything be cleaned up with this? [200 locals]".
+**0.15.553 (the clean-up of #1-#4; built 12:41:43, DLL f9102355...; NOT installed, restart asked):**
+- spawn_nodes.lua: removed the path census (census_tick, PATH_CENSUS), ai_tick and its mon_kind/MON_NAME, the full
+  recordings (REC_NODES/REC_S, fullrec.start/event/tick/stop_all), path_push (PATH_PUSH, off since 0.15.534), the
+  load-time "census: entity ... alive" lines. core/fullrec.lua deleted (nothing else used it; the companions have their
+  own 02_fullrec). HUNT_ON / THREAT_ON / STUCK_ON untouched. tools/sntest/ai.lua now checks none of those logs appear
+  and that the hunt order still goes out.
+- FlameKit Native build_anywhere.cpp: path grid probe (path_probe, owner_kind, PathReq, kPathSiteSig/kPathListSig)
+  removed; the animal hold kept as it was, minus the console switch "flamekit.tamepath" (g_tame_hold), the held/passed
+  counters and the "tame path test" log lines (hooks renamed "(animal hold)"; "animal hold: ON/off" lines stay). The
+  0.15.459 free build probe: its log lines, the add_buildzones_server/client hooks (logging only) and the "again 10 s
+  in" block removed; the clear_buildzones hooks KEPT (they add Free build's zones).
+- features/build_anywhere.lua deleted (it was only the Free build debug log; main.lua no longer lists it).
+- companions/09_setup.lua: the "npc probe: loaded (companion test: flamekit.npc)" line removed (flamekit.npc itself is
+  the companions' admin console command: kept).
+- flamekit_native/notes/tests/run.lua: sn_enabled added to the mock's settings (0.15.550 broke the suite: "unknown
+  setting sn_enabled"; I had not run it then). Both modes ALL PASSED; sntest all 14 OK.
+- Files deleted 12:40 (owner 12:33, delete permission granted): server: 80 spawn_nodes_rec_*.txt (16 MB),
+  features/chop_loot.lua, every old DLL copy (.old_1857 ... .old_539, .hooks_400, .keep_466, .old, 26 hidden
+  .old_v412...v439 files); game: .old_403 ... .old_539 and the 25 hidden .old_v* files, _old_free_build_tool.txt. Kept:
+  flamekit_native.dll.old_550 in both. At the install: core/fullrec.lua and features/build_anywhere.lua go from the
+  server, the game and the work folder.
+

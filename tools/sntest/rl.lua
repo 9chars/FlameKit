@@ -1,6 +1,6 @@
 -- reload in the middle of a raid; and the switched-off parts switched on (no errors)
 package.path = (arg[0]:match("(.*/)") or "./") .. "?.lua;" .. package.path
-package.path = (arg[1]:match("(.*/)features/") or "./") .. "?.lua;" .. package.path  -- the real core modules (0.15.532: core/fullrec.lua)
+package.path = (arg[1]:match("(.*/)features/") or "./") .. "?.lua;" .. package.path  -- the real core modules
 local M = require("mock")
 package.preload["core.threat"] = package.preload["core.threat"]
 emf.enemy_order = function() return 7 end

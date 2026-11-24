@@ -1,4 +1,5 @@
--- usage: texlua tools/sntest/ai.lua flamekit/features/spawn_nodes.lua: the 0.15.527 AI log lines
+-- usage: texlua tools/sntest/ai.lua flamekit/features/spawn_nodes.lua: (0.15.553) the 2026-11-23 test code is gone (no AI
+-- log, no path census, no recordings, no path push) and the hunt order still goes out (was: the 0.15.527 AI log lines)
 package.path = (arg[0]:match("(.*/)") or "./") .. "?.lua;" .. package.path
 package.path = (arg[1]:match("(.*/)features/") or "./") .. "?.lua;" .. package.path  -- the real core/threat.lua
 local M = require("mock")
@@ -32,21 +33,14 @@ M.ents[id].path = 1
 M.ents[id].x = M.ents[id].x - 3
 run(1)
 local function has(p) return M.count(p) > 0 end
-ok(has("state 1, target 0, threat table [empty]"), "a line when its AI shows up")
-ok(has("threat table [1: 3 e1 f7 a55]"), "a line when the player comes into its threat table")
-ok(has("state 6, target 1"), "a line when it fights the player")
-ok(has("spawn nodes: ai (10 s): monster"), "the 10 s line")
-ok(has("nearest player 1 "), "the distance to the player is in it")
-ok(has("; order 77 at player 1"), "the order is in the line")
-ok(has("first moved 1"), "the first move is logged with how long it stood")
+ok(not has("spawn nodes: ai"), "no AI log lines")
+ok(not has("path census"), "no path census")
+ok(not has("recording monster") and not has("fullrec"), "no full recordings")
+ok(not has("path push"), "no path push")
+ok(F._test_S.orders[id] and F._test_S.orders[id].id == 77, "the hunt order still goes out (order 77 at player 1)")
 ok(M.count("ground teleport") >= 1 and M.count("ground move queued") == 0, "no ground teleport any more")
-ok(has("spawn nodes: recording monster"), "the first monster is recorded")
-ok(has("spawn nodes: path census: "), "the path census logs a pass")
-ok(has("path came 1"), "the moment its path came is logged")
-ok(M.count("path census: attempt") == 0 and M.count("path census: /") == 0, "no census errors")
 local rf = io.popen('ls ' .. emf.dir .. '/*spawn_nodes_rec_* 2>/dev/null; ls "' .. emf.dir .. '"\\spawn_nodes_rec_* 2>/dev/null'):read("a")
-print("  rec files: " .. rf:gsub("\n", " "))
-ok(M.count("ai_tick: ") == 0 and M.count("hunt_tick: ") == 0 and M.count("fullrec: ") == 0, "no errors")
-for _, l in ipairs(M.logs) do if l:find("spawn nodes: ai", 1, true) then print("  " .. l) break end end
+ok(rf == "", "no recording files")
+ok(M.count("hunt_tick: ") == 0, "no errors")
 print(fails == 0 and "ALL OK" or (fails .. " FAILED"))
 os.exit(fails == 0 and 0 or 1)

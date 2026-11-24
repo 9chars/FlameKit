@@ -18,7 +18,7 @@ Each prints `ok` / `FAIL` lines and ends with `ALL OK` or `N FAILED`.
 |---|---|
 | tr.lua | the roster: own monsters, deaths, unreadable health, monsters coming up with 0 health, Remove (old wave timing: `wave_dead = 0`) |
 | rl.lua | a reload in the middle of a raid: monsters, bodies and the raid taken back; the raid still ends |
-| ai.lua | the AI log lines (test logging from 0.15.527) |
+| ai.lua | (0.15.553) the 2026-11-23 test code is gone: no AI log, path census, full recordings or path push; the hunt order still goes out |
 | hd.lua | the animal hold file: held from the raid's start, rewritten while it runs, let go at its end and after 30 min |
 | ui.lua | the tab and the Spawn Nodes window for every trigger: no errors, every label beside its drop-down, the window button |
 | mk.lua | Raid monster markers against a fake EMF that refuses past 39 messages a step (`EMF_LIMIT=20` for a stricter one): never more than 30 a check, all taken off after Remove; the "Mark its monsters" switch |

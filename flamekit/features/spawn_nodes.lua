@@ -55,11 +55,9 @@
 -- raid_lock_server.txt, raid_protect_server.txt, spare_server.txt, animal_hold_server.txt (and it reads
 -- altar_areas_server.txt, base_names_server.txt, where_now.txt).
 --
--- STILL ON FROM THE 2026-11-23 PATH INVESTIGATION (test logging, costs server time every step; see HANDOFF "OPEN"):
--- PATH_CENSUS (a census of every entity's path finder, logged every CENSUS_S s), ai_tick (each raid monster's AI,
--- up to AI_LOG_MAX lines a raid), the full recordings (core/fullrec.lua: the first monster of REC_NODES nodes for REC_S
--- s), HUNT_ON and THREAT_ON (each raid monster ordered at / threat-listed for the nearest player); PATH_PUSH and STUCK_ON
--- are off.
+-- (0.15.553, owner 12:33 "clean these up") the 2026-11-23 path investigation's test code is gone: the path census, the
+-- AI log (ai_tick), the full recordings (core/fullrec.lua) and the path push. HUNT_ON and THREAT_ON stay on: they are
+-- what sends each raid monster at the nearest player (hunt_tick), not logging. STUCK_ON stays off.
 -- This file is at Lua's 200 top-level locals: newer constants and modules are in the table K.
 --
 -- ==== HISTORY NOTES (what each part was added for; the code below has the details) ====
@@ -79,7 +77,6 @@ local admins = require("core.admins")
 local players = require("core.players")
 local monsters = require("core.monsters")
 local threat = require("core.threat")  -- (0.15.522)
-local fullrec = require("core.fullrec")  -- (0.15.532) the full recorder (owner 20:42 "there had to be a way to find out what the delay is")
 -- (0.15.547) this file is at Lua's 200 top-level locals: newer constants and modules go in K
 local K = {
   MARK_BUDGET = 30,      -- (0.15.541) marker messages per check (07:52: 32 in one check all arrived, the 40th and later did not)
@@ -95,10 +92,6 @@ local K = {
   test_tag = require("core.test_tag"),          -- (0.15.547) FlameKit's test monsters: never join a raid
   chests = require("core.loot_chest"),          -- (0.15.547) FlameKit's loot chests: never join a raid
 }
--- (0.15.532) In each raid the first monster of each node (REC_NODES nodes at most) is recorded for REC_S seconds: every
--- field of every component every half second (only the changes) into emf.dir\spawn_nodes_rec_<id>_<time>.txt, with
--- Spawn Nodes' own events (AI state/target/threat changes, its order, the threat writes, its first move) in between.
-local REC_NODES, REC_S = 4, 90
 
 -- (0.15.550, owner 12:04) enabled_setting "sn_enabled": the "Spawn Nodes" switch in the Settings tab's Features section.
 -- Off in a player's game: no Spawn Nodes tab or window there, and none of its notices or sounds. Off on the server
@@ -643,30 +636,6 @@ local function scan_tick(world)
     local oks, scl = pcall(world.get, world, "ScaleComponent", id)
     local gid = oks and scl and group_of_tag(scl.uniformScale)
     local nodes = gid and nodes_of(gid)
-    -- (0.15.506, owner 15:56 "the left over monsters were definitely spawned from the nodes ... look at the problem"):
-    -- a census at every load: each living creature within 150 m of any node, with its tag (scale), faction and
-    -- template, so the leftovers can be told what they are
-    if (S.census_n or 0) < 60 then
-      local okp, cx, cy, cz = pcall(world.position, world, id)
-      if okp and cx then
-        local near = nil
-        for _, n in pairs(data().nodes) do
-          if dist2(cx, cy, cz, n.x, n.y, n.z) <= 150 * 150 then near = n break end
-        end
-        if near then
-          local okh, cur = pcall(emf.health, world, id)
-          local oka, acc = pcall(world.account, world, id)
-          if okh and cur and cur > 0 and not (oka and acc) then
-            local okf, f = pcall(world.get, world, "Faction", id)
-            local okg, guid = pcall(emf.template, world, id)
-            S.census_n = (S.census_n or 0) + 1
-            emf.log(string.format("spawn nodes: census: entity %s alive at %.0f %.0f %.0f (node %d %.0f m), health %s, scale %s, tag group %s, faction %s, template %s",
-              tostring(id), cx, cy, cz, near.id, math.sqrt(dist2(cx, cy, cz, near.x, near.y, near.z)), tostring(cur),
-              oks and scl and tostring(scl.uniformScale) or "none", tostring(gid), okf and f and tostring(f.faction) or "?", okg and tostring(guid) or "?"))
-          end
-        end
-      end
-    end
     if nodes and #nodes > 0 then
       local okp, x, y, z = pcall(world.position, world, id)
       local best, nid = nil, nodes[1].id
@@ -1262,9 +1231,6 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.trickle_log = nil  -- (0.15.512)
   S.ground_log, S.threat_log = nil, nil  -- (0.15.518); (0.15.522)
   S.mon_log = nil  -- (0.15.526)
-  S.ai_log = nil  -- (0.15.527)
-  S.rec_nodes, S.rec_n = {}, 0  -- (0.15.532) a new raid records its first monsters again
-  S.push_log = nil  -- (0.15.533)
   mon_new_raid(gid)  -- (0.15.526) the bodies of its earlier raids put aside, monsters left from before counted apart
   if S.raid[gid] then  -- (0.15.526) an earlier raid of it was not over yet (stopped, monsters left): this one has its own count
     emf.log(string.format("spawn nodes: %s: its earlier raid was not over yet: this start begins a new raid (a new count)", g.name))
@@ -1557,38 +1523,6 @@ local function pick_spot(world, q, spread)
   return q.x, find_surface(world, q.x, q.y, q.z) or q.y, q.z
 end
 
--- (0.15.533, owner 20:59 "we tried raising or setting priority and that didn't seem to work ... it seemed there was a big
--- queue of events and it just wasn't bumping the events up in the queue", 21:02 "go ahead and try") PATH PUSH: the
--- recordings of 20:48 showed raid monsters angry at once but without a path from the game for 35-40 s
--- (DynamicPathWalker.lastPathfindingResult 0), then walking straight in. Tried here: the monster's own path finder
--- (DynamicPathFinder) gets queryPriority = PATH_PRIO (the highest value seen on monsters) and enforceUpdate = true right
--- at the spawn, before its first query, and again every half second until its path came (result 1). Unproven: the
--- field names and the values 0/1 are all that is known. Logged: the first write per monster (what it read back),
--- write errors, and "path came N s after it appeared" (also in the full recording).
-local PATH_PUSH, PATH_PRIO = false, 1  -- (0.15.534) OFF: no difference (21:06-21:17, owner "forcing the priority didnt make any difference"); it only forced more queries
-local function path_push(world, id, first)
-  if not PATH_PUSH then return end
-  local okw, why = pcall(function()
-    local pf = world:get("DynamicPathFinder", id)
-    if not pf then error("no DynamicPathFinder") end
-    if tonumber(tostring(pf.queryPriority)) ~= PATH_PRIO then pf.queryPriority = PATH_PRIO end
-    if pf.enforceUpdate ~= true then pf.enforceUpdate = true end
-  end)
-  if first or not okw then
-    local back = "?"
-    pcall(function()
-      local pf = world:get("DynamicPathFinder", id)
-      back = string.format("queryPriority %s, enforceUpdate %s", tostring(pf.queryPriority), tostring(pf.enforceUpdate))
-    end)
-    if (S.push_log or 0) < 60 then
-      S.push_log = (S.push_log or 0) + 1
-      emf.log(string.format("spawn nodes: path push: monster %s%s: %s; read back: %s", tostring(id), first and " (at its spawn)" or "",
-        okw and "written" or ("NOT written: " .. tostring(why)), back))
-    end
-    pcall(fullrec.event, world, id, "PATH PUSH " .. (okw and "written" or ("failed: " .. tostring(why))) .. "; read back: " .. back)
-  end
-end
-
 -- (0.15.508) Spawns queue entry `q`'s monster at x, sy, z (the body of spawn_tick before 0.15.508).
 local function do_spawn(world, q, x, sy, z)
   -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
@@ -1627,19 +1561,6 @@ local function do_spawn(world, q, x, sy, z)
     pcall(K.mark_loot, id, qn0 and qn0.g)  -- (0.15.547) Reward loot / No loot: Auto Loot leaves its body alone
     local okl, whyl = pcall(K.level_spawned, world, id, qn0 and qn0.g, q)  -- (0.15.547) the group's level
     if not okl then emf.log("spawn nodes: level: " .. tostring(whyl)) end
-    S.rec_nodes = S.rec_nodes or {}
-    if not S.rec_nodes[q.node] and (S.rec_n or 0) < REC_NODES then  -- (0.15.532) the full recording of its first monster
-      local kind = tostring(q.guid)
-      for _, mm in ipairs(monsters) do if mm[3] == q.guid then kind = mm[1] .. ": " .. mm[2] break end end
-      local okr, file = pcall(fullrec.start, world, id, REC_S, "spawn_nodes_rec", string.format("%s, node %s, spawned at %.1f %.1f %.1f", kind, tostring(q.node), x, sy, z))
-      if okr and file then
-        S.rec_nodes[q.node], S.rec_n = id, (S.rec_n or 0) + 1
-        emf.log(string.format("spawn nodes: recording monster %s [%s] of node %s for %d s into %s", tostring(id), kind, tostring(q.node), REC_S, file))
-      else
-        emf.log(string.format("spawn nodes: the recording of monster %s could not start (%s)", tostring(id), tostring(file)))
-      end
-    end
-    path_push(world, id, true)  -- (0.15.533) before its first path query
     -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
     -- (0.15.531, owner 20:16 "yes" to taking it out, rule 0n) NO teleport onto the ground after the spawn any more: the
     -- spot is already on the ground (find_surface, 0.15.493), and the teleport put back in 0.15.518 (on a misquote) hung
@@ -1924,7 +1845,6 @@ local function hunt_tick(world)
           local d = dist2(px0, py0, pz0, p[2], p[3], p[4])
           if d <= THREAT_R * THREAT_R then
             local oka, res = pcall(threat.alarm, world, id, p[1], math.sqrt(d))
-            if fullrec.on(id) and res ~= "kept" then pcall(fullrec.event, world, id, string.format("THREAT write: player %s (%.0f m): %s", tostring(p[1]), math.sqrt(d), oka and tostring(res) or ("error " .. tostring(res)))) end
             if not seen[p[1]] then
               seen[p[1]] = true
               local oke, sent = pcall(threat.event, id, p[1])
@@ -1953,7 +1873,6 @@ local function hunt_tick(world)
           if pid then
             if o and o.id then pcall(emf.enemy_order_cancel, o.id) end
             local ok, oid, why = pcall(emf.enemy_order, world, id, pid)
-            pcall(fullrec.event, world, id, string.format("ORDER to go for player %s (%.0f m): %s", tostring(pid), math.sqrt(best), ok and tostring(oid) or ("error " .. tostring(oid))))
             S.orders[id] = { id = ok and oid or nil, target = pid, at = os.time(), n = ((o and o.n) or 0) + 1 }
             if ok and oid and (S.order_log or 0) < 80 then  -- (0.15.511, owner 16:17 "of course add the fucking logging")
               S.order_log = (S.order_log or 0) + 1
@@ -2002,155 +1921,6 @@ local function hunt_tick(world)
     local alive = false
     if S.mon[id] and not S.mon[id].dead then alive = true end  -- (0.15.526)
     if not alive then S.threat_seen[id] = nil end
-  end
-end
-
--- (0.15.534, owner 21:21 "no you need find out why its slow") PATH CENSUS, read only: who uses the game's path search.
--- Every CENSUS_S seconds one pass over every entity in the world (SCAN_MAX entities / SCAN_BUDGET s a step, as the load
--- scan): each one with a DynamicPathFinder is counted; one whose lastQueryTime changed since the last pass made a new path
--- query; pathQueryCheck 1 = asking now; DynamicPathWalker.lastPathfindingResult 0 = no path. Per kind of entity (its
--- template: a monster's name from core/monsters.lua, else the GUID's first 8): how many, how many asked, how many near a
--- player (100 m). One summary line per pass ("spawn nodes: path census: ..."), and the top askers.
-local PATH_CENSUS, CENSUS_S, CENSUS_TOP = true, 10, 12
-local MON_NAME0 = {}
-for _, mm in ipairs(monsters) do MON_NAME0[mm[3]] = mm[1] .. ": " .. mm[2] end
-local function census_tick(world)
-  local pc = S.pc
-  if not pc then
-    if os.time() - (S.pc_at or 0) < CENSUS_S then return end
-    S.pc_at = os.time()
-    local ok, list = pcall(world.entities, world)
-    S.pc = { list = ok and list or {}, i = 1, t0 = clock and clock() or 0, n = 0, pf = 0, asked = 0, asked_near = 0, asking = 0, nopath = 0,
-             nopath_near = 0, kinds = {}, spots = player_spots(world) }
-    return
-  end
-  S.pc_last = S.pc_last or {}
-  local t0 = clock and clock() or 0
-  local done = 0
-  while pc.i <= #pc.list and done < SCAN_MAX and not (clock and clock() - t0 > SCAN_BUDGET) do
-    local id = pc.list[pc.i]
-    pc.i, done = pc.i + 1, done + 1
-    pc.n = pc.n + 1
-    local okf, pf = pcall(world.get, world, "DynamicPathFinder", id)
-    if okf and pf then
-      pc.pf = pc.pf + 1
-      local lqt, chk = "?", nil
-      pcall(function() lqt = tostring(pf.lastQueryTime) end)
-      pcall(function() chk = tonumber(tostring(pf.pathQueryCheck)) end)
-      local res = nil
-      pcall(function() res = tonumber(tostring(world:get("DynamicPathWalker", id).lastPathfindingResult)) end)
-      local near = false
-      local okp, x, y, z = pcall(world.position, world, id)
-      if okp and x then near = player_near(pc.spots, x, y, z, 100) end
-      local asked = S.pc_last[id] ~= nil and S.pc_last[id] ~= lqt
-      S.pc_last[id] = lqt
-      local okg, guid = pcall(emf.template, world, id)
-      local kind = okg and guid and (MON_NAME0[tostring(guid)] or tostring(guid):sub(1, 8)) or "?"
-      local k = pc.kinds[kind] or { n = 0, asked = 0, near = 0, nopath = 0 }
-      pc.kinds[kind] = k
-      k.n = k.n + 1
-      if near then k.near = k.near + 1 end
-      if asked then pc.asked, k.asked = pc.asked + 1, k.asked + 1 if near then pc.asked_near = pc.asked_near + 1 end end
-      if chk == 1 then pc.asking = pc.asking + 1 end
-      if res == 0 then pc.nopath, k.nopath = pc.nopath + 1, k.nopath + 1 if near then pc.nopath_near = pc.nopath_near + 1 end end
-    end
-  end
-  if pc.i <= #pc.list then return end
-  local top = {}
-  for kind, k in pairs(pc.kinds) do top[#top + 1] = { kind, k } end
-  table.sort(top, function(a, b) if a[2].asked ~= b[2].asked then return a[2].asked > b[2].asked end return a[2].n > b[2].n end)
-  local parts = {}
-  for i = 1, math.min(CENSUS_TOP, #top) do
-    local k = top[i][2]
-    parts[#parts + 1] = string.format("%s x%d (%d asked, %d near, %d no path)", top[i][1], k.n, k.asked, k.near, k.nopath)
-  end
-  emf.log(string.format("spawn nodes: path census: %d entities, %d with a path finder; since the last pass (%d s) %d made a new path query (%d within 100 m of a player); %d asking now; %d with no path (%d near a player); raid monsters alive %d",
-    pc.n, pc.pf, CENSUS_S, pc.asked, pc.asked_near, pc.asking, pc.nopath, pc.nopath_near, #mon_alive()))
-  emf.log("spawn nodes: path census top: " .. table.concat(parts, "; "))
-  S.pc = nil
-end
-
--- (0.15.527, owner 19:20 "how are you going to find the answer? is their agro range set to short?", 19:21 "yes" to
--- logging it) LOGGING ONLY, nothing is changed on a monster. Every half second, for each living raid monster: its AI
--- state (the raw number, core/threat.lua ai), its target and its threat table (who it knows about); a line whenever one
--- of them changes, with how far the nearest player is (and how much higher or lower), and how far the monster moved
--- since its last line. And every 10 s a line for each one anyway (the distances while nothing changes). This tells
--- apart: it never notices the player (never in its threat table), notices him but its state never changes, or it
--- fights (state 6, measured 0.15.68) but does not move. At most AI_LOG_MAX lines a raid.
-local AI_STEPS = 30
--- (0.15.528, owner 19:30 "go ahead": which monster each one is) template GUID -> "Family: name" from core/monsters.lua
-local MON_NAME = {}
-for _, mm in ipairs(monsters) do MON_NAME[mm[3]] = mm[1] .. ": " .. mm[2] end
-local function mon_kind(world, id)
-  local guid = S.track[id] and S.track[id].guid
-  if not guid then
-    local okg, g = pcall(emf.template, world, id)
-    guid = okg and g or nil
-  end
-  if not guid then return "type not known" end
-  guid = tostring(guid)
-  return MON_NAME[guid] or MON_NAME[guid:lower()] or ("template " .. guid)
-end
-local AI_EVERY_S = 10
-local AI_LOG_MAX = 1500
-local function ai_tick(world)
-  if (S.ai_log or 0) >= AI_LOG_MAX then return end
-  local now = os.time()
-  local spots = nil
-  local every = now - (S.ai_every_at or 0) >= AI_EVERY_S
-  if every then S.ai_every_at = now end
-  for _, id in ipairs(mon_alive()) do
-    local m = S.mon[id]
-    local okp, x, y, z = pcall(world.position, world, id)
-    if m and okp and x then
-      -- (0.15.531) the moment it first moves 0.5 m from where it was spawned (or found): how long it stood first
-      m.spawn_pos = m.spawn_pos or { x, y, z }
-      if not m.first_moved and dist2(x, y, z, m.spawn_pos[1], m.spawn_pos[2], m.spawn_pos[3]) >= 0.25 then
-        m.first_moved = now
-        pcall(fullrec.event, world, id, string.format("FIRST MOVE %.1f m from where it appeared", math.sqrt(dist2(x, y, z, m.spawn_pos[1], m.spawn_pos[2], m.spawn_pos[3]))))
-        local okt, tp = pcall(world.get, world, "Teleport", id)
-        S.ai_log = (S.ai_log or 0) + 1
-        emf.log(string.format("spawn nodes: ai: monster %s [%s] first moved %d s after it appeared (state %s, target %s; a Teleport on it: %s)",
-          tostring(id), mon_kind(world, id), now - m.born, tostring(select(2, pcall(threat.ai, world, id))), tostring(select(3, pcall(threat.ai, world, id))),
-          okt and tp ~= nil and "yes" or "no"))
-      end
-      -- (0.15.533) until its path came from the game: the push again; the moment it came, logged
-      if not m.path_at then
-        local okr, res = pcall(function() return tonumber(tostring(world:get("DynamicPathWalker", id).lastPathfindingResult)) end)
-        if okr and res == 1 then
-          m.path_at = now
-          S.ai_log = (S.ai_log or 0) + 1
-          emf.log(string.format("spawn nodes: ai: monster %s [%s] path came %d s after it appeared%s", tostring(id), mon_kind(world, id), now - m.born,
-            PATH_PUSH and " (path push on)" or ""))
-          pcall(fullrec.event, world, id, string.format("PATH CAME %d s after it appeared", now - m.born))
-        else
-          path_push(world, id, false)
-        end
-      end
-      local oks, st, tgt = pcall(threat.ai, world, id)
-      if not oks then st, tgt = "?", "?" end
-      local okk, tk = pcall(threat.key, world, id)
-      local key = tostring(st) .. "|" .. tostring(tgt) .. "|" .. (okk and tk or "?")
-      if key ~= m.ai_key or every then
-        spots = spots or player_spots(world)
-        local best, pl = nil, nil
-        for _, p in ipairs(spots) do
-          local d = dist2(x, y, z, p[2], p[3], p[4])
-          if not best or d < best then best, pl = d, p end
-        end
-        local moved = m.ai_pos and math.sqrt(dist2(x, y, z, m.ai_pos[1], m.ai_pos[2], m.ai_pos[3])) or 0
-        local okl, line = pcall(threat.line, world, id)
-        S.ai_log = (S.ai_log or 0) + 1
-        emf.log(string.format("spawn nodes: ai%s: monster %s [%s] (node %s, %s, %d s old) at %.1f %.1f %.1f: state %s, target %s, threat table [%s]; nearest player %s %.1f m away (%+.1f m height), moved %.1f m in %d s; order %s",
-          key ~= m.ai_key and "" or " (10 s)", tostring(id), mon_kind(world, id), tostring(m.n), m.own and "its own" or "counted apart", now - m.born, x, y, z,
-          tostring(st), tostring(tgt), okl and line or "?", pl and tostring(pl[1]) or "none", best and math.sqrt(best) or -1,
-          pl and (pl[3] - y) or 0, moved, now - (m.ai_at or m.born),
-          S.orders[id] and S.orders[id].id and string.format("%s at player %s", tostring(S.orders[id].id), tostring(S.orders[id].target)) or "none"))  -- (0.15.530) instead of the 0.15.529 home values (no EnemySettings on monsters, home never changed)
-        if key ~= m.ai_key then pcall(fullrec.event, world, id, string.format("ai state %s, target %s, threat [%s], nearest player %.1f m", tostring(st), tostring(tgt), okl and line or "?", best and math.sqrt(best) or -1)) end
-        m.ai_key, m.ai_pos, m.ai_at = key, { x, y, z }, now
-        if S.ai_log >= AI_LOG_MAX then emf.log("spawn nodes: ai: the log limit for this raid is reached (" .. AI_LOG_MAX .. " lines)") return end
-      end
-    end
   end
 end
 
@@ -2735,7 +2505,6 @@ function F.tick(world)
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     S.session, S.queue, S.runs = session, {}, {}
     S.mon, S.old_bodies = {}, {}  -- (0.15.526) the roster
-    pcall(fullrec.stop_all, "a new world or a reload")  -- (0.15.532)
     S.scan, S.scanned, S.purge, S.raid, S.started = nil, false, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
     S.unmark = {}  -- (0.15.541) take-offs EMF has not taken yet
@@ -2771,9 +2540,6 @@ function F.tick(world)
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
     if not okh then emf.log("spawn nodes: hunt_tick: " .. tostring(why)) end
   end
-  if PATH_CENSUS and S.steps % 2 == 0 then local okc, why = pcall(census_tick, world) if not okc then emf.log("spawn nodes: path census: " .. tostring(why)) S.pc = nil end end  -- (0.15.534)
-  if S.steps % AI_STEPS == 13 and fullrec.count() > 0 then local okr, why = pcall(fullrec.tick, world) if not okr then emf.log("spawn nodes: fullrec: " .. tostring(why)) end end  -- (0.15.532)
-  if S.steps % AI_STEPS == 11 then local oka, why = pcall(ai_tick, world) if not oka then emf.log("spawn nodes: ai_tick: " .. tostring(why)) end end  -- (0.15.527)
   local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end
   if not need_spots then return end
