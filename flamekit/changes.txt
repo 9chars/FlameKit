@@ -1,5 +1,5 @@
 0.15.547 Nov 24, 2026
-- Spawn Nodes: three new settings per group, in Monsters. Starting level: the level of the first wave's monsters (Game's own, or 1 to 100). Level per wave: added for each wave after the first (+5 to +100). No monster ever goes above level 100. Loot: Normal monster loot, Reward loot (like the test monsters: runes and legendary runes into the bag of the last player who hit it, and a legendary item in a loot chest by the body; twice for bosses), Reward + normal loot, or No loot.
+- Spawn Nodes: three new settings per group, in Monsters. Starting level: the level of the first wave's monsters (Game's own, or 1 to 100). Level per wave: added for each wave after the first (+5 to +100). No monster ever goes above level 100. Loot: Normal monster loot, Reward loot (like the test monsters: a loot chest comes up on the ground by the body with runes, legendary runes and a legendary item; twice for bosses), Reward + normal loot, or No loot.
 
 0.15.546 Nov 24, 2026
 - Spawn Nodes: open to every player for testing (no longer FlameKit admins only).

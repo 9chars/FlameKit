@@ -49,7 +49,7 @@ local ids = {} for id in pairs(levels) do if id > mark then ids[#ids + 1] = id e
 local seq = {} for _, id in ipairs(ids) do seq[#seq + 1] = levels[id] end
 ok(table.concat(seq, ",") == "60,60,85,85,100,100", "waves 1-3 at 60, 85 and 100 (not 110): " .. table.concat(seq, ","))
 ok(#gives == 6 and #clears == 6, "Reward loot: a reward and the game loot removed for each of the 6 (" .. #gives .. ", " .. #clears .. ")")
-ok(gives[1].killer == 1 and gives[1].level == 60, "the reward goes to the player who hit it, at its level")
+ok(gives[1].killer == 1 and gives[1].level == 60, "the reward is at its level (and names the player who hit it)")
 local lv_ok = true for _, gv in ipairs(gives) do if gv.level > 100 then lv_ok = false end end
 ok(lv_ok, "no reward above level 100")
 -- both: rewards, game loot kept; none: nothing given, game loot removed

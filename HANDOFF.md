@@ -2691,3 +2691,8 @@ questions. I told you exactly how I want it"; Lua only; NOT installed, asked):**
 - spawn_nodes.lua was at 200 locals: the newer constants (MARK_BUDGET, MARK_OFF_TRIES, HOLD_FILE, HOLD_BEAT_S,
   HOLD_MAX_S, LEFT_MIN_STEPS) + MAX_LEVEL, set_level, reward now live in one table `K` near the top.
 - Test tools/sntest/lv.lua (fake set_level/reward: 60,85,100 not 110; each loot mode; reward to the hitter); all 11 OK.
+10:01 owner: ""Reward loot: exactly like the test monsters. Runes and legendary runes go into the bag of the last player
+who hit it," its is wrong. The reward loot goes into a chest that spawns on the ground." -> core/reward_loot.lua give puts
+ALL of it (runes, legendary runes, the legendary item) into the loot chest at the body; nothing into a bag (the killer is
+only named in the log). (Experimental's drop_test_loot still has the bag path in its code: not touched.) Tooltip,
+changes.txt fixed. Test tools/sntest/rw.lua (run from the repo root). Still NOT installed.
