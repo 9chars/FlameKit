@@ -10,11 +10,22 @@ Keep this list current: strike an item only with the test or the owner's word th
 1. Free build vs the raid lock: whether a player in a Free build area (FlameKit Native build zones) can still build or
    dismantle while the raid lock has cleared his EDIT BASE permission. Test: Free build on, stand by a raid's node, start
    the raid, try to place and to dismantle.
-2. Experimental's PvP hit rules vs Spawn Nodes' "spare animals, pets and villagers" (FlameKit Native's spare list):
-   which wins for a raid monster's hit on a pet while someone has PvP on. Test: PvP on, a raid with spare on, a pet near.
-3. Experimental's test monster Reward loot: its code (drop_test_loot) still tries emf.put into the killer's bag first;
-   the owner sees all of it in the chest (10:01). Why the bag put does not land is not known. Experimental keeps its own
-   copy of the reward code; core/reward_loot.lua (Spawn Nodes) puts everything into the chest. Not merged.
+2. ~~Experimental's PvP hit rules vs Spawn Nodes' "spare animals, pets and villagers"~~ SETTLED 2026-11-24 10:33 by
+   reading both (owner asked to explain it): no conflict is possible. Experimental's guard_pets puts an EMF hit rule "no
+   damage from players" on pets / farm animals / non-villager allies near a PvP player (attacker = players only).
+   FlameKit Native's spare_hit cancels hits whose attacker is a listed raid monster on factions 5, 6, 11, 12 or IsTame
+   (attacker = raid monsters only), and returns at once for a hit already cancelled. Different attackers, and both only
+   ever cancel (neither lets a cancelled hit land). Since 0.15.525 spare is not an EMF hit rule, so it no longer takes
+   EMF's 64 rules either. My 10:08 entry listed it without having read guard_pets: wrong, struck.
+3. Experimental's test monster Reward loot: its code (drop_test_loot) puts the runes and legendary runes into the killer's
+   bag with emf.put (killer = the last player who hit it, else whoever spawned it; what the bag does not take goes into
+   the chest) and only the legendary item into the chest. The owner says all of it is in the chest (10:01). The production
+   server's log (production_stable_logs\emf_core.log, 00:44:36-00:45:05) has lines like "test monster 626677 loot: 15
+   runes and 10 legendary runes to player entity 1, armor ... legendary to the chest": that is the code saying it handed
+   the runes to emf.put for player 1; nothing logs whether the bag took them, and no "emf.put refused" line is there. So
+   whether they land in the bag is unproven either way. Test: note the rune count in the bag, kill one test monster with
+   Reward loot on, look at the bag and the chest. Experimental keeps its own copy of the reward code; core/reward_loot.lua
+   (Spawn Nodes) puts everything into the chest (the owner's word). Not merged.
 
 **0.15.547 (Starting level, Level per wave, Loot, the fixes of 10:08) is not tested in the game yet:**
 4. Starting level / Level per wave: the monsters' health and damage really follow the set level (core/spawn.lua
