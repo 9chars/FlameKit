@@ -2517,3 +2517,8 @@ installed, restart asked):** THE ANIMAL HOLD, automatic in every raid; full note
 at the top. Tests tr/rl/ai/hd all OK. The by-hand hold from 22:16:55 is still on in the running server (0.15.537).
 
 22:34 owner: the companions' game-AI pathing failed for the same reason (same base area); noted in the ANIMAL HOLD section.
+22:35 owner "yes" -> 0.15.538 installed 22:36 (old DLL kept as flamekit_native.dll.old_537; spawn_nodes.lua, mod.json,
+changes.txt copied), up 22:37:50. Log: hooks installed; "spawn nodes: animal hold: off (no raid at the script's
+start)"; animal_hold_server.txt = "0" in emf\mods\flamekit (the same folder FlameKit Native reads). The by-hand hold
+from 0.15.537 is gone with the restart: the animals walk until a raid starts. NEXT: owner runs a raid; check
+"animal hold: ON" at its start, the probe's waits, and "off" at its end.
