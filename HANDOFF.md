@@ -2522,3 +2522,12 @@ changes.txt copied), up 22:37:50. Log: hooks installed; "spawn nodes: animal hol
 start)"; animal_hold_server.txt = "0" in emf\mods\flamekit (the same folder FlameKit Native reads). The by-hand hold
 from 0.15.537 is gone with the restart: the animals walk until a raid starts. NEXT: owner runs a raid; check
 "animal hold: ON" at its start, the probe's waits, and "off" at its end.
+
+**22:44-22:47 raid with 0.15.538 (read 2026-11-24 06:46; owner "so its definitely a problem with the animal AI"):** the
+hold worked: "animal hold: ON (raid start: group 1)" 22:44:07, the DLL took it 0.2 s later, "off (the raid is over)"
+22:47:42 in both. Held ~100 animal creates per 10 s; the 17 animal requests made before the raid sat idle (no new
+search steps) for the whole raid. BUT this raid was much bigger: 79 monsters / 192 path requests (the 22:17 test: 29 /
+71). Live requests rose to 150-200 with ~140 of them unsearched (state/search 0/0); "path came" median 22 s, max 75 s;
+54 requests gone without being searched (some will be monsters that died); 15 step-limit hits, all raid monsters. So
+the animals were a real cause (the test proved it), and the game's path search ALSO can't keep up with ~80 monsters at
+once. Not investigated yet.
