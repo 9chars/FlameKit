@@ -1948,12 +1948,19 @@ local function mark_spec(id, share)
   return { entity = id, height = 2.6, text = "Raid monster", colour = MARK_COLOUR, shape = "diamond", edge_arrow = true,
            game_map = true, max_distance = NOTICE_DIST, bar = share }
 end
+-- (0.15.540, owner 2026-11-24 07:48 "the monsters are tagged with "Raid monster" when I stop the raid and remove the
+-- monsters, I see a lot of these still on the screen", 07:51 "sure..." to logging it) MARKER LOGGING: one line per check
+-- that sent or took off a marker: "spawn nodes: markers: N new, N bar updates, N sent again, N taken off (N refused);
+-- marked now N", with what EMF answered (send_marker: how many players it went to; unsend_marker: its answer) and the
+-- first ids of each kind. A send or take-off that raised an error is logged on its own (the first 5 per check).
 local function mark_tick(world)
   if not emf.send_marker then return end
   local now = os.time()
   local resend = now - (S.mark_sent_at or 0) >= MARK_RESEND
   if resend then S.mark_sent_at = now end
   local living = {}
+  local c = { new = 0, bar = 0, again = 0, off = 0, bad = 0, errs = 0, sent_to = {}, off_ans = {}, off_ids = {}, new_ids = {} }
+  local function tally(t, v) local k = tostring(v) t[k] = (t[k] or 0) + 1 end
   for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
     do
       living[id] = true
@@ -1964,15 +1971,41 @@ local function mark_tick(world)
       if resend or not was or (share and math.abs(share - (was.share or 1)) >= 0.05) then
         local ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, share))
         if not ok then ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, nil)) end  -- an older EMF: no bar
-        if ok then S.marked[id] = { share = share or 1 } end
+        if ok then
+          if not was then c.new = c.new + 1 if #c.new_ids < 6 then c.new_ids[#c.new_ids + 1] = id end
+          elseif resend then c.again = c.again + 1
+          else c.bar = c.bar + 1 end
+          tally(c.sent_to, n)
+          S.marked[id] = { share = share or 1 }
+        else
+          c.errs = c.errs + 1
+          if c.errs <= 5 then emf.log(string.format("spawn nodes: markers: sending the marker of monster %s failed: %s", tostring(id), tostring(n))) end
+        end
       end
     end
   end
   for id in pairs(S.marked) do
     if not living[id] then
-      pcall(emf.unsend_marker, nil, "m" .. id)
+      local ok, ans = pcall(emf.unsend_marker, nil, "m" .. id)
+      c.off = c.off + 1
+      if #c.off_ids < 6 then c.off_ids[#c.off_ids + 1] = id end
+      if ok then tally(c.off_ans, ans)
+      else
+        c.bad = c.bad + 1
+        if c.bad <= 5 then emf.log(string.format("spawn nodes: markers: taking off the marker of monster %s failed: %s", tostring(id), tostring(ans))) end
+      end
       S.marked[id] = nil
     end
+  end
+  if c.new + c.bar + c.again + c.off + c.errs > 0 then
+    local function list(t) local o = {} for k, v in pairs(t) do o[#o + 1] = k .. " x" .. v end table.sort(o) return table.concat(o, ", ") end
+    local function ids(t) local o = {} for _, v in ipairs(t) do o[#o + 1] = tostring(v) end return table.concat(o, " ") end
+    local marked = 0 for _ in pairs(S.marked) do marked = marked + 1 end
+    emf.log(string.format("spawn nodes: markers: %d new%s, %d bar update(s), %d sent again, %d failed; %d taken off (%d refused)%s; marked now %d%s%s",
+      c.new, c.new > 0 and (" [" .. ids(c.new_ids) .. (c.new > #c.new_ids and " ..." or "") .. "]") or "", c.bar, c.again, c.errs,
+      c.off, c.bad, c.off > 0 and (" [" .. ids(c.off_ids) .. (c.off > #c.off_ids and " ..." or "") .. "]") or "", marked,
+      next(c.sent_to) and ("; send_marker answered (players): " .. list(c.sent_to)) or "",
+      next(c.off_ans) and ("; unsend_marker answered: " .. list(c.off_ans)) or ""))
   end
 end
 

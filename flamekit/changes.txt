@@ -1,5 +1,6 @@
 0.15.540 Nov 24, 2026
 - FlameKit's separate windows (Spawn Nodes, Experimental, Companion Roster): a drop-down is only as wide as its longest entry needs (the Spawn Nodes window's Within 2 m boxes were much wider than their text).
+- Spawn Nodes (server log): each marker check that puts up or takes off Raid monster markers logs how many and what EMF answered, to find why some markers stay after the monsters are removed.
 
 0.15.539 Nov 24, 2026
 - Spawn Nodes: a new Spawn Nodes window for working on the map: the group, Start now, Stop, Remove its monsters, Add node here, Show nodes, Put trip wire here, and the nearest nodes one line each (Spawn within, Move here, Delete). Open it with the Spawn Nodes window button in the Spawn Nodes tab.

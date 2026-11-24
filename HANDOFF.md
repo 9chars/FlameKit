@@ -2571,3 +2571,17 @@ little bit longer than the longest text in the box"; built 07:41:41, DLL d758cab
 ExperimentalLayer::list_width: longest entry + 44 px (arrow room), the old 200 px minimum dropped (min 60). Applies to
 all three Experimental-style windows (Experimental, Companion Roster, Spawn Nodes); the F4 tabs' drop-downs unchanged.
 DLL-only change: install = the DLL (+ native mod.json, Lua mod.json/changes.txt) in the game AND the server.
+
+**07:48-07:52 Raid monster markers that stay (owner 07:48 "the monsters are tagged with "Raid monster" when I stop the
+raid and remove the monsters, I see a lot of these still on the screen"):** log: stop 07:47:58, Remove 85 monsters +
+1 body 07:48:02, roster empty 07:48:03, so mark_tick must have called unsend for all 85; but it never checked/logged the
+answers and forgets each id right away (a lost take-off is never repeated; EMF clears a mod's markers on its reload).
+Unconfirmed: EMF's player outbox limits (reference.md: 256 lines waiting per player, 30 s) during an 85-monster raid.
+Owner 07:51 "sure..." to logging -> mark_tick logs "spawn nodes: markers: N new [ids], N bar update(s), N sent again,
+N failed; N taken off (N refused) [ids]; marked now N; send_marker answered (players): ...; unsend_marker answered: ..."
+(part of 0.15.540; tests OK). spawn_nodes.lua hot-copied 07:52 to the server and the game (Lua live reload; mod.json
+still 0.15.539 there until the 0.15.540 install).
+!! The reload at 07:52:07 forgot Group 1's cooldown (S.last_end is in memory only): its trigger "raid" (Base within)
+fired again at 07:52:08 although the owner stopped it at 07:47:58 with a 10 min cooldown. A live Lua reload restarts
+cooldowns. Told the owner, asked whether to stop that raid.
+First log: unsend_marker answers 1 (one player) per take-off.
