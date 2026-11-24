@@ -2344,3 +2344,5 @@ Owner 19:54 "#1 is unacceptable": NO limiting of monster types (all types stay).
 if the log says anything new?" -> HUNT_ON = true (EMF enemy_order at the nearest player within 120 m), THREAT_ON stays on,
 STUCK_ON off; ai lines carry "order <id> at player <p>". Not built, offered: FlameKit's own drive (companion C++) for
 raid monsters if ordered hover/range types still stay.
+Owner 19:56: "#2 is based on the companions following me, not what the monsters would be doing" (the drive follows the player's own breadcrumb trail; a raid monster has no trail to him): the drive is NOT a raid-monster fix as it is.
+On the local server 19:56:46 (no raid; 22 features, no error).
