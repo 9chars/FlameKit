@@ -54,6 +54,9 @@ local K = {
   MAX_LEVEL = 100,       -- (0.15.547, owner 09:41 "the max level of any monster can only be 100")
   set_level = require("core.spawn").set_level,  -- (0.15.547) a monster's level (shared with the test monsters)
   reward = require("core.reward_loot"),         -- (0.15.547) Reward loot (shared with the test monsters' kind)
+  skip = require("core.loot_skip"),             -- (0.15.547) tells Auto Loot (loot_drop) to leave a body alone
+  test_tag = require("core.test_tag"),          -- (0.15.547) FlameKit's test monsters: never join a raid
+  chests = require("core.loot_chest"),          -- (0.15.547) FlameKit's loot chests: never join a raid
 }
 -- (0.15.532) In each raid the first monster of each node (REC_NODES nodes at most) is recorded for REC_S seconds: every
 -- field of every component every half second (only the changes) into emf.dir\spawn_nodes_rec_<id>_<time>.txt, with
@@ -377,6 +380,7 @@ local function mon_drop(id)
   S.mon[id] = nil
   S.track[id], S.active_at[id], S.orders[id], S.threat_seen[id], S.hunt_pos[id] = nil, nil, nil, nil, nil
   if S.hitby then S.hitby[id] = nil end  -- (0.15.547)
+  K.skip.set(id, false)  -- (0.15.547)
 end
 
 -- The ids of the living monsters, in id order: of group `gid` (nil: every group), of node `nid` (nil: every node),
@@ -469,6 +473,15 @@ K.level_spawned = function(world, id, gid, q)
     emf.log(string.format("spawn nodes: level: monster %s: setting level %d failed (%s)", tostring(id), lvl, tostring(set)))
   end
 end
+-- (0.15.547, owner 10:08 "fix that bug") marks monster `id` of group `gid` for Auto Loot (core/loot_skip.lua) when its
+-- group's Loot removes the game loot itself (Reward loot, No loot): Auto Loot's first look (0.5 s after the death) came
+-- before Spawn Nodes' removal (2 s) and moved the loot to a killer with Auto Loot on. Marked at the spawn, and again
+-- for every living one when the group's Loot is changed.
+K.mark_loot = function(id, gid)
+  local g = gid and group(gid)
+  local mode = g and g.loot or "normal"
+  K.skip.set(id, mode == "reward" or mode == "none")
+end
 K.on_death = function(world, id, m)
   if not m.sp or m.looted then return end
   m.looted = true
@@ -485,7 +498,7 @@ K.on_death = function(world, id, m)
     said[#said + 1] = ok and tostring(what) or ("reward error: " .. tostring(what))
   end
   if mode == "reward" or mode == "none" then
-    K.reward.clear_game_loot(world, id, x, z)
+    K.reward.clear_game_loot(world, id, x, z, y)
     said[#said + 1] = "its game loot removed"
   end
   S.loot_log = (S.loot_log or 0) + 1
@@ -822,6 +835,9 @@ local function persist()
   end
 end
 local function restore()
+  for _, g in ipairs(groups()) do  -- (0.15.547) the cooldowns, kept with the groups (finish)
+    if tonumber(g.last_end) and not S.last_end[g.id] then S.last_end[g.id] = tonumber(g.last_end) end
+  end
   local ok, saved = pcall(kit.store.load, "spawn_nodes_raid", nil)
   if not ok or type(saved) ~= "table" then saved = {} end
   local token = nil
@@ -899,6 +915,10 @@ raid_monster = function(world, gid, first_id, id, engaged)
   if not nid then return nil end
   local oka, acc = pcall(world.account, world, id)
   if oka and acc then return nil end  -- a player
+  -- (0.15.547, found 10:08 cross-checking the features) never FlameKit's own: a test monster spawned near a raid joined
+  -- it (hostile faction) and held it open until it died; a loot chest (Reward loot puts one at each body) made during
+  -- the raid and hit by a player joined as a "monster" (engaged skips the faction check)
+  if K.test_tag.is(world, id) or K.chests.is(id) then return nil end
   local okh, cur = pcall(emf.health, world, id)
   if not (okh and cur) then return nil, "wait" end
   local okf, f = pcall(world.get, world, "Faction", id)
@@ -1213,6 +1233,11 @@ local function finish(gid)
   S.runs[gid] = nil
   S.last_end[gid] = os.time()
   S.next_timer[gid] = nil  -- the timer picks its next time from now
+  -- (0.15.547, found 10:08 cross-checking: a Lua reload or a server restart forgot every cooldown, and a "Base raid"
+  -- group fired again at once: the 07:52 raid that started 1 s after a live reload) kept with the group in
+  -- spawn_nodes.json; restore() takes it back
+  local g = group(gid)
+  if g then g.last_end = S.last_end[gid] save() end
 end
 
 -- One wave of group `gid`: monsters queued at every node, (0.15.491) while a player is within its near_r of any of
@@ -1553,6 +1578,7 @@ local function do_spawn(world, q, x, sy, z)
     S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
     mon_add(id, qn0 and qn0.g or 0, q.node, true, false, q.respawn and "spawned again for a stuck one" or "spawned by its node")  -- (0.15.526)
     if S.mon[id] then S.mon[id].sp = true end  -- (0.15.547) spawned by a node: its loot follows the group's Loot
+    pcall(K.mark_loot, id, qn0 and qn0.g)  -- (0.15.547) Reward loot / No loot: Auto Loot leaves its body alone
     local okl, whyl = pcall(K.level_spawned, world, id, qn0 and qn0.g, q)  -- (0.15.547) the group's level
     if not okl then emf.log("spawn nodes: level: " .. tostring(whyl)) end
     S.rec_nodes = S.rec_nodes or {}
@@ -2550,6 +2576,7 @@ local function handle(world, account, entity, msg, from)
       g[key] = v == true
     elseif allowed(key, v) then
       g[key] = v
+      if key == "loot" then for _, mid in ipairs(mon_alive(gid)) do if S.mon[mid] and S.mon[mid].sp then pcall(K.mark_loot, mid, gid) end end end  -- (0.15.547)
       if key == "trigger" or key == "timer_min" or key == "timer_max" then S.next_timer[gid] = nil end
     else
       note("That setting was refused.")

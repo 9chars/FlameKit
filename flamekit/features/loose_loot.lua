@@ -27,6 +27,7 @@ local feed = require("core.msg_feed")  -- the monster's name for the Loot tab
 local news = require("core.loot_news")
 local bag = require("core.bag")
 local events = require("core.game_events")
+local skip = require("core.loot_skip")  -- (0.15.547)
 
 local F = { id = "loose_loot", title = "Loose Loot" }
 local kit
@@ -106,6 +107,7 @@ local function on_hit(world, hit)
   if target == 0 or get(world, "PlayerState", target) then return end
   local monster = get(world, "Faction", target) ~= nil
   if monster and route.player_of(world, target) then return end  -- a companion or pet
+  if monster and skip.is(target) then return end  -- (0.15.547) its game loot is removed elsewhere (Spawn Nodes: Reward loot, No loot)
   if not monster and not is_tool(hit) then return end            -- an object: only an axe or a pickaxe
   local player = route.player_of(world, hit.attacker)
   if not player then return end

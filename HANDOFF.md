@@ -2701,3 +2701,28 @@ changes.txt fixed. Test tools/sntest/rw.lua (run from the repo root). Still NOT 
 experimental.lua drop_test_loot's header and its 0.15.154 note, the on_hit last_hitter note, and the Reward loot tooltip
 players see (now: everything into a loot chest on the ground); HANDOFF's "Test monsters' reward loot" line and the 0.15.547
 note marked CORRECTED. experimental.lua's tooltip change goes in with 0.15.547.
+
+**10:08 owner "ok fix that bug and cross reference all the features in the game for more bugs....." (0.15.547, still NOT
+installed). Fixed (all with tests; 14 test files OK):**
+1. Auto Loot race: NEW core/loot_skip.lua (set/is). Spawn Nodes marks a node-spawned monster at its spawn (K.mark_loot)
+   and all living ones when the group's Loot is changed: marked when Loot is "reward" or "none". features/loot_drop.lua
+   died() and features/loose_loot.lua on_hit leave marked bodies alone. (Before: Auto Loot's first look 0.5 s after the
+   death took the game loot to a killer with Auto Loot on before Spawn Nodes removed it at 2 s.)
+2. Loose drops: core/reward_loot.lua clear_game_loot(world, id, x, z, y) also removes loose items the game throws on the
+   ground within 6 m / 4 m up-down and 10 s of the death (core/loot_news.lua on_pickup; never FlameKit's own loot marks).
+   Before, "No loot" still left e.g. a Fog Nest drone's Archaic Essence on the ground. Test tools/sntest/rw.lua.
+3. Joining: raid_monster never takes FlameKit's test monsters (core/test_tag) or loot chests (NEW core/loot_chest.lua
+   M.is). Before, a test monster spawned within 100 m of a node during a raid joined it (hostile faction) and held it
+   open; a loot chest made during the raid and hit by a player could join (engaged skips the faction check). Test jn.lua.
+4. Cooldowns: finish() keeps the group's last_end in spawn_nodes.json; restore() takes it back. Before, every Lua reload or
+   server restart forgot the cooldowns (the 07:52 raid). Test cd.lua.
+Checked, no conflict found (code reading only, not tested in the game): the animal hold and companions (they move by
+FlameKit's drive input, not the game's path search); Spawn Nodes' group tags (0.976-0.996) vs the test tag (0.999) and
+Fast Dive's scale; kit.notice updates (the countdown) do not repeat into the Messages window (only a new tag does);
+features/chop_loot.lua on the server is not loaded (main.lua does not list it).
+Not resolved, told the owner: Free build zones vs the raid lock (EDIT BASE cleared) not tested; Experimental's PvP hit
+rules vs Spawn Nodes' spare list (which wins) not tested; Experimental keeps its own copy of the reward code (its loot
+still tries the killer's bag first, which the owner says does not land); the test probes still run on the server every
+step (PATH_CENSUS, ai_tick logs, fullrec 90 s recordings; 28 ms step seen 07:52).
+Files for the install (server + game): core/reward_loot.lua, core/loot_chest.lua, core/loot_skip.lua (new),
+features/spawn_nodes.lua, features/loot_drop.lua, features/loose_loot.lua, features/experimental.lua, mod.json, changes.txt.

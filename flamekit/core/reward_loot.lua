@@ -10,9 +10,12 @@
 --        legendary item (cosmetic, weapon, armor, ring or gem; gear at `level`). (0.15.547, owner 10:01 "The reward loot
 --        goes into a chest that spawns on the ground": nothing goes into a bag; `killer` is only named in the log.)
 --        Returns one line for the log.
---   reward.clear_game_loot(world, id, x, z)  the monster's own game loot goes: what is in its body is taken out and
---        thrown away 2, 3 and 5 s after the death (the game puts it in 1.5-3 s after), and a separate loot pile the game
---        leaves where it died (core/loot_spots.lua) is removed 2 s after.
+--   reward.clear_game_loot(world, id, x, z, y)  the monster's own game loot goes: what is in its body is taken out and
+--        thrown away 2, 3 and 5 s after the death (the game puts it in 1.5-3 s after), a separate loot pile the game
+--        leaves where it died (core/loot_spots.lua) is removed 2 s after, and (0.15.547, found 10:08 cross-checking
+--        features/loose_loot.lua) what it throws loose on the ground (a Shroud Fog Nest drone's Archaic Essence) within
+--        DROP_R m and DROP_TICKS of the death is removed the moment the game makes it (core/loot_news.lua, the DLL's
+--        news; FlameKit's own loot marks never).
 --   reward.tick(world)  every server step (does its work once per world step, whoever calls it).
 
 local M = {}
@@ -20,12 +23,30 @@ local item_db = require("core.item_db")
 local loot_chest = require("core.loot_chest")
 local bag = require("core.bag")
 local spots = require("core.loot_spots")
+local news = require("core.loot_news")      -- (0.15.547) loose drops, the moment the game makes them
+local ground = require("core.ground_loot")  -- (0.15.547) FlameKit's own loot marks: never removed
 
 M.KINDS = { "cosmetic", "weapon", "armor", "ring", "gem" }  -- (0.15.162, owner: "we want cosmetics too")
 local PICK_TRIES = 5
 local not_legendary = {}  -- debug names that came out of the chest below legendary (0.15.168)
 local steps, last_tick = 0, nil
 local clears, piles = {}, {}  -- { id, at } bodies to empty; { id, x, z, at } loot piles to remove
+local deaths, hooked = {}, false  -- (0.15.547) { id, x, y, z, from, till } (world ticks): loose drops to remove
+local DROP_R, DROP_UP, DROP_TICKS = 6, 4, 60 * 10
+
+-- (0.15.547) a new loose item (the DLL's news): removed when it lies within DROP_R m of a death that wants its game loot gone
+local function on_pickup(world, pid, x, y, z, tick)
+  if not (x and z) or #deaths == 0 then return end
+  for _, d in ipairs(deaths) do
+    if (not tick or (tick >= d.from and tick <= d.till)) and (x - d.x) ^ 2 + (z - d.z) ^ 2 <= DROP_R * DROP_R
+       and (not y or not d.y or math.abs(y - d.y) <= DROP_UP) then
+      if ground.is_mark(pid) then return end
+      local ok = pcall(emf.destroy, world, pid)
+      emf.log(string.format("reward loot: monster %s: a loose drop (%s) removed%s", tostring(d.id), tostring(pid), ok and "" or " (FAILED)"))
+      return
+    end
+  end
+end
 
 -- Puts legendary item `name` into the loot chest at x, y, z; one that comes out below legendary is noted, taken back and
 -- another one tried (PICK_TRIES times at most). (0.15.168, owner: "it also dropped uncommon gems and rings")
@@ -72,13 +93,21 @@ function M.give(world, x, y, z, killer, level, boss)
     tostring(kind), tostring(name), level, killer and ("player entity " .. tostring(killer)) or "nobody known")
 end
 
-function M.clear_game_loot(world, id, x, z)
+function M.clear_game_loot(world, id, x, z, y)
   for _, t in ipairs({ 120, 180, 300 }) do clears[#clears + 1] = { id = id, at = steps + t } end
-  if x and z then piles[#piles + 1] = { id = id, x = x, z = z, at = steps + 120 } end
+  if x and z then
+    piles[#piles + 1] = { id = id, x = x, z = z, at = steps + 120 }
+    local okt, now = pcall(world.tick, world)
+    now = okt and tonumber(now) or nil
+    if now then
+      if not hooked then news.on_pickup(on_pickup) hooked = true end
+      deaths[#deaths + 1] = { id = id, x = x, y = y, z = z, from = now - 30, till = now + DROP_TICKS }
+    end
+  end
 end
 
 -- Whether anything is waiting (a caller may skip the tick).
-function M.busy() return #clears > 0 or #piles > 0 end
+function M.busy() return #clears > 0 or #piles > 0 or #deaths > 0 end
 
 function M.tick(world)
   local okt, t = pcall(world.tick, world)
@@ -114,6 +143,16 @@ function M.tick(world)
     piles = keep
   end
   pcall(spots.tick, world)  -- answers the questions asked above (at the next step); nothing to do when none waits
+  if #deaths > 0 then  -- (0.15.547) the loose drops: the news read while a death waits; old deaths forgotten
+    pcall(news.tick, world, true)
+    local okn, now = pcall(world.tick, world)
+    now = okn and tonumber(now) or nil
+    if now then
+      local keep = {}
+      for _, d in ipairs(deaths) do if d.till >= now then keep[#keep + 1] = d end end
+      deaths = keep
+    end
+  end
 end
 
 return M

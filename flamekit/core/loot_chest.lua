@@ -261,6 +261,9 @@ function M.tick(world, bag)
   if changed then save() end
 end
 
+-- (0.15.547) Whether entity `id` is one of these loot chests (Spawn Nodes: never a raid monster).
+function M.is(id) return id ~= nil and chests[id] ~= nil end
+
 -- (0.15.167) what every loot chest holds, for the log (console "flamekit.chests": item, count, rarity, level)
 function M.describe(world, bag)
   local lines = {}

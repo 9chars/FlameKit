@@ -61,6 +61,19 @@ gives, clears = {}, {}
 set("loot", "none") F._handle(W, "acc1", 1, { op = "start", g = 1 }, {}) run(4)
 for _ = 1, 10 do kill_all() run(3) end run(15)
 ok(#gives == 0 and #clears == 6, "No loot: nothing given, the game loot removed (" .. #gives .. ", " .. #clears .. ")")
+-- (0.15.547) Auto Loot is told to leave Reward loot / No loot bodies alone (core/loot_skip.lua), from the spawn on
+local skip = require("core.loot_skip")
+set("loot", "none") F._handle(W, "acc1", 1, { op = "start", g = 1 }, {}) run(4)
+local any, all = false, true
+for id, m in pairs(S.mon) do if m.sp and not m.dead then any = true if not skip.is(id) then all = false end end end
+ok(any and all, "No loot: its living monsters are marked for Auto Loot to leave alone")
+set("loot", "normal")
+local none = true for id, m in pairs(S.mon) do if m.sp and not m.dead and skip.is(id) then none = false end end
+ok(none, "changed to Normal monster loot during the raid: the marks are taken off")
+set("loot", "reward")
+local all2 = true for id, m in pairs(S.mon) do if m.sp and not m.dead and not skip.is(id) then all2 = false end end
+ok(all2, "changed to Reward loot: marked again")
+for _ = 1, 10 do kill_all() run(3) end run(15)
 -- a value off the list is refused; 110 is not on it
 set("start_level", 110)
 ok(S.data.groups["1"].start_level == 60, "a starting level of 110 is refused")

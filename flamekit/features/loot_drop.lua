@@ -17,6 +17,7 @@ local route = require("core.loot_route")     -- (0.15.376) where each item goes
 local prefs = require("core.player_prefs")   -- (0.15.376) the killer's Auto Loot choice
 local feed = require("core.msg_feed")        -- (0.15.377) the monster's name for the Loot tab
 local test_tag = require("core.test_tag")
+local skip = require("core.loot_skip")  -- (0.15.547) bodies another feature takes care of (Spawn Nodes: Reward loot, No loot)
 local spots = require("core.loot_spots")  -- (0.15.170) a creature's separate loot spot
 local players = require("core.players")   -- (0.15.179) the nearest player opens a body that fills only when opened
 
@@ -74,6 +75,7 @@ local function died(world, e)
     return  -- this body is the test's: the normal Loot Drop leaves it alone
   end
   if test_tag.is(world, id) then return end  -- (0.15.156, owner) FlameKit's test monsters: their loot goes into chests
+  if skip.is(id) then note("body %s: its game loot is taken care of elsewhere (core/loot_skip.lua): left alone", tostring(id)) return end  -- (0.15.547)
   -- (0.15.392) the game can send one death twice (body 100463, 13:23:42.808 and .976): the second was handled as a death
   -- without a killer (the first had used the killing blow up) and its loot spot was left to the game
   if dead[id] and steps - dead[id] < 600 then return end
