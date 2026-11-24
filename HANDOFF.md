@@ -2402,3 +2402,10 @@ Ant Poison Ranger x2 + Giant Crab got NO path in 45-60 s (angry, target, order, 
 wave they just dont move", 21:21 "blah blah blah done this all before". => The priority approach is DEAD (tried twice).
 Path push still ON in 0.15.533 (forces a query every 0.5 s per waiting monster): switch it off unless the owner says
 otherwise. Stop proposing path tests; the owner has done them before (companions).
+
+## 0.15.534 (Nov 23, 21:25) Spawn Nodes: path census; path push OFF (owner 21:21-21:22)
+Owner 21:21 "no you need find out why its slow", 21:22 "guessing at random shit is what you did last time". Read only:
+census_tick (PATH_CENSUS) every 10 s walks every entity: DynamicPathFinder count, new queries (lastQueryTime changed since
+the last pass), pathQueryCheck 1 (asking), DynamicPathWalker.lastPathfindingResult 0 (no path), per kind (template ->
+core/monsters.lua name, else GUID first 8), near a player (100 m). Lines "spawn nodes: path census: ..." + "... top:".
+PATH_PUSH = false.

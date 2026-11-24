@@ -1,3 +1,6 @@
+0.15.534 Nov 23, 2026
+- Spawn Nodes (logging only): a path census every 10 s in the server log: how many entities in the world use the game's path search, how many asked for a new path, how many have none, and which kinds of creatures ask the most. The priority push of 0.15.533 is off again (it made no difference).
+
 0.15.533 Nov 23, 2026
 - Spawn Nodes (a test): each raid monster's path search is asked for at the highest priority and forced to update, from its spawn until the game has given it a path. The log says how long each monster waited for its path ("path came N s after it appeared").
 

@@ -1308,7 +1308,7 @@ end
 -- at the spawn, before its first query, and again every half second until its path came (result 1). Unproven: the
 -- field names and the values 0/1 are all that is known. Logged: the first write per monster (what it read back),
 -- write errors, and "path came N s after it appeared" (also in the full recording).
-local PATH_PUSH, PATH_PRIO = true, 1
+local PATH_PUSH, PATH_PRIO = false, 1  -- (0.15.534) OFF: no difference (21:06-21:17, owner "forcing the priority didnt make any difference"); it only forced more queries
 local function path_push(world, id, first)
   if not PATH_PUSH then return end
   local okw, why = pcall(function()
@@ -1742,6 +1742,71 @@ local function hunt_tick(world)
     if S.mon[id] and not S.mon[id].dead then alive = true end  -- (0.15.526)
     if not alive then S.threat_seen[id] = nil end
   end
+end
+
+-- (0.15.534, owner 21:21 "no you need find out why its slow") PATH CENSUS, read only: who uses the game's path search.
+-- Every CENSUS_S seconds one pass over every entity in the world (SCAN_MAX entities / SCAN_BUDGET s a step, as the load
+-- scan): each one with a DynamicPathFinder is counted; one whose lastQueryTime changed since the last pass made a new path
+-- query; pathQueryCheck 1 = asking now; DynamicPathWalker.lastPathfindingResult 0 = no path. Per kind of entity (its
+-- template: a monster's name from core/monsters.lua, else the GUID's first 8): how many, how many asked, how many near a
+-- player (100 m). One summary line per pass ("spawn nodes: path census: ..."), and the top askers.
+local PATH_CENSUS, CENSUS_S, CENSUS_TOP = true, 10, 12
+local MON_NAME0 = {}
+for _, mm in ipairs(monsters) do MON_NAME0[mm[3]] = mm[1] .. ": " .. mm[2] end
+local function census_tick(world)
+  local pc = S.pc
+  if not pc then
+    if os.time() - (S.pc_at or 0) < CENSUS_S then return end
+    S.pc_at = os.time()
+    local ok, list = pcall(world.entities, world)
+    S.pc = { list = ok and list or {}, i = 1, t0 = clock and clock() or 0, n = 0, pf = 0, asked = 0, asked_near = 0, asking = 0, nopath = 0,
+             nopath_near = 0, kinds = {}, spots = player_spots(world) }
+    return
+  end
+  S.pc_last = S.pc_last or {}
+  local t0 = clock and clock() or 0
+  local done = 0
+  while pc.i <= #pc.list and done < SCAN_MAX and not (clock and clock() - t0 > SCAN_BUDGET) do
+    local id = pc.list[pc.i]
+    pc.i, done = pc.i + 1, done + 1
+    pc.n = pc.n + 1
+    local okf, pf = pcall(world.get, world, "DynamicPathFinder", id)
+    if okf and pf then
+      pc.pf = pc.pf + 1
+      local lqt, chk = "?", nil
+      pcall(function() lqt = tostring(pf.lastQueryTime) end)
+      pcall(function() chk = tonumber(tostring(pf.pathQueryCheck)) end)
+      local res = nil
+      pcall(function() res = tonumber(tostring(world:get("DynamicPathWalker", id).lastPathfindingResult)) end)
+      local near = false
+      local okp, x, y, z = pcall(world.position, world, id)
+      if okp and x then near = player_near(pc.spots, x, y, z, 100) end
+      local asked = S.pc_last[id] ~= nil and S.pc_last[id] ~= lqt
+      S.pc_last[id] = lqt
+      local okg, guid = pcall(emf.template, world, id)
+      local kind = okg and guid and (MON_NAME0[tostring(guid)] or tostring(guid):sub(1, 8)) or "?"
+      local k = pc.kinds[kind] or { n = 0, asked = 0, near = 0, nopath = 0 }
+      pc.kinds[kind] = k
+      k.n = k.n + 1
+      if near then k.near = k.near + 1 end
+      if asked then pc.asked, k.asked = pc.asked + 1, k.asked + 1 if near then pc.asked_near = pc.asked_near + 1 end end
+      if chk == 1 then pc.asking = pc.asking + 1 end
+      if res == 0 then pc.nopath, k.nopath = pc.nopath + 1, k.nopath + 1 if near then pc.nopath_near = pc.nopath_near + 1 end end
+    end
+  end
+  if pc.i <= #pc.list then return end
+  local top = {}
+  for kind, k in pairs(pc.kinds) do top[#top + 1] = { kind, k } end
+  table.sort(top, function(a, b) if a[2].asked ~= b[2].asked then return a[2].asked > b[2].asked end return a[2].n > b[2].n end)
+  local parts = {}
+  for i = 1, math.min(CENSUS_TOP, #top) do
+    local k = top[i][2]
+    parts[#parts + 1] = string.format("%s x%d (%d asked, %d near, %d no path)", top[i][1], k.n, k.asked, k.near, k.nopath)
+  end
+  emf.log(string.format("spawn nodes: path census: %d entities, %d with a path finder; since the last pass (%d s) %d made a new path query (%d within 100 m of a player); %d asking now; %d with no path (%d near a player); raid monsters alive %d",
+    pc.n, pc.pf, CENSUS_S, pc.asked, pc.asked_near, pc.asking, pc.nopath, pc.nopath_near, #mon_alive()))
+  emf.log("spawn nodes: path census top: " .. table.concat(parts, "; "))
+  S.pc = nil
 end
 
 -- (0.15.527, owner 19:20 "how are you going to find the answer? is their agro range set to short?", 19:21 "yes" to
@@ -2326,6 +2391,7 @@ function F.tick(world)
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
     if not okh then emf.log("spawn nodes: hunt_tick: " .. tostring(why)) end
   end
+  if PATH_CENSUS and S.steps % 2 == 0 then local okc, why = pcall(census_tick, world) if not okc then emf.log("spawn nodes: path census: " .. tostring(why)) S.pc = nil end end  -- (0.15.534)
   if S.steps % AI_STEPS == 13 and fullrec.count() > 0 then local okr, why = pcall(fullrec.tick, world) if not okr then emf.log("spawn nodes: fullrec: " .. tostring(why)) end end  -- (0.15.532)
   if S.steps % AI_STEPS == 11 then local oka, why = pcall(ai_tick, world) if not oka then emf.log("spawn nodes: ai_tick: " .. tostring(why)) end end  -- (0.15.527)
   local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
