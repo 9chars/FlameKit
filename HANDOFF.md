@@ -2552,3 +2552,8 @@ out to its own window so its easier to create and manage nodes as I'm moving aro
 - INSTALL needs the CLIENT too (the window is drawn by the game): <game folder>\emf\mods\flamekit_native (DLL, mod.json)
   and \flamekit (features/spawn_nodes.lua, features/native_ui.lua, mod.json, changes.txt), plus the server's copies.
   07:22 folder access to the game's emf folder was refused by the auto-mode check: the owner adds it with Add folder.
+07:24 owner "restart so I can see it" -> 0.15.539 installed 07:25 on the SERVER (DLL, old kept .old_538; spawn_nodes.lua,
+native_ui.lua, mod.json, changes.txt) and the GAME (D:\...\Enshrouded\emf, connected 07:22: DLL, old kept .old_525,
+mod.json; flamekit\features\spawn_nodes.lua, native_ui.lua, core\fullrec.lua (was missing), core\threat.lua (was older),
+mod.json, changes.txt; the game had been on 0.15.525; chop_loot.lua is on the server only, left alone). Up 07:26:36.
+Game log: FlameKit Native loaded, "22 feature(s) loaded", no errors.
