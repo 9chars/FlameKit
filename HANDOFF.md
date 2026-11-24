@@ -2411,3 +2411,25 @@ core/monsters.lua name, else GUID first 8), near a player (100 m). Lines "spawn 
 PATH_PUSH = false.
 
 Owner 21:25: "when the monsters were fighting each other, they had no issues running around killing shit" (fits ClearPathToTarget: a clear line -> no path query needed). Owner 21:27: "point 4 is absolute bullshit IMO. we had the exact same problems previously LONGGGGGGGG before the bigger base size. there is definitely some shit going on with #3, but its not related to #4" -> Bigger altar areas is NOT the lead; #3 = the constant terrain chunk unpacking (20k/min world thread, 40-75k/min other threads, 21:1x) is.
+
+## 2026-11-23 21:28-21:50 DISASSEMBLY of the path system (owner 21:28 "actually go look at the problem ... disassembled it
+## the other day ... start figuring out how to find the problem") - server exe build 1287369, objdump in the container
+(/tmp/re/srv.asm; tools: /tmp/re/pe.py strings/descriptors, xr.py + q.py call index). EMF's docs/ecs_programs.md is for
+the CLIENT exe 1269579: its addresses do NOT match the server; program descriptors found by name in the server .rdata
+(desc +0x10 = update): pathfinding desc 0x1413702b0 -> 0x140203ab0; enemy01 desc 0x1413533c0 -> 0x14012db50;
+pathgrid_interaction_update -> 0x140205110; process_query_commands -> 0x1406ba730 (not the path one).
+VERIFIED: pathfinding (0x140203ab0) per monster: no target -> cancel; if enforceUpdate (DynamicPathFinder +0x7a) is 0, a
+new query only when (now - lastQueryTime) * 1e-9 >= 0.1 s (const 0x140bd81e8) -> enforceUpdate ONLY skips that 0.1 s gap
+(why the 0.15.533 push did nothing). No open query (queryId +0x38 == 0): 0x1405fb550 writes command kind 5
+(CreatePathQuery, 0x128 B, params block = rbp-0x70, queryPriority (+0xe2) copied into it) into the job's command buffer
+(0x1405f9f60); open query + changed params/enforce: kind 6 (UpdatePathQuery, 0x1405fc120). The world's command executor
+(0x1406bf320; messages "Could not create/update path query") hands them to the PATH GRID SYSTEM at world+0x470:
+create 0x140628bd0 (entries 0x1a0 B, hash at pg+0x138, count pg+0x148, array pg+0x178; entry +0x120 = query STATE
+(set 0/4), +0x191 = search state (1,2,4,5,6,7 MaxIterations,8), +0x198 = iterations, +0x8.. = copied params).
+One search = 0x14060f430 (A*-like: iterations vs max, open list) / 0x140652c30, tried from up to 8 start spots by
+0x140653570; run as job callbacks 0x140646c70 / 0x140649950 (called indirectly). PathGridSystem made at 0x140628680 with
+a FIXED memory budget by world kind byte (+0x45): 0x1c00000 (28 MB) / 0x4800000 (72 MB) / else 0x2c00000 (44 MB); on
+running out: "PathGrid : Couldn't create cell because grounded data couldn't be allocated" logged ONCE (flag pg+0x1450).
+The game log (logs\enshrouded_server.log) has no PathGrid warnings (only "Path Grid Game Loaded State Changed : true").
+NOT FOUND YET: the scheduler that decides when the queued searches run (what gives the ~60 s batches). CORRECTION
+21:50: Claude first said "the create ignores the priority" - wrong: +0x120 is the state, the priority is in the params.
