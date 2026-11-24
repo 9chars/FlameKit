@@ -2282,3 +2282,16 @@ mock world; also run with the switches on): ALL OK. Server-only (rule 0d): flame
 DLL, no Development channel. Files: C:\enshrouded mod shit\Claude outputs\0.15.526\. Pushed 19:10 (owner 19:08 "you
 need to push it to git"; add_repo was refused at 18:49 and worked at 19:08). Owner 19:12 "yes": on the local
 server 19:12:49 (reload: 22 features, no error; scan found 14 tagged = bodies, put aside; 0 raids taken back).
+
+## 0.15.527 (Nov 23, 19:23) Spawn Nodes: AI logging (owner 19:20-19:21)
+Owner 19:16 "nothing is attacking me, just standing around like usual" (0.15.526 tracking itself worked: kill -> next spawn
+< 0.1 s, count only down). Claude's guess "the walking grid has no way out" (from the 16:2x path lines) was WRONG data:
+those answers were status "other" (timed out), not no-path; owner 19:20 "how is that even possible? ... a basic flat walk
+way ... how are you going to find the answer? is their agro range set to short?" -> 19:21 "yes" to LOGGING ONLY:
+ai_tick (every 0.5 s): per living raid monster a line "spawn nodes: ai: ..." when its AI state (raw
+DynamicEnemy01BehaviorState.state; 6 = fight, measured 0.15.68), target (SelectedTargets[1]) or threat table (DynamicAggro
+slots, no aggro values) changes, and "ai (10 s)" every 10 s anyway: distance + height to the nearest player, moved since
+its last line. Max 1500 lines a raid. core/threat.lua: ai(), key() (read only). Undead Melee01 (b3e66f3b) = the test
+duelist skeleton that attacked every time (spawned 3 m in front of him). Tests tools/sntest ai.lua + tr.lua + rl.lua ALL
+OK. On the local server 19:23:01 (no raid; 22 features, no error). Server-only (rule 0d). Next: owner runs a raid, Claude
+reads the ai lines.

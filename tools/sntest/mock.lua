@@ -53,6 +53,14 @@ M.world = {
     local e = M.ents[id] if not e then return nil end
     if comp == "Faction" then return { faction = e.faction } end
     if comp == "ScaleComponent" then return e.scale and { uniformScale = e.scale } or nil end
+    if comp == "DynamicEnemy01BehaviorState" then return e.ai_state and { state = e.ai_state } or nil end
+    if comp == "SelectedTargets" then return e.ai_state and { targets = { { targetEntityId = { id = e.target or 0 } } } } or nil end
+    if comp == "DynamicAggro" then
+      if not e.ai_state then return nil end
+      local t = {} for i = 1, 6 do t[i] = { state = 0, entityId = { id = 0 }, faction = 0, aggro = 0 } end
+      if e.knows then t[1] = { state = 3, entityId = { id = e.knows }, faction = 7, aggro = 55 } end
+      return { targets = t }
+    end
     return nil
   end,
   entities = function(w) local l = {} for id in pairs(M.ents) do l[#l+1] = id end table.sort(l) return l end,

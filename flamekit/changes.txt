@@ -1,3 +1,6 @@
+0.15.527 Nov 23, 2026
+- Spawn Nodes (logging only, nothing changes for the monsters): the server log shows, for each raid monster, what its AI is doing (its state, its target and who is in its threat table) whenever that changes, and every 10 s anyway, with how far the nearest player is and how far it moved. Lines start with "spawn nodes: ai".
+
 0.15.526 Nov 23, 2026
 - Spawn Nodes: the raid's monsters are kept track of in one place. "Most alive per node" counts only the monsters that node spawned, so a body that got up again or a summon no longer holds a node back. A body that gets up again is still to kill but no longer raises the count of monsters left. Bodies from earlier raids are never counted in a new raid. A monster whose health cannot be read is no longer counted alive forever (10 s, then dropped). Every change is logged ("spawn nodes: roster: ...").
 

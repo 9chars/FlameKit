@@ -1020,6 +1020,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.trickle_log = nil  -- (0.15.512)
   S.ground_log, S.threat_log = nil, nil  -- (0.15.518); (0.15.522)
   S.mon_log = nil  -- (0.15.526)
+  S.ai_log = nil  -- (0.15.527)
   mon_new_raid(gid)  -- (0.15.526) the bodies of its earlier raids put aside, monsters left from before counted apart
   if S.raid[gid] then  -- (0.15.526) an earlier raid of it was not over yet (stopped, monsters left): this one has its own count
     emf.log(string.format("spawn nodes: %s: its earlier raid was not over yet: this start begins a new raid (a new count)", g.name))
@@ -1693,6 +1694,51 @@ local function hunt_tick(world)
   end
 end
 
+-- (0.15.527, owner 19:20 "how are you going to find the answer? is their agro range set to short?", 19:21 "yes" to
+-- logging it) LOGGING ONLY, nothing is changed on a monster. Every half second, for each living raid monster: its AI
+-- state (the raw number, core/threat.lua ai), its target and its threat table (who it knows about); a line whenever one
+-- of them changes, with how far the nearest player is (and how much higher or lower), and how far the monster moved
+-- since its last line. And every 10 s a line for each one anyway (the distances while nothing changes). This tells
+-- apart: it never notices the player (never in its threat table), notices him but its state never changes, or it
+-- fights (state 6, measured 0.15.68) but does not move. At most AI_LOG_MAX lines a raid.
+local AI_STEPS = 30
+local AI_EVERY_S = 10
+local AI_LOG_MAX = 1500
+local function ai_tick(world)
+  if (S.ai_log or 0) >= AI_LOG_MAX then return end
+  local now = os.time()
+  local spots = nil
+  local every = now - (S.ai_every_at or 0) >= AI_EVERY_S
+  if every then S.ai_every_at = now end
+  for _, id in ipairs(mon_alive()) do
+    local m = S.mon[id]
+    local okp, x, y, z = pcall(world.position, world, id)
+    if m and okp and x then
+      local oks, st, tgt = pcall(threat.ai, world, id)
+      if not oks then st, tgt = "?", "?" end
+      local okk, tk = pcall(threat.key, world, id)
+      local key = tostring(st) .. "|" .. tostring(tgt) .. "|" .. (okk and tk or "?")
+      if key ~= m.ai_key or every then
+        spots = spots or player_spots(world)
+        local best, pl = nil, nil
+        for _, p in ipairs(spots) do
+          local d = dist2(x, y, z, p[2], p[3], p[4])
+          if not best or d < best then best, pl = d, p end
+        end
+        local moved = m.ai_pos and math.sqrt(dist2(x, y, z, m.ai_pos[1], m.ai_pos[2], m.ai_pos[3])) or 0
+        local okl, line = pcall(threat.line, world, id)
+        S.ai_log = (S.ai_log or 0) + 1
+        emf.log(string.format("spawn nodes: ai%s: monster %s (node %s, %s, %d s old) at %.1f %.1f %.1f: state %s, target %s, threat table [%s]; nearest player %s %.1f m away (%+.1f m height), moved %.1f m in %d s",
+          key ~= m.ai_key and "" or " (10 s)", tostring(id), tostring(m.n), m.own and "its own" or "counted apart", now - m.born, x, y, z,
+          tostring(st), tostring(tgt), okl and line or "?", pl and tostring(pl[1]) or "none", best and math.sqrt(best) or -1,
+          pl and (pl[3] - y) or 0, moved, now - (m.ai_at or m.born)))
+        m.ai_key, m.ai_pos, m.ai_at = key, { x, y, z }, now
+        if S.ai_log >= AI_LOG_MAX then emf.log("spawn nodes: ai: the log limit for this raid is reached (" .. AI_LOG_MAX .. " lines)") return end
+      end
+    end
+  end
+end
+
 -- (0.15.493, owner 14:33 "all monsters need to get "marked" always") Every living raid monster has an orange marker on
 -- every player's game (EMF's send_marker: over the 3D view within NOTICE_DIST m, with an arrow at the screen's edge and
 -- its health as a bar, and on the map at any distance). Every 2 s: new ones marked, dead or gone ones unmarked, a bar
@@ -2191,6 +2237,7 @@ function F.tick(world)
     local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
     if not okh then emf.log("spawn nodes: hunt_tick: " .. tostring(why)) end
   end
+  if S.steps % AI_STEPS == 11 then local oka, why = pcall(ai_tick, world) if not oka then emf.log("spawn nodes: ai_tick: " .. tostring(why)) end end  -- (0.15.527)
   local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end
   if not need_spots then return end
