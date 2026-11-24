@@ -78,6 +78,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <thread>
@@ -1393,6 +1394,104 @@ void speed_tick() {
 }  // namespace
 
 // called by flamekit_native's emf_mod_load in every process (a dedicated server, a player's game)
+// (0.15.535, owner 2026-11-23 21:37 "yes" to the path grid probe; 21:28 "actually go look at the problem") THE PATH GRID
+// PROBE, read only. Disassembly of the server exe (build 1287369, HANDOFF 2026-11-23 21:28-21:50): every creature's path
+// request becomes an entry (0x1a0 bytes) in the PATH GRID SYSTEM (storage+0x470; the game's command executor:
+// kPathSiteSig, its +28 = 0x470): a slot list at pg+0x138 (+0x8 used-bits, +0x10 capacity, +0x40 the entries; checked
+// with kPathListSig, which is the game's own create code). Entry +0x0 the request id, +0x120 its state, +0x190 a flag,
+// +0x191 the search state, +0x198 the search's iteration count. Every PROBE_STEPS server steps all used entries are read
+// (ReadProcessMemory: a bad pointer gives nothing, never a crash): one summary line when the mix of states changes (at
+// most every second) and every 10 s, and a line for each request's state change (PROBE_LINES a minute at most). Also
+// whether the game's own singleton "ecs::PathGridSystem" is the same pointer.
+constexpr const char* kPathSiteSig = "41 0F B6 85 20 01 00 00 49 8D 75 0C 44 8B 06 4D 8D 4D 10 41 0F B7 55 04 49 8B 8C 24 ?? ?? 00 00 88 44 24 20 E8";
+constexpr int kPathSiteImm = 28;
+constexpr const char* kPathListSig = "4C 8B A1 30 01 00 00 4C 89 6C 24 28 4C 89 7C 24 20 4D 85 E4 0F 84 ?? ?? ?? ?? 48 8D A9 38 01 00 00 48 8B CD 48 8D 54 24 70 E8 ?? ?? ?? ?? 48 8B D0 48 3B 45 10 0F 83 ?? ?? ?? ?? 4C 8B 55 08 4C 8B C0 48 8B C8 49 C1 E8 06 48 69 F2 A0 01 00 00 4F 8B 0C C2 83 E1 3F 48 03 75 40";
+constexpr uint32_t PROBE_STEPS = 30, PROBE_LINES = 400, PROBE_MAX = 4096;
+struct PathReq { uint8_t state, flag, search; uint32_t iter; uint32_t seen_step, change_step; };
+void path_probe(emf::World w) {
+    static int ok = -1;
+    static uint32_t pg_off = 0, steps = 0, minute_lines = 0, minute_at = 0, last_summary = 0;
+    static std::unordered_map<uint32_t, PathReq> reqs;
+    static std::string last_mix;
+    ++steps;
+    if (ok < 0) {
+        const uintptr_t a = emf::find_pattern(kPathSiteSig, kPathSiteImm), b = emf::find_pattern(kPathListSig, 0);
+        pg_off = a ? *reinterpret_cast<const uint32_t*>(a) : 0;
+        ok = (a && b && pg_off == 0x470 && owner_setup(w) && g_storage_off.load() != 0) ? 1 : 0;
+        EMF_LOG(kMod, "path grid probe: %s (executor site %s, request list code %s, path grid at storage+0x%x, storage at world+0x%x)",
+                ok ? "on (read only)" : "OFF: the game's code does not match this build", a ? "found" : "not found", b ? "found" : "not found",
+                pg_off, g_storage_off.load());
+    }
+    if (ok != 1 || steps % PROBE_STEPS) return;
+    if (steps - minute_at >= 3600) minute_at = steps, minute_lines = 0;
+    const uint64_t storage = uint64_t(reinterpret_cast<uintptr_t>(w.raw())) + g_storage_off.load();
+    uint64_t pg = 0, sched = 0, bits = 0, cap = 0, entries = 0;
+    if (!read_mem(storage + pg_off, &pg, 8) || !pg) return;
+    static bool said_single = false;
+    if (!said_single) {
+        said_single = true;
+        void* single = w.singleton("ecs::PathGridSystem");
+        EMF_LOG(kMod, "path grid probe: path grid system at %p; the game's singleton \"ecs::PathGridSystem\" %p (%s)", reinterpret_cast<void*>(pg),
+                single, single == reinterpret_cast<void*>(pg) ? "the same" : "NOT the same: the probe reads storage+0x470");
+    }
+    read_mem(pg + 0x130, &sched, 8);
+    if (!read_mem(pg + 0x138 + 0x8, &bits, 8) || !read_mem(pg + 0x138 + 0x10, &cap, 8) || !read_mem(pg + 0x138 + 0x40, &entries, 8)) return;
+    if (!bits || !entries || cap == 0 || cap > PROBE_MAX) {
+        static uint64_t said_cap = ~0ull;
+        if (said_cap != cap) { said_cap = cap; EMF_LOG(kMod, "path grid probe: request list not readable (capacity %llu, bits %p, entries %p)", (unsigned long long)cap, (void*)bits, (void*)entries); }
+        return;
+    }
+    std::vector<uint64_t> used((cap + 63) / 64);
+    if (!read_mem(bits, used.data(), used.size() * 8)) return;
+    std::unordered_map<uint32_t, PathReq> now;
+    std::map<std::string, int> mix;
+    std::vector<uint8_t> e(0x1a0);
+    for (uint64_t i = 0; i < cap; ++i) {
+        if (!((used[i >> 6] >> (i & 63)) & 1)) continue;
+        if (!read_mem(entries + i * 0x1a0, e.data(), e.size())) continue;
+        const uint32_t id = *reinterpret_cast<const uint32_t*>(&e[0]);
+        PathReq r{e[0x120], e[0x190], e[0x191], *reinterpret_cast<const uint32_t*>(&e[0x198]), steps, steps};
+        char key[32];
+        snprintf(key, sizeof key, "%u/%u%s", r.state, r.search, r.flag ? "f" : "");
+        mix[key]++;
+        auto it = reqs.find(id);
+        if (it == reqs.end()) {
+            if (minute_lines < PROBE_LINES) { ++minute_lines; EMF_LOG(kMod, "path grid probe: request %u new: state %u, search %u, flag %u, iterations %u", id, r.state, r.search, r.flag, r.iter); }
+        } else {
+            r.seen_step = it->second.seen_step;
+            r.change_step = it->second.change_step;
+            if (it->second.state != r.state || it->second.search != r.search || it->second.flag != r.flag) {
+                if (minute_lines < PROBE_LINES) {
+                    ++minute_lines;
+                    EMF_LOG(kMod, "path grid probe: request %u: state %u -> %u, search %u -> %u, flag %u -> %u, iterations %u -> %u (%.1f s in the last state, %.1f s since it came)",
+                            id, it->second.state, r.state, it->second.search, r.search, it->second.flag, r.flag, it->second.iter, r.iter,
+                            (steps - it->second.change_step) / 60.0, (steps - it->second.seen_step) / 60.0);
+                }
+                r.change_step = steps;
+            }
+        }
+        now[id] = r;
+    }
+    for (auto& kv : reqs) {
+        if (!now.count(kv.first) && minute_lines < PROBE_LINES) {
+            ++minute_lines;
+            EMF_LOG(kMod, "path grid probe: request %u gone (last: state %u, search %u, iterations %u; it lived %.1f s)", kv.first, kv.second.state,
+                    kv.second.search, kv.second.iter, (steps - kv.second.seen_step) / 60.0);
+        }
+    }
+    reqs.swap(now);
+    std::string m;
+    for (auto& kv : mix) m += " " + kv.first + " x" + std::to_string(kv.second);
+    if ((m != last_mix && steps - last_summary >= 60) || steps - last_summary >= 600) {
+        last_summary = steps;
+        last_mix = m;
+        uint32_t live = 0;
+        read_mem(pg + 0x138 + 0x54, &live, 4);
+        EMF_LOG(kMod, "path grid probe: %zu request(s) (live count %u, capacity %llu, scheduler %p); state/search:%s", reqs.size(), live,
+                (unsigned long long)cap, (void*)sched, m.empty() ? " none" : m.c_str());
+    }
+}
+
 bool fk_build_anywhere_load(bool dedicated) {
     // (0.15.423) the factor is read now, before the world loads (the game decides what to keep then)
     if (dedicated) read_spots("server, at start");  // (0.15.440) before the world loads
@@ -1485,6 +1584,7 @@ bool fk_build_anywhere_load(bool dedicated) {
         }
         if (w.is_server()) {
             speed_tick();  // (0.15.466)
+            path_probe(w);  // (0.15.535) read only
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)

@@ -1,3 +1,6 @@
+0.15.535 Nov 23, 2026
+- Server (logging only): FlameKit Native reads the game's own list of path searches on the server every half second and logs how many there are, what state each is in, and every change ("path grid probe: ..."), to find out why monsters wait so long for a path.
+
 0.15.534 Nov 23, 2026
 - Spawn Nodes (logging only): a path census every 10 s in the server log: how many entities in the world use the game's path search, how many asked for a new path, how many have none, and which kinds of creatures ask the most. The priority push of 0.15.533 is off again (it made no difference).
 
