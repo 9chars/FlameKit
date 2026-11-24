@@ -2406,6 +2406,8 @@ local function protect_tick(world, spots)
   -- (0.15.486, owner 13:05: the Undead could not be killed) players' hits on placed objects are cancelled by FlameKit
   -- Native (build_anywhere.cpp, protect_hit), which spares every creature; no EMF hit rule any more (EMF's "objects"
   -- class takes in monsters the game marks breakable). raid_protect_server.txt: "1" while wanted.
+  -- (0.15.551, owner 12:12) the same file also makes FlameKit Native cancel players' hits on pets and animals (a tame
+  -- one, or faction 12 FarmAnimal); nothing else changed here.
   if want ~= S.protect_on then
     local f = io.open(emf.dir .. "\\raid_protect_server.txt.tmp", "w")
     if f then
@@ -3016,7 +3018,8 @@ function F.panel(world)
   switch_row(rows, "protect", g.protect == true, "Players cannot damage base structures during raid",  -- (0.15.484, owner 12:50: the label)
     "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
       .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
-      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
+      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server; "
+      .. "and players' hits on pets and animals (tamed ones and farm animals) do nothing, on the whole server. "
       .. "Admins too, for now.")
   switch_row(rows, "breaks", g.breaks == true, "Monsters damage buildings",
     "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "

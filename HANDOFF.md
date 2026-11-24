@@ -51,6 +51,9 @@ Keep this list current: strike an item only with the test or the owner's word th
    the switch is on. Harmless (nothing ran; Spawn Nodes ticked normally 0.8 s later, and its file states are reset so the
    next tick rewrites any it needs), and only on the first reload after a setting is added. kit.enabled has the same
    half-second gap for any new enabled_setting.
+7e. 0.15.551 in the game: with a group's "Players cannot damage base structures during raid" on and its raid running,
+   hit a tamed animal / pet in the base: no damage; log "raid protection: N player hit(s) on pets and animals cancelled".
+   Placed objects and monsters as before. Which pets carry IsTame is not checked in the game yet.
 
 **Performance / leftovers:**
 8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
@@ -2883,3 +2886,13 @@ raid_lock_server.txt empty, raid_protect_server.txt "0", spare_server.txt empty)
 their deaths are not seen (game loot drops). New test tools/sntest/sw.lua (17 checks, also the kit hook); all 14 tests
 OK. Live 12:08:41 on the server and the game (kit.lua da7ca53e, spawn_nodes.lua 95e9efb4, mod.json 4ec9b25b), no errors;
 see OPEN 7b-7d.
+
+
+**0.15.551 (owner 12:12 ""Players cannot damage base structures during raid" should also prevent player damage to pets and
+animals ... DO NOT CHANGE ANYTHING ELSE"):** FlameKit Native build_anywhere.cpp protect_hit: while raid_protect_server.txt
+is "1" (unchanged: the same switch, same times), a hit whose attacker is a player (PlayerState) on a target with IsTame
+or faction 12 FarmAnimal is cancelled; counted apart and logged every 15 s ("raid protection: N player hit(s) on pets
+and animals cancelled"). The placed-objects check below it is untouched. Lua: the switch's tooltip gets "and players'
+hits on pets and animals (tamed ones and farm animals) do nothing, on the whole server"; a comment in protect_tick.
+Nothing else. Built 12:14:33 (DLL a5824e16...). NOT installed: restart asked.
+

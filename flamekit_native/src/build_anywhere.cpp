@@ -727,6 +727,7 @@ void read_raid_lock(emf::World w) {
 // the game's impact thread) then cancels a player's hit on anything without a faction: placed objects (chests,
 // stations, doors) and the world's props. Never a hit on a creature (it has a faction: a monster, an animal, a villager)
 // or on a player. Counted, and the count logged every 15 s while it is not 0 (no logging on the impact thread).
+// (0.15.551) And a player's hit on a base's pet or animal: see protect_hit.
 std::atomic<bool> g_protect_objects{false};
 std::atomic<uint32_t> g_protect_cancels{0};
 std::atomic<uint32_t> g_protect_last_target{0};
@@ -816,13 +817,30 @@ void read_spare() {  // every 15 server steps, with read_raid_protect
     }
 }
 
+// (0.15.551, owner 2026-11-24 12:12 ""Players cannot damage base structures during raid" should also prevent player
+// damage to pets and animals ... to prevent player damage from hurting and killing pets and animals in the base") while
+// the protection is on, a player's hit on a base's pet or animal is cancelled too: a tame one (IsTame on the entity: the
+// base's tamed animals and pets, whose faction reads Environment) or faction 12 FarmAnimal. Wild animals, villagers,
+// monsters and players are not covered by this. Counted apart from the placed objects, logged every 15 s while not 0.
+std::atomic<uint32_t> g_protect_pet_cancels{0};
+std::atomic<uint32_t> g_protect_pet_last_target{0};
+std::atomic<uint32_t> g_protect_pet_last_attacker{0};
+
 void protect_hit(EmfWorld* w, EmfHit* hit, void*) {
     if (!hit) return;
     spare_hit(w, hit);  // (0.15.525)
     if (!g_protect_objects.load(std::memory_order_relaxed)) return;
     if (hit->kind != EMF_HIT_KIND_HIT || hit->cancel || (hit->flags & EMF_HIT_HEALING) || !hit->attacker) return;
-    if (hit->target_faction != 0) return;  // a creature or a player: never
     auto* a = emf::api();
+    if ((hit->target_faction == 12 || a->get_component(w, gen::ecs::IsTame::kHash, hit->target, nullptr))
+        && a->get_component(w, emf::detail::kPlayerStateHash, hit->attacker, nullptr)) {  // (0.15.551) a player's hit on a base's pet or animal
+        hit->cancel = 1;
+        g_protect_pet_cancels.fetch_add(1, std::memory_order_relaxed);
+        g_protect_pet_last_target.store(hit->target, std::memory_order_relaxed);
+        g_protect_pet_last_attacker.store(hit->attacker, std::memory_order_relaxed);
+        return;
+    }
+    if (hit->target_faction != 0) return;  // a creature or a player: never
     if (!a->get_component(w, emf::detail::kPlayerStateHash, hit->attacker, nullptr)) return;  // not a player's hit
     if (a->get_component(w, emf::detail::kPlayerStateHash, hit->target, nullptr)) return;
     if (has_faction(w, hit->target) || (hit->part != hit->target && has_faction(w, hit->part))) return;
@@ -841,7 +859,7 @@ void read_raid_protect() {  // every 15 server steps
     }
     if (on != g_protect_objects.load()) {
         g_protect_objects = on;
-        EMF_LOG(kMod, "raid protection: players' hits on placed objects (anything without a faction) are %s%s", on ? "cancelled now" : "allowed again",
+        EMF_LOG(kMod, "raid protection: players' hits on placed objects (anything without a faction) and on pets and animals (tame or farm animals) are %s%s", on ? "cancelled now" : "allowed again",
                 g_protect_hook ? "" : " (NOT in force: EMF's on_hit_before is not available here)");
     }
     static uint32_t steps = 0;
@@ -849,6 +867,9 @@ void read_raid_protect() {  // every 15 server steps
         const uint32_t n = g_protect_cancels.exchange(0);
         if (n) EMF_LOG(kMod, "raid protection: %u player hit(s) on placed objects cancelled in the last 15 s (last: player %u on entity %u)", n,
                        g_protect_last_attacker.load(), g_protect_last_target.load());
+        const uint32_t np = g_protect_pet_cancels.exchange(0);  // (0.15.551)
+        if (np) EMF_LOG(kMod, "raid protection: %u player hit(s) on pets and animals cancelled in the last 15 s (last: player %u on entity %u)", np,
+                        g_protect_pet_last_attacker.load(), g_protect_pet_last_target.load());
     }
 }
 
