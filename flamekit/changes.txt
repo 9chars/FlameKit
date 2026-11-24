@@ -1,3 +1,6 @@
+0.15.533 Nov 23, 2026
+- Spawn Nodes (a test): each raid monster's path search is asked for at the highest priority and forced to update, from its spawn until the game has given it a path. The log says how long each monster waited for its path ("path came N s after it appeared").
+
 0.15.532 Nov 23, 2026
 - Spawn Nodes (logging only): in each raid the first monster of each node is fully recorded for 90 s (every value the game keeps on it, every half second, only what changed) into its own file on the server (spawn_nodes_rec_<monster>_<time>.txt), with Spawn Nodes' own events in between (it got angry, its order, the threat write, its first move). For finding out what holds raid monsters back before they move. New shared module core/fullrec.lua.
 

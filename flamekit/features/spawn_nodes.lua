@@ -1025,6 +1025,7 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.mon_log = nil  -- (0.15.526)
   S.ai_log = nil  -- (0.15.527)
   S.rec_nodes, S.rec_n = {}, 0  -- (0.15.532) a new raid records its first monsters again
+  S.push_log = nil  -- (0.15.533)
   mon_new_raid(gid)  -- (0.15.526) the bodies of its earlier raids put aside, monsters left from before counted apart
   if S.raid[gid] then  -- (0.15.526) an earlier raid of it was not over yet (stopped, monsters left): this one has its own count
     emf.log(string.format("spawn nodes: %s: its earlier raid was not over yet: this start begins a new raid (a new count)", g.name))
@@ -1299,6 +1300,38 @@ local function pick_spot(world, q, spread)
   return q.x, find_surface(world, q.x, q.y, q.z) or q.y, q.z
 end
 
+-- (0.15.533, owner 20:59 "we tried raising or setting priority and that didn't seem to work ... it seemed there was a big
+-- queue of events and it just wasn't bumping the events up in the queue", 21:02 "go ahead and try") PATH PUSH: the
+-- recordings of 20:48 showed raid monsters angry at once but without a path from the game for 35-40 s
+-- (DynamicPathWalker.lastPathfindingResult 0), then walking straight in. Tried here: the monster's own path finder
+-- (DynamicPathFinder) gets queryPriority = PATH_PRIO (the highest value seen on monsters) and enforceUpdate = true right
+-- at the spawn, before its first query, and again every half second until its path came (result 1). Unproven: the
+-- field names and the values 0/1 are all that is known. Logged: the first write per monster (what it read back),
+-- write errors, and "path came N s after it appeared" (also in the full recording).
+local PATH_PUSH, PATH_PRIO = true, 1
+local function path_push(world, id, first)
+  if not PATH_PUSH then return end
+  local okw, why = pcall(function()
+    local pf = world:get("DynamicPathFinder", id)
+    if not pf then error("no DynamicPathFinder") end
+    if tonumber(tostring(pf.queryPriority)) ~= PATH_PRIO then pf.queryPriority = PATH_PRIO end
+    if pf.enforceUpdate ~= true then pf.enforceUpdate = true end
+  end)
+  if first or not okw then
+    local back = "?"
+    pcall(function()
+      local pf = world:get("DynamicPathFinder", id)
+      back = string.format("queryPriority %s, enforceUpdate %s", tostring(pf.queryPriority), tostring(pf.enforceUpdate))
+    end)
+    if (S.push_log or 0) < 60 then
+      S.push_log = (S.push_log or 0) + 1
+      emf.log(string.format("spawn nodes: path push: monster %s%s: %s; read back: %s", tostring(id), first and " (at its spawn)" or "",
+        okw and "written" or ("NOT written: " .. tostring(why)), back))
+    end
+    pcall(fullrec.event, world, id, "PATH PUSH " .. (okw and "written" or ("failed: " .. tostring(why))) .. "; read back: " .. back)
+  end
+end
+
 -- (0.15.508) Spawns queue entry `q`'s monster at x, sy, z (the body of spawn_tick before 0.15.508).
 local function do_spawn(world, q, x, sy, z)
   -- (0.15.477) the way it faces: given to the spawn (EMF Lua 1.40+) and to the move onto the ground (any EMF)
@@ -1345,6 +1378,7 @@ local function do_spawn(world, q, x, sy, z)
         emf.log(string.format("spawn nodes: the recording of monster %s could not start (%s)", tostring(id), tostring(file)))
       end
     end
+    path_push(world, id, true)  -- (0.15.533) before its first path query
     -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
     -- (0.15.531, owner 20:16 "yes" to taking it out, rule 0n) NO teleport onto the ground after the spawn any more: the
     -- spot is already on the ground (find_surface, 0.15.493), and the teleport put back in 0.15.518 (on a misquote) hung
@@ -1753,6 +1787,19 @@ local function ai_tick(world)
         emf.log(string.format("spawn nodes: ai: monster %s [%s] first moved %d s after it appeared (state %s, target %s; a Teleport on it: %s)",
           tostring(id), mon_kind(world, id), now - m.born, tostring(select(2, pcall(threat.ai, world, id))), tostring(select(3, pcall(threat.ai, world, id))),
           okt and tp ~= nil and "yes" or "no"))
+      end
+      -- (0.15.533) until its path came from the game: the push again; the moment it came, logged
+      if not m.path_at then
+        local okr, res = pcall(function() return tonumber(tostring(world:get("DynamicPathWalker", id).lastPathfindingResult)) end)
+        if okr and res == 1 then
+          m.path_at = now
+          S.ai_log = (S.ai_log or 0) + 1
+          emf.log(string.format("spawn nodes: ai: monster %s [%s] path came %d s after it appeared%s", tostring(id), mon_kind(world, id), now - m.born,
+            PATH_PUSH and " (path push on)" or ""))
+          pcall(fullrec.event, world, id, string.format("PATH CAME %d s after it appeared", now - m.born))
+        else
+          path_push(world, id, false)
+        end
       end
       local oks, st, tgt = pcall(threat.ai, world, id)
       if not oks then st, tgt = "?", "?" end

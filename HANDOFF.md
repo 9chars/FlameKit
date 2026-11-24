@@ -2382,3 +2382,13 @@ once. ClearPathToTarget.hasHitSolidCollider true most of the time (something sol
 that's just too much to test. I think the AI pathing in this game is broke" -> NOT measuring why the path search is slow
 (whole server vs into his built base). Nothing built after this; goal (19:33) still open.
 Owner 20:55: "we did the same exacts tests with the companion testing and it just didn't work it was slow, didnt respond" (the same slow game path search sank the game AI for companions; that is why companions use FlameKit's own drive).
+
+## 0.15.533 (Nov 23, 21:05) Spawn Nodes: path push test (owner 21:02 "go ahead and try")
+Owner 20:59: "we tried raising or setting priority and that didn't seem to work at all when we tested it. I'm open to
+trying it again. maybe something was over looked. it seemed there was a big queue of events and it just wasn't bumping
+the events up in the queue when we tried setting the priority". That earlier test is NOT in the notes (HANDOFF,
+companion history, git log since 0.15.18). Seen on monsters (recording 20:48): DynamicPathFinder.queryPriority 0/1,
+maxIterations 0/4000, enforceUpdate false, pathQueryCheck 0/1. path_push (PATH_PUSH = true): queryPriority = 1 and
+enforceUpdate = true at the spawn (before its first query) and every 0.5 s until DynamicPathWalker.lastPathfindingResult
+= 1. Logs: "path push: monster N (at its spawn): written; read back: ...", "ai: monster N [...] path came N s after it
+appeared (path push on)", EVENT lines in the recordings. Compare with 35-40 s (Bat, Wolf) / 4 s (Wisp) without it.

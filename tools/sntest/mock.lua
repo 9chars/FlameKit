@@ -54,6 +54,8 @@ M.world = {
     if comp == "Faction" then return { faction = e.faction } end
     if comp == "ScaleComponent" then return e.scale and { uniformScale = e.scale } or nil end
     if comp == "DynamicEnemy01BehaviorState" then return e.ai_state and { state = e.ai_state, homeZonePosition = { x = 20, y = 0, z = 0 }, combatData = { isTargetInsideLeash = false } } or nil end
+    if comp == "DynamicPathFinder" then e.pf = e.pf or { queryPriority = 0, enforceUpdate = false } return e.pf end
+    if comp == "DynamicPathWalker" then return { lastPathfindingResult = e.path or 0 } end
     if comp == "EnemySettings" then return e.ai_state and { checkDistance = 12, maxTargetDistanceToHomeZone = { value = 15 }, leashLength = 20 } or nil end
     if comp == "SelectedTargets" then return e.ai_state and { targets = { { targetEntityId = { id = e.target or 0 } } } } or nil end
     if comp == "DynamicAggro" then
