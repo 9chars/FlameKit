@@ -1,9 +1,14 @@
--- core/reward_loot.lua (0.15.547, owner 2026-11-24 09:41 "add in the "reward loot" system like we build for the test
+-- core/reward_loot.lua: SPAWN NODES' OWN REWARD LOOT. (0.15.547, owner 2026-11-24 09:41 "add in the "reward loot" system like we build for the test
 -- monsters and this should be configurable by group as well", 09:45 "make it configurable. so I can do reward loot
 -- (exactly like how test monsters work), normal monster loot, and/or no loot ... if the player chooses no loot, it drops
--- nothing"): the test monsters' Reward loot (features/experimental.lua drop_test_loot, 0.15.142-0.15.186) as shared core
--- code, so Spawn Nodes can use it without reaching into another feature (HANDOFF rule 0b). Experimental keeps its own
--- copy for now; the two do the same (runes into the killer's bag, the legendary item into the chest).
+-- nothing"): the same rule as the test monsters' Reward loot (written from features/experimental.lua drop_test_loot,
+-- 0.15.142-0.15.186), as Spawn Nodes' own code. KEEP THEM SEPARATE (owner 2026-11-24 11:06 "the monster test loot reward
+-- system should not be connected to or depend on the reward system for the spawn nodes system ... "test monsters" is
+-- experimental and the spawn nodes is an actual game feature so their functionality must remain separate ... there could
+-- be new stuff tested in the "test monsters" code that could impact the "spawn nodes" feature and we cannot have that"):
+-- Experimental's test monsters do not use this file and this file uses nothing of Experimental. Do not merge them; a
+-- change tried on the test monsters goes into experimental.lua only. Both use the plain core helpers (core/item_db,
+-- core/loot_chest, core/bag).
 --
 --   reward.give(world, x, y, z, killer, level, boss)  a kill's reward, as the test monsters': 10 or 15 runes and 5 or 10
 --        legendary runes (twice for a boss) into the killer's bag (player entity; what the bag does not take, and all of
@@ -17,8 +22,9 @@
 --        leaves where it died (core/loot_spots.lua) is removed 2 s after, and (0.15.547, found 10:08 cross-checking
 --        features/loose_loot.lua) what it throws loose on the ground (a Shroud Fog Nest drone's Archaic Essence) within
 --        DROP_R m and DROP_TICKS of the death is removed the moment the game makes it (core/loot_news.lua, the DLL's
---        news; never FlameKit's own loose items or loot marks: core/ground_loot.lua is_own, is_mark). It cannot tell a
---        monster's drop from an item a player drops by hand at that spot in those 10 s: that one goes too.
+--        news; never FlameKit's own loose items or loot marks: core/ground_loot.lua is_own, is_mark). An item a player
+--        drops by hand on that spot in those 10 s goes too (owner 11:06: "if a player dumps some shit to the ground who
+--        cares?").
 --   reward.tick(world)  every server step (does its work once per world step, whoever calls it).
 
 local M = {}

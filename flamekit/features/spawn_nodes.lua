@@ -90,7 +90,7 @@ local K = {
   LEFT_MIN_STEPS = 30,   -- (0.15.544) the countdown changes at most every 0.5 s
   MAX_LEVEL = 100,       -- (0.15.547, owner 09:41 "the max level of any monster can only be 100")
   set_level = require("core.spawn").set_level,  -- (0.15.547) a monster's level (shared with the test monsters)
-  reward = require("core.reward_loot"),         -- (0.15.547) Reward loot (shared with the test monsters' kind)
+  reward = require("core.reward_loot"),         -- (0.15.547) Spawn Nodes' own Reward loot (the test monsters have their own: kept separate)
   skip = require("core.loot_skip"),             -- (0.15.547) tells Auto Loot (loot_drop) to leave a body alone
   test_tag = require("core.test_tag"),          -- (0.15.547) FlameKit's test monsters: never join a raid
   chests = require("core.loot_chest"),          -- (0.15.547) FlameKit's loot chests: never join a raid
@@ -479,7 +479,8 @@ end
 -- loot, and/or no loot ... if the player chooses no loot, it drops nothing") LEVEL AND LOOT, per group:
 --   Starting level (start_level; 0 = the game's own) + Level per wave (level_step) x (wave - 1), at most K.MAX_LEVEL;
 --   set on each monster its node spawns (core/spawn.lua set_level, as the test monsters). Both 0: left alone.
---   Loot (loot): "normal" the game's own; "reward" the test monsters' Reward loot (core/reward_loot.lua give: runes and
+--   Loot (loot): "normal" the game's own; "reward" Reward loot by the test monsters' rule, in Spawn Nodes' own code (owner
+--   11:06: never connected to the test monsters' code) (core/reward_loot.lua give: runes and
 --   legendary runes into the bag of the last player who hit it (S.hitby), a legendary item at its level into a loot
 --   chest by the body, twice for Bosses; owner 10:47 "everything should end up in the chest except the runes ... regular
 --   monster loot should never end up in these chests ever") and its game loot removed (never into a chest); "both" the reward and its game loot; "none" its game loot removed, nothing
