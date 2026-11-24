@@ -2622,3 +2622,5 @@ monsters left alive (K or fewer wanted): the next wave comes in N s". Test tools
 wave_dead = 0 (its old timing). All 7 tests OK. Both mod.json 0.15.542 in the repo; the DLL is unchanged (0.15.541).
 NOTE: dist-test (Development channel) is still 0.15.525; nothing since was packaged or signed.
 A Lua live reload forgets cooldowns (Group 1's trigger is "raid": it fires again if the owner is in the base).
+08:11 owner "yes" -> 0.15.542 live (spawn_nodes.lua e4d2665e..., mod.json, changes.txt) on the server and the game;
+both reloaded 08:11:53, no errors, no raid started by the reload this time.
