@@ -1666,7 +1666,7 @@ end
 -- that") test switches: STUCK_ON (this whole stuck/ground/water/fall handling), HUNT_ON (the enemy orders), THREAT_ON
 -- (the threat table writes). All off: monsters are only spawned (with the game's ground move) and counted; the 10 s
 -- hunt summary still logs how many moved.
-local STUCK_ON, HUNT_ON, THREAT_ON = false, true, true  -- (0.15.529, owner 19:40 "turn the threat table shit back on still if you must, to see that it does nothing": THREAT_ON back on); (0.15.530, owner 19:55 "turn this back on to see if the log says anything new": HUNT_ON, the enemy orders)
+local STUCK_ON, HUNT_ON, THREAT_ON = false, true, true  -- (owner 2026-11-24 13:19: STUCK_ON code is still needed, kept off for now: HANDOFF OPEN #16; do not remove) (0.15.529, owner 19:40 "turn the threat table shit back on still if you must, to see that it does nothing": THREAT_ON back on); (0.15.530, owner 19:55 "turn this back on to see if the log says anything new": HUNT_ON, the enemy orders)
 local function stuck_tick(world)
   if not STUCK_ON then return end
   local now = os.time()
@@ -2753,6 +2753,16 @@ function F.panel(world)
     return rows
   end
   local g, list = shown_group(v)
+  -- (0.15.554, owner 13:19 "The "Nodes" section on the "Spawn Nodes" tab needs to get moved all the way to the top so
+  -- users do not have to scroll all the way to the bottom to find it") the Nodes section first (it was last)
+  if g then
+    local n_nodes = 0
+    for _, n in ipairs(v.nodes or {}) do if n[2] == g.id then n_nodes = n_nodes + 1 end end
+    rows[#rows + 1] = { heading = "Nodes" }
+    rows[#rows + 1] = { dim = true, text = string.format("%s has %d node%s. Add, move and delete them in the Spawn Nodes window.", g.name, n_nodes, n_nodes == 1 and "" or "s") }
+    rows[#rows + 1] = { button = "window", text = "Spawn Nodes window",
+      tooltip = "Opens or closes the Spawn Nodes window." }
+  end
   rows[#rows + 1] = { heading = "Groups" }
   if g then group_row(rows, g, list)
   else rows[#rows + 1] = { dim = true, text = "No groups yet: make one with New group." } end
@@ -2841,12 +2851,6 @@ function F.panel(world)
   if g.trigger == "wire" and g.wire then
     rows[#rows + 1] = { dim = true, text = string.format("Trip wire at %.0f, %.0f: move it with Put trip wire here in the Spawn Nodes window.", g.wire.x, g.wire.z) }
   end
-  local n_nodes = 0
-  for _, n in ipairs(v.nodes or {}) do if n[2] == g.id then n_nodes = n_nodes + 1 end end
-  rows[#rows + 1] = { heading = "Nodes" }
-  rows[#rows + 1] = { dim = true, text = string.format("%s has %d node%s. Add, move and delete them in the Spawn Nodes window.", g.name, n_nodes, n_nodes == 1 and "" or "s") }
-  rows[#rows + 1] = { button = "window", text = "Spawn Nodes window",
-    tooltip = "Opens or closes the Spawn Nodes window." }
   return rows
 end
 

@@ -80,6 +80,18 @@ Keep this list current: strike an item only with the test or the owner's word th
 15. Raid monster markers after Stop + Remove with 80+ monsters (0.15.541: at most 30 messages per check, take-offs
     repeated): passed in the fake-EMF test (tools/sntest/mk.lua); not yet watched in the game.
 
+**To come back to (owner 2026-11-24 13:19 "we probably still need that stuck-monster handling code, I'm just not ready
+to continue with it yet... just note it and put it on a list some place for me to come back to"):**
+16. SPAWN NODES' STUCK-MONSTER HANDLING: KEEP THE CODE, it is switched off, not dead. features/spawn_nodes.lua stuck_tick,
+    switch `STUCK_ON = false` (with HUNT_ON / THREAT_ON, "local STUCK_ON, HUNT_ON, THREAT_ON = false, true, true"). On, it
+    checks every 2 s for raid monsters in the ground, in water or stuck (no move for STUCK_S, no hit given or taken:
+    S.track, S.active_at) and takes them away to come again at their node; also the ground / water / fall handling.
+    Off since 0.15.524 (owner 2026-11-23 18:14 "just spawn the monsters and see what happens.. no threat table no spot
+    check none of that"); the stuck raids of that day turned out to be the tamed animals hogging the path search (the
+    animal hold, 0.15.538), so it was never tried again with the hold on. NOT to be removed in a clean-up (12:33 list #16
+    named it as the biggest unused part; owner 13:19: still needed). When he picks it up: switch it on and test a raid
+    with the animal hold, monsters spawned on slopes / near water.
+
 **Releases:** the Development channel (dist-test) is still 0.15.525 and Stable (dist) 0.15.475; nothing since was
 packaged or signed. G-Portal untouched. Only the owner's word moves those (Rule 0g).
 
@@ -2940,3 +2952,9 @@ remove as needed #5 leave it alone [Spawn Nodes open to all] #6 appears to work 
   flamekit_native.dll.old_550 in both. At the install: core/fullrec.lua and features/build_anywhere.lua go from the
   server, the game and the work folder.
 spawn_nodes.lua top-level locals after 0.15.553: 177 of Lua's 200 (194 before); 3079 lines (3313 before).
+
+**13:19 owner: the stuck-monster handling is still needed ("just note it and put it on a list")** -> HANDOFF OPEN #16 and a
+comment on the STUCK_ON line (code untouched, still off).
+**0.15.554 (owner 13:19 "The \"Nodes\" section on the \"Spawn Nodes\" tab needs to get moved all the way to the top"):**
+F.panel: the Nodes section (heading, "<group> has N nodes...", the Spawn Nodes window button) is now first, before
+Groups (shown when a group exists, as before); nothing else moved or changed. Lua only.
