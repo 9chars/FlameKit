@@ -2409,3 +2409,5 @@ census_tick (PATH_CENSUS) every 10 s walks every entity: DynamicPathFinder count
 the last pass), pathQueryCheck 1 (asking), DynamicPathWalker.lastPathfindingResult 0 (no path), per kind (template ->
 core/monsters.lua name, else GUID first 8), near a player (100 m). Lines "spawn nodes: path census: ..." + "... top:".
 PATH_PUSH = false.
+
+Owner 21:25: "when the monsters were fighting each other, they had no issues running around killing shit" (fits ClearPathToTarget: a clear line -> no path query needed). Owner 21:27: "point 4 is absolute bullshit IMO. we had the exact same problems previously LONGGGGGGGG before the bigger base size. there is definitely some shit going on with #3, but its not related to #4" -> Bigger altar areas is NOT the lead; #3 = the constant terrain chunk unpacking (20k/min world thread, 40-75k/min other threads, 21:1x) is.
