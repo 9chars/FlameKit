@@ -2533,3 +2533,22 @@ the animals were a real cause (the test proved it), and the game's path search A
 once. Not investigated yet.
 07:07 owner: "I made the raid size larger than it would normally be" -> the 22:44 raid (79 monsters) was deliberately
 oversized; the backlog at that size is not the normal case. The 22:17 raid (29 monsters, animals held) is closer to normal.
+
+**0.15.539 (owner 07:13 "cleaning up the UI you made. it looks awful", 07:16 screenshot + "We need to move a lot of this
+out to its own window so its easier to create and manage nodes as I'm moving around the map"; built 07:20:44, DLL
+223d9b87...; NOT installed):**
+- New SPAWN NODES WINDOW (FlameKit Native: a third ExperimentalLayer "spawn_nodes_window", ui_nodes.dat, clicks "nod",
+  toggled by ui_nodes_toggle.request, at the left 12% / 15%). Rows: features/spawn_nodes.lua F.window_rows (group,
+  status, Start now / Stop / Remove its monsters, Add node here / Show nodes / Put trip wire here, nearest nodes one
+  line each: "Node 8, 10 m [Within 2 m v] [Move here] [Delete]"); clicks F.window_click = F.click. Plumbing:
+  features/native_ui.lua write_nod / "nod".
+- The TAB (F.panel) re-sectioned: Groups (drop-down; New, Delete, Spawn Nodes window), Raid rules (switches + Building
+  damage), Monsters, When (trigger + its settings, Player within, waves, raid length, cooldown), Nodes (count + button).
+- FORM ALIGNMENT in FlameKit Native (form_widths, both the tab renderer and the Experimental-style windows): a label
+  that starts a line followed by a same-line drop-down gets the widest such label's width in its section (between
+  headings/separators), and the drop-down the widest such drop-down's width. Affects every tab/window with label +
+  drop-down rows (Experimental too).
+- Tests: tools/sntest/ui.lua (tab + window for every trigger, no lone labels, the window button) + tr/rl/ai/hd all OK.
+- INSTALL needs the CLIENT too (the window is drawn by the game): <game folder>\emf\mods\flamekit_native (DLL, mod.json)
+  and \flamekit (features/spawn_nodes.lua, features/native_ui.lua, mod.json, changes.txt), plus the server's copies.
+  07:22 folder access to the game's emf folder was refused by the auto-mode check: the owner adds it with Add folder.

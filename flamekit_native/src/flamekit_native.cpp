@@ -2797,6 +2797,36 @@ ItemIcons& game_files() {
     return files;
 }
 
+// (0.15.539, owner 2026-11-24 07:13 "cleaning up the UI you made. it looks awful") FORM ALIGNMENT, for every tab of rows
+// and every Experimental-style window: a label that starts a line and is followed on that line by a drop-down (a
+// "form row": "Waves [2 v]") gets the width of the widest such label in its section (rows between two headings or
+// separators), and its drop-down the width of the widest such drop-down there, so the drop-downs line up in one
+// column instead of zig-zagging. Rows that are not form rows are laid out as before.
+template <class R, class LabelW, class ListW>
+void form_widths(const std::vector<R>& rows, LabelW label_w, ListW list_w, std::vector<int>& lab, std::vector<int>& lst) {
+    lab.assign(rows.size(), -1);
+    lst.assign(rows.size(), -1);
+    std::vector<size_t> sec;
+    auto flush = [&] {
+        int ml = 0, md = 0;
+        for (size_t i : sec) {
+            ml = std::max(ml, label_w(rows[i]));
+            md = std::max(md, list_w(rows[i + 1]));
+        }
+        for (size_t i : sec) {
+            lab[i] = ml;
+            lst[i + 1] = md;
+        }
+        sec.clear();
+    };
+    for (size_t i = 0; i < rows.size(); ++i) {
+        const R& r = rows[i];
+        if (r.kind == 'h' || r.kind == 's') flush();
+        else if (r.kind == 'l' && !r.same && i + 1 < rows.size() && rows[i + 1].kind == 'd' && rows[i + 1].same) sec.push_back(i);
+    }
+    flush();
+}
+
 struct PinnedLayer;
 std::vector<PinnedLayer*> g_pinned;  // every pinned window, for the Windows tab
 
@@ -4642,16 +4672,20 @@ struct WindowLayer : Layer {
                 x = left;
                 line_h = 0;
             };
-            for (const Row& r : rows) {
+            auto drop_w = [&](const Row& r) {  // as wide as its longest entry, within the window
+                int widest = text.width(r.text);
+                for (const ListOpt& o : r.list) widest = std::max(widest, text.width(o.label) + (o.heading ? 0 : 12));
+                return std::min(right - left, std::max(220, widest + 48));
+            };
+            std::vector<int> form_lab, form_lst;  // (0.15.539) form alignment
+            form_widths(rows, [&](const Row& r) { return text.width(r.text) + 8; }, drop_w, form_lab, form_lst);
+            for (size_t ri = 0; ri < rows.size(); ++ri) {
+                const Row& r = rows[ri];
                 if (r.kind == 'b' || r.kind == 'i' || r.kind == 'l' || r.kind == 'd') {  // run along the line and wrap
                     const bool tile_row = r.kind == 'i';
                     int w = tile_row ? kIcon : std::max(34, text.width(r.text) + 22);
-                    if (r.kind == 'l') w = text.width(r.text) + 8;
-                    if (r.kind == 'd') {  // as wide as its longest entry, within the window
-                        int widest = text.width(r.text);
-                        for (const ListOpt& o : r.list) widest = std::max(widest, text.width(o.label) + (o.heading ? 0 : 12));
-                        w = std::min(right - left, std::max(220, widest + 48));
-                    }
+                    if (r.kind == 'l') w = form_lab[ri] >= 0 ? form_lab[ri] + 10 : text.width(r.text) + 8;
+                    if (r.kind == 'd') w = form_lst[ri] >= 0 ? form_lst[ri] : drop_w(r);
                     const int h = tile_row ? kIcon : 30;
                     if (!(r.same && x > left && x + w <= right)) newline();
                     placed.push_back({&r, x, y, w, h, {}});
@@ -5867,12 +5901,14 @@ struct ExperimentalLayer : PinnedLayer {
             x = left;
             line_h = 0;
         };
+        std::vector<int> form_lab, form_lst;  // (0.15.539) form alignment
+        form_widths(rows, [&](const Row& r) { return text.width(r.text) + 6; }, [&](const Row& r) { return list_width(r, width); }, form_lab, form_lst);
         for (size_t i = 0; i < rows.size(); ++i) {
             const Row& r = rows[i];
             if (r.kind == 'b' || r.kind == 'l' || r.kind == 'd' || r.kind == 'e') {
                 int w = std::max(30, text.width(r.text) + 18);
-                if (r.kind == 'l') w = text.width(r.text) + 6;
-                if (r.kind == 'd') w = list_width(r, width);
+                if (r.kind == 'l') w = form_lab[i] >= 0 ? form_lab[i] + 10 : text.width(r.text) + 6;
+                if (r.kind == 'd') w = form_lst[i] >= 0 ? form_lst[i] : list_width(r, width);
                 if (r.kind == 'e') w = std::min(width - 16, 240);
                 if (!(r.same && x > left && x + w <= right)) newline();
                 placed.push_back({i, {x, y, x + w, y + kBtnH}, {}});
@@ -7180,11 +7216,21 @@ void ui_thread_body() {
     experimental.window = &window;
     ExperimentalLayer roster("companion_roster", L"Companion Roster", L"ui_roster.dat", "ros", L"ui_roster_toggle.request");
     roster.window = &window;
+    // (0.15.539, owner 2026-11-24 07:16 "We need to move a lot of this out to its own window so its easier to create and
+    // manage nodes as I'm moving around the map") the Spawn Nodes window: rows from features/spawn_nodes.lua
+    // F.window_rows in ui_nodes.dat, clicks "nod ...", shown and hidden by ui_nodes_toggle.request (its button in the
+    // Spawn Nodes tab); at the left, out of the way of the middle of the screen.
+    ExperimentalLayer nodes_win("spawn_nodes_window", L"Spawn Nodes", L"ui_nodes.dat", "nod", L"ui_nodes_toggle.request");
+    nodes_win.window = &window;
+    nodes_win.def_center = false;
+    nodes_win.def_x_pt = 120;
+    nodes_win.def_y_pt = 1500;
+    nodes_win.default_h = 560;
     BoardLayer board;
     UpdateDialog update_dialog;
     ChangeLogDialog change_log;
     g_act = [&window](const std::string& what, const std::string& arg) { window.act(what, arg); };
-    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &roster, &change_log, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
+    g_compositor.layers = {&hud, &backdrop, &minimap, &party, &messages, &notices, &experimental, &board, &window, &roster, &nodes_win, &change_log, &update_dialog};  // bottom first (the minimap and the pinned windows over the backdrop: they take the mouse)
     Watchdog watchdog;
     HWND game = nullptr;
     uint64_t looked = 0, ordered = 0, stats_at = 0;

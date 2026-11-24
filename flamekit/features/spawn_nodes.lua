@@ -2607,6 +2607,47 @@ local function choice_row(rows, g, key, title, tip, list, show)
   rows[#rows + 1] = { options = opts, text = show and show(g[key]) or label(key, g[key]), same_line = true, tooltip = tip }
 end
 
+-- ============================================================================================================
+-- (0.15.539, owner 2026-11-24 07:13 "cleaning up the UI you made. it looks awful", 07:16 "We need to move a lot of
+-- this out to its own window so its easier to create and manage nodes as I'm moving around the map") THE TAB and THE
+-- SPAWN NODES WINDOW. The tab keeps the group's setup (Groups / Raid rules / Monsters / When); the window (FlameKit
+-- Native's third Experimental-style window, rows in ui_nodes.dat via features/native_ui.lua, clicks "nod ...", shown
+-- and hidden by ui_nodes_toggle.request) has what is used out on the map: the group, Start / Stop / Remove, Add node
+-- here, Show nodes, Put trip wire here, and the nearest nodes one line each. Both share the chosen group (C.sel) and
+-- F.click. Labels followed by a drop-down line up in a column (FlameKit Native's form alignment, 0.15.539).
+-- ============================================================================================================
+
+-- The group shown (C.sel, else the first) and the group list.
+local function shown_group(v)
+  local list = v.groups or {}
+  local g = nil
+  for _, x in ipairs(list) do if x.id == C.sel then g = x end end
+  if not g then g = list[1] C.sel = g and g.id or nil end
+  return g, list
+end
+
+-- The group drop-down row (label + drop-down).
+local function group_row(rows, g, list)
+  local opts = {}
+  for _, x in ipairs(list) do
+    opts[#opts + 1] = { key = "sel:" .. x.id, text = x.name .. (x.on and "" or " (off)") .. (x.running and " (running)" or ""), selected = x.id == g.id }
+  end
+  rows[#rows + 1] = { label = true, text = "Group" }
+  rows[#rows + 1] = { options = opts, text = g.name .. (g.running and " (running)" or ""), same_line = true, tooltip = "The group these settings and nodes belong to." }
+end
+
+-- An on/off switch row.
+local function switch_row(rows, key, on, text, tip)
+  rows[#rows + 1] = { button = key, text = (on and "On    " or "Off   ") .. text, selected = on or nil, tooltip = tip }
+end
+
+-- Opens or closes the Spawn Nodes window (FlameKit Native shows or hides it when this file appears).
+local function toggle_window()
+  local f = emf.dir and io.open(emf.dir .. "\\ui_nodes_toggle.request", "w")
+  if f then f:write("toggle\n") f:close() end
+end
+
+-- The tab: the group's setup.
 function F.panel(world)
   local v = my_state(world)
   if not v then
@@ -2620,89 +2661,125 @@ function F.panel(world)
     rows[#rows + 1] = { dim = true, text = "Only FlameKit admins can set up spawn nodes." }
     return rows
   end
-  local list = v.groups or {}
-  local g = nil
-  for _, x in ipairs(list) do if x.id == C.sel then g = x end end
-  if not g then g = list[1] C.sel = g and g.id or nil end
+  local g, list = shown_group(v)
   rows[#rows + 1] = { heading = "Groups" }
-  if g then
-    local opts = {}
-    for _, x in ipairs(list) do
-      opts[#opts + 1] = { key = "sel:" .. x.id, text = x.name .. (x.on and "" or " (off)") .. (x.running and " (running)" or ""), selected = x.id == g.id }
-    end
-    rows[#rows + 1] = { label = true, text = "Group" }
-    rows[#rows + 1] = { options = opts, text = g.name, same_line = true, tooltip = "The group these settings and nodes belong to." }
-  else
-    rows[#rows + 1] = { dim = true, text = "No groups yet: make one with New group." }
-  end
+  if g then group_row(rows, g, list)
+  else rows[#rows + 1] = { dim = true, text = "No groups yet: make one with New group." } end
   rows[#rows + 1] = { button = "new", text = "New group", disabled = (#list >= (v.max_groups or MAX_GROUPS)) or nil,
     tooltip = "Makes a new group with the default settings: Random monsters, started by hand, 3 waves 30 s apart, 3 monsters per node in each wave." }
+  if g then
+    local asked = C.del_asked and C.del_asked.g == g.id and os.time() - C.del_asked.at <= 5
+    rows[#rows + 1] = { button = "delgroup", same_line = true, selected = asked or nil,
+      text = asked and "Click again to delete" or "Delete group",
+      tooltip = "Deletes " .. g.name .. " and all its nodes. Click twice within 5 seconds." }
+  end
+  rows[#rows + 1] = { button = "window", same_line = true, text = "Spawn Nodes window",
+    tooltip = "Opens or closes the Spawn Nodes window: the group, Start / Stop, Add node here and its nodes, to use while you move around the map." }
   if not g then return rows end
-  local asked = C.del_asked and C.del_asked.g == g.id and os.time() - C.del_asked.at <= 5
-  rows[#rows + 1] = { button = "delgroup", same_line = true, selected = asked or nil,
-    text = asked and "Click again to delete" or "Delete group",
-    tooltip = "Deletes " .. g.name .. " and all its nodes. Click twice within 5 seconds." }
-  rows[#rows + 1] = { dim = true, text = (v.status or {})[tostring(g.id)] or "" }
+  local status = (v.status or {})[tostring(g.id)]
+  if status and status ~= "" then rows[#rows + 1] = { dim = true, text = status } end
 
-  rows[#rows + 1] = { heading = g.name }
-  rows[#rows + 1] = { button = "on", text = (g.on and "On    " or "Off   ") .. "Group on", selected = g.on == true,
-    tooltip = "Off: its trigger never fires (Start now still works)." }
-  rows[#rows + 1] = { button = "start", text = "Start now", same_line = true, disabled = g.running or nil,
-    tooltip = "Starts its waves now, whatever its trigger, also during its cooldown, when a player is within its Player within distance of one of its nodes." }
-  rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
-  rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
-    tooltip = "Removes this group's monsters only, alive or dead (their bodies on the ground too); other groups' and the world's "
-      .. "own monsters stay. Only the ones spawned since the server last started or reloaded FlameKit." }
-  choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, Random (any kind, no bosses) or Bosses (any boss: set Monsters per node to 1 for one boss).",
-    FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
-  choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
-    .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
-  rows[#rows + 1] = { button = "announce", text = (g.announce ~= false and "On    " or "Off   ") .. "Announce the raid to players", selected = g.announce ~= false,  -- (0.15.488)
-    tooltip = "Orange FlameKit notices: when it starts (to every player, with the name of the nearest flame altar), each new wave and how "
-      .. "many monsters are left (to the players within " .. NOTICE_DIST .. " m of its nodes), and when it is over." }
-  rows[#rows + 1] = { button = "spare", text = (g.spare and "On    " or "Off   ") .. "Its monsters spare animals, pets and villagers", selected = g.spare == true,
-    tooltip = "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
-      .. "safe from them (other monsters too). Players are not covered: they can still be hit." }
-  rows[#rows + 1] = { button = "breaks", text = (g.breaks and "On    " or "Off   ") .. "Monsters damage buildings", selected = g.breaks == true,
-    tooltip = "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "
+  rows[#rows + 1] = { heading = "Raid rules" }
+  switch_row(rows, "on", g.on == true, "Group on", "Off: its trigger never fires (Start now still works).")
+  switch_row(rows, "announce", g.announce ~= false, "Announce the raid to players",  -- (0.15.488)
+    "Orange FlameKit notices: when it starts (to every player, with the name of the nearest flame altar), each new wave and how "
+      .. "many monsters are left (to the players within " .. NOTICE_DIST .. " m of its nodes), and when it is over.")
+  switch_row(rows, "spare", g.spare == true, "Its monsters spare animals, pets and villagers",
+    "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
+      .. "safe from them (other monsters too). Players are not covered: they can still be hit.")
+  switch_row(rows, "protect", g.protect == true, "Players cannot damage base structures during raid",  -- (0.15.484, owner 12:50: the label)
+    "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
+      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
+      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
+      .. "Admins too, for now.")
+  switch_row(rows, "breaks", g.breaks == true, "Monsters damage buildings",
+    "Its monsters hit player-built blocks: on their way to the nearest player, or right beside them. How often and how hard: "
       .. "Building damage below. Never the ground or the world's own ruins. Inside a flame altar's area what breaks stays broken. "
-      .. "Needs EMF 0.6.19 on the server." }
+      .. "Needs EMF 0.6.19 on the server.")
   if g.breaks then
     choice_row(rows, g, "break_level", "Building damage", "Low: a hit every 3 s like a top pickaxe, blocks within 4 m. Medium: every 1.5 s, "
       .. "twice as hard, 5 m. High: every 1 s, 4 times as hard, 6 m, 1.5 m holes. Extreme: every 0.5 s, 8 times as hard, 6 m, 1.5 m holes. "
       .. "Stone takes about 22 top-pickaxe hits.", BREAK_LEVELS, function(l) return (BREAK_LEVEL[l] or {}).label or l end)
+    if v.no_break then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
   end
-  if v.no_break and g.breaks then rows[#rows + 1] = { color = "#ffb060", text = "This server's EMF cannot break blocks: it needs EMF 0.6.19." } end
-  rows[#rows + 1] = { button = "protect", text = (g.protect and "On    " or "Off   ") .. "Players cannot damage base structures during raid", selected = g.protect == true,  -- (0.15.484, owner 12:50: the label)
-    tooltip = "While its waves run, and until the last of its monsters is dead: players within its Base within distance (" .. g.raid_r .. " m) of one of its nodes lose the game's own "
-      .. "base editing permission, so they cannot build, dismantle or mine in bases (they get it back when that is over or they "
-      .. "leave that range); and players' hits on placed objects (chests, crafting stations, doors and the like) do nothing, on the whole server. "
-      .. "Admins too, for now." }
-  choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
-    .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
+
+  rows[#rows + 1] = { heading = "Monsters" }
+  choice_row(rows, g, "family", "Monsters", "Which monsters its nodes spawn: one kind, Random (any kind, no bosses) or Bosses (any boss: set Monsters per node to 1 for one boss).",
+    FAMILIES, function(f) return FAMILY_LABEL[f] or f end)
+  choice_row(rows, g, "face", "Monsters face", "Which way a monster faces when it appears: the nearest player, the node's direction "
+    .. "(the way you faced when you added or last moved the node), or a random way.", FACES, function(f) return FACE_LABEL[f] or f end)
+  choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave, one after another (see Most alive per node). "
+    .. "The wave is over when every node has spawned all of them; then Between waves starts.")  -- (0.15.512)
+  choice_row(rows, g, "max_alive", "Most alive per node", "At most this many of a node's monsters are alive at once: its next one comes when one of them dies. "
+    .. "1: one at a time.")
+
+  rows[#rows + 1] = { heading = "When" }
   choice_row(rows, g, "trigger", "Trigger", "What starts its waves. Start now works with every trigger.", TRIGGERS, function(t) return TRIGGER_LABEL[t] or t end)
   if g.trigger == "timer" then
     choice_row(rows, g, "timer_min", "Timer from", "The timer fires at a random time between these two (after the cooldown).")
-    choice_row(rows, g, "timer_max", "to", "The timer fires at a random time between these two (after the cooldown).")
+    choice_row(rows, g, "timer_max", "Timer to", "The timer fires at a random time between these two (after the cooldown).")
   elseif g.trigger == "wire" then
     choice_row(rows, g, "wire_r", "Trip wire size", "A player this close to the trip wire's spot fires it.")
-    rows[#rows + 1] = { button = "wire", text = "Put trip wire here",
-      tooltip = g.wire and string.format("Moves the trip wire to where you stand (now at %.0f, %.0f).", g.wire.x, g.wire.z)
-        or "Puts the trip wire where you stand." }
   elseif g.trigger == "time" then
     choice_row(rows, g, "hour", "At", "Fires when the game's clock passes this hour.")
   elseif g.trigger == "raid" then
     choice_row(rows, g, "raid_r", "Base within", "Fires when a player is inside a flame altar's area whose middle is this close to one of the group's nodes.")
   end
+  choice_row(rows, g, "near_r", "Player within", "It starts only when a player is this close to one of its nodes (any trigger, also Start now), "
+    .. "and its waves come only while one is. A timer that is due waits for a player; a time of day with nobody near is skipped that day.")  -- (0.15.491)
   choice_row(rows, g, "waves", "Waves", "How many waves one start brings.")
   choice_row(rows, g, "wave_gap", "Between waves", "The time between two waves.")
-  choice_row(rows, g, "per_wave", "Monsters per node", "How many monsters each node spawns in one wave, one after another (see Most alive per node). "
-    .. "The wave is over when every node has spawned all of them; then Between waves starts.")  -- (0.15.512)
-  choice_row(rows, g, "max_alive", "Most alive per node", "At most this many of a node's monsters are alive at once: its next one comes when one of them dies. "
-    .. "1: one at a time.")
   choice_row(rows, g, "duration", "Raid lasts at most", "From its start: when this time is up its raid ends, whatever is left: no more waves, its "
     .. "living monsters are taken away (and with them its protection), the bodies stay.")  -- (0.15.492)
   choice_row(rows, g, "cooldown", "Cooldown", "After its waves, the trigger cannot fire again for this long.")
+  if g.trigger == "wire" and g.wire then
+    rows[#rows + 1] = { dim = true, text = string.format("Trip wire at %.0f, %.0f: move it with Put trip wire here in the Spawn Nodes window.", g.wire.x, g.wire.z) }
+  end
+  local n_nodes = 0
+  for _, n in ipairs(v.nodes or {}) do if n[2] == g.id then n_nodes = n_nodes + 1 end end
+  rows[#rows + 1] = { heading = "Nodes" }
+  rows[#rows + 1] = { dim = true, text = string.format("%s has %d node%s. Add, move and delete them in the Spawn Nodes window.", g.name, n_nodes, n_nodes == 1 and "" or "s") }
+  rows[#rows + 1] = { button = "window", text = "Spawn Nodes window",
+    tooltip = "Opens or closes the Spawn Nodes window." }
+  return rows
+end
+
+-- The Spawn Nodes window: what is used out on the map.
+function F.window_rows(world)
+  local v = my_state(world)
+  if not v then return { { dim = true, text = "Asking the server..." } } end
+  local rows = {}
+  local note = C.note or v.note
+  if note then rows[#rows + 1] = { color = "#ffb060", text = note } end
+  if not v.admin then
+    rows[#rows + 1] = { dim = true, text = "Only FlameKit admins can set up spawn nodes." }
+    return rows
+  end
+  local g, list = shown_group(v)
+  if not g then
+    rows[#rows + 1] = { dim = true, text = "No groups yet: make one in the Spawn Nodes tab (F4)." }
+    return rows
+  end
+  group_row(rows, g, list)
+  local status = (v.status or {})[tostring(g.id)]
+  if status and status ~= "" then rows[#rows + 1] = { dim = true, text = status } end
+  rows[#rows + 1] = { button = "start", text = "Start now", disabled = g.running or nil,
+    tooltip = "Starts its waves now, whatever its trigger, also during its cooldown, when a player is within its Player within distance of one of its nodes." }
+  rows[#rows + 1] = { button = "stop", text = "Stop", same_line = true, disabled = (not g.running) or nil, tooltip = "Ends its waves now; its cooldown starts." }
+  rows[#rows + 1] = { button = "remove", text = "Remove its monsters", same_line = true,
+    tooltip = "Removes this group's monsters only, alive or dead (their bodies on the ground too); other groups' and the world's "
+      .. "own monsters stay. Only the ones spawned since the server last started or reloaded FlameKit." }
+  rows[#rows + 1] = { button = "add", text = "Add node here", disabled = (#(v.nodes or {}) >= (v.max_nodes or MAX_NODES)) or nil,
+    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Its monsters spawn within " .. SPREAD .. " m of it (change it on its line below)." }
+  switch_row(rows, "show", show_on(), "Show nodes",
+    "Shows every node and trip wire as a marker over the world and on the map, only in your game. Other players never see them.")
+  rows[#rows].same_line = true
+  if g.trigger == "wire" then
+    rows[#rows + 1] = { button = "wire", text = "Put trip wire here", same_line = true,
+      tooltip = g.wire and string.format("Moves the trip wire to where you stand (now at %.0f, %.0f).", g.wire.x, g.wire.z)
+        or "Puts the trip wire where you stand." }
+  end
+  if C.no_markers then rows[#rows + 1] = { color = "#ffb060", text = "Your EMF cannot draw markers yet: let FlameKit update EMF (About tab)." } end
 
   local mine = {}
   for _, n in ipairs(v.nodes or {}) do if n[2] == g.id then mine[#mine + 1] = n end end
@@ -2711,33 +2788,29 @@ function F.panel(world)
   pcall(function() px, py, pz = world:position(me) end)
   for _, n in ipairs(mine) do n.d = px and math.sqrt(dist2(px, py, pz, n[3], n[4], n[5])) or nil end
   table.sort(mine, function(a, b) return (a.d or 1e9) < (b.d or 1e9) end)
-  rows[#rows + 1] = { heading = string.format("Nodes of %s (%d)", g.name, #mine) }
-  rows[#rows + 1] = { button = "add", text = "Add node here", disabled = (#(v.nodes or {}) >= (v.max_nodes or MAX_NODES)) or nil,
-    tooltip = "Adds a node to " .. g.name .. " where you stand, facing the way you face. Its monsters spawn within " .. SPREAD .. " m of it (change it with Spawn within)." }
+  rows[#rows + 1] = { heading = string.format("Nodes of %s (%d), nearest first", g.name, #mine) }
+  if #mine == 0 then rows[#rows + 1] = { dim = true, text = "None yet: stand where monsters should come from and click Add node here." } end
   for i = 1, math.min(#mine, NEAR_LIST) do
     local n = mine[i]
-    rows[#rows + 1] = { dim = true, text = string.format("Node %d: %.0f, %.0f%s", n[1], n[3], n[5], n.d and string.format(", %d m away", math.floor(n.d)) or "") }
-    rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand, facing the way you face." }
-    rows[#rows + 1] = { button = "del:" .. n[1], text = "Delete", same_line = true, tooltip = "Deletes node " .. n[1] .. "." }
-    -- (0.15.485) its own spawn distance
     local sp = tonumber(n[6]) or SPREAD
     local opts = {}
     for _, c in ipairs(SPREADS) do
-      opts[#opts + 1] = { key = "spread:" .. n[1] .. ":" .. c, text = c == 0 and "On the node" or (c .. " m"), selected = sp == c }
+      opts[#opts + 1] = { key = "spread:" .. n[1] .. ":" .. c, text = c == 0 and "On the node" or ("Within " .. c .. " m"), selected = sp == c }
     end
-    rows[#rows + 1] = { label = true, text = "    Spawn within" }
-    rows[#rows + 1] = { options = opts, text = sp == 0 and "On the node" or (sp .. " m"), same_line = true,
+    rows[#rows + 1] = { label = true, text = string.format("Node %d%s", n[1], n.d and string.format(", %d m", math.floor(n.d)) or ""),
+      tooltip = string.format("Node %d at %.0f, %.0f.", n[1], n[3], n[5]) }
+    rows[#rows + 1] = { options = opts, text = sp == 0 and "On the node" or ("Within " .. sp .. " m"), same_line = true,
       tooltip = "How far from node " .. n[1] .. " its monsters may appear. A spot behind a wall, inside a building or inside rock is not used: "
         .. "FlameKit tries " .. SPOT_TRIES .. " spots, then uses the node itself. Chests and other placed objects are not seen." }
+    rows[#rows + 1] = { button = "move:" .. n[1], text = "Move here", same_line = true, tooltip = "Moves node " .. n[1] .. " to where you stand, facing the way you face." }
+    rows[#rows + 1] = { button = "del:" .. n[1], text = "Delete", same_line = true, tooltip = "Deletes node " .. n[1] .. "." }
   end
   if #mine > NEAR_LIST then rows[#rows + 1] = { dim = true, text = string.format("(%d more further away)", #mine - NEAR_LIST) } end
-
-  rows[#rows + 1] = { heading = "Markers" }
-  rows[#rows + 1] = { button = "show", text = (show_on() and "On    " or "Off   ") .. "Show nodes", selected = show_on(),
-    tooltip = "Shows every node and trip wire as a marker over the world and on the map, only in your game. Other players never see them." }
-  if C.no_markers then rows[#rows + 1] = { color = "#ffb060", text = "Your EMF cannot draw markers yet: let FlameKit update EMF (About tab)." } end
   return rows
 end
+
+-- A click in the Spawn Nodes window: the same keys as the tab's.
+function F.window_click(world, key) return F.click(world, key) end
 
 function F.click(world, key)
   C.note = nil
@@ -2747,6 +2820,7 @@ function F.click(world, key)
   local sel = key:match("^sel:(%d+)$")
   if sel then C.sel = tonumber(sel) return end
   if key == "new" then act(world, { op = "new_group" }) return end
+  if key == "window" then toggle_window() return end  -- (0.15.539) the Spawn Nodes window
   if key == "show" then
     C.show = not show_on()
     pcall(kit.store.save, "spawn_nodes_client", { show = C.show })
