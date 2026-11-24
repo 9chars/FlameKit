@@ -2392,3 +2392,13 @@ maxIterations 0/4000, enforceUpdate false, pathQueryCheck 0/1. path_push (PATH_P
 enforceUpdate = true at the spawn (before its first query) and every 0.5 s until DynamicPathWalker.lastPathfindingResult
 = 1. Logs: "path push: monster N (at its spawn): written; read back: ...", "ai: monster N [...] path came N s after it
 appeared (path push on)", EVENT lines in the recordings. Compare with 35-40 s (Bat, Wolf) / 4 s (Wisp) without it.
+
+**21:06-21:17 results (0.15.533 path push, owner: "same pattern of delay ... forcing the priority didnt make any difference"):**
+path push written and read back (queryPriority 1, enforceUpdate true) on every monster; paths still 29-58 s; they come
+in BATCHES: 4 monsters spawned 21:06:25 got theirs 21:06:54-55, 4 spawned 21:06:57-21:07:08 all at 21:07:55.25 (60.6 s
+apart). Nothing in the server log or in FlameKit's code runs on that cycle (only log counters). 21:15 raid, owner on
+natural ground outside the base (22-39 m): wave 1 paths in 2-5 s (Raven, Bat, Crocodile; Vulture came 15 m), then Spider
+Ant Poison Ranger x2 + Giant Crab got NO path in 45-60 s (angry, target, order, 0.0 m). Owner 21:16 "after the initial
+wave they just dont move", 21:21 "blah blah blah done this all before". => The priority approach is DEAD (tried twice).
+Path push still ON in 0.15.533 (forces a query every 0.5 s per waiting monster): switch it off unless the owner says
+otherwise. Stop proposing path tests; the owner has done them before (companions).
