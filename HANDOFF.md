@@ -2585,3 +2585,9 @@ still 0.15.539 there until the 0.15.540 install).
 fired again at 07:52:08 although the owner stopped it at 07:47:58 with a 10 min cooldown. A live Lua reload restarts
 cooldowns. Told the owner, asked whether to stop that raid.
 First log: unsend_marker answers 1 (one player) per take-off.
+**07:52 PROVEN (the new marker log, owner stopped 07:52:45 and removed 83 at 07:52:46):** EMF takes only ~39 marker
+messages in one go (one server step): every check that sent or took off more answered 1 for the first 39 and 0 ("went
+to 0 players") for the rest: 07:52:25 and 07:52:41 resends "1 x39, 0 x44"; 07:52:47 the 83 take-offs "1 x39, 0 x44"
+-> 44 Raid monster markers stayed on the owner's screen. Spawn Nodes forgets an id after unsend whatever the answer,
+so they are never taken off (until FlameKit reloads: EMF clears a mod's markers then). The waves' first sends were
+16/32/32 per check (under the limit), so they all arrived. Not fixed yet: owner asked.
