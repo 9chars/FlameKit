@@ -2305,3 +2305,5 @@ Hollow Wisp, ...; summons joined 19:28:25), so the ai lines now carry the type (
 emf.template -> core/monsters.lua name). Duelist comparison test (Experimental, Undead: Melee01, 10 m) proposed earlier,
 not run.
 On the local server 19:31:37 (owner 19:31 "i stopped the raid.. go ahead and update it"; 22 features, no error).
+
+**GOAL (owner 2026-11-23 19:33, verbatim):** "they need to be aggressively attacking is the goal. they should flood to me. not just wander around".
