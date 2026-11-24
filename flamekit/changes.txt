@@ -1,3 +1,7 @@
+0.15.545 Nov 24, 2026
+- Spawn Nodes: the raid's start notice (Raid forces are pushing into ...!) is red and no longer ends with how many monsters are coming; its siren sounds twice again.
+- Spawn Nodes: the countdown (N of TOTAL monsters left to kill) appears only once the first monsters have come.
+
 0.15.544 Nov 24, 2026
 - Spawn Nodes: the raid's countdown (N of TOTAL monsters left to kill) changes as soon as a monster dies (within half a second) and shows 0 right after the last kill, instead of up to 5 s late and staying on 1 until the raid-over notice.
 

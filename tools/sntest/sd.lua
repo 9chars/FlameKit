@@ -29,12 +29,23 @@ ok(notice_seen, "the start notice went out and said when")
 ok(alive() == 0, "4 s after the start: no monster yet (" .. alive() .. ")")
 run(8)
 ok(alive() == 0, "12 s after the start (9 s after the notice): still none (" .. alive() .. ")")
+local counted = false for _, t in ipairs(sent) do if t:find("left to kill", 1, true) then counted = true end end
+ok(not counted, "(0.15.545) no \"left to kill\" countdown before the first monster")
 run(3)
 ok(alive() > 0, "after the notice + 10 s the monsters come (" .. alive() .. ")")
+run(1)
+local counted2 = false for _, t in ipairs(sent) do if t:find("left to kill", 1, true) then counted2 = true end end
+ok(counted2, "(0.15.545) the countdown comes with the first monsters")
 local twice, once = 0, 0
 for _, t in ipairs(sent) do if t:find('"raid_siren_twice"', 1, true) then twice = twice + 1 elseif t:find('"raid_siren"', 1, true) then once = once + 1 end end
 for _, l in ipairs(M.logs) do end
-ok(twice == 0, "the start siren is no longer the double one (" .. twice .. " double, " .. once .. " single)")
+ok(twice == 1, "(0.15.545) the start notice has the double siren again (" .. twice .. " double, " .. once .. " single)")
+local start_text, start_red, early_count = nil, false, false
+for _, t in ipairs(sent) do
+  if t:find("Raid forces are pushing", 1, true) or t:find("A raid has begun", 1, true) then start_text = t start_red = t:find('"c":"#ff4040"', 1, true) ~= nil end
+end
+ok(start_text and not start_text:find("are coming", 1, true), "(0.15.545) the start line has no \"N monsters are coming\"")
+ok(start_red, "(0.15.545) the start line is red")
 -- 0 s
 for _ = 1, 20 do for id, m in pairs(S.mon) do if not m.dead and M.ents[id] then M.ents[id].hp = 0 end end run(1) end
 run(30)

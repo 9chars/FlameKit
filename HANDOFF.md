@@ -2646,3 +2646,12 @@ alive and nothing queued/running (the END_GRACE wait, the world search) it shows
 reloaded 08:29:01-02, no errors, no raid started by the reload.
 08:31 owner asked why the raid-over message comes ~11 s after "0 left" (END_GRACE 10 s + the world search ~1 s); 08:32
 "ok leave that then" -> the end wait stays as it is.
+
+**0.15.545 (owner 08:36 "The first "Raid forces are pushing into" message should show up in red and the "N monster are
+coming." message can be removed from the end of that line... The "Raid on base: N of N monsters left to kill" should NOT
+appear until the first wave of monsters comes in... Also bring back the second siren on the first notice of the raid
+forces notice."; Lua only; NOT installed, asked):** notice_to/raid_notice take a colour (message field `c`; the
+players' games use it when it is "#rrggbb", an older FlameKit shows orange); the start notice: red "#ff4040" (inline:
+spawn_nodes.lua is at Lua's 200-locals limit, a new top-level local does not compile), text without " N monsters are
+coming.", sound "raid_siren_twice" again. count_notice returns while r.spawned == 0 (no countdown before the first
+monster). sd.lua updated (double siren, red, no count, no countdown before the first monster); all 9 tests OK.

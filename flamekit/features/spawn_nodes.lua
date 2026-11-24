@@ -135,7 +135,7 @@ if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = ni
 -- the Messages window), per group switch "announce" (on by default). The start, the end and a Remove go to every player;
 -- the waves and the count of monsters left to the players within NOTICE_DIST m of one of the group's nodes. The place:
 -- see raid_place (the minimap's place of the player who started or triggered it).
-local NOTICE_COLOUR = "#ff9632"
+local NOTICE_COLOUR = "#ff9632"  -- (0.15.545: the start notice is red, "#ff4040" in raid_tick; this file is at Lua's 200 locals)
 local NOTICE_DIST = 300
 local PLACE_WAIT = 180         -- steps (3 s): how long the start notice waits for the asked player's place
 local LEFT_EVERY = 30          -- s: the "monsters left" notice is refreshed at least this often while the raid lasts
@@ -665,11 +665,11 @@ local function play_sound(name)
   if f then f:write(string.format("%d %s.wav\n", os.time() * 100 + S.sound_n % 100, name)) f:close() end
 end
 
-local function notice_to(world, pid, text, seconds, tag, sound)
+local function notice_to(world, pid, text, seconds, tag, sound, colour)
   S.notice_n = S.notice_n + 1
-  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n), snd = sound }
+  local msg = { op = "notice", t = text, s = seconds or 10, tag = tag or ("raid_" .. S.notice_n), snd = sound, c = colour }  -- (0.15.545) c: its colour
   if pid == emf.local_player() and kit.is_host() then
-    kit.notice("nodes_" .. msg.tag, text, NOTICE_COLOUR, msg.s)
+    kit.notice("nodes_" .. msg.tag, text, colour or NOTICE_COLOUR, msg.s)
     if sound then play_sound(sound) end
   else
     pcall(emf.net.send_to, world, pid, CHANNEL, emf.json.encode(msg))
@@ -677,7 +677,7 @@ local function notice_to(world, pid, text, seconds, tag, sound)
 end
 
 -- (0.15.488) To every player (near = nil) or to the players within NOTICE_DIST m of group `near`'s nodes.
-local function raid_notice(world, gid, text, near, seconds, tag, sound)
+local function raid_notice(world, gid, text, near, seconds, tag, sound, colour)  -- (0.15.545) colour: "#rrggbb", else orange
   local g = group(gid)
   if not g or g.announce == false then return end
   emf.log("spawn nodes: notice: " .. text)
@@ -688,7 +688,7 @@ local function raid_notice(world, gid, text, near, seconds, tag, sound)
         if dist2(p[2], p[3], p[4], n.x, n.y, n.z) <= NOTICE_DIST * NOTICE_DIST then ok = true break end
       end
     end
-    if ok then notice_to(world, p[1], text, seconds, tag, sound) end
+    if ok then notice_to(world, p[1], text, seconds, tag, sound, colour) end
   end
 end
 
@@ -883,6 +883,9 @@ end
 -- last kill. Now the last kill shows "0 of 24" at once (zero = true while none is alive).
 local LEFT_MIN_STEPS = 30
 local function count_notice(world, gid, r, g, zero)
+  -- (0.15.545, owner 08:36 "The "Raid on base: N of N monsters left to kill" should NOT appear until the first wave of
+  -- monsters comes in") nothing before the raid's first monster has spawned
+  if (r.spawned or 0) == 0 then return end
   local text
   local total = r.total
   if zero then
@@ -944,11 +947,11 @@ local function raid_tick(world)
           answer and string.format("player %s's minimap: place '%s', region '%s'", tostring(r.ask.by), tostring(answer.place), tostring(answer.region))
           or "no answer came: the nearest flame altar"))
         r.ask = nil
-        local tot = r.total and string.format(" %d monsters are coming.", r.total) or ""  -- (0.15.514)
-        -- (0.15.517, owner 17:02 "make the siren sound twice at the beginning of the raid and sound once at the beginning of
-        -- every new wave") the start: twice (sounds/raid_siren_twice.wav: the siren two times, 16 s)
-        -- (0.15.543, owner 08:16 "reduce it to just one siren warning from 2") the start: the siren once
-        raid_notice(world, gid, (r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!") .. tot, nil, START_END_S, nil, "raid_siren")
+        -- (0.15.545, owner 2026-11-24 08:36 "The first "Raid forces are pushing into" message should show up in red and the
+        -- "N monster are coming." message can be removed from the end of that line ... Also bring back the second siren on
+        -- the first notice of the raid forces notice") red, no count, the siren twice again (as 0.15.517-0.15.542)
+        raid_notice(world, gid, r.place and string.format("Raid forces are pushing into %s!", r.place) or "A raid has begun!", nil, START_END_S, nil,
+          "raid_siren_twice", "#ff4040")
         local run = S.runs[gid]
         local g = group(gid)
         if run and run.hold_until then  -- (0.15.543) the first monsters after the notice
@@ -3069,7 +3072,8 @@ function F.setup(k)
       end
       if okd and type(msg) == "table" and msg.op == "notice" and type(msg.t) == "string" and type(msg.tag) == "string" then  -- (0.15.488)
         local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
-        if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), NOTICE_COLOUR, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
+        local colour = type(msg.c) == "string" and msg.c:match("^#%x%x%x%x%x%x$") and msg.c or NOTICE_COLOUR  -- (0.15.545)
+        if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), colour, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
         if msg.snd == "raid_siren" or msg.snd == "raid_siren_twice" then play_sound(msg.snd) end  -- (0.15.502); (0.15.517) twice
         return
       end
