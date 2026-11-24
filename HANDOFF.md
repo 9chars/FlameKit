@@ -2372,3 +2372,12 @@ lines (ai state/target/threat changes, ORDER, THREAT write, FIRST MOVE). Look at
 lastPathfindingResult, stuckTime, standingDuration), DynamicPathFinder, DynamicEnemy01BehaviorState.combatData.* at the
 moment of FIRST MOVE. Tests tools/sntest tr/rl/ai ALL OK (also with every switch on).
 Owner 20:45: "when they come after me they know how to path because they walk around the front entry way and come right in the door" (pathing on his built base WORKS once they go). On the local server 20:45:54 (owner stopped the raid; 22 features, no error).
+
+**FOUND (20:48 raid, 0.15.532 recordings spawn_nodes_rec_69169..69172_204812.txt):** the delay is the game's own path
+search. DynamicPathWalker.lastPathfindingResult stays 0 (no path yet) while the monster is angry (state 6, target,
+order): Bat Frost Hover 37 s at exactly 13.3 m, then result 1 -> 13.3 -> 2.1 m in 3 s; Wolf Heavy 41 s (combatData.state
+cycles 3 -> 0 -> 2 every ~1.5 s, distance 11.4-12.5 m), then result 1 -> walked in; Willo Wisp result at 4 s -> moved at
+once. ClearPathToTarget.hasHitSolidCollider true most of the time (something solid between them and him). Owner 20:51
+"I can easily see the monsters stand there for minutes and then eventually they'll come right in after me", 20:54 "no,
+that's just too much to test. I think the AI pathing in this game is broke" -> NOT measuring why the path search is slow
+(whole server vs into his built base). Nothing built after this; goal (19:33) still open.
