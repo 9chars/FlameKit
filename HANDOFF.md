@@ -2602,3 +2602,9 @@ more than 30 per step, after Remove every marker off within 16 s. tr/rl/ai/hd/ui
 Install = 0.15.540 + 0.15.541 together (DLL + native mod.json, Lua spawn_nodes.lua, mod.json, changes.txt) on the
 server and the game. NOTE: any restart or Lua reload forgets Group 1's cooldown (in memory), and its trigger is "raid"
 (Base within): it fires again as soon as the owner is in the base.
+**0.15.541 + "Mark its monsters" (owner 07:58 "yes" to the restart + "I would like to add an option to control whether
+it puts the raid monster on or not"):** per-group switch `mark` (DEFAULTS mark = true; set handler; Raid rules row
+"Mark its monsters"; click "mark"); mark_tick only marks monsters of groups with mark ~= false (switched off mid-raid:
+theirs come off through the take-off queue). mk.lua tests it (off: 0 markers; on mid-raid: marked; off again: all off).
+Installed 07:59 on the server and the game (DLL e988cca9..., old kept .old_539 in both; spawn_nodes.lua a7db489e...,
+mod.json, changes.txt in both). Up 08:02:02; game "22 feature(s) loaded", no errors.

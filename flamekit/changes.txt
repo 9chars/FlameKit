@@ -1,6 +1,7 @@
 0.15.541 Nov 24, 2026
 - Spawn Nodes: Raid monster markers no longer stay on screen after Stop and Remove. EMF takes only about 39 marker messages at once and dropped the rest; FlameKit now sends at most 30 every 2 seconds (take-offs first) and tries a take-off again until EMF takes it. With 80+ monsters the markers come off over a few seconds.
 - Spawn Nodes (server log): every marker check logs what it sent, took off, and what EMF refused.
+- Spawn Nodes: new switch in Raid rules, Mark its monsters (on by default): off, the group's raids put no Raid monster markers up (switched off during a raid, the ones up come off).
 
 0.15.540 Nov 24, 2026
 - FlameKit's separate windows (Spawn Nodes, Experimental, Companion Roster): a drop-down is only as wide as its longest entry needs (the Spawn Nodes window's Within 2 m boxes were much wider than their text).

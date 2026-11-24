@@ -168,7 +168,7 @@ local CHOICES = {
   duration = { 10, 15, 20, 30, 45, 60, 90, 0 },  -- (0.15.492) min; 0 = no limit
 }
 local UNIT = { wave_gap = "s", cooldown = "min", timer_min = "min", timer_max = "min", wire_r = "m", raid_r = "m", near_r = "m", duration = "min" }
-local DEFAULTS = { announce = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
+local DEFAULTS = { announce = true, mark = true, on = true, family = "Random", trigger = "manual", face = "player", breaks = false, break_level = "high", protect = false, spare = true, waves = 3, per_wave = 3, wave_gap = 30, max_alive = 6,
   cooldown = 10, timer_min = 10, timer_max = 20, wire_r = 20, hour = 20, raid_r = 150, near_r = 50, duration = 30 }
 local COLOURS = { 0xff6040ff, 0x40c0ffff, 0xffd040ff, 0x80ff60ff, 0xd070ffff, 0xff80c0ff, 0x60ffe0ff, 0xffa040ff }
 
@@ -1963,8 +1963,14 @@ local function mark_tick(world)
   if not emf.send_marker then return end
   local now = os.time()
   S.unmark = S.unmark or {}
-  local living, order = {}, mon_alive()
-  for _, id in ipairs(order) do living[id] = true end
+  -- (0.15.541, owner 07:58 "I would like to add an option to control whether it puts the raid monster on or not")
+  -- only the monsters of groups whose "Mark its monsters" is on; switched off mid-raid: theirs are taken off
+  local living, order = {}, {}
+  for _, id in ipairs(mon_alive()) do
+    local m = S.mon[id]
+    local g = m and group(m.g)
+    if not (g and g.mark == false) then order[#order + 1] = id living[id] = true end
+  end
   for id in pairs(S.marked) do  -- gone from the roster: to be taken off
     if not living[id] then S.unmark[id] = S.unmark[id] or 0 S.marked[id] = nil end
   end
@@ -2387,7 +2393,7 @@ local function handle(world, account, entity, msg, from)
     note(string.format("Deleted %s and its %d node(s).", g.name, n))
   elseif msg.op == "set" and g then
     local key, v = tostring(msg.key), msg.value
-    if key == "on" or key == "breaks" or key == "protect" or key == "spare" or key == "announce" then  -- (0.15.488) announce  -- (0.15.478) the raid switches; (0.15.482) spare
+    if key == "on" or key == "breaks" or key == "protect" or key == "spare" or key == "announce" or key == "mark" then  -- (0.15.541) mark  -- (0.15.488) announce  -- (0.15.478) the raid switches; (0.15.482) spare
       g[key] = v == true
     elseif allowed(key, v) then
       g[key] = v
@@ -2757,6 +2763,9 @@ function F.panel(world)
   switch_row(rows, "announce", g.announce ~= false, "Announce the raid to players",  -- (0.15.488)
     "Orange FlameKit notices: when it starts (to every player, with the name of the nearest flame altar), each new wave and how "
       .. "many monsters are left (to the players within " .. NOTICE_DIST .. " m of its nodes), and when it is over.")
+  switch_row(rows, "mark", g.mark ~= false, "Mark its monsters",  -- (0.15.541, owner 07:58)
+    "An orange Raid monster marker over each of its living monsters, with a health bar and an arrow at the screen's edge, and on the map, "
+      .. "on every player's game. Off: no markers (switched off during a raid, the ones up come off).")
   switch_row(rows, "spare", g.spare == true, "Its monsters spare animals, pets and villagers",
     "Its monsters' hits on anything that is not a player do nothing: farm animals, pets, mounts, villagers and companions are "
       .. "safe from them (other monsters too). Players are not covered: they can still be hit.")
@@ -2912,6 +2921,7 @@ function F.click(world, key)
   elseif key == "breaks" then act(world, { op = "set", g = gid, key = "breaks", value = not g.breaks })
   elseif key == "spare" then act(world, { op = "set", g = gid, key = "spare", value = not g.spare })
   elseif key == "announce" then act(world, { op = "set", g = gid, key = "announce", value = g.announce == false })  -- (0.15.488)
+  elseif key == "mark" then act(world, { op = "set", g = gid, key = "mark", value = g.mark == false })  -- (0.15.541)
   elseif key == "protect" then act(world, { op = "set", g = gid, key = "protect", value = not g.protect })
   elseif key == "start" then act(world, { op = "start", g = gid })
   elseif key == "stop" then act(world, { op = "stop", g = gid })

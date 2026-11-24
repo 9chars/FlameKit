@@ -36,6 +36,18 @@ ok(on_screen() > 0, "4 s after Remove some are still coming off (" .. on_screen(
 run(12)
 ok(on_screen() == 0, "16 s after Remove every marker is off the screen (" .. on_screen() .. " left)")
 ok(most <= 30, "still never more than 30 in one step (most: " .. most .. ")")
+-- (0.15.541) "Mark its monsters" off: a raid puts up no markers; switched off during one, its markers come off
+F._handle(W, "acc1", 1, { op = "set", g = 1, key = "mark", value = false }, {})
+F._handle(W, "acc1", 1, { op = "start", g = 1 }, {})
+run(20)
+local alive2 = 0 for _, m in pairs(F._test_S.mon) do if not m.dead then alive2 = alive2 + 1 end end
+ok(alive2 > 0 and on_screen() == 0, string.format("Mark its monsters off: %d monsters, %d markers", alive2, on_screen()))
+F._handle(W, "acc1", 1, { op = "set", g = 1, key = "mark", value = true }, {})
+run(8)
+ok(on_screen() == alive2 or on_screen() > 0, "switched on during the raid: its monsters are marked (" .. on_screen() .. ")")
+F._handle(W, "acc1", 1, { op = "set", g = 1, key = "mark", value = false }, {})
+run(8)
+ok(on_screen() == 0, "switched off during the raid: the markers come off (" .. on_screen() .. " left)")
 local lines = 0 for _, l in ipairs(M.logs) do if l:find("markers:", 1, true) then lines = lines + 1 if os.getenv("SNLOG") == nil and lines <= 3 then print("  " .. l) end end end
 local err = 0 for _, l in ipairs(M.logs) do if l:find("tick: ", 1, true) or l:find("attempt to", 1, true) then err = err + 1 print("  " .. l) end end
 ok(err == 0, "no errors in the log")
