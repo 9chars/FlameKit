@@ -2371,3 +2371,4 @@ rule 0b debt, not moved unasked): first monster of each node per raid (max 4), 9
 lines (ai state/target/threat changes, ORDER, THREAT write, FIRST MOVE). Look at DynamicPathWalker (state,
 lastPathfindingResult, stuckTime, standingDuration), DynamicPathFinder, DynamicEnemy01BehaviorState.combatData.* at the
 moment of FIRST MOVE. Tests tools/sntest tr/rl/ai ALL OK (also with every switch on).
+Owner 20:45: "when they come after me they know how to path because they walk around the front entry way and come right in the door" (pathing on his built base WORKS once they go). On the local server 20:45:54 (owner stopped the raid; 22 features, no error).
