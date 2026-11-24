@@ -2894,5 +2894,8 @@ is "1" (unchanged: the same switch, same times), a hit whose attacker is a playe
 or faction 12 FarmAnimal is cancelled; counted apart and logged every 15 s ("raid protection: N player hit(s) on pets
 and animals cancelled"). The placed-objects check below it is untouched. Lua: the switch's tooltip gets "and players'
 hits on pets and animals (tamed ones and farm animals) do nothing, on the whole server"; a comment in protect_tick.
-Nothing else. Built 12:14:33 (DLL a5824e16...). NOT installed: restart asked.
+Nothing else. Built 12:14:33 (DLL a5824e16...). 12:16 owner "Restart Both": serverstop 12:17:09, DLL a5824e16 on the
+server and the game (old kept as flamekit_native.dll.old_550 in both), native mod.json, spawn_nodes.lua, mod.json,
+changes.txt in both and in the work folder; serverstart, server up 12:17:21 ("raid protection: placed objects hook on",
+22 features, no errors), game "FlameKit v0.15.551 connected to server!" 12:19:00. See OPEN 7e.
 
