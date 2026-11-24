@@ -2644,3 +2644,5 @@ alive and nothing queued/running (the END_GRACE wait, the world search) it shows
 (08:24): last kill 08:24:50, countdown stayed "1 of 24" until the end notice 08:25:01. Test tools/sntest/ct.lua; all 9 OK.
 08:28 owner "yes" -> 0.15.544 live (spawn_nodes.lua d15360a5..., mod.json, changes.txt) on the server and the game;
 reloaded 08:29:01-02, no errors, no raid started by the reload.
+08:31 owner asked why the raid-over message comes ~11 s after "0 left" (END_GRACE 10 s + the world search ~1 s); 08:32
+"ok leave that then" -> the end wait stays as it is.
