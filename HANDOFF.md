@@ -2304,3 +2304,4 @@ STILL did not come closer: 0.0-1.7 m in 10 s at 6-10 m. Undead pool has casters/
 Hollow Wisp, ...; summons joined 19:28:25), so the ai lines now carry the type (mon_kind: S.track guid, else
 emf.template -> core/monsters.lua name). Duelist comparison test (Experimental, Undead: Melee01, 10 m) proposed earlier,
 not run.
+On the local server 19:31:37 (owner 19:31 "i stopped the raid.. go ahead and update it"; 22 features, no error).
