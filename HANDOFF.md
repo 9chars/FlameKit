@@ -2633,3 +2633,5 @@ start notice, sets it to now + delay; trickle_tick queues nothing while it holds
 come in N s." Log "spawn nodes: <group>: the start notice went out; its first monsters come in N s". The start
 siren: "raid_siren" (once) instead of "raid_siren_twice". Test tools/sntest/sd.lua; tr/ai/rl/wv set start_delay = 0
 (tr/ai also wait 4 s after the start: the mock never answers the place, so the notice goes after 3 s). All 8 tests OK.
+08:20 owner "yes" -> 0.15.543 live (spawn_nodes.lua b245eb69..., mod.json, changes.txt) on the server and the game;
+reloaded 08:20:34-35, no errors, no raid started by the reload.
