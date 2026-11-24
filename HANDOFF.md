@@ -2460,3 +2460,11 @@ unsearched after 45 s (73). The game's template name for those faction-0 creatur
 22:08 the console (emf\commands.txt, read only: inspect 1041/1050, ai 1041/1052) confirms they're tamed animals:
 IsTame + Wildlife + DynamicWildlife, faction Environment (0), "no creature AI", 92 components each. Owner 22:06 "yeah
 its probably pets and animals". Species not named yet (no console command gives a template name; near needs the player in the world).
+
+**0.15.537 (owner 22:10 "yes", built 22:13:49, DLL b5e5c15d...; NOT installed, restart asked):** tame path test switch,
+off by default. Hooks the game's path request create (0x1405fb550, kind 5) and update (0x1405fc120, kind 6) on the server
+(patterns checked unique in the 1287369 exe). Console `flamekit.tamepath off` = when the request's owner (settings +0x0)
+is a tamed animal (IsTame + Wildlife template; list rebuilt every 5 s) the call gives the game's own failure answer
+(create: id 0, which the pathfinding program 0x140203ab0 keeps and asks again; update: false, not read) -> the animals
+stand still. `flamekit.tamepath on` = the game as it is. Logs "tame path test: ..." (switch, the animals' ids, every 10 s
+held/passed counts). Purpose: prove whether the animals' failing searches are what keeps raid monsters waiting.

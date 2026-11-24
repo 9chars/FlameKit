@@ -1540,6 +1540,84 @@ void path_probe(emf::World w) {
     }
 }
 
+// (0.15.537, owner 2026-11-23 22:10 "yes" to the test build) TAME PATH TEST SWITCH, off by default. The 22:00 probe:
+// ~22 tamed animals in the base (IsTame + Wildlife, faction Environment, no creature AI; console 22:08) keep failing
+// their short walk searches at the 500-step limit, and raid requests wait 54-89 s unsearched. Test: with
+// "flamekit.tamepath off" the game's own create (0x1405fb550, kind 5) and update (0x1405fc120, kind 6) of a path
+// request return their own failure answer (id 0 / false, as when the command buffer is full; the pathfinding program
+// 0x140203ab0 then keeps id 0 and asks again later; the update's answer is not read) when the request's owner
+// (settings +0x0) is a tamed animal. The animals then stand still. "flamekit.tamepath on" (the default) = the game as
+// it is. Nothing else changes; nothing is saved. Logged: the switch, the animals found, and every 10 s how many
+// creates/updates were held.
+constexpr const char* kPathCreateSig = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 30 41 8B 00 49 8B D8 48 8B FA 89 44 24 20 48 8D 51 10 41 B0 05 41 B9 28 01 00";
+constexpr const char* kPathUpdateSig = "48 89 5C 24 08 57 48 83 EC 30 41 8B 00 49 8B F8 8B DA 89 44 24 20 48 8D 51 10 41 B0 06 41 B9 28 01 00 00 E8";
+using PathCreateFn = uint32_t* (*)(void*, uint32_t*, const uint32_t*, uint64_t);
+using PathUpdateFn = bool (*)(void*, uint32_t, const uint32_t*, uint64_t);
+PathCreateFn g_path_create = nullptr;
+PathUpdateFn g_path_update = nullptr;
+std::atomic<bool> g_tame_hold{false};
+constexpr uint32_t kTameBits = 1u << 21;  // entity ids below 2M
+std::atomic<uint64_t> g_tame[kTameBits / 64];
+std::atomic<uint64_t> g_held_create{0}, g_held_update{0}, g_passed_create{0}, g_passed_update{0};
+bool is_tame_bit(uint32_t id) {
+    return id < kTameBits && (g_tame[id >> 6].load(std::memory_order_relaxed) >> (id & 63) & 1);
+}
+uint32_t* path_create_detour(void* ctx, uint32_t* out, const uint32_t* settings, uint64_t r9) {
+    if (g_tame_hold.load(std::memory_order_relaxed) && settings && is_tame_bit(settings[0])) {
+        g_held_create.fetch_add(1, std::memory_order_relaxed);
+        *out = 0;
+        return out;
+    }
+    g_passed_create.fetch_add(1, std::memory_order_relaxed);
+    return g_path_create(ctx, out, settings, r9);
+}
+bool path_update_detour(void* ctx, uint32_t id, const uint32_t* settings, uint64_t r9) {
+    if (g_tame_hold.load(std::memory_order_relaxed) && settings && is_tame_bit(settings[0])) {
+        g_held_update.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    g_passed_update.fetch_add(1, std::memory_order_relaxed);
+    return g_path_update(ctx, id, settings, r9);
+}
+// on the server world's steps: every 5 s while held, the tamed animals (IsTame + the Wildlife template) into the bits
+void tame_tick(emf::World w) {
+    static uint32_t steps = 0;
+    static bool was = false;
+    ++steps;
+    const bool hold = g_tame_hold.load();
+    if (hold != was) {
+        was = hold;
+        EMF_LOG(kMod, "tame path test: %s", hold ? "ON: tamed animals' path searches are held (they stand still)" : "off: the game as it is");
+        if (!hold) for (auto& b : g_tame) b.store(0);
+        steps = 0;
+    }
+    if (!hold) return;
+    if (steps % 300 == 1) {
+        auto* a = emf::api();
+        std::vector<uint32_t> ids;
+        w.for_each_entity([&](uint32_t id) {
+            uint64_t sz = 0;
+            if (a->get_component(w.raw(), gen::ecs::IsTame::kHash, id, &sz) &&
+                a->get_template_component && a->get_template_component(w.raw(), gen::ecs::Wildlife::kHash, id, &sz))
+                ids.push_back(id);
+        });
+        static std::vector<uint32_t> last;
+        for (auto& b : g_tame) b.store(0);
+        for (uint32_t id : ids)
+            if (id < kTameBits) g_tame[id >> 6].fetch_or(uint64_t(1) << (id & 63));
+        if (ids != last) {
+            last = ids;
+            std::string t;
+            for (size_t i = 0; i < ids.size() && i < 60; ++i) t += " " + std::to_string(ids[i]);
+            EMF_LOG(kMod, "tame path test: %zu tamed animal(s):%s", ids.size(), t.c_str());
+        }
+    }
+    if (steps % 600 == 0)
+        EMF_LOG(kMod, "tame path test: in the last 10 s held %llu create(s) and %llu update(s) of tamed animals; passed %llu create(s) and %llu update(s) of others",
+                (unsigned long long)g_held_create.exchange(0), (unsigned long long)g_held_update.exchange(0),
+                (unsigned long long)g_passed_create.exchange(0), (unsigned long long)g_passed_update.exchange(0));
+}
+
 bool fk_build_anywhere_load(bool dedicated) {
     // (0.15.423) the factor is read now, before the world loads (the game decides what to keep then)
     if (dedicated) read_spots("server, at start");  // (0.15.440) before the world loads
@@ -1549,6 +1627,23 @@ bool fk_build_anywhere_load(bool dedicated) {
                                       reinterpret_cast<void*>(&add_zone_detour), reinterpret_cast<void**>(&g_add_zone));
     EMF_LOG(kMod, "free build and bigger altar areas (up to x%.1f, the world's option): hook on addZone %s", kMaxFactor,
             al ? "installed" : "NOT installed");
+    if (dedicated) {  // (0.15.537) the tame path test switch (off until "flamekit.tamepath off")
+        const bool c = emf::hook_pattern("flamekit: path request create (tame test)", kPathCreateSig, reinterpret_cast<void*>(&path_create_detour),
+                                         reinterpret_cast<void**>(&g_path_create));
+        const bool u = c && emf::hook_pattern("flamekit: path request update (tame test)", kPathUpdateSig, reinterpret_cast<void*>(&path_update_detour),
+                                              reinterpret_cast<void**>(&g_path_update));
+        EMF_LOG(kMod, "tame path test: hooks on create %s, update %s; the switch is off ('flamekit.tamepath off' holds the tamed animals' searches)",
+                c ? "installed" : "NOT installed", u ? "installed" : "NOT installed");
+        if (c && u)
+            emf::add_command("flamekit.tamepath", "on|off: off = tamed animals ask the game for no walks (they stand still; a raid test); on = the game as it is",
+                             [](emf::World, const std::vector<std::string>& args) {
+                const std::string v = args.size() > 1 ? args[1] : "";
+                if (v == "off") g_tame_hold = true;
+                else if (v == "on") g_tame_hold = false;
+                EMF_LOG(kMod, "flamekit.tamepath %s", v.c_str());
+                EMF_REPLY("tamed animals' walks: %s", g_tame_hold.load() ? "OFF (held; they stand still)" : "on (the game as it is)");
+            });
+    }
     if (dedicated && sampler_file_on()) {  // (0.15.469) the chunk counter: test servers only
         const bool u = emf::hook_pattern("flamekit: terrain chunk unpack (counter)", kUnpackSig, reinterpret_cast<void*>(&unpack_detour),
                                          reinterpret_cast<void**>(&g_unpack));
@@ -1633,6 +1728,7 @@ bool fk_build_anywhere_load(bool dedicated) {
         if (w.is_server()) {
             speed_tick();  // (0.15.466)
             path_probe(w);  // (0.15.535) read only
+            tame_tick(w);  // (0.15.537) the tame path test switch
             if (steps_server++ % 15 == 0) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)
