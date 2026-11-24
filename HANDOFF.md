@@ -2958,3 +2958,21 @@ comment on the STUCK_ON line (code untouched, still off).
 **0.15.554 (owner 13:19 "The \"Nodes\" section on the \"Spawn Nodes\" tab needs to get moved all the way to the top"):**
 F.panel: the Nodes section (heading, "<group> has N nodes...", the Spawn Nodes window button) is now first, before
 Groups (shown when a group exists, as before); nothing else moved or changed. Lua only.
+
+**RELEASE 0.15.554 (owner 13:40 "make sure EVERYTHING is checked into development and stable and prepared a release --
+also update G-portal"):**
+- flamekit_native/mod.json 0.15.554 (no DLL rebuild: the DLL carries no version; 0.15.554 is 0.15.553's DLL f9102355...
+  + the Lua). dist-test built (80 files), signed 13:41:38 (sig good); dist = dist-test (sig good); emf-dist = emf-dist-test
+  (EMF 0.6.19, emf.sig good, unchanged). Commit 73770ff, pushed: DEVELOPMENT AND STABLE ARE 0.15.554.
+- Package: release\FlameKit-0.15.554.zip (md5 ba14b14272bf4c5a2f818c5f5581c659, 133 files, from dist + emf-dist +
+  EMF-0.6.19's README/LICENSE; built in the container, sent as base64 per Rule 0c2, md5 checked on the PC).
+- FOUND: the work folder's flamekit\ and the installs were NOT all equal to the repository (work folder: 12 files old or
+  missing; server and game: README.md, companions/03_follow.lua, npc_fields.lua older = comment/doc differences only).
+  All three now = the release's 78 files (md5 checked). Left over, not loaded by main.lua: core/server_settings.lua and
+  features/server_tab.lua (work folder, server, game) and features/chop_loot.lua (work folder): deleting them in the work
+  folder was refused by the tool's safety check; not asked again.
+- G-Portal: outbox = the 23 files changed since 0.15.475 (what G-Portal runs: ftp_list Nov 23 10:19), md5 = dist:
+  README.md, changes.txt, mod.json, main.lua, core/{kit,loot_chest,loot_skip,reward_loot,spawn,threat}.lua,
+  features/{experimental,loose_loot,loot_drop,native_ui,npc_fields,spawn_nodes}.lua, companions/{03_follow,09_setup}.lua,
+  sounds/*.wav (3), _flamekit_native/{flamekit_native.dll,mod.json}. features/build_anywhere.lua stays on G-Portal
+  (removed in 0.15.553; main.lua no longer loads it). G-Portal must be STOPPED for the DLL upload: asked the owner.
