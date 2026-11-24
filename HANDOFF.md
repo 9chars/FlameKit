@@ -2565,3 +2565,9 @@ mod.json, changes.txt; the game had been on 0.15.525; chop_loot.lua is on the se
 Game log: FlameKit Native loaded, "22 feature(s) loaded", no errors.
 
 07:37 owner: "no stop trying to suggest changing things when I ask questions" -> Rule 0q (top of the file).
+
+**0.15.540 (owner 07:40: the Spawn Nodes window's "Within 2 m" drop-down "could be shorter ... it just needs to be a
+little bit longer than the longest text in the box"; built 07:41:41, DLL d758cab0...; NOT installed, restart asked):**
+ExperimentalLayer::list_width: longest entry + 44 px (arrow room), the old 200 px minimum dropped (min 60). Applies to
+all three Experimental-style windows (Experimental, Companion Roster, Spawn Nodes); the F4 tabs' drop-downs unchanged.
+DLL-only change: install = the DLL (+ native mod.json, Lua mod.json/changes.txt) in the game AND the server.

@@ -5882,11 +5882,14 @@ struct ExperimentalLayer : PinnedLayer {
         return out;
     }
 
-    // The width of a drop-down list for row r.
+    // The width of a drop-down list for row r. (0.15.540, owner 2026-11-24 07:40: the Spawn Nodes window's "Within 2 m"
+    // box "could be shorter ... it just needs to be a little bit longer than the longest text in the box"): its longest
+    // entry plus room for the arrow, no longer at least 200 px (every Experimental-style window: Experimental, Companion
+    // Roster, Spawn Nodes).
     int list_width(const Row& r, int width) {
         int widest = text.width(r.text);
         for (const Opt& o : r.list) widest = std::max(widest, text.width(o.label) + (o.heading ? 0 : 12));
-        return std::min(width - 16, std::max(200, widest + 44));
+        return std::min(width - 16, std::max(60, widest + 44));
     }
 
     // Places the rows (buttons, labels, drop-downs, text boxes) for `width` pixels; again only when the width changed.
