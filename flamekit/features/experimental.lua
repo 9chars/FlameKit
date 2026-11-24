@@ -1047,14 +1047,17 @@ give_legendary = function(world, key, x, y, z, name, level, tries)
   end)
 end
 
--- A test monster's loot: runes into the killer's bag (the rest and a legendary item into a chest beside the body); doubled for a boss.
+-- A test monster's loot, doubled for a boss. IN THE GAME IT ALL GOES INTO THE LOOT CHEST BESIDE THE BODY: runes, legendary
+-- runes and the legendary item (owner 2026-11-24 10:01 "the test monster loot doesn't go into the players bag ... the
+-- loot goes into a chest"). The to_bag code below still tries the killer's bag first (emf.put) and puts only what does not
+-- fit into the chest; that bag put does not land in the game, and why is not investigated.
 local function drop_test_loot(world, id, b)
   local ok, x, y, z = pcall(world.position, world, id)
   if not ok or not x then return "no position" end
   local twice = b.boss and 2 or 1
   local level = tonumber(b.level) or 1
   local runes, lrunes = (math.random(2) == 1 and 10 or 15) * twice, (math.random(2) == 1 and 5 or 10) * twice
-  -- (0.15.154, owner: too much loot on the ground) runes straight into the killer's bag (the last player who hit it;
+  -- (0.15.154, owner: too much loot on the ground) meant: runes straight into the killer's bag (the last player who hit it;
   -- else whoever spawned it); what does not fit there, and the legendary item, into a chest beside the body
   -- (core/loot_chest.lua: a new chest when one is full)
   local killer = b.last_hitter
@@ -2584,7 +2587,7 @@ function F.window_rows(world)
       selected = duel_team == t, disabled = in_pvp or nil, tooltip = team_tip }
   end
   rows[#rows + 1] = { label = true, text = "Reward loot" }  -- (0.15.182, owner)
-  local loot_tip = "On: a kill gives runes and legendary runes into your bag and one legendary item into a loot chest. "
+  local loot_tip = "On: a kill puts runes, legendary runes and one legendary item into a loot chest on the ground by the body. "  -- (2026-11-24, owner 10:01: the chest, not the bag)
     .. "Off: a kill gives nothing at all. For the monsters you spawn next."
   rows[#rows + 1] = { button = "dbg:loot:on", text = "On", same_line = true, selected = duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
   rows[#rows + 1] = { button = "dbg:loot:off", text = "Off", same_line = true, selected = not duel_loot, disabled = in_pvp or nil, tooltip = loot_tip }
@@ -3080,7 +3083,8 @@ function F.setup(k)
   -- (0.15.134) hits between PvP players start the PvP cool-down of the one hit (see PVP_LOCK_S)
   pcall(emf.on_hit, kit.guard(F, function(world, hit)
     if not hit or hit.kind ~= "hit" or not hit.attacker or hit.attacker == 0 or hit.attacker == hit.target then return end
-    -- (0.15.154) a test monster remembers the last player who hit it: its runes go into that player's bag
+    -- (0.15.154) a test monster remembers the last player who hit it: meant for putting its runes into that player's bag
+    -- (owner 2026-11-24 10:01: in the game the runes land in the loot chest, not a bag; see drop_test_loot)
     if bodies[hit.target] then
       for _, p in pairs(online) do
         if p.entity == hit.attacker then bodies[hit.target].last_hitter = hit.attacker break end

@@ -358,8 +358,9 @@ systems.
   with a VFX_Altar_FlameEssence mark (`MARK_FX eb3633fc-...`, chosen by the owner) that follows a sliding item
   (0.15.197: a new mark when the item moved 0.6 m). Whether a body is a creature is read at the death (0.15.198: the
   Faction goes when the body fills; the queue no longer waits in order).
-- **Test monsters' reward loot** (experimental.lua, Experimental tab "Reward loot" switch, default off): runes and
-  legendary runes into the killer's bag (`emf.put`, overflow to the chest), one legendary item (weapon, armour, ring,
+- **Test monsters' reward loot** (experimental.lua, Experimental tab "Reward loot" switch, default off): [CORRECTED
+  2026-11-24, owner 10:01: in the game ALL of it goes into the loot chest, nothing into a bag; the code still tries
+  `emf.put` into the killer's bag first, which does not land; not investigated] runes and legendary runes, one legendary item (weapon, armour, ring,
   gem, cosmetic; rings and gems from `db.LEGENDARY_BY_TYPE`) into a spawned `Prop_Decoration_T5_Storage_40_Chest`
   (core/loot_chest.lua: nearest non-full chest within 50 m else a new one 2.5 m apart, a hit rule per chest so it takes
   no damage, a grave-flame glow, removed when emptied or 15 min after its last item; `flamekit.chests` lists them).
@@ -2682,9 +2683,9 @@ questions. I told you exactly how I want it"; Lua only; NOT installed, asked):**
   monsters spawn after its run is over; found by tools/sntest/lv.lua). Log once per wave: "<group> wave N: its monsters at
   level L (...)".
 - Loot at a death (mon_check -> K.on_death), only monsters a node spawned (m.sp), once each (m.looted): reward/both ->
-  core/reward_loot.lua give (the test monsters' drop_test_loot, copied into core: runes + legendary runes into the bag of
-  the last player who hit it (S.hitby from on_hit), a legendary item at its level into a loot chest by the body, twice for
-  Bosses); reward/none -> clear_game_loot (body emptied at 2, 3, 5 s; the game's loot pile removed at 2 s). Log
+  core/reward_loot.lua give (the test monsters' drop_test_loot, copied into core; [CORRECTED 10:01] everything into a
+  loot chest by the body: runes, legendary runes, a legendary item at its level; twice for Bosses; S.hitby (from on_hit)
+  only names the last player who hit it in the log); reward/none -> clear_game_loot (body emptied at 2, 3, 5 s; the game's loot pile removed at 2 s). Log
   "spawn nodes: loot (<mode>): monster N: ...".
 - NEW core/reward_loot.lua (Experimental keeps its own copy of the same code for now). core/loot_chest.lua tick now runs
   once per world step whoever calls it (Experimental and reward_loot both do).
@@ -2696,3 +2697,7 @@ who hit it," its is wrong. The reward loot goes into a chest that spawns on the 
 ALL of it (runes, legendary runes, the legendary item) into the loot chest at the body; nothing into a bag (the killer is
 only named in the log). (Experimental's drop_test_loot still has the bag path in its code: not touched.) Tooltip,
 changes.txt fixed. Test tools/sntest/rw.lua (run from the repo root). Still NOT installed.
+10:03 owner "fix the fucking comments. why are you not updating comments in the code?" -> the wrong comments fixed:
+experimental.lua drop_test_loot's header and its 0.15.154 note, the on_hit last_hitter note, and the Reward loot tooltip
+players see (now: everything into a loot chest on the ground); HANDOFF's "Test monsters' reward loot" line and the 0.15.547
+note marked CORRECTED. experimental.lua's tooltip change goes in with 0.15.547.
