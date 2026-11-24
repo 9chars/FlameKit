@@ -8,7 +8,7 @@ needs the in-game tests in HANDOFF.md's "OPEN" section.
 Run all of them from the repository root:
 
 ```
-for t in tr rl ai hd ui mk wv sd ct op lv jn cd; do echo -n "$t "; texlua tools/sntest/$t.lua flamekit/features/spawn_nodes.lua | tail -1; done
+for t in tr rl ai hd ui mk wv sd ct op lv jn cd sw; do echo -n "$t "; texlua tools/sntest/$t.lua flamekit/features/spawn_nodes.lua | tail -1; done
 texlua tools/sntest/rw.lua
 ```
 
@@ -29,6 +29,7 @@ Each prints `ok` / `FAIL` lines and ends with `ALL OK` or `N FAILED`.
 | lv.lua | Starting level and Level per wave (60, 85, 100, never 110), each Loot choice, the Auto Loot marks (core/loot_skip.lua) |
 | jn.lua | a world monster that comes into a raid joins it; a FlameKit test monster does not |
 | cd.lua | a group's cooldown survives a reload |
+| sw.lua | the Spawn Nodes switch (`sn_enabled`) turned off mid-raid: the group stops as with Stop, the raid's count is forgotten, the animal hold / raid lock / protection / spare files are set to nothing; kit.lua calls `switched_off` when the switch turns off and at load (not for another key, not when it turns on) |
 | rw.lua | core/reward_loot.lua on its own: runes into the killer's bag (the chest when no killer is known), the legendary item into the chest; loose drops near the death removed, far ones, late ones and FlameKit's own marks left (run from the repository root, no argument) |
 
 When a change makes an older test's assumption wrong, set that test's group to the old behaviour (as tr.lua does with

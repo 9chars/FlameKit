@@ -39,6 +39,19 @@ Keep this list current: strike an item only with the test or the owner's word th
 7a. ~~Hand-dropped items near a Reward loot / No loot death are removed too~~ not a problem: owner 11:06 "if a player
    dumps some shit to the ground who cares?".
 
+**0.15.550 (the Spawn Nodes switch, sn_enabled) is not tested in the game yet:**
+7b. In the game: Settings tab -> Features -> "Spawn Nodes" Off: the Spawn Nodes tab and window gone, no raid notices or
+   sounds in that game; On: back. This switch is per game (the game's own emf\config\flamekit.ini); it does NOT reach
+   the server (no player's setting does).
+7c. On the server: the server has no flamekit.ini in emf\config (only emf\config\flamekit\). NOT tried whether EMF on
+   the server reads sn_enabled=0 from emf\config\flamekit.ini there. Test: write [flamekit] sn_enabled=0 there,
+   restart the server, look for "spawn nodes: switched off (sn_enabled)" in its emf_core.log and that no raid starts.
+7d. Seen 12:08:41 on the server: right after a reload, before EMF declares a NEW mod.json setting (0.5 s later), emf.setting
+   of that key returns false, so kit.lua's load-time switched_off ran once ("spawn nodes: switched off" logged) although
+   the switch is on. Harmless (nothing ran; Spawn Nodes ticked normally 0.8 s later, and its file states are reset so the
+   next tick rewrites any it needs), and only on the first reload after a setting is added. kit.enabled has the same
+   half-second gap for any new enabled_setting.
+
 **Performance / leftovers:**
 8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
    ai_tick logs, the 90 s full recordings, HUNT_ON, THREAT_ON). FlameKit took 28 ms in one server step at 07:52. Owner
@@ -2858,3 +2871,15 @@ flamekit_sounds_src\).
 you've come up with yet. Once again adding shit I didn't ask for." -> the all-clear plays ONLY with "The raid on X is over:
 all N raid monsters defeated!"; taken off the time-is-up notice. changes.txt and the Raid sounds help say so. Live 11:55:45
 (server) / 11:55:46 (game), no errors. LESSON (again): build exactly what was asked; no extra cases.
+
+**0.15.550 (owner 12:03 "You didn't add the "Features" button to turn it on or off like you said you would", 12:04 "yes"
+to adding it now):** features/spawn_nodes.lua `enabled_setting = "sn_enabled"`; mod.json bool sn_enabled (default on,
+label "Spawn Nodes", group "Spawn Nodes"): settings.lua shows it under Features. While off, kit skips every Spawn Nodes
+callback (tick, the channel, hits), native_ui hides its tab and window. NEW kit hook `switched_off()` (core/kit.lua): called
+once when a feature's enabled_setting turns off, and at load for a feature that is off; it runs although the feature is
+off. Spawn Nodes' F.switched_off: every running group stopped as Stop does (cooldown starts, queue dropped), S.raid
+forgotten, and the files FlameKit Native reads set to nothing if they exist (animal_hold_server.txt "0",
+raid_lock_server.txt empty, raid_protect_server.txt "0", spare_server.txt empty). Monsters still alive stay; while off
+their deaths are not seen (game loot drops). New test tools/sntest/sw.lua (17 checks, also the kit hook); all 14 tests
+OK. Live 12:08:41 on the server and the game (kit.lua da7ca53e, spawn_nodes.lua 95e9efb4, mod.json 4ec9b25b), no errors;
+see OPEN 7b-7d.

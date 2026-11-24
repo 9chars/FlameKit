@@ -1,3 +1,6 @@
+0.15.550 Nov 24, 2026
+- Spawn Nodes has its own on/off switch in the Settings tab (Features). Off: no Spawn Nodes tab or window, and none of its raid notices or sounds.
+
 0.15.549 Nov 24, 2026
 - Spawn Nodes: a short all-clear fanfare plays with the raid-over notice when all its monsters are defeated. The Raid siren setting is now Raid sounds and covers it.
 

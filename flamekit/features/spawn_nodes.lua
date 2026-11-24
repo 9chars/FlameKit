@@ -100,7 +100,13 @@ local K = {
 -- Spawn Nodes' own events (AI state/target/threat changes, its order, the threat writes, its first move) in between.
 local REC_NODES, REC_S = 4, 90
 
-local F = { id = "spawn_nodes", title = "Spawn Nodes" }
+-- (0.15.550, owner 12:04) enabled_setting "sn_enabled": the "Spawn Nodes" switch in the Settings tab's Features section.
+-- Off in a player's game: no Spawn Nodes tab or window there, and none of its notices or sounds. Off on the server
+-- (sn_enabled=0, see below): no raid starts and nothing of it
+-- runs; F.switched_off ends the running raids and lets go of the files FlameKit Native reads (see there). The server
+-- has no Settings tab: its value is the default (on) unless set in its own copy of FlameKit's settings (the game keeps
+-- them in emf\config\flamekit.ini; that the server reads the same file there is NOT tried yet).
+local F = { id = "spawn_nodes", title = "Spawn Nodes", enabled_setting = "sn_enabled" }
 local kit
 
 local CHANNEL = "nodes"
@@ -3251,6 +3257,40 @@ function F.setup(k)
     end, "the Spawn Nodes state from the server"),
   })
   if not ok then emf.log("spawn nodes: the channel flamekit/nodes was refused: the Spawn Nodes tab cannot reach the server") end
+end
+
+-- (0.15.550) Spawn Nodes switched off (kit.lua calls this once when "sn_enabled" turns off, and at load if it is off).
+-- Nothing of it runs while off (kit skips its tick), so what it left active is let go of here:
+--   * every running group is stopped as its Stop button does (its waves end, its cooldown starts, its queued monsters
+--     are dropped); the raids' counts are forgotten (no "monsters left" notice; the last one shown fades by itself);
+--   * the files FlameKit Native reads are set to "nothing": the animal hold "0" (the animals walk again), the raid lock
+--     empty (players may change bases), the protection "0" (players can hit placed objects), spare empty. Only files
+--     that are there are written (a player's own game has none of them).
+-- The raid monsters still alive stay in the world as they are (Remove takes them away once it is on again); while off,
+-- their deaths are not seen, so the game's own loot drops for them. Switched on again: everything runs as before; any
+-- of its monsters still alive count again for the protection.
+function F.switched_off()
+  S.halted = S.halted or {}
+  for gid in pairs(S.runs or {}) do
+    finish(gid)
+    S.halted[gid] = true
+    cancel_checks(gid)
+  end
+  S.runs, S.queue, S.raid = {}, {}, {}
+  local function put(name, text)
+    local f = io.open(emf.dir .. name, "r")
+    if not f then return false end
+    f:close()
+    f = io.open(emf.dir .. name, "w")
+    if f then f:write(text) f:close() end
+    return true
+  end
+  local any = false
+  if put(K.HOLD_FILE, "0\n") then any = true S.hold_on = false end
+  if put("\\raid_lock_server.txt", "") then any = true S.lock_text = "" end
+  if put("\\raid_protect_server.txt", "0\n") then any = true S.protect_on = false end
+  if put("\\spare_server.txt", "\n") then any = true S.spare_text = "" end
+  emf.log("spawn nodes: switched off (sn_enabled): no raid runs" .. (any and "; the animal hold, raid lock, protection and spare files are let go of" or ""))
 end
 
 -- tests only
