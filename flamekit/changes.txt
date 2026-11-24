@@ -1,3 +1,6 @@
+0.15.549 Nov 24, 2026
+- Spawn Nodes: a short all-clear fanfare plays with the raid-over notice (also when a raid's time is up). The Raid siren setting is now Raid sounds and covers it.
+
 0.15.548 Nov 24, 2026
 - Spawn Nodes: Starting level no longer has "Game's own": it is 1 to 100, level 1 by default (a group set to Game's own is now level 1). New groups start with Reward loot and 20 s before the first monsters.
 

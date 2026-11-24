@@ -1127,7 +1127,9 @@ local function raid_tick(world)
     elseif not S.runs[gid] and alive == 0 and queued == 0 then
       S.raid[gid] = nil
       S.started[gid] = nil
-      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.total or r.spawned), nil, START_END_S)
+      -- (0.15.549, owner 11:38 "add an "all clear" sound effect after the raid is over", 11:46 "yeah go with that one":
+      -- sounds/raid_all_clear.wav, a short brass "da-da-da DAAA", 1.2 s) the all-clear with the end notice
+      raid_notice(world, gid, string.format("The raid on %s is over: all %d raid monsters defeated!", r.place or "the area", r.total or r.spawned), nil, START_END_S, nil, "raid_all_clear")
       raid_notice(world, gid, "", true, 1, "left_" .. gid)  -- takes the count away soon
     else
       r.none_since, r.verified = nil, nil
@@ -1461,7 +1463,7 @@ local function time_tick(world)
       local r = S.raid[gid]
       if r then
         raid_notice(world, gid, string.format("Time is up! The raid on %s is over%s.", r.place or "the area",
-          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S)
+          n > 0 and string.format(": %d monster%s retreated", n, n == 1 and "" or "s") or ""), nil, START_END_S, nil, "raid_all_clear")  -- (0.15.549) over: the all-clear too
         raid_notice(world, gid, "", true, 1, "left_" .. gid)
         S.raid[gid] = nil
       end
@@ -3238,7 +3240,7 @@ function F.setup(k)
         local tag = "nodes_" .. msg.tag:gsub("[^%w_]", "")
         local colour = type(msg.c) == "string" and msg.c:match("^#%x%x%x%x%x%x$") and msg.c or NOTICE_COLOUR  -- (0.15.545)
         if msg.t == "" then kit.notice(tag) else kit.notice(tag, msg.t:sub(1, 200), colour, math.max(2, math.min(120, tonumber(msg.s) or 10))) end
-        if msg.snd == "raid_siren" or msg.snd == "raid_siren_twice" then play_sound(msg.snd) end  -- (0.15.502); (0.15.517) twice
+        if msg.snd == "raid_siren" or msg.snd == "raid_siren_twice" or msg.snd == "raid_all_clear" then play_sound(msg.snd) end  -- (0.15.502); (0.15.517) twice; (0.15.549) the all-clear
         return
       end
       if okd and type(msg) == "table" and msg.op == "state" then

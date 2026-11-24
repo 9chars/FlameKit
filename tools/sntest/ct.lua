@@ -34,6 +34,8 @@ run(0.8)
 ok(M.last_left() and M.last_left():find("0 of 6", 1, true), "0.8 s after the last kill: 0 of 6 (" .. tostring(M.last_left()) .. ")")
 run(15)
 ok(S.raid[1] == nil, "and the raid ends after its 10 s wait")
+local clear = false for _, n in ipairs(M.notices) do if n:find('"snd":"raid_all_clear"', 1, true) and n:find("is over", 1, true) then clear = true end end
+ok(clear, "(0.15.549) the raid-over notice comes with the all-clear sound")
 local err = 0 for _, ln in ipairs(M.logs) do if ln:find("tick: ", 1, true) or ln:find("attempt to", 1, true) then err = err + 1 print("  " .. ln) end end
 ok(err == 0, "no errors in the log")
 print(fails == 0 and "ALL OK" or (fails .. " FAILED"))

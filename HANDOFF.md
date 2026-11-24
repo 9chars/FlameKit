@@ -239,6 +239,13 @@ not require core/reward_loot.lua; core/reward_loot.lua requires nothing of Exper
 Both use only plain core helpers (core/item_db, core/loot_chest, core/bag, core/spawn set_level, core/test_tag). Never
 merge their reward code; anything tried on the test monsters goes into experimental.lua only.
 
+## Rule 0c2: binary files to the PC (found 2026-11-24 11:47)
+
+device_commit_files from a staged path CORRUPTS BINARY FILES: raid_all_clear.wav (52,520 bytes, md5 5108aedb...) arrived
+as 58,286 bytes with a broken RIFF header (bytes above 0x7F rewritten). Text files (lua, json, txt, md) arrive intact.
+For a binary file: base64 -w 0 it in the container, commit the .b64.txt, then on the PC `base64 -d` it with device_bash
+and check the md5. (The DLL was never affected: it is built on the PC and copied there with device_bash cp.)
+
 ## Rule 0x: CORE DIRECTIVE, ASK before every restart (owner, 2026-11-22 16:45-16:47)
 
 2026-11-22 16:45:06 Claude restarted the local server and game during the owner's water test after "its been running
@@ -2838,3 +2845,12 @@ ALL CLEAR SOUND: two candidates made (numpy, 22050 Hz mono 16-bit like sounds/ra
 over 3 s, holds, winds down): A all_clear_A_siren.wav (11 s: wind up 2.5 s, one steady 500 Hz tone 5 s, wind down 3.5 s:
 the traditional all-clear after a warning siren, the raid siren's own voice), B all_clear_B_horn.wav (2.7 s: G4 C5 E5 and
 a held G5 chord, brass-like). Sent to the owner to preview; nothing in the game until he picks.
+11:46 owner "yeah go with that one" (all_clear_E_short2.wav: a brass "da-da-da DAAA", 1.19 s, no chord; earlier
+candidates A siren, B horn, C bugle, D war horn, E fanfare, E2/E3 with a synthesized crowd (owner: "didn't really sound
+like a crowd", "forget the crowd effect completely"), E_short) -> **0.15.549** live 11:47 on the local server and the game
+(with 0.15.548's defaults): flamekit/sounds/raid_all_clear.wav (md5 5108aedb...); spawn_nodes.lua plays "raid_all_clear"
+with both raid-over notices (all defeated, and time is up) and the players' games accept that sound name; mod.json
+setting raid_siren relabelled "Raid sounds" (its help said the start notice is orange: red since 0.15.545; it now names
+the all-clear). ct.lua checks the sound. Reloaded 11:47:22-23, no errors. The first copy of the .wav was corrupted by
+device_commit_files (Rule 0c2) and replaced 11:48 through base64 (the .b64.txt is kept in the work folder,
+flamekit_sounds_src\).
