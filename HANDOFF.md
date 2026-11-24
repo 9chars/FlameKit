@@ -2468,3 +2468,6 @@ is a tamed animal (IsTame + Wildlife template; list rebuilt every 5 s) the call 
 (create: id 0, which the pathfinding program 0x140203ab0 keeps and asks again; update: false, not read) -> the animals
 stand still. `flamekit.tamepath on` = the game as it is. Logs "tame path test: ..." (switch, the animals' ids, every 10 s
 held/passed counts). Purpose: prove whether the animals' failing searches are what keeps raid monsters waiting.
+22:14 owner "yes" -> 0.15.537 installed 22:15 (old DLL kept as flamekit_native.dll.old_536), up 22:16:48. 22:16:55
+`flamekit.tamepath off` (owner's yes to the test plan): 100 tamed animals found (ids 1041-1142...), ~4100 creates held
+per 10 s (they ask every step), path grid 0 requests. Raid 1 (animals held) next.
