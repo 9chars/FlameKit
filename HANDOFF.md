@@ -2471,3 +2471,8 @@ held/passed counts). Purpose: prove whether the animals' failing searches are wh
 22:14 owner "yes" -> 0.15.537 installed 22:15 (old DLL kept as flamekit_native.dll.old_536), up 22:16:48. 22:16:55
 `flamekit.tamepath off` (owner's yes to the test plan): 100 tamed animals found (ids 1041-1142...), ~4100 creates held
 per 10 s (they ask every step), path grid 0 requests. Raid 1 (animals held) next.
+**22:17-22:21 raid 1, animals held: PROVEN.** 71 raid path requests, every one searched at once (0 s waiting; one 2 s),
+against 54-89 s at 22:00 with the animals walking. Spawn Nodes "path came": 29 monsters, median 1 s, max 4 s. Only 1
+step-limit hit in the whole raid (a raid monster). Held ~4100-5200 animal creates per 10 s. Switch still OFF (animals
+standing) after the raid. CAUSE: tamed animals' walk searches that never succeed fill the game's path search; raid
+monsters' searches wait behind them.
