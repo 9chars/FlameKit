@@ -2591,3 +2591,14 @@ to 0 players") for the rest: 07:52:25 and 07:52:41 resends "1 x39, 0 x44"; 07:52
 -> 44 Raid monster markers stayed on the owner's screen. Spawn Nodes forgets an id after unsend whatever the answer,
 so they are never taken off (until FlameKit reloads: EMF clears a mod's markers then). The waves' first sends were
 16/32/32 per check (under the limit), so they all arrived. Not fixed yet: owner asked.
+
+**0.15.541 (owner 07:55 "yeah" to the marker fix; built 07:57:00, DLL e988cca9... = 0.15.540's code with the version
+bumped; NOT installed, restart asked):** mark_tick rewritten: at most MARK_BUDGET = 30 marker messages per check (every
+2 s), in order take-offs, new markers, bar updates, 15 s resends (oldest first); a take-off stays in S.unmark and is
+tried every check until EMF answers >= 1 (MARK_OFF_TRIES = 15 at most); a new marker / bar update that answered 0 is
+tried again. Log per check: "spawn nodes: markers: N sent of 30 at most: ...; waiting: N to mark, N to take off".
+Test tools/sntest/mk.lua (a fake EMF that refuses past 39 per step; EMF_LIMIT=20 too): 75 monsters all marked, never
+more than 30 per step, after Remove every marker off within 16 s. tr/rl/ai/hd/ui all OK.
+Install = 0.15.540 + 0.15.541 together (DLL + native mod.json, Lua spawn_nodes.lua, mod.json, changes.txt) on the
+server and the game. NOTE: any restart or Lua reload forgets Group 1's cooldown (in memory), and its trigger is "raid"
+(Base within): it fires again as soon as the owner is in the base.

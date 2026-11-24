@@ -1948,64 +1948,103 @@ local function mark_spec(id, share)
   return { entity = id, height = 2.6, text = "Raid monster", colour = MARK_COLOUR, shape = "diamond", edge_arrow = true,
            game_map = true, max_distance = NOTICE_DIST, bar = share }
 end
--- (0.15.540, owner 2026-11-24 07:48 "the monsters are tagged with "Raid monster" when I stop the raid and remove the
--- monsters, I see a lot of these still on the screen", 07:51 "sure..." to logging it) MARKER LOGGING: one line per check
--- that sent or took off a marker: "spawn nodes: markers: N new, N bar updates, N sent again, N taken off (N refused);
--- marked now N", with what EMF answered (send_marker: how many players it went to; unsend_marker: its answer) and the
--- first ids of each kind. A send or take-off that raised an error is logged on its own (the first 5 per check).
+-- (0.15.541, owner 2026-11-24 07:48 "the monsters are tagged with "Raid monster" when I stop the raid and remove the
+-- monsters, I see a lot of these still on the screen"; 07:55 "yeah" to the fix) MARKERS STAY UNDER EMF's LIMIT AND
+-- TAKE-OFFS ARE REPEATED. PROVEN 07:52 with the 0.15.540 marker log: EMF takes only ~39 marker messages in one go;
+-- the rest answer 0 ("went to 0 players") and are dropped. 83 take-offs at once: 39 came off, 44 stayed on the
+-- owner's screen, and the old code forgot them. Now each check (every 2 s) sends at most MARK_BUDGET messages, in this
+-- order: take-offs, new markers, health bar updates, the 15 s resends (oldest first). A take-off is kept in S.unmark
+-- and tried again every check until EMF answers 1 or more (MARK_OFF_TRIES at most: with nobody online it answers 0);
+-- a new marker or bar update that answered 0 is tried again too. Logged per check: "spawn nodes: markers: ...".
+local MARK_BUDGET = 30     -- messages per check (07:52: 32 in one check all arrived, the 40th and later did not)
+local MARK_OFF_TRIES = 15  -- a take-off is tried this many checks (30 s) at most
+local function delivered(ok, n) return ok and (type(n) ~= "number" or n >= 1) end
 local function mark_tick(world)
   if not emf.send_marker then return end
   local now = os.time()
-  local resend = now - (S.mark_sent_at or 0) >= MARK_RESEND
-  if resend then S.mark_sent_at = now end
-  local living = {}
-  local c = { new = 0, bar = 0, again = 0, off = 0, bad = 0, errs = 0, sent_to = {}, off_ans = {}, off_ids = {}, new_ids = {} }
-  local function tally(t, v) local k = tostring(v) t[k] = (t[k] or 0) + 1 end
-  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
-    do
-      living[id] = true
-      local share = nil
-      local okh, cur, max = pcall(emf.health, world, id)
-      if okh and cur and max and max > 0 then share = math.max(0, math.min(1, cur / max)) end
-      local was = S.marked[id]
-      if resend or not was or (share and math.abs(share - (was.share or 1)) >= 0.05) then
-        local ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, share))
-        if not ok then ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, nil)) end  -- an older EMF: no bar
-        if ok then
-          if not was then c.new = c.new + 1 if #c.new_ids < 6 then c.new_ids[#c.new_ids + 1] = id end
-          elseif resend then c.again = c.again + 1
-          else c.bar = c.bar + 1 end
-          tally(c.sent_to, n)
-          S.marked[id] = { share = share or 1 }
+  S.unmark = S.unmark or {}
+  local living, order = {}, mon_alive()
+  for _, id in ipairs(order) do living[id] = true end
+  for id in pairs(S.marked) do  -- gone from the roster: to be taken off
+    if not living[id] then S.unmark[id] = S.unmark[id] or 0 S.marked[id] = nil end
+  end
+  local budget = MARK_BUDGET
+  local c = { new = 0, bar = 0, again = 0, off = 0, zero = 0, errs = 0, retry = 0, gave = 0, off_ids = {}, new_ids = {} }
+  -- 1. take-offs (also the ones EMF refused before)
+  for id, tries in pairs(S.unmark) do
+    if living[id] then S.unmark[id] = nil  -- back in the roster (got up): marked again below
+    elseif budget > 0 then
+      budget = budget - 1
+      local ok, ans = pcall(emf.unsend_marker, nil, "m" .. id)
+      if delivered(ok, ans) then
+        S.unmark[id] = nil
+        c.off = c.off + 1
+        if #c.off_ids < 6 then c.off_ids[#c.off_ids + 1] = id end
+      else
+        if not ok then c.errs = c.errs + 1 if c.errs <= 5 then emf.log("spawn nodes: markers: taking off the marker of monster " .. tostring(id) .. " failed: " .. tostring(ans)) end end
+        if tries + 1 >= MARK_OFF_TRIES then
+          S.unmark[id] = nil
+          c.gave = c.gave + 1
         else
-          c.errs = c.errs + 1
-          if c.errs <= 5 then emf.log(string.format("spawn nodes: markers: sending the marker of monster %s failed: %s", tostring(id), tostring(n))) end
+          S.unmark[id] = tries + 1
+          c.retry = c.retry + 1
         end
       end
     end
   end
-  for id in pairs(S.marked) do
-    if not living[id] then
-      local ok, ans = pcall(emf.unsend_marker, nil, "m" .. id)
-      c.off = c.off + 1
-      if #c.off_ids < 6 then c.off_ids[#c.off_ids + 1] = id end
-      if ok then tally(c.off_ans, ans)
-      else
-        c.bad = c.bad + 1
-        if c.bad <= 5 then emf.log(string.format("spawn nodes: markers: taking off the marker of monster %s failed: %s", tostring(id), tostring(ans))) end
-      end
-      S.marked[id] = nil
+  -- 2. new markers, 3. bar updates, 4. resends (oldest first)
+  local function send(id, share)
+    budget = budget - 1
+    local ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, share))
+    if not ok then ok, n = pcall(emf.send_marker, nil, "m" .. id, mark_spec(id, nil)) end  -- an older EMF: no bar
+    if not ok then c.errs = c.errs + 1 if c.errs <= 5 then emf.log("spawn nodes: markers: sending the marker of monster " .. tostring(id) .. " failed: " .. tostring(n)) end end
+    if ok and not delivered(ok, n) then c.zero = c.zero + 1 end
+    return delivered(ok, n)
+  end
+  local shares = {}
+  for _, id in ipairs(order) do
+    local okh, cur, max = pcall(emf.health, world, id)
+    if okh and cur and max and max > 0 then shares[id] = math.max(0, math.min(1, cur / max)) end
+  end
+  for _, id in ipairs(order) do
+    if budget <= 0 then break end
+    if not S.marked[id] and send(id, shares[id]) then
+      S.marked[id] = { share = shares[id] or 1, at = now }
+      c.new = c.new + 1
+      if #c.new_ids < 6 then c.new_ids[#c.new_ids + 1] = id end
     end
   end
-  if c.new + c.bar + c.again + c.off + c.errs > 0 then
-    local function list(t) local o = {} for k, v in pairs(t) do o[#o + 1] = k .. " x" .. v end table.sort(o) return table.concat(o, ", ") end
+  for _, id in ipairs(order) do
+    if budget <= 0 then break end
+    local m = S.marked[id]
+    if m and shares[id] and math.abs(shares[id] - (m.share or 1)) >= 0.05 and send(id, shares[id]) then
+      m.share, m.at = shares[id], now
+      c.bar = c.bar + 1
+    end
+  end
+  if budget > 0 then
+    local old = {}
+    for _, id in ipairs(order) do
+      local m = S.marked[id]
+      if m and now - (m.at or 0) >= MARK_RESEND then old[#old + 1] = id end
+    end
+    table.sort(old, function(x, y) return (S.marked[x].at or 0) < (S.marked[y].at or 0) end)
+    for _, id in ipairs(old) do
+      if budget <= 0 then break end
+      if send(id, shares[id]) then S.marked[id].at = now c.again = c.again + 1 end
+    end
+  end
+  local waiting_new = 0
+  for _, id in ipairs(order) do if not S.marked[id] then waiting_new = waiting_new + 1 end end
+  local waiting_off = 0 for _ in pairs(S.unmark) do waiting_off = waiting_off + 1 end
+  if c.new + c.bar + c.again + c.off + c.zero + c.errs + c.retry + c.gave > 0 then
     local function ids(t) local o = {} for _, v in ipairs(t) do o[#o + 1] = tostring(v) end return table.concat(o, " ") end
     local marked = 0 for _ in pairs(S.marked) do marked = marked + 1 end
-    emf.log(string.format("spawn nodes: markers: %d new%s, %d bar update(s), %d sent again, %d failed; %d taken off (%d refused)%s; marked now %d%s%s",
-      c.new, c.new > 0 and (" [" .. ids(c.new_ids) .. (c.new > #c.new_ids and " ..." or "") .. "]") or "", c.bar, c.again, c.errs,
-      c.off, c.bad, c.off > 0 and (" [" .. ids(c.off_ids) .. (c.off > #c.off_ids and " ..." or "") .. "]") or "", marked,
-      next(c.sent_to) and ("; send_marker answered (players): " .. list(c.sent_to)) or "",
-      next(c.off_ans) and ("; unsend_marker answered: " .. list(c.off_ans)) or ""))
+    emf.log(string.format("spawn nodes: markers: %d sent of %d at most: %d new%s, %d bar update(s), %d sent again, %d answered 0 (again next check); "
+      .. "%d taken off%s, %d refused (again next check), %d given up after %d tries; %d error(s); marked now %d, waiting: %d to mark, %d to take off",
+      MARK_BUDGET - budget, MARK_BUDGET, c.new, c.new > 0 and (" [" .. ids(c.new_ids) .. (c.new > #c.new_ids and " ..." or "") .. "]") or "",
+      c.bar, c.again, c.zero, c.off, c.off > 0 and (" [" .. ids(c.off_ids) .. (c.off > #c.off_ids and " ..." or "") .. "]") or "",
+      c.retry, c.gave, MARK_OFF_TRIES, c.errs, marked, waiting_new, waiting_off))
   end
 end
 
@@ -2465,6 +2504,7 @@ function F.tick(world)
     pcall(fullrec.stop_all, "a new world or a reload")  -- (0.15.532)
     S.scan, S.scanned, S.purge, S.raid, S.started = nil, false, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
+    S.unmark = {}  -- (0.15.541) take-offs EMF has not taken yet
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
     S.join_hits, S.join_seen = {}, nil  -- (0.15.501)
     S.orders = {}  -- (0.15.503)
