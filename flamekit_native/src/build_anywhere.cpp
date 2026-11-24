@@ -68,6 +68,7 @@
 #include <tlhelp32.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iterator>
 #include <array>
@@ -1407,11 +1408,29 @@ constexpr const char* kPathSiteSig = "41 0F B6 85 20 01 00 00 49 8D 75 0C 44 8B 
 constexpr int kPathSiteImm = 28;
 constexpr const char* kPathListSig = "4C 8B A1 30 01 00 00 4C 89 6C 24 28 4C 89 7C 24 20 4D 85 E4 0F 84 ?? ?? ?? ?? 48 8D A9 38 01 00 00 48 8B CD 48 8D 54 24 70 E8 ?? ?? ?? ?? 48 8B D0 48 3B 45 10 0F 83 ?? ?? ?? ?? 4C 8B 55 08 4C 8B C0 48 8B C8 49 C1 E8 06 48 69 F2 A0 01 00 00 4F 8B 0C C2 83 E1 3F 48 03 75 40";
 constexpr uint32_t PROBE_STEPS = 30, PROBE_LINES = 400, PROBE_MAX = 4096;
-struct PathReq { uint8_t state, flag, search; uint32_t iter; uint32_t seen_step, change_step; };
+struct PathReq { uint8_t state, flag, search; uint32_t iter; uint32_t seen_step, change_step; uint32_t owner; float sx, sy, sz, tx, ty, tz; };
+// (0.15.536, owner 21:52 "yes go for it") who a request belongs to: the entry's copied settings start at +0x8 (0x140610dc0
+// copies them byte for byte); their +0x0 is the entity (the program slice's current entity, 0x14065b870), +0x10 the
+// start (3 floats), +0x1c the target (3 floats). What the owner is: its faction (entity or template) and whether it has
+// the enemy AI or the villager state.
+std::string owner_kind(EmfWorld* w, uint32_t id) {
+    auto* a = emf::api();
+    uint64_t size = 0;
+    const void* f = a->get_component(w, gen::ecs::Faction::kHash, id, &size);
+    if (!f && a->get_template_component) f = a->get_template_component(w, gen::ecs::Faction::kHash, id, &size);
+    const bool enemy = a->get_component(w, gen::ecs::DynamicEnemy01BehaviorState::kHash, id, &size) != nullptr;
+    const bool npc = a->get_component(w, gen::ecs::DynamicActiveNpcState::kHash, id, &size) != nullptr;
+    char b[64];
+    snprintf(b, sizeof b, "faction %d%s%s", f ? int(*static_cast<const uint8_t*>(f)) : -1, enemy ? ", enemy AI" : "", npc ? ", villager" : "");
+    return b;
+}
 void path_probe(emf::World w) {
     static int ok = -1;
     static uint32_t pg_off = 0, steps = 0, minute_lines = 0, minute_at = 0, last_summary = 0;
     static std::unordered_map<uint32_t, PathReq> reqs;
+    struct Cap { uint32_t n = 0, iter = 0; float sx = 0, sy = 0, sz = 0, tx = 0, ty = 0, tz = 0; };
+    static std::unordered_map<uint32_t, Cap> caps;  // (0.15.536) owner -> step-limit hits since the last 10 s summary
+    static uint32_t caps_at = 0;
     static std::string last_mix;
     ++steps;
     if (ok < 0) {
@@ -1450,21 +1469,33 @@ void path_probe(emf::World w) {
         if (!((used[i >> 6] >> (i & 63)) & 1)) continue;
         if (!read_mem(entries + i * 0x1a0, e.data(), e.size())) continue;
         const uint32_t id = *reinterpret_cast<const uint32_t*>(&e[0]);
-        PathReq r{e[0x120], e[0x190], e[0x191], *reinterpret_cast<const uint32_t*>(&e[0x198]), steps, steps};
+        auto fl = [&](size_t o) { return *reinterpret_cast<const float*>(&e[o]); };
+        PathReq r{e[0x120], e[0x190], e[0x191], *reinterpret_cast<const uint32_t*>(&e[0x198]), steps, steps,
+                  *reinterpret_cast<const uint32_t*>(&e[0x8]), fl(0x18), fl(0x1c), fl(0x20), fl(0x24), fl(0x28), fl(0x2c)};
         char key[32];
         snprintf(key, sizeof key, "%u/%u%s", r.state, r.search, r.flag ? "f" : "");
         mix[key]++;
         auto it = reqs.find(id);
         if (it == reqs.end()) {
-            if (minute_lines < PROBE_LINES) { ++minute_lines; EMF_LOG(kMod, "path grid probe: request %u new: state %u, search %u, flag %u, iterations %u", id, r.state, r.search, r.flag, r.iter); }
+            if (minute_lines < PROBE_LINES) {
+                ++minute_lines;
+                EMF_LOG(kMod, "path grid probe: request %u new: owner %u (%s) from %.1f %.1f %.1f to %.1f %.1f %.1f (%.1f m); state %u, search %u, flag %u, iterations %u",
+                        id, r.owner, owner_kind(w.raw(), r.owner).c_str(), r.sx, r.sy, r.sz, r.tx, r.ty, r.tz,
+                        std::sqrt((r.tx - r.sx) * (r.tx - r.sx) + (r.ty - r.sy) * (r.ty - r.sy) + (r.tz - r.sz) * (r.tz - r.sz)), r.state, r.search, r.flag, r.iter);
+            }
         } else {
             r.seen_step = it->second.seen_step;
             r.change_step = it->second.change_step;
+            if (r.search == 7 && it->second.search != 7) {  // (0.15.536) ran into the step limit: counted per owner
+                auto& c = caps[r.owner];
+                c.n++;
+                c.sx = r.sx, c.sy = r.sy, c.sz = r.sz, c.tx = r.tx, c.ty = r.ty, c.tz = r.tz, c.iter = r.iter;
+            }
             if (it->second.state != r.state || it->second.search != r.search || it->second.flag != r.flag) {
                 if (minute_lines < PROBE_LINES) {
                     ++minute_lines;
-                    EMF_LOG(kMod, "path grid probe: request %u: state %u -> %u, search %u -> %u, flag %u -> %u, iterations %u -> %u (%.1f s in the last state, %.1f s since it came)",
-                            id, it->second.state, r.state, it->second.search, r.search, it->second.flag, r.flag, it->second.iter, r.iter,
+                    EMF_LOG(kMod, "path grid probe: request %u (owner %u): state %u -> %u, search %u -> %u, flag %u -> %u, iterations %u -> %u (%.1f s in the last state, %.1f s since it came)",
+                            id, r.owner, it->second.state, r.state, it->second.search, r.search, it->second.flag, r.flag, it->second.iter, r.iter,
                             (steps - it->second.change_step) / 60.0, (steps - it->second.seen_step) / 60.0);
                 }
                 r.change_step = steps;
@@ -1480,6 +1511,23 @@ void path_probe(emf::World w) {
         }
     }
     reqs.swap(now);
+    if (steps - caps_at >= 600) {  // (0.15.536) every 10 s: who ran into the step limit, most first
+        caps_at = steps;
+        if (!caps.empty()) {
+            std::vector<std::pair<uint32_t, Cap>> v(caps.begin(), caps.end());
+            std::sort(v.begin(), v.end(), [](auto& a, auto& b) { return a.second.n > b.second.n; });
+            std::string t;
+            for (size_t i = 0; i < v.size() && i < 8; ++i) {
+                char b[200];
+                snprintf(b, sizeof b, "%s owner %u (%s) x%u, from %.0f %.0f %.0f to %.0f %.0f %.0f", i ? ";" : "", v[i].first,
+                         owner_kind(w.raw(), v[i].first).c_str(), v[i].second.n, v[i].second.sx, v[i].second.sy, v[i].second.sz,
+                         v[i].second.tx, v[i].second.ty, v[i].second.tz);
+                t += b;
+            }
+            EMF_LOG(kMod, "path grid probe: in the last 10 s these ran into the game's step limit (search 7):%s", t.c_str());
+            caps.clear();
+        }
+    }
     std::string m;
     for (auto& kv : mix) m += " " + kv.first + " x" + std::to_string(kv.second);
     if ((m != last_mix && steps - last_summary >= 60) || steps - last_summary >= 600) {

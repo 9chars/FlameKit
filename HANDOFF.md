@@ -2441,3 +2441,12 @@ running until the owner started it 21:42:39 - a restart.request written while it
 serverstart 21:48:42 (client too). Log 21:47:25: "path grid probe: on (read only) (... path grid at storage+0x470,
 storage at world+0xe179c0)"; "path grid system at 00000208EFCC0048; the game's singleton "ecs::PathGridSystem" ... (the
 same)" -> offsets CONFIRMED; request list capacity 2048. Server-only: no Development/Stable change.
+
+**21:50 raid with the probe (0.15.535):** ~30 requests in the whole path grid; the raid monsters' 8 requests (68-75,
+21:50:06-08) stayed at iterations 0 (never searched) for 38-40 s, then all started 21:50:45-46 (= the "all at once").
+Meanwhile older requests (11, 7, 14, 5, 1, 15, 10; there before the raid) kept running into the 500-step limit (search 7)
+and restarting every ~0.5 s: request 11 31x, 7 18x, 14 10x in 2 min. Owner 21:51 "like you say that all come at me at
+once, then theres nothing", 21:52 "yes go for it. I think you'll just find the game sucks" -> 0.15.536: the probe names
+each request's owner (entry +0x8 = settings copy: +0x0 entity, +0x10 start, +0x1c target), its faction / enemy AI /
+villager, and every 10 s the owners that hit the step limit most. Built 21:54:29 (DLL 8f3d0c2a...). NOT installed:
+server restart asked.

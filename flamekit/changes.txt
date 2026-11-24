@@ -1,3 +1,6 @@
+0.15.536 Nov 23, 2026
+- Server (logging only): the path grid probe also names who each path search belongs to (the creature, its faction, enemy or villager) and where it goes from and to, and every 10 s which ones ran into the game's step limit the most.
+
 0.15.535 Nov 23, 2026
 - Server (logging only): FlameKit Native reads the game's own list of path searches on the server every half second and logs how many there are, what state each is in, and every change ("path grid probe: ..."), to find out why monsters wait so long for a path.
 
