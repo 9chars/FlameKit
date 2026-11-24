@@ -54,6 +54,22 @@ helper "build", stage out\flamekit_native\flamekit_native.dll -> make_dist.py . 
 mods, serverstart (ASK first, rule 0x). Never copy client files during his test. Never touch ftp.txt /
 ftp_password.dat / restart_helper\_to_delete.
 
+**REVIEW + DECISION (2026-11-23 18:48-18:59, new conversation).** Owner 18:48 "can you check the work from the previous
+session? ... I don't trust anything that was done or written on the spawn node system", 18:57 "is it worth fixing or
+starting over?", 18:59 "yes" to: rewrite ONLY the monster-tracking part of spawn_nodes.lua (which monsters are the raid's,
+alive or dead, when the raid is over), keep everything else. Claude said before building: the switched-off parts (stuck
+respawn, orders, threat table, spot check) are KEPT (his features), still off, moved onto the new tracking.
+Checked (read only): the server runs 0.15.525 = 0.15.523 + the 524 switches + the 525 spare change (old per-monster hit
+rule fully gone); server DLL md5 = flamekit_native\out build (2ece6b80...). WRONG in this file: (a) C:\enshrouded mod
+shit\flamekit is NOT a working copy: its spawn_nodes.lua is 0.15.523, its main.lua has no spawn_nodes, core\spawn.lua
+is missing there; the live code is only in the server folder (and the repo); (b) the 0.15.518 note's "13:32 the owner
+said raids worked well" is false (the "worked pretty well" quote is 12:25, about the raid lock); (c) not written down:
+all 4 nodes have Spawn within 0 m, duration 15 min, face = node. Server folder access needs the owner's "Add folder"
+(the request tool was refused by the app's check, 18:49-18:54).
+Bugs seen in the 18:45-18:52 raid (emf_core.log): 18:51:24 seven bodies "got up again" (health 4-6; real Undead get up
+at 727/1000) and the count went 1 -> 8 of 60; 18:47:43-18:48:43 no node spawned (Most alive counts bodies that got up
+and joined monsters); with every switch off 0-3 of 4 moved per 10 s (cause of the standing still: NOT known).
+
 ## Start here (next conversation, written 2026-11-17 07:25) (OLDER)
 
 1. Read Rules 0r, 0p, 0g, 0n, 0w, 0h, 0a, 0d, 0c, 0b below before anything else, then "Companions". The two that went wrong most on 2026-11-16:
@@ -2250,3 +2266,18 @@ Now: spawn_nodes.lua spare_tick writes spare_server.txt (ids of living monsters 
 build_anywhere.cpp read_spare + spare_hit (inside protect_hit, on_hit_before) cancels a listed attacker's hit only on
 target_faction 5/6/11/12 or IsTame. Logs: "spawn nodes: spare: N raid monster(s) now spare ...", native "spare: N listed",
 "spare: N hit(s) cancelled in the last 15 s". LESSON: when an API can't do exactly what the owner asked, TELL HIM, don't pick a wider workaround.
+
+## 0.15.526 (Nov 23, 19:15) Spawn Nodes: monster tracking rewritten (owner 18:59 "yes")
+One roster S.mon[id] = { g, n, own, dead, born, seen, lost_at, miss } replaces S.alive / S.dead / S.adopted / S.miss and
+the per-monster spare_rules leftovers. own = spawned by its node in this raid (holds the node's "Most alive per node" place,
+in "N of TOTAL"); counted apart = joined (summon, world monster), a body that got up again, or left from an earlier raid
+(never holds a node place, never raises N, the raid still waits for it). mon_check (every 0.25 s) is the only health read:
+> 0 alive (a body getting up -> counted apart, logged), 0 dead (an own one never seen with health counts alive RISE_S 10 s:
+still coming up), not readable -> counted LOST_S 10 s then forgotten (logged; was: alive forever), no health and no
+position 3x -> gone. fire(): mon_new_raid puts the group's bodies into S.old_bodies (only Remove touches them; never
+counted again) and counts leftovers apart; an earlier raid not yet over -> a new raid/count. After a reload: tagged alive ->
+own, tagged dead -> old_bodies. Stuck/orders/threat/spot check KEPT, still OFF, now on the roster (stuck only on own ones).
+Logs: "spawn nodes: roster: ..." (add, died, got up, forgotten, new raid). Tests: tools/sntest/tr.lua + rl.lua in the repo (texlua,
+mock world; also run with the switches on): ALL OK. Server-only (rule 0d): flamekit/mod.json 0.15.526 + changes.txt; no
+DLL, no Development channel. Files: C:\enshrouded mod shit\Claude outputs\0.15.526\. Pushed 19:10 (owner 19:08 "you
+need to push it to git"; add_repo was refused at 18:49 and worked at 19:08). NOT yet on the local server: asked.

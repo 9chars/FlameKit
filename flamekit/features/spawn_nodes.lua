@@ -1,4 +1,4 @@
--- features/spawn_nodes.lua (0.15.476, owner 2026-11-23 10:53 "I'd like a way to place down "nodes" around the map that
+-- features/spawn_nodes.lua (0.15.476; monster tracking rewritten 0.15.526, owner 2026-11-23 10:53 "I'd like a way to place down "nodes" around the map that
 -- could be configured to spawn monsters periodically based on how I set it up", 10:53 admins only, "maybe it would be
 -- used as part a larger "raid" type system for spawning monsters against peoples bases", 11:03 "just go to the location
 -- I want and click add node", 11:06 "can you group the nodes together also such that when a trigger is activated, all
@@ -28,7 +28,8 @@
 -- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and "Players cannot damage placed
 -- objects during its waves" (protect_tick); (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage
 -- to" and Remove "by node group ... including the dead ones on the ground") "Its monsters spare animals, pets and villagers"
--- (a hit rule per monster: from it to "creatures", cancel) and Remove takes the group's dead bodies too; (0.15.479) renamed "Players cannot change bases during its waves": also the
+-- (0.15.525: FlameKit Native's spare list, spare_tick; until 0.15.524 an EMF hit rule that also kept them from hurting
+-- other monsters) and Remove takes the group's dead bodies too; (0.15.479) renamed "Players cannot change bases during its waves": also the
 -- players near its nodes lose the game's base editing permission while it runs (raid_lock_server.txt, FlameKit Native).
 -- Uses only core modules (HANDOFF rule 0b).
 
@@ -185,9 +186,9 @@ end
 
 -- ---- the server's half ----
 
-local S = { data = nil, steps = 0, runs = {}, alive = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
+local S = { data = nil, steps = 0, runs = {}, queue = {}, last_end = {}, next_timer = {}, last_tod = {},
             notes = {}, session = nil, protect_rule = nil, no_break = nil, broke = {},
-            dead = {}, spare_rules = {}, scan = nil, scanned = false, miss = {}, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, adopted = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, threat_seen = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned, miss; (0.15.488) raid; (0.15.482) dead: node -> { body id -> true }; spare_rules: monster -> hit rule id
+            mon = {}, old_bodies = {}, scan = nil, scanned = false, raid = {}, place_answers = {}, place_q = 0, started = {}, track = {}, active_at = {}, respawns = {}, marked = {}, wet = {}, depth_said = {}, sub_said = {}, join_hits = {}, join_seen = nil, orders = {}, bad = {}, join_wait = {}, checks = {}, hunt_pos = {}, halted = {}, threat_seen = {} }  -- (0.15.492) started: gid -> os.time() of its start  -- (0.15.483) scan, scanned; (0.15.488) raid; (0.15.526) mon, old_bodies: the roster (below)
 local ground = spawn.ground({ max = 20, keep = function() return true end })  -- with the test monsters' 40: below EMF's 64
 
 -- The saved groups and nodes (spawn_nodes.json), loaded once.
@@ -310,11 +311,136 @@ local function altar_boxes()
   return boxes
 end
 
--- How many monsters of node `nid` are alive.
+-- ---- (0.15.526) THE ROSTER: the one place that knows the raids' monsters ----
+-- (owner 2026-11-23 18:59 "yes": rewrite the monster tracking. Until 0.15.525 six things each decided on their own
+-- whether a monster was a raid's (S.alive per node, S.dead, S.adopted, the scale tag, the area test, the end check) and
+-- they disagreed: at 18:51:24 seven bodies "got up again" with 4-6 health and the count went 1 -> 8 of 60, and for a
+-- minute (18:47:43-18:48:43) no node spawned because "Most alive per node" counted bodies that got up and monsters that
+-- had joined.) Now every monster of a raid is one entry S.mon[id] = { g = group, n = node, own, dead, born, seen,
+-- lost_at, miss }:
+--   own   = its node spawned it in this raid: it holds that node's "Most alive per node" place and is in "N of TOTAL";
+--   not own = it joined (a summon, a monster of the world that came in), it got up again after it died, or it is left
+--           from an earlier raid: it never holds a node's place and never raises N, but the raid ends only when it is
+--           dead too ("... summoned monsters still to kill").
+-- mon_check (every 0.25 s) is the only thing that reads their health and moves an entry between alive and dead.
+-- Bodies of an earlier raid of the group are never looked at again (S.old_bodies: only Remove takes them away).
+local RISE_S = 10      -- s: an own monster that has not had health yet (an Undead coming up) counts alive this long
+local LOST_S = 10      -- s: a monster whose health can't be read is counted this long, then it is forgotten (logged)
+local MISSES = 3       -- checks in a row with neither health nor position: gone, forgotten
+
+-- Adds monster `id` to group `gid`'s raid at node `nid`. `why`: for the log.
+local function mon_add(id, gid, nid, own, dead, why)
+  if not id or S.mon[id] then return end
+  S.mon[id] = { g = gid, n = nid, own = own == true, dead = dead == true, born = os.time(), seen = false, miss = 0 }
+  if (S.mon_log or 0) < 300 then
+    S.mon_log = (S.mon_log or 0) + 1
+    emf.log(string.format("spawn nodes: roster: monster %s in group %d's raid at node %s: %s, %s (%s)", tostring(id), gid,
+      tostring(nid), own and "its own" or "counted apart", dead and "dead" or "alive", tostring(why)))
+  end
+end
+
+-- Forgets monster `id` (and what the off switches kept about it).
+local function mon_drop(id)
+  S.mon[id] = nil
+  S.track[id], S.active_at[id], S.orders[id], S.threat_seen[id], S.hunt_pos[id] = nil, nil, nil, nil, nil
+end
+
+-- The ids of the living monsters, in id order: of group `gid` (nil: every group), of node `nid` (nil: every node),
+-- only its own ones when `own_only`.
+local function mon_alive(gid, nid, own_only)
+  local list = {}
+  for id, m in pairs(S.mon) do
+    if not m.dead and (not gid or m.g == gid) and (not nid or m.n == nid) and (not own_only or m.own) then list[#list + 1] = id end
+  end
+  table.sort(list)
+  return list
+end
+
+-- How many of node `nid`'s OWN monsters are alive: what "Most alive per node" counts.
 local function alive_count(nid)
-  local n = 0
-  for _ in pairs(S.alive[nid] or {}) do n = n + 1 end
-  return n
+  return #mon_alive(nil, nid, true)
+end
+
+-- The dead bodies of group `gid` (this raid's and earlier ones'): for Remove and the tab.
+local function mon_bodies(gid)
+  local list = {}
+  for id, m in pairs(S.mon) do if m.dead and m.g == gid then list[#list + 1] = id end end
+  for id, g in pairs(S.old_bodies) do if g == gid then list[#list + 1] = id end end
+  table.sort(list)
+  return list
+end
+
+-- Whether monster `id` is known (in a raid, or a body of an earlier one).
+local function known(id)
+  return S.mon[id] ~= nil or S.old_bodies[id] ~= nil
+end
+
+-- (0.15.526) A new raid of group `gid` starts: the bodies of its earlier raids are put aside (never counted, never
+-- looked at for getting up again: 18:22:44 eighteen of them "got up" and were counted back in), and any of its monsters
+-- still alive from before is counted apart.
+local function mon_new_raid(gid)
+  local bodies, left = 0, 0
+  for id, m in pairs(S.mon) do
+    if m.g == gid then
+      if m.dead then
+        S.old_bodies[id] = gid
+        mon_drop(id)
+        bodies = bodies + 1
+      elseif m.own then
+        m.own = false
+        left = left + 1
+      end
+    end
+  end
+  emf.log(string.format("spawn nodes: roster: group %d's new raid: %d bod(ies) of its earlier raids put aside, %d monster(s) still alive from before counted apart", gid, bodies, left))
+end
+
+-- Every 0.25 s: each monster's health, read once. Health > 0: alive (a body that gets up again is counted apart from
+-- now on); 0: dead (an own monster that never had health yet counts alive for RISE_S s: still coming up); not readable:
+-- counted for LOST_S s, then forgotten; neither health nor position MISSES times in a row: gone.
+local function mon_check(world)
+  local now = os.time()
+  for id, m in pairs(S.mon) do
+    local okh, cur = pcall(emf.health, world, id)
+    if not okh then cur = nil end
+    if cur == nil then
+      local okp, px = pcall(world.position, world, id)
+      if not (okp and px) then
+        m.miss = m.miss + 1
+        if m.miss >= MISSES then
+          if (S.mon_log or 0) < 300 then S.mon_log = (S.mon_log or 0) + 1 emf.log(string.format("spawn nodes: roster: monster %s gone from the world: forgotten", tostring(id))) end
+          mon_drop(id)
+        end
+      else
+        m.miss = 0
+        m.lost_at = m.lost_at or now
+        if now - m.lost_at >= LOST_S then
+          emf.log(string.format("spawn nodes: roster: monster %s: its health could not be read for %d s: forgotten", tostring(id), LOST_S))
+          mon_drop(id)
+        end
+      end
+    else
+      m.miss, m.lost_at = 0, nil
+      if cur > 0 then
+        if m.dead then
+          m.dead, m.own = false, false
+          emf.log(string.format("spawn nodes: roster: monster %s got up again (health %s): alive, counted apart (it does not hold node %s's place)", tostring(id), tostring(cur), tostring(m.n)))
+        end
+        m.seen = true
+      elseif not m.dead then
+        if m.own and not m.seen and now - m.born < RISE_S then
+          -- still coming up out of the ground: alive
+        else
+          m.dead = true
+          if (S.mon_log or 0) < 300 then
+            S.mon_log = (S.mon_log or 0) + 1
+            emf.log(string.format("spawn nodes: roster: monster %s died (%s, node %s)%s", tostring(id), m.own and "its own" or "counted apart", tostring(m.n),
+              m.seen and "" or string.format(": never had health in %d s", RISE_S)))
+          end
+        end
+      end
+    end
+  end
 end
 
 -- (0.15.483) The tag of group `gid`, and the group a tag names (nil: not one of ours).
@@ -327,7 +453,7 @@ local function group_of_tag(v)
 end
 
 -- (0.15.483) One step of the world scan that finds the nodes' monsters again: each one tagged with a group that still
--- has nodes goes to that group's nearest node, alive (S.alive) or dead (S.dead). True when the scan is done.
+-- has nodes goes to that group's nearest node: alive into the roster, dead into S.old_bodies. True when the scan is done.
 local function scan_tick(world)
   if not S.scan then
     -- the protection stays as it was meanwhile: the raid lock file is kept, and if it names players the rule against
@@ -396,11 +522,9 @@ local function scan_tick(world)
       end
       local okh, cur = pcall(emf.health, world, id)
       if okh and cur and cur > 0 then
-        S.alive[nid] = S.alive[nid] or {}
-        S.alive[nid][id] = true
+        mon_add(id, gid, nid, true, false, "found again after a reload")  -- (0.15.526) the roster
       elseif okh and cur then
-        S.dead[nid] = S.dead[nid] or {}
-        S.dead[nid][id] = true
+        S.old_bodies[id] = gid  -- (0.15.526) a body: only Remove takes it away
       end
       sc.found = sc.found + 1
     end
@@ -410,9 +534,7 @@ local function scan_tick(world)
   S.scan, S.scanned = nil, true
   -- (0.15.492) a raid found again after a reload: its time limit counts from now (its real start is not known)
   for _, g in ipairs(groups()) do
-    for _, n in ipairs(nodes_of(g.id)) do
-      if alive_count(n.id) > 0 then S.started[g.id] = S.started[g.id] or os.time() break end
-    end
+    if #mon_alive(g.id) > 0 then S.started[g.id] = S.started[g.id] or os.time() end
   end
   return true
 end
@@ -467,9 +589,8 @@ local function purge_tick(world)
     end
     if gid and pg.gids[gid] then
       if pcall(emf.destroy, world, id) then pg.n = pg.n + 1 end
-      if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      for _, ids in pairs(S.alive) do ids[id] = nil end
-      for _, ids in pairs(S.dead) do ids[id] = nil end
+      mon_drop(id)  -- (0.15.526)
+      S.old_bodies[id] = nil
     end
   end
   if pg.i <= #pg.list then return end
@@ -561,11 +682,9 @@ local function raid_notice(world, gid, text, near, seconds, tag, sound)
   end
 end
 
--- (0.15.488) How many monsters of group `gid` are alive (and still to come from the queue).
+-- (0.15.488) How many monsters of group `gid` are alive, its own and those counted apart (0.15.526: the roster).
 local function group_alive(gid)
-  local n = 0
-  for _, node in ipairs(nodes_of(gid)) do n = n + alive_count(node.id) end
-  return n
+  return #mon_alive(gid)
 end
 local function group_queued(gid)
   local n = 0
@@ -632,8 +751,7 @@ local function restore()
   end
   for _, g in ipairs(groups()) do  -- (0.15.500) its monsters live but its raid was over or not known: a raid again
     if not S.raid[g.id] then
-      local alive = 0
-      for _, nd in ipairs(nodes_of(g.id)) do alive = alive + alive_count(nd.id) end
+      local alive = #mon_alive(g.id)  -- (0.15.526)
       if alive > 0 then
         S.raid[g.id] = { place = raid_place(g.id, nil), spawned = alive }
         S.started[g.id] = S.started[g.id] or os.time()
@@ -643,11 +761,7 @@ local function restore()
   end
   for gid, r in pairs(S.raid) do  -- (0.15.501) a raid from before 0.15.501: its first monster = the lowest id it has
     if not r.first_id then
-      for _, nd in ipairs(nodes_of(gid)) do
-        for _, set in ipairs({ S.alive[nd.id] or {}, S.dead[nd.id] or {} }) do
-          for id in pairs(set) do if not r.first_id or id < r.first_id then r.first_id = id end end
-        end
-      end
+      for _, id in ipairs(mon_alive(gid)) do if not r.first_id or id < r.first_id then r.first_id = id end end  -- (0.15.526)
     end
   end
   emf.log(string.format("spawn nodes: after the reload: %d raid(s) and %d run(s) taken back", n, (function() local c = 0 for _ in pairs(S.runs) do c = c + 1 end return c end)()))
@@ -665,11 +779,6 @@ local JOIN_R = 100
 local JOIN_EVERY = 120
 local JOIN_FULL = 5            -- (0.15.509) every 5th look (10 s): all ids since the raid's first monster
 local FRIENDLY = { [0] = true, [5] = true, [7] = true, [8] = true, [11] = true, [12] = true }
-local function known(id)
-  for _, ids in pairs(S.alive) do if ids[id] then return true end end
-  for _, ids in pairs(S.dead) do if ids[id] then return true end end
-  return false
-end
 -- Group `gid`'s node nearest x, y, z within JOIN_R m, or nil.
 local function join_node(gid, x, y, z)
   local best, nid = nil, nil
@@ -712,15 +821,9 @@ local function try_join(world, id, engaged)
       if nid and cur == 0 then wait = true end  -- (0.15.509) 0 health: still coming up out of the ground (the Undead), asked again
       if nid and type(cur) == "number" and cur > 0 then
         do
-          S.alive[nid] = S.alive[nid] or {}
-          S.alive[nid][id] = true
-          S.adopted[id] = true
+          mon_add(id, gid, nid, false, false, string.format("joined: faction %s%s, at %.0f %.0f %.0f", tostring(faction),
+            engaged and ", in the fight" or "", x, y, z))  -- (0.15.526) counted apart
           r.spawned = r.spawned + 1
-          if (S.joined_said or 0) < 40 then
-            S.joined_said = (S.joined_said or 0) + 1
-            emf.log(string.format("spawn nodes: monster %s (faction %s%s) joined the raid at node %d: %.0f %.0f %.0f", tostring(id),
-              tostring(faction), engaged and ", in the fight" or "", nid, x, y, z))
-          end
           return true
         end
       end
@@ -810,10 +913,8 @@ local function raid_tick(world)
       -- (16:32 "the number keeps going up, you kill more it goes down, it spawns more, number goes up, thats absolutely
       -- useless") so it only goes down: the monsters that joined (summons, the world's) are not in it while the nodes'
       -- own are left; when only joined ones are left, it is their number
-      local own, joined = 0, 0
-      for _, nd in ipairs(nodes_of(gid)) do
-        for id in pairs(S.alive[nd.id] or {}) do if S.adopted[id] then joined = joined + 1 else own = own + 1 end end
-      end
+      local own = #mon_alive(gid, nil, true)  -- (0.15.526) the roster: its own ones, and the ones counted apart
+      local joined = #mon_alive(gid) - own
       local n = own + queued
       local run = S.runs[gid]
       if run then
@@ -870,13 +971,10 @@ local function verify_tick(world)
     if not mine and r.first_id then  -- (0.15.507) or a monster of its raid area without the tag (a summon)
       local nid0, cur0 = raid_monster(world, v.gid, r.first_id, id, false)
       mine = nid0 ~= nil and type(cur0) == "number" and cur0 > 0
-      if mine then S.adopted[id] = true end
     end
-    if mine then
+    if mine and not known(id) then  -- (0.15.526) one the roster has is mon_check's; a body of an earlier raid is never counted
       local okh, cur = pcall(emf.health, world, id)
-      local known = false
-      for _, ids in pairs(S.alive) do if ids[id] then known = true break end end
-      if okh and cur and cur > 0 and not known then
+      if okh and cur and cur > 0 then
         local okp, x, y, z = pcall(world.position, world, id)
         local nodes = nodes_of(v.gid)
         local best, nid = nil, nodes[1] and nodes[1].id
@@ -885,9 +983,7 @@ local function verify_tick(world)
           if not best or d < best then best, nid = d, n.id end
         end
         if nid then
-          S.alive[nid] = S.alive[nid] or {}
-          S.alive[nid][id] = true
-          for _, ids in pairs(S.dead) do ids[id] = nil end
+          mon_add(id, v.gid, nid, false, false, "found alive by the search before the end notice")  -- (0.15.526) counted apart
           v.found = v.found + 1
         end
       end
@@ -923,6 +1019,12 @@ local function fire(world, gid, why, manual, by)  -- (0.15.490) by: the player w
   S.order_log, S.stuck_log, S.path_said, S.spawn_said, S.joined_said = nil, nil, nil, nil, nil  -- (0.15.511) each raid logs anew
   S.trickle_log = nil  -- (0.15.512)
   S.ground_log, S.threat_log = nil, nil  -- (0.15.518); (0.15.522)
+  S.mon_log = nil  -- (0.15.526)
+  mon_new_raid(gid)  -- (0.15.526) the bodies of its earlier raids put aside, monsters left from before counted apart
+  if S.raid[gid] then  -- (0.15.526) an earlier raid of it was not over yet (stopped, monsters left): this one has its own count
+    emf.log(string.format("spawn nodes: %s: its earlier raid was not over yet: this start begins a new raid (a new count)", g.name))
+    S.raid[gid] = nil
+  end
   emf.log(string.format("spawn nodes: %s (group %d, %d node(s), %s) started: %s", g.name, gid, #nodes_of(gid), g.family, why))
   return true
 end
@@ -1096,12 +1198,9 @@ local function time_tick(world)
         if qn and qn.g == gid then table.remove(S.queue, i) end
       end
       local n = 0
-      for _, node in ipairs(nodes_of(gid)) do
-        for id in pairs(S.alive[node.id] or {}) do
-          if pcall(emf.destroy, world, id) then n = n + 1 end
-          if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-        end
-        S.alive[node.id] = nil
+      for _, id in ipairs(mon_alive(gid)) do  -- (0.15.526) the roster: its own ones and those counted apart
+        if pcall(emf.destroy, world, id) then n = n + 1 end
+        mon_drop(id)
       end
       emf.log(string.format("spawn nodes: %s: its time is up (%d min): its raid ends, %d living monster(s) taken away", g.name, g.duration, n))
       local r = S.raid[gid]
@@ -1228,16 +1327,12 @@ local function do_spawn(world, q, x, sy, z)
       if gq then gq.last_first_id = id save() end  -- (0.15.507) kept: Remove and the end check use it
     end
     S.track[id] = { x = x, y = sy, z = z, at = os.time(), born = os.time(), guid = q.guid, q = q }  -- (0.15.493) for stuck_tick
-    S.alive[q.node] = S.alive[q.node] or {}
-    S.alive[q.node][id] = true
-    local qn = data().nodes[tostring(q.node)]
-    local qg = qn and group(qn.g)
+    mon_add(id, qn0 and qn0.g or 0, q.node, true, false, q.respawn and "spawned again for a stuck one" or "spawned by its node")  -- (0.15.526)
     -- (0.15.525) "spare": no EMF hit rule any more (spare_tick, FlameKit Native)
-    local _ = qg
     -- (0.15.518, owner 17:11 "the monsters are literally just standing around? not fighting at all? something is wrong with
   -- how they're getting spawned", 17:13 "um sure") the game's own move onto the ground after every spawn again, as until
-  -- 0.15.493 (raids "worked pretty well", 13:32): since 0.15.493 dropped it, 11-15 monsters at a time stood with their
-  -- order and 0 moved (17:11). It starts from the ground found here (no monster starts inside the ground).
+  -- 0.15.493. (0.15.526: the 0.15.518 reason "raids worked pretty well at 13:32" was a misquote: that was 12:25, about the
+  -- raid lock; and with the move back, 1 of 21 moved at 18:20. It stays: the owner did not ask to take it out.)
   ground.add(id, x, sy, z, yaw)
   if (S.ground_log or 0) < 40 then
     S.ground_log = (S.ground_log or 0) + 1
@@ -1345,8 +1440,10 @@ local function stuck_tick(world)
   if not STUCK_ON then return end
   local now = os.time()
   local spots = player_spots(world)
-  for nid, ids in pairs(S.alive) do
-    for id in pairs(ids) do
+  -- (0.15.526) only the nodes' own monsters (the roster): one counted apart is never taken away as stuck
+  for _, id in ipairs(mon_alive(nil, nil, true)) do
+    local nid = S.mon[id].n
+    do
       local t = S.track[id]
       local okp, x, y, z = pcall(world.position, world, id)
       local node = data().nodes[tostring(nid)]
@@ -1469,12 +1566,10 @@ local function stuck_tick(world)
         if why then
           local okd, gone = pcall(emf.destroy, world, id)
           if not (okd and gone) then emf.log(string.format("spawn nodes: monster %s: EMF did not take it away (%s)", tostring(id), tostring(gone))) end  -- (0.15.499)
-          ids[id] = nil
-          if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-          S.track[id], S.active_at[id] = nil, nil
+          mon_drop(id)  -- (0.15.526)
           S.respawns[nid] = (S.respawns[nid] or 0) + 1
           local nd0 = data().nodes[tostring(nid)]
-          local again = S.respawns[nid] <= RESPAWN_MAX and nd0 ~= nil and not S.adopted[id]  -- (0.15.501) a joined one is not replaced
+          local again = S.respawns[nid] <= RESPAWN_MAX and nd0 ~= nil
             and not S.halted[nd0.g]  -- (0.15.514) nor one of a stopped or removed group
           if again then
             local q = {}
@@ -1489,9 +1584,7 @@ local function stuck_tick(world)
     end
   end
   for id in pairs(S.track) do  -- dead or gone: no longer watched
-    local alive = false
-    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
-    if not alive then S.track[id], S.active_at[id] = nil, nil end
+    if not (S.mon[id] and not S.mon[id].dead) then S.track[id], S.active_at[id] = nil, nil end  -- (0.15.526)
   end
 end
 
@@ -1506,8 +1599,8 @@ local THREAT_R = 50            -- m: (0.15.521, owner 17:21) every player this n
 local function hunt_tick(world)
   local spots = player_spots(world)
   local now0 = os.time()
-  for _, ids in pairs(S.alive) do
-    for id in pairs(ids) do
+  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+    do
       -- (0.15.522, owner 17:21 "any player near like 50 m gets automatically added to the monsters threat table, one of
       -- their 5 or 6 slots", 17:22 "no hitting for +1 damage. I asked you to put me directly into their threat table.
       -- you've done this before") every player within THREAT_R m of a raid monster is written straight into its threat
@@ -1568,8 +1661,8 @@ local function hunt_tick(world)
   S.hunt_n = (S.hunt_n or 0) + 1
   if S.hunt_n % 5 == 0 then
     local n, ordered, going, moved = 0, 0, 0, 0
-    for _, ids in pairs(S.alive) do
-      for id in pairs(ids) do
+    for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+      do
         n = n + 1
         local o = S.orders[id]
         if o and o.id then ordered = ordered + 1 end
@@ -1590,12 +1683,12 @@ local function hunt_tick(world)
   end
   for id in pairs(S.orders) do  -- dead or gone: forgotten
     local alive = false
-    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
+    if S.mon[id] and not S.mon[id].dead then alive = true end  -- (0.15.526)
     if not alive then S.orders[id] = nil end
   end
   for id in pairs(S.threat_seen) do  -- (0.15.522)
     local alive = false
-    for _, ids in pairs(S.alive) do if ids[id] then alive = true break end end
+    if S.mon[id] and not S.mon[id].dead then alive = true end  -- (0.15.526)
     if not alive then S.threat_seen[id] = nil end
   end
 end
@@ -1616,8 +1709,8 @@ local function mark_tick(world)
   local resend = now - (S.mark_sent_at or 0) >= MARK_RESEND
   if resend then S.mark_sent_at = now end
   local living = {}
-  for _, ids in pairs(S.alive) do
-    for id in pairs(ids) do
+  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+    do
       living[id] = true
       local share = nil
       local okh, cur, max = pcall(emf.health, world, id)
@@ -1638,53 +1731,10 @@ local function mark_tick(world)
   end
 end
 
--- Forgets monsters that died or are gone.
--- (0.15.482) A monster that died stays known as a body (S.dead) until its group's Remove takes it away; one that is
--- gone from the world is forgotten. Its "spare" hit rule goes when it dies. The rules follow the group's switch.
+-- (0.15.526) Was the old tracking's health read (alive -> body, body -> alive again, spare rules); now the roster's
+-- mon_check is the only one (above). Kept under its name: F.tick calls it.
 local function clean_tick(world)
-  for nid, ids in pairs(S.alive) do
-    local node = data().nodes[tostring(nid)]
-    local g = node and group(node.g)
-    for id in pairs(ids) do
-      local ok, cur = pcall(emf.health, world, id)
-      if not ok or cur == nil then  -- (0.15.487) health not readable: still in the world? then it is still alive for us
-        local okp, px = pcall(world.position, world, id)
-        if okp and px then ok, cur = true, 1 end
-      end
-      S.miss[id] = (not ok or cur == nil) and ((S.miss[id] or 0) + 1) or nil
-      if S.miss[id] and S.miss[id] < MISSES then
-        -- (0.15.483) not read this time: still counted alive (and still protecting) until MISSES checks in a row
-      elseif not ok or not cur or cur <= 0 then
-        ids[id] = nil
-        S.miss[id] = nil
-        if ok and cur then  -- dead, the body still there
-          S.dead[nid] = S.dead[nid] or {}
-          S.dead[nid][id] = true
-        end
-        if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      elseif S.spare_rules[id] then  -- (0.15.525) an EMF rule from before: gone (spare_tick does it now)
-        pcall(emf.hit_rule_remove, S.spare_rules[id])
-        S.spare_rules[id] = nil
-      end
-    end
-    if next(ids) == nil then S.alive[nid] = nil end
-  end
-  for nid, ids in pairs(S.dead) do  -- bodies the game took away
-    for id in pairs(ids) do
-      local ok, cur = pcall(emf.health, world, id)
-      if not ok or cur == nil then ids[id] = nil
-      elseif cur > 0 then
-        -- (0.15.500, owner 15:05 "it said all 41 raid monsters were defeated yet there were still a couple attacking
-        -- me?": monsters 41049, 41050 and 42749 were killed by him at 15:04:57-15:05:08, after the end at 15:04:54:
-        -- they had been counted dead) a body with health again got up (the Undead do): alive again
-        ids[id] = nil
-        S.alive[nid] = S.alive[nid] or {}
-        S.alive[nid][id] = true
-        emf.log(string.format("spawn nodes: node %s: monster %s got up again (health %s): alive again", tostring(nid), tostring(id), tostring(cur)))
-      end
-    end
-    if next(ids) == nil then S.dead[nid] = nil end
-  end
+  mon_check(world)
 end
 
 -- (0.15.478) "Monsters damage buildings": each monster of such a group looks along the line to the nearest player within
@@ -1704,8 +1754,8 @@ local function break_tick(world, spots)
     if g.breaks and S.steps % lv.every == 0 then
       local damage = {}
       for i, d in ipairs(PICKAXE) do damage[i] = math.floor(d * lv.mult) end
-      for _, n in ipairs(nodes_of(g.id)) do
-        for id in pairs(S.alive[n.id] or {}) do
+      for _, id in ipairs(mon_alive(g.id)) do  -- (0.15.526) the roster
+        do
           if hits >= BREAK_MAX then return end
           local ok, x, y, z = pcall(world.position, world, id)
           if ok and x then
@@ -1756,12 +1806,9 @@ end
 -- switch on, one line; written when the list changes (every 2 s at most), and its size logged.
 local function spare_tick()
   local ids = {}
-  for nid, list in pairs(S.alive) do
-    local node = data().nodes[tostring(nid)]
-    local g = node and group(node.g)
-    if g and g.spare then
-      for id in pairs(list) do ids[#ids + 1] = math.floor(tonumber(id) or 0) end
-    end
+  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+    local g = group(S.mon[id].g)
+    if g and g.spare then ids[#ids + 1] = math.floor(tonumber(id) or 0) end
   end
   table.sort(ids)
   local text = table.concat(ids, " ")
@@ -1789,11 +1836,7 @@ local function protect_tick(world, spots)
   for gid in pairs(S.runs) do active[gid] = true end
   for gid in pairs(S.raid) do active[gid] = true end  -- (0.15.500) until its end notice (no gap while a replacement comes)
   for _, g in ipairs(groups()) do
-    if not active[g.id] then
-      for _, n in ipairs(nodes_of(g.id)) do
-        if alive_count(n.id) > 0 then active[g.id] = true break end
-      end
-    end
+    if not active[g.id] and #mon_alive(g.id) > 0 then active[g.id] = true end  -- (0.15.526) any of its monsters (the roster)
   end
   for gid in pairs(active) do
     local g = group(gid)
@@ -1899,12 +1942,8 @@ local function status(gid)
   local g = group(gid)
   if not g then return "" end
   local run = S.runs[gid]
-  local alive = 0
-  local bodies = 0
-  for _, n in ipairs(nodes_of(gid)) do
-    alive = alive + alive_count(n.id)
-    for _ in pairs(S.dead[n.id] or {}) do bodies = bodies + 1 end
-  end
+  local alive = #mon_alive(gid)  -- (0.15.526) the roster: its own ones and those counted apart
+  local bodies = #mon_bodies(gid)
   local a = (alive > 0 and string.format(" %d of its monsters alive.", alive) or "")
     .. ((S.broke[gid] or 0) > 0 and string.format(" Blocks they broke: %d.", S.broke[gid]) or "")
     .. (bodies > 0 and string.format(" %d dead bod%s on the ground.", bodies, bodies == 1 and "y" or "ies") or "")
@@ -2032,7 +2071,7 @@ local function handle(world, account, entity, msg, from)
     if not n then note("That node is gone.") return state(world, account, from) end
     if msg.op == "delete_node" then
       d.nodes[tostring(n.id)] = nil
-      S.alive[n.id] = nil
+      for id, m in pairs(S.mon) do if m.n == n.id then mon_drop(id) end end  -- (0.15.526) as before: its monsters forgotten
       note(string.format("Node %d deleted.", n.id))
       emf.log(string.format("spawn nodes: player %s deleted node %d", who, n.id))
     else
@@ -2080,14 +2119,15 @@ local function handle(world, account, entity, msg, from)
     note(g.name .. " stopped: no more monsters come (its cooldown starts now). Remove its monsters takes away the ones still alive.")
   elseif msg.op == "remove" and g then
     local n, bodies = 0, 0
-    for _, node in ipairs(nodes_of(gid)) do
-      for id in pairs(S.alive[node.id] or {}) do
-        if pcall(emf.destroy, world, id) then n = n + 1 end
-        if S.spare_rules[id] then pcall(emf.hit_rule_remove, S.spare_rules[id]) S.spare_rules[id] = nil end
-      end
-      S.alive[node.id] = nil
-      for id in pairs(S.dead[node.id] or {}) do if pcall(emf.destroy, world, id) then bodies = bodies + 1 end end  -- (0.15.482)
-      S.dead[node.id] = nil
+    -- (0.15.526) the roster: its living monsters (its own and those counted apart), then its bodies of every raid
+    for _, id in ipairs(mon_alive(gid)) do
+      if pcall(emf.destroy, world, id) then n = n + 1 end
+      mon_drop(id)
+    end
+    for _, id in ipairs(mon_bodies(gid)) do  -- (0.15.482)
+      if pcall(emf.destroy, world, id) then bodies = bodies + 1 end
+      mon_drop(id)
+      S.old_bodies[id] = nil
     end
     for i = #S.queue, 1, -1 do
       local q = S.queue[i]
@@ -2117,12 +2157,12 @@ function F.tick(world)
   S.steps = S.steps + 1
   local session = emf.session()
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
-    for _, rid in pairs(S.spare_rules) do pcall(emf.hit_rule_remove, rid) end
-    S.session, S.alive, S.queue, S.runs, S.dead, S.spare_rules = session, {}, {}, {}, {}, {}
-    S.scan, S.scanned, S.miss, S.purge, S.raid, S.started = nil, false, {}, nil, {}, {}
+    S.session, S.queue, S.runs = session, {}, {}
+    S.mon, S.old_bodies = {}, {}  -- (0.15.526) the roster
+    S.scan, S.scanned, S.purge, S.raid, S.started = nil, false, nil, {}, {}
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
-    S.adopted, S.join_hits, S.join_seen = {}, {}, nil  -- (0.15.501)
+    S.join_hits, S.join_seen = {}, nil  -- (0.15.501)
     S.orders = {}  -- (0.15.503)
     S.bad, S.verify = {}, nil  -- (0.15.505)
     S.join_wait = {}  -- (0.15.507)
@@ -2538,6 +2578,10 @@ F._test_S = S  -- (0.15.507)
 F._test_spawn_tick = function(w) spawn_tick(w) end  -- (0.15.508)
 F._test_trickle = function(w) trickle_tick(w) end  -- (0.15.512)
 F._test_hunt = function(w) hunt_tick(w) end  -- (0.15.521)
-F._reset = function() S.data, S.runs, S.alive, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {} end
+F._reset = function() S.data, S.runs, S.mon, S.old_bodies, S.queue, S.last_end, S.next_timer, S.last_tod = nil, {}, {}, {}, {}, {}, {}, {} end
+F._test_mon_check = function(w) mon_check(w) end  -- (0.15.526)
+F._test_raid_tick = function(w) raid_tick(w) end  -- (0.15.526)
+F._test_fire = function(w, gid) return fire(w, gid, "test", true, nil) end  -- (0.15.526)
+F._test_wave = function(w, gid, spots) wave(w, gid, spots) end  -- (0.15.526)
 
 return F
