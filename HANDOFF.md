@@ -2818,3 +2818,7 @@ only one comment block differs from the installed file (code and tooltip identic
 11:06 owner: test monsters' reward and Spawn Nodes' reward must stay separate -> Rule 0t (checked: no dependency either
 way); "for now"/"shared" wording in core/reward_loot.lua and spawn_nodes.lua replaced; experimental.lua notes it; OPEN
 7a struck ("who cares").
+11:23 owner "update my local copy so I can test" -> 0.15.547 live on the local server and the game (Lua only: core/reward_loot.lua,
+core/loot_chest.lua, core/loot_skip.lua (new), features/spawn_nodes.lua, loot_drop.lua, loose_loot.lua, experimental.lua,
+mod.json, changes.txt; md5 checked against the repo). Reloaded 11:23:59 (server) and 11:24:02 (game): 22 features, no
+errors, no raid started. OPEN items 4-7 are now testable in the game.
