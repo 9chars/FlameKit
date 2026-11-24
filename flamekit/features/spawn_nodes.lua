@@ -1,37 +1,74 @@
--- features/spawn_nodes.lua (0.15.476; monster tracking rewritten 0.15.526, owner 2026-11-23 10:53 "I'd like a way to place down "nodes" around the map that
--- could be configured to spawn monsters periodically based on how I set it up", 10:53 admins only, "maybe it would be
--- used as part a larger "raid" type system for spawning monsters against peoples bases", 11:03 "just go to the location
--- I want and click add node", 11:06 "can you group the nodes together also such that when a trigger is activated, all
--- the nodes work together? ... control the monster group type ... (foggers, vukah, scavengers, undead, etc) ... set it
--- to random ... multiple different groups with multiple different nodes", 11:08 "all 5 of those triggers would be good
--- ... lets go ahead and build it"): the Spawn Nodes tab, for FlameKit admins.
+-- features/spawn_nodes.lua: the Spawn Nodes system (raids). Started 0.15.476 (owner 2026-11-23 10:53 "I'd like a way to
+-- place down "nodes" around the map that could be configured to spawn monsters periodically based on how I set it up",
+-- 11:06 "can you group the nodes together ... multiple different groups with multiple different nodes", 11:08 "all 5 of
+-- those triggers would be good ... lets go ahead and build it"); monster tracking rewritten 0.15.526.
 --
--- A NODE is only a saved place (x, y, z) that belongs to a GROUP; nothing of it is in the game world, so players cannot
--- see or touch it. Only the monsters it spawns are real (ordinary monsters of the game, not test monsters).
--- A GROUP has: a name ("Group 1"), on/off, a monster type (one of core/monsters.lua's groups, Random, or (0.15.477) Bosses),
--- a trigger, and a run: `waves` waves `wave_gap` seconds apart, each wave `per_wave` monsters at every node of the
--- group, never more than `max_alive` alive from one node; then `cooldown` minutes before the trigger can fire again.
--- TRIGGERS: manual ("Start now" only), timer (every `timer_min` to `timer_max` minutes, a random time in between),
--- trip wire (a player within `wire_r` m of the group's trip wire point, set with "Put trip wire here"), time of day
--- (when the game's clock passes `hour`), base raid (a player inside a flame altar area within `raid_r` m of one of the
--- group's nodes). "Start now" works for every trigger and ignores the cooldown.
--- (0.15.491: a group starts and its waves come only while a player is within its near_r of one of its nodes.) Before: a node spawned only while a player was within ACTIVE_DIST m of it (the game removes monsters far from every player);
--- the others skip that wave. Monsters spawn within SPREAD m of their node, on the ground found there (find_surface).
--- Kept on the server in spawn_nodes.json (kit.store): groups and nodes. What runs (waves, monsters alive) is not kept:
--- a restart or reload ends running waves; the game keeps or removes the monsters as it does any monster.
+-- ==== WHAT IT IS (as the code works in 0.15.547; the sections below hold the details and the owner's words) ====
+-- A NODE is only a saved place (x, y, z, facing, its own "Spawn within" distance) that belongs to a GROUP; nothing of it
+-- is in the game world. Only the monsters it spawns are real: ordinary monsters of the game (not FlameKit's test
+-- monsters), each tagged with its group in a ScaleComponent (TAG_BASE - group * TAG_STEP: 0.996, 0.99598, ...; the test
+-- monsters' tag is 0.999) so a reload or restart finds them again (scan_tick).
+-- At most MAX_GROUPS (30) groups and MAX_NODES (200) nodes on the server, all groups together.
 --
--- ADMINS ONLY (until 0.15.545; since 0.15.546, owner 2026-11-24 08:43, OPEN TO EVERY PLAYER for testing: is_admin):
--- every change and the node list go only to FlameKit admins (core/admins.lua). An admin's own game shows
--- the nodes and trip wires as markers (emf.marker: over the 3D view and on the map; only in that game, EMF Lua 1.25+),
--- while "Show nodes" is on (this game's own switch, spawn_nodes_client.json). Other players' games never get the list.
--- The channel "nodes": a player's game asks with {op = "get"}; the server answers {op = "state", admin, groups, nodes,
--- status, note}; an admin's clicks send {op = ...} (below). In a game that hosts the world everything is done right here.
--- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and "Players cannot damage placed
--- objects during its waves" (protect_tick); (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage
--- to" and Remove "by node group ... including the dead ones on the ground") "Its monsters spare animals, pets and villagers"
--- (0.15.525: FlameKit Native's spare list, spare_tick; until 0.15.524 an EMF hit rule that also kept them from hurting
--- other monsters) and Remove takes the group's dead bodies too; (0.15.479) renamed "Players cannot change bases during its waves": also the
--- players near its nodes lose the game's base editing permission while it runs (raid_lock_server.txt, FlameKit Native).
+-- A GROUP's settings (DEFAULTS; the drop-down choices in CHOICES), by the tab's sections:
+--   Raid rules: on (Group on: off = its trigger never fires; Start now still works), announce (the notices), mark (Raid
+--     monster markers), spare (its monsters' hits on anything but players do nothing: FlameKit Native's spare list),
+--     protect (players near its nodes lose the game's base editing permission and players' hits on placed objects do
+--     nothing, while it runs), breaks + break_level (its monsters hit player-built blocks).
+--   Monsters: family (a monster group of core/monsters.lua, Random, or Bosses), face (which way a new monster faces),
+--     per_wave (monsters per node per wave, spawned one by one), max_alive (most alive per node at once),
+--     start_level (0 = the game's own) + level_step (added per wave after the first; never above K.MAX_LEVEL 100),
+--     loot (normal / reward / both / none: see K.on_death).
+--   When: trigger (manual = Start now only; timer = a random time between timer_min and timer_max minutes; wire = a
+--     player within wire_r m of its trip wire; time = the game's clock passes `hour`; raid = a player inside a flame
+--     altar area whose middle is within raid_r m of one of its nodes), start_delay (the first monsters come this long
+--     after the start notice), near_r (a group starts, and its waves come, only while a player is within this of one of
+--     its nodes), waves, wave_dead (the Between waves time starts only when this share of the last wave is dead; 0 = when
+--     it has spawned), wave_gap (Between waves, s), duration (the raid ends after this many minutes, its living monsters
+--     taken away; 0 = no limit), cooldown (minutes before its trigger can fire again; Start now ignores it).
+--
+-- A RAID: fire() starts a run (waves); wave() gives each node per_wave monsters to spawn; trickle_tick queues them one by
+-- one while fewer than max_alive of the node's are alive; spawn_tick spawns them (on the ground within the node's
+-- distance, find_surface). The roster S.mon (mon_add / mon_check every 0.25 s) is the only count of who is alive: its
+-- own monsters, and "counted apart" ones (summons and monsters of the world that come into the raid: join_tick /
+-- try_join; never players, FlameKit's test monsters or loot chests). raid_tick sends the notices (the red start notice
+-- with the place from the starter's minimap, wave notices, "N of TOTAL monsters left to kill" from the first monster on,
+-- updated as they die (left_tick), the end) and ends the raid when nothing of it is alive for END_GRACE s and a search of
+-- the whole world found none (verify_tick). Stop ends the waves; Remove takes the group's monsters and bodies away.
+-- While a raid runs: THE ANIMAL HOLD (below), Raid monster markers on every player's game (mark_tick, at most
+-- K.MARK_BUDGET messages per check), the raid lock / protection / spare files for FlameKit Native.
+--
+-- WHO: since 0.15.546 (owner 2026-11-24 08:43 "remove all the admin restrictions ... so other players can test it out")
+-- EVERY PLAYER counts as an admin here (is_admin returns true; admins.is is named there to restrict it again).
+-- WHERE IT IS SHOWN: the Spawn Nodes tab (F.panel: the group's settings) and, since 0.15.539, the Spawn Nodes window
+-- (F.window_rows: group, Start / Stop / Remove, Add node here, Show nodes, Put trip wire here, the nearest nodes), drawn by
+-- FlameKit Native from features/native_ui.lua. "Show nodes" (this game's own switch, spawn_nodes_client.json) shows
+-- every node and trip wire as markers in that game only.
+-- THE CHANNEL "nodes": a player's game asks {op = "get"}; the server answers {op = "state", admin, groups, nodes, status,
+-- note, ...}; clicks send {op = new_group, delete_group, set, start, stop, remove, add_node, move_node, delete_node,
+-- node_spread, wire_here}; the server sends {op = notice} (a raid notice and its siren) and {op = place_ask} (where are
+-- you, by your minimap), answered {op = place}. In a game that hosts the world everything is done right here.
+--
+-- KEPT (kit.store, on the server): spawn_nodes.json = the groups (with each group's last raid end: its cooldown, since
+-- 0.15.547) and nodes; spawn_nodes_raid.json = the running raids and runs, taken back after a FlameKit reload in the same
+-- world run (restore; a server restart ends them: another session token). Files for FlameKit Native in this folder:
+-- raid_lock_server.txt, raid_protect_server.txt, spare_server.txt, animal_hold_server.txt (and it reads
+-- altar_areas_server.txt, base_names_server.txt, where_now.txt).
+--
+-- STILL ON FROM THE 2026-11-23 PATH INVESTIGATION (test logging, costs server time every step; see HANDOFF "OPEN"):
+-- PATH_CENSUS (a census of every entity's path finder, logged every CENSUS_S s), ai_tick (each raid monster's AI,
+-- up to AI_LOG_MAX lines a raid), the full recordings (core/fullrec.lua: the first monster of REC_NODES nodes for REC_S
+-- s), HUNT_ON and THREAT_ON (each raid monster ordered at / threat-listed for the nearest player); PATH_PUSH and STUCK_ON
+-- are off.
+-- This file is at Lua's 200 top-level locals: newer constants and modules are in the table K.
+--
+-- ==== HISTORY NOTES (what each part was added for; the code below has the details) ====
+-- (0.15.478) Two raid switches per group: "Monsters damage buildings" (break_tick) and the protection (protect_tick);
+-- (0.15.482, owner 12:36 "we need an option to protect animals and pets from damage to" and Remove "by node group ...
+-- including the dead ones on the ground") "Its monsters spare animals, pets and villagers" (0.15.525: FlameKit Native's
+-- spare list, spare_tick; until 0.15.524 an EMF hit rule that also kept them from hurting other monsters) and Remove takes
+-- the group's dead bodies too; (0.15.479) the players near its nodes lose the game's base editing permission while it runs
+-- (raid_lock_server.txt, FlameKit Native); (0.15.484, owner 12:50) its label "Players cannot damage base structures during raid".
 -- (0.15.538) !!! THE ANIMAL HOLD, every raid, always on: from a raid's start until it is over, tamed animals ask the
 -- game for no walks and stand still (animal_hold_server.txt -> FlameKit Native). WITHOUT IT RAID MONSTERS STAND
 -- AROUND FOR A MINUTE OR MORE: the animals' failing walk searches fill the game's one path search (measured

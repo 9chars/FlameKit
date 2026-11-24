@@ -3,7 +3,8 @@
 -- (exactly like how test monsters work), normal monster loot, and/or no loot ... if the player chooses no loot, it drops
 -- nothing"): the test monsters' Reward loot (features/experimental.lua drop_test_loot, 0.15.142-0.15.186) as shared core
 -- code, so Spawn Nodes can use it without reaching into another feature (HANDOFF rule 0b). Experimental keeps its own
--- copy for now; the two do the same.
+-- copy for now, and they differ: Experimental's still tries the killer's bag first (which the owner says does not land
+-- in the game: everything is in the chest there); this one puts everything into the chest. HANDOFF "OPEN" item 3.
 --
 --   reward.give(world, x, y, z, killer, level, boss)  a kill's reward, all of it in a loot chest that comes up on the
 --        ground at x, y, z (core/loot_chest.lua): 10 or 15 runes and 5 or 10 legendary runes (twice for a boss) and one

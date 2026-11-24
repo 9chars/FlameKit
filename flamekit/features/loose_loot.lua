@@ -18,6 +18,8 @@
 -- killed; it is taken at once. The news are read only while a drop is awaited. Items that were there before are never reported, so they are never taken.
 -- Learned on the local server (2026-11-21 12:49-12:54): trees are entities with Health and no Faction; the breaking
 -- hit (killed) comes when the tree is gone (no position: the hit's own position is used).
+-- (0.15.547) A monster marked in core/loot_skip.lua is left alone (Spawn Nodes: a group with "Reward loot" or "No loot"
+-- removes what its monsters throw loose itself, core/reward_loot.lua).
 -- Uses only core modules (HANDOFF rule 0b).
 
 local route = require("core.loot_route")

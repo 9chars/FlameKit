@@ -8,6 +8,9 @@
 -- death, a boss's (Boss component) after 45 s. Players and their bodies are never touched.
 -- What a loose item cannot carry (core/ground_loot.lua): a gem socketed into a weapon. A piece that has one stays in
 -- the body (pressing E still gets it) and the body is then left to the game.
+-- (0.15.547) A body marked in core/loot_skip.lua is left alone: Spawn Nodes marks the monsters of a group whose Loot is
+-- "Reward loot" or "No loot" (it removes their game loot itself; before, this feature's first look 0.5 s after the death
+-- took that loot to the killer first). FlameKit's test monsters (core/test_tag.lua) are left alone too.
 -- Uses only core modules (HANDOFF rule 0b). The death event (EntityDiedEvent) needs one server restart after the
 -- update that brought it (EMF delivers an event only to scripts that asked for it when the server started).
 

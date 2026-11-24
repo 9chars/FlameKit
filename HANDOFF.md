@@ -2,6 +2,53 @@
 
 Read this first when starting a new conversation about FlameKit. Updated 2026-11-23 18:45 (START HERE section first); before that 2026-11-17 07:25 (versions: "Where things stand" below). First written 2026-11-13.
 
+## OPEN: UNRESOLVED ISSUES AND TESTS STILL TO DO (owner 2026-11-24 10:18 "just note the unresolved issues / tests some place for future reference")
+
+Keep this list current: strike an item only with the test or the owner's word that settles it (date it).
+
+**Not tested in the game (found by reading the code, 2026-11-24 10:08 cross-check):**
+1. Free build vs the raid lock: whether a player in a Free build area (FlameKit Native build zones) can still build or
+   dismantle while the raid lock has cleared his EDIT BASE permission. Test: Free build on, stand by a raid's node, start
+   the raid, try to place and to dismantle.
+2. Experimental's PvP hit rules vs Spawn Nodes' "spare animals, pets and villagers" (FlameKit Native's spare list):
+   which wins for a raid monster's hit on a pet while someone has PvP on. Test: PvP on, a raid with spare on, a pet near.
+3. Experimental's test monster Reward loot: its code (drop_test_loot) still tries emf.put into the killer's bag first;
+   the owner sees all of it in the chest (10:01). Why the bag put does not land is not known. Experimental keeps its own
+   copy of the reward code; core/reward_loot.lua (Spawn Nodes) puts everything into the chest. Not merged.
+
+**0.15.547 (Starting level, Level per wave, Loot, the fixes of 10:08) is not tested in the game yet:**
+4. Starting level / Level per wave: the monsters' health and damage really follow the set level (core/spawn.lua
+   set_level, as the test monsters); the per-wave rise; never above 100.
+5. Loot "Reward loot": a loot chest by each body with runes, legendary runes and a legendary item at its level; nothing
+   of the game's own (body emptied, loot pile and loose drops gone). Kill with Auto Loot set to Main bag: nothing must
+   reach the bag. A Shroud Fog Nest drone (it throws Archaic Essence loose): nothing must stay on the ground.
+6. Loot "No loot": nothing at all, also with Auto Loot on. "Reward + normal loot": the chest and the game's own loot.
+7. A group's cooldown after a FlameKit reload and after a server restart (it is kept now): a Base raid group must not
+   fire again at once.
+
+**Performance / leftovers:**
+8. The 2026-11-23 path investigation's test logging still runs on the server (features/spawn_nodes.lua: PATH_CENSUS, the
+   ai_tick logs, the 90 s full recordings, HUNT_ON, THREAT_ON). FlameKit took 28 ms in one server step at 07:52. Owner
+   to decide whether it goes.
+9. features/spawn_nodes.lua is at Lua's 200 top-level locals (newer things in the table K). The lasting fix is splitting
+   it into parts like the companions (features/companions/*.lua). Not asked for.
+10. Spawn Nodes is open to every player (0.15.546, "for now ... so other players can test it out"): restrict again with
+    the line named in is_admin.
+11. An old features/chop_loot.lua is in the local server's mods folder; main.lua does not load it.
+
+**Raids, measured but not solved:**
+12. Oversized raids (79 monsters at once, 22:44): even with the animals held the game's path search fell behind (median
+    22 s, max 75 s for a monster's path). The owner made that raid bigger than normal on purpose; normal sizes (29) were
+    fine (0-4 s).
+13. The owner believes the companions' game-AI pathing failed for the same reason as the raids (the base's tamed
+    animals); not measured (before the probe existed).
+14. Raids at a base other than the main one (other tamed animals there) not tried with the animal hold.
+15. Raid monster markers after Stop + Remove with 80+ monsters (0.15.541: at most 30 messages per check, take-offs
+    repeated): passed in the fake-EMF test (tools/sntest/mk.lua); not yet watched in the game.
+
+**Releases:** the Development channel (dist-test) is still 0.15.525 and Stable (dist) 0.15.475; nothing since was
+packaged or signed. G-Portal untouched. Only the owner's word moves those (Rule 0g).
+
 ## !!! THE ANIMAL HOLD: WHY RAID MONSTERS STOOD AROUND, AND THE FIX (0.15.538, 2026-11-23 22:29) !!!
 
 **Owner 22:28 "before a raid starts it has to stop all the animals", 22:29 "can you build that into the system and note it heavily".**
@@ -2726,3 +2773,10 @@ still tries the killer's bag first, which the owner says does not land); the tes
 step (PATH_CENSUS, ai_tick logs, fullrec 90 s recordings; 28 ms step seen 07:52).
 Files for the install (server + game): core/reward_loot.lua, core/loot_chest.lua, core/loot_skip.lua (new),
 features/spawn_nodes.lua, features/loot_drop.lua, features/loose_loot.lua, features/experimental.lua, mod.json, changes.txt.
+10:18 owner "just note the unresolved issues / tests some place for future reference. make sure the code and features
+are well documented and accurately documented based on what the code is actually doing so there cannot be any future
+confusion" -> the "OPEN" section at the top of this file; features/spawn_nodes.lua's header rewritten to what the code
+does now (it still said admins only, that running raids are lost at a reload, and listed half the settings);
+features/loot_drop.lua and features/loose_loot.lua headers name core/loot_skip.lua; flamekit/README.md: the tabs
+(Building, Spawn Nodes, Settings, Windows, About were missing) and the server install (it said a dedicated server does
+not need flamekit_native: it does, for Free build and the raid parts).
