@@ -2531,3 +2531,5 @@ search steps) for the whole raid. BUT this raid was much bigger: 79 monsters / 1
 54 requests gone without being searched (some will be monsters that died); 15 step-limit hits, all raid monsters. So
 the animals were a real cause (the test proved it), and the game's path search ALSO can't keep up with ~80 monsters at
 once. Not investigated yet.
+07:07 owner: "I made the raid size larger than it would normally be" -> the 22:44 raid (79 monsters) was deliberately
+oversized; the backlog at that size is not the normal case. The 22:17 raid (29 monsters, animals held) is closer to normal.
