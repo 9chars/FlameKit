@@ -2915,7 +2915,10 @@ remove as needed #5 leave it alone [Spawn Nodes open to all] #6 appears to work 
 [loot] #8 not test [cooldown after reload/restart] #9 not worried about testing that right now [Free build vs raid lock]
 #10 seems to work [sn_enabled switch] #11 seems to work [pets protection] #12 seems to work [markers 80+] #13 not tested
 [raid at another base] #16 can anything be cleaned up with this? [200 locals]".
-**0.15.553 (the clean-up of #1-#4; built 12:41:43, DLL f9102355...; NOT installed, restart asked):**
+**0.15.553 (the clean-up of #1-#4; built 12:41:43, DLL f9102355...; 12:47 owner "Restart Both": installed, server up
+12:48:00 ("animal hold: hooks ... installed", "free build: FlameKit's zones are added right after ...", raid protection hook on,
+21 features, no errors; no probe/census/tame test lines), game 12:49:18 21 features, no errors; old DLL kept as
+.old_551 in both, .old_550 deleted):**
 - spawn_nodes.lua: removed the path census (census_tick, PATH_CENSUS), ai_tick and its mon_kind/MON_NAME, the full
   recordings (REC_NODES/REC_S, fullrec.start/event/tick/stop_all), path_push (PATH_PUSH, off since 0.15.534), the
   load-time "census: entity ... alive" lines. core/fullrec.lua deleted (nothing else used it; the companions have their
@@ -2936,4 +2939,4 @@ remove as needed #5 leave it alone [Spawn Nodes open to all] #6 appears to work 
   .old_v412...v439 files); game: .old_403 ... .old_539 and the 25 hidden .old_v* files, _old_free_build_tool.txt. Kept:
   flamekit_native.dll.old_550 in both. At the install: core/fullrec.lua and features/build_anywhere.lua go from the
   server, the game and the work folder.
-
+spawn_nodes.lua top-level locals after 0.15.553: 177 of Lua's 200 (194 before); 3079 lines (3313 before).
