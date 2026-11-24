@@ -2295,3 +2295,12 @@ its last line. Max 1500 lines a raid. core/threat.lua: ai(), key() (read only). 
 duelist skeleton that attacked every time (spawned 3 m in front of him). Tests tools/sntest ai.lua + tr.lua + rl.lua ALL
 OK. On the local server 19:23:01 (no raid; 22 features, no error). Server-only (rule 0d). Next: owner runs a raid, Claude
 reads the ai lines.
+
+## 0.15.528 (Nov 23, 19:32) Spawn Nodes: monster type in the ai lines (owner 19:30 "go ahead")
+Findings of the 19:27 raid (0.15.527 ai lines): the player shows up in their threat table at 4-12 m (flat, same height)
+but only as slot state 1-2 with aggro 0, never Alarmed (3); AI state alternates 2 and 15 (= standing / walking around).
+19:28:19 three switched to state 6 (fight), target 1, slot Alarmed aggro 12 (trigger not logged; maybe his hit) and then
+STILL did not come closer: 0.0-1.7 m in 10 s at 6-10 m. Undead pool has casters/summoners (Mage01, Elite Necromancer,
+Hollow Wisp, ...; summons joined 19:28:25), so the ai lines now carry the type (mon_kind: S.track guid, else
+emf.template -> core/monsters.lua name). Duelist comparison test (Experimental, Undead: Melee01, 10 m) proposed earlier,
+not run.

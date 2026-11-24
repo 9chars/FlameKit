@@ -1,3 +1,6 @@
+0.15.528 Nov 23, 2026
+- Spawn Nodes (logging only): the "spawn nodes: ai" lines also name the monster (for example "Undead: Mage01").
+
 0.15.527 Nov 23, 2026
 - Spawn Nodes (logging only, nothing changes for the monsters): the server log shows, for each raid monster, what its AI is doing (its state, its target and who is in its threat table) whenever that changes, and every 10 s anyway, with how far the nearest player is and how far it moved. Lines start with "spawn nodes: ai".
 

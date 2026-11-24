@@ -1702,6 +1702,19 @@ end
 -- apart: it never notices the player (never in its threat table), notices him but its state never changes, or it
 -- fights (state 6, measured 0.15.68) but does not move. At most AI_LOG_MAX lines a raid.
 local AI_STEPS = 30
+-- (0.15.528, owner 19:30 "go ahead": which monster each one is) template GUID -> "Family: name" from core/monsters.lua
+local MON_NAME = {}
+for _, mm in ipairs(monsters) do MON_NAME[mm[3]] = mm[1] .. ": " .. mm[2] end
+local function mon_kind(world, id)
+  local guid = S.track[id] and S.track[id].guid
+  if not guid then
+    local okg, g = pcall(emf.template, world, id)
+    guid = okg and g or nil
+  end
+  if not guid then return "type not known" end
+  guid = tostring(guid)
+  return MON_NAME[guid] or MON_NAME[guid:lower()] or ("template " .. guid)
+end
 local AI_EVERY_S = 10
 local AI_LOG_MAX = 1500
 local function ai_tick(world)
@@ -1728,8 +1741,8 @@ local function ai_tick(world)
         local moved = m.ai_pos and math.sqrt(dist2(x, y, z, m.ai_pos[1], m.ai_pos[2], m.ai_pos[3])) or 0
         local okl, line = pcall(threat.line, world, id)
         S.ai_log = (S.ai_log or 0) + 1
-        emf.log(string.format("spawn nodes: ai%s: monster %s (node %s, %s, %d s old) at %.1f %.1f %.1f: state %s, target %s, threat table [%s]; nearest player %s %.1f m away (%+.1f m height), moved %.1f m in %d s",
-          key ~= m.ai_key and "" or " (10 s)", tostring(id), tostring(m.n), m.own and "its own" or "counted apart", now - m.born, x, y, z,
+        emf.log(string.format("spawn nodes: ai%s: monster %s [%s] (node %s, %s, %d s old) at %.1f %.1f %.1f: state %s, target %s, threat table [%s]; nearest player %s %.1f m away (%+.1f m height), moved %.1f m in %d s",
+          key ~= m.ai_key and "" or " (10 s)", tostring(id), mon_kind(world, id), tostring(m.n), m.own and "its own" or "counted apart", now - m.born, x, y, z,
           tostring(st), tostring(tgt), okl and line or "?", pl and tostring(pl[1]) or "none", best and math.sqrt(best) or -1,
           pl and (pl[3] - y) or 0, moved, now - (m.ai_at or m.born)))
         m.ai_key, m.ai_pos, m.ai_at = key, { x, y, z }, now
