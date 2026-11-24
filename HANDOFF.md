@@ -163,6 +163,12 @@ words why (e.g. "Restart: none: EMF reloaded the server's Lua by itself"). Owner
 while to read all your shit to figure out if I need to restart or not ... I have to keep telling and asking you this."
 No exceptions, also for small changes, probes and test copies.
 
+## Rule 0q: CORE DIRECTIVE, a question gets an answer, not a change (owner, 2026-11-24 07:37)
+
+"no stop trying to suggest changing things when I ask questions". When the owner asks a question, answer it and stop:
+no proposal to change anything, and no closing "Should I change/rename/build ...?" question. This overrides the old
+habit of ending every reply with a yes/no question: a reply to a question needs none.
+
 ## Rule 0x: CORE DIRECTIVE, ASK before every restart (owner, 2026-11-22 16:45-16:47)
 
 2026-11-22 16:45:06 Claude restarted the local server and game during the owner's water test after "its been running
@@ -2557,3 +2563,5 @@ native_ui.lua, mod.json, changes.txt) and the GAME (D:\...\Enshrouded\emf, conne
 mod.json; flamekit\features\spawn_nodes.lua, native_ui.lua, core\fullrec.lua (was missing), core\threat.lua (was older),
 mod.json, changes.txt; the game had been on 0.15.525; chop_loot.lua is on the server only, left alone). Up 07:26:36.
 Game log: FlameKit Native loaded, "22 feature(s) loaded", no errors.
+
+07:37 owner: "no stop trying to suggest changing things when I ask questions" -> Rule 0q (top of the file).
