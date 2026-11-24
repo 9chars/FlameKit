@@ -2357,3 +2357,4 @@ think that its causing monsters not to move". Claude said: not proven to cause t
 stood ~30 s), but it is a second mechanism for a job find_surface already does (rule 0n) -> removed from spawn_nodes
 (core/spawn.lua stays for experimental's test monsters). New log line "first moved N s after it appeared (... a Teleport
 on it: yes/no)".
+On the local server 20:18:17 (owner 20:18 "i ended the raid"; 22 features, no error).
