@@ -2280,4 +2280,5 @@ own, tagged dead -> old_bodies. Stuck/orders/threat/spot check KEPT, still OFF, 
 Logs: "spawn nodes: roster: ..." (add, died, got up, forgotten, new raid). Tests: tools/sntest/tr.lua + rl.lua in the repo (texlua,
 mock world; also run with the switches on): ALL OK. Server-only (rule 0d): flamekit/mod.json 0.15.526 + changes.txt; no
 DLL, no Development channel. Files: C:\enshrouded mod shit\Claude outputs\0.15.526\. Pushed 19:10 (owner 19:08 "you
-need to push it to git"; add_repo was refused at 18:49 and worked at 19:08). NOT yet on the local server: asked.
+need to push it to git"; add_repo was refused at 18:49 and worked at 19:08). Owner 19:12 "yes": on the local
+server 19:12:49 (reload: 22 features, no error; scan found 14 tagged = bodies, put aside; 0 raids taken back).
