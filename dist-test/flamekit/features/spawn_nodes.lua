@@ -1338,7 +1338,13 @@ end
 -- (0.15.493) Every 2 s: monsters in the ground, in water or stuck are taken away and come again at their node (see
 -- STUCK_S). S.track[id] = { x, y, z (where it was), at (since when), born, guid, q (its queue entry) }; S.active_at[id]:
 -- the last hit it gave or took (emf.on_hit) or wall it broke.
+-- (0.15.524, owner 18:14 "and just spawn the monsters and see what happens.. no threat table no spot check none of
+-- that") test switches: STUCK_ON (this whole stuck/ground/water/fall handling), HUNT_ON (the enemy orders), THREAT_ON
+-- (the threat table writes). All off: monsters are only spawned (with the game's ground move) and counted; the 10 s
+-- hunt summary still logs how many moved.
+local STUCK_ON, HUNT_ON, THREAT_ON = false, false, false
 local function stuck_tick(world)
+  if not STUCK_ON then return end
   local now = os.time()
   local spots = player_spots(world)
   for nid, ids in pairs(S.alive) do
@@ -1500,9 +1506,7 @@ local HUNT_R = 120
 local THREAT_R = 50            -- m: (0.15.521, owner 17:21) every player this near is written into a raid monster's threat table
 
 local function hunt_tick(world)
-  if not emf.enemy_order then return end
   local spots = player_spots(world)
-  if #spots == 0 then return end
   local now0 = os.time()
   for _, ids in pairs(S.alive) do
     for id in pairs(ids) do
@@ -1512,7 +1516,7 @@ local function hunt_tick(world)
       -- table (core/threat.lua: the way PvP players are, experimental.lua since 0.15.69), as Alarmed, every hunt tick
       -- (2 s) while he is that near, and the game's own AddThreatTargetEvent is sent once for him. No hits.
       local okp0, px0, py0, pz0 = pcall(world.position, world, id)
-      if okp0 and px0 then
+      if THREAT_ON and okp0 and px0 then  -- (0.15.524) off for the test
         local seen = S.threat_seen[id] or {}
         S.threat_seen[id] = seen
         for _, p in ipairs(spots) do
@@ -1536,7 +1540,7 @@ local function hunt_tick(world)
       local o = S.orders[id]
       local okt, tgt = pcall(emf.enemy_target, world, id)
       local still = o and okt and tgt == o.target
-      if not still and (not o or os.time() - o.at >= 4) then
+      if HUNT_ON and emf.enemy_order and #spots > 0 and not still and (not o or os.time() - o.at >= 4) then  -- (0.15.524) off for the test
         local okp, x, y, z = pcall(world.position, world, id)
         if okp and x then
           local best, pid = nil, nil

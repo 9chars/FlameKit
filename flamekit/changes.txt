@@ -1,3 +1,6 @@
+0.15.524 Nov 23, 2026
+- Spawn Nodes (test): monsters are only spawned and counted. No orders to go for players, no threat table writes, and no stuck, ground, water or fall handling (nothing is moved or taken away and spawned again). The log still says every 10 s how many moved.
+
 0.15.523 Nov 23, 2026
 - Spawn Nodes: the spot check on the game's path grid is switched off: it no longer answered and held every spawn back 0.75 s.
 

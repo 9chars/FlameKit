@@ -2142,3 +2142,9 @@ runs FlameKit vX, too old for this game...". An older server that is still compa
 | 0.15.141 | server: cap 1000, hexagonal grid, seen_alive; game: no 5000 button | no: a 0.15.140 game asking for 5000 gets 1000 |
 | 0.15.142 | server: Loot Drop (EntityDiedEvent: one server restart), Server tab channel srv, test monster loot; game: the Server tab | no: an older game has no Server tab; an older server: the tab says no settings came |
 | 0.15.143 | server: Loot Drop looks again (0.5/1.5/3/6 s), removes a body only after its loot came out | no |
+
+## 0.15.524 (Nov 23, 18:20) Spawn Nodes test: spawn only
+Owner 18:14: "and just spawn the monsters and see what happens.. no threat table no spot check none of that".
+spawn_nodes.lua switches STUCK_ON / HUNT_ON / THREAT_ON = false (PATH_CHECK already false since 0.15.523).
+Still on: spawning with the ground teleport, counting, trickle/waves, notices, siren, markers, revive check, summons joining,
+and the 10 s "hunt: N alive ... moved" summary in the log. Turn a switch back on only when the owner says so.
