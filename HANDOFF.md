@@ -2665,3 +2665,5 @@ Owner 08:42-08:43 questions answered: Spawn Nodes is its own feature (features/s
 enabled_setting); the 200-locals limit is a code-layout limit (fix = split into parts like companions); asked "should
 it have its own on/off feature button?" -> answered yes in my view (test probes still run on the server: PATH_CENSUS,
 ai_tick logging, fullrec 90 s recordings; 28 ms step at 07:52); not built (not asked to).
+08:45 owner "yes" -> 0.15.546 (with 0.15.545) live (spawn_nodes.lua 918c31ae..., mod.json, changes.txt) on the server
+and the game; reloaded 08:45:35-36, no errors, no raid started by the reload. SPAWN NODES IS OPEN TO EVERY PLAYER NOW.
