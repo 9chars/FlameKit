@@ -3003,3 +3003,11 @@ checks that. Uploaded to G-Portal 21:03:41 (spawn_nodes.lua, changes.txt, mod.js
 server, game and work folder. NOT in the update channels (still 0.15.554; server-side only). Owner 21:02 "we've been
 running TONS of spawns tonight with no crashes", 21:04 "I deleted some nodes..". OPEN: the real fix (no single step over
 250 ms with a big raid on a big world: measure, then spread join_tick / the spawns over steps).
+**21:17:29 G-Portal FlameKit PAUSED AGAIN** (owner 21:18 "it crashed again. I guess I need the command"): Group 6 (player 2,
+Scavengers, per_wave 15, max_alive 40, level 100, many nodes 67-75+ spread ~3676-3714 958 1287-1296): its wave-1 spawn
+step logged its last line at 21:17:29.338, then 272 ms with no line, then the pause at .610: what ran in those 272 ms is
+NOT known (no log in it). README.md re-uploaded 21:19:12 -> reload only at 21:25:49 (G-Portal time, ~1 min behind):
+EMF on G-Portal took ~6 min to see the changed file this time (20:55 -> ~1 min). 0.15.555 worked: "1 running raid(s)
+ended, not carried on". main.lua re-uploaded 21:27 too (not needed). NEW: release\FlameKit FTP tool\wake_flamekit.cmd
+(owner double-clicks it): copies flamekit\README.md into the outbox and runs upload.ps1 (OPEN #17 option a); not
+added to the repository (the FTP tool folder is not in it).
