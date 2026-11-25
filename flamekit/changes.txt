@@ -1,3 +1,6 @@
+0.15.556 Nov 24, 2026
+- Spawn Nodes: big raids are spread over more server steps (a time limit per step), so they no longer stall the server script.
+
 0.15.555 Nov 24, 2026
 - Spawn Nodes: a raid running when FlameKit reloads on the server now ends instead of carrying on.
 

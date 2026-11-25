@@ -3011,3 +3011,13 @@ EMF on G-Portal took ~6 min to see the changed file this time (20:55 -> ~1 min).
 ended, not carried on". main.lua re-uploaded 21:27 too (not needed). NEW: release\FlameKit FTP tool\wake_flamekit.cmd
 (owner double-clicks it): copies flamekit\README.md into the outbox and runs upload.ps1 (OPEN #17 option a); not
 added to the repository (the FTP tool folder is not in it).
+**21:32:57 third G-Portal pause** (Group 6 again, same spawn lines then 287 ms silent). **0.15.556 (owner 21:36 "is there a
+way to stagger them briefly so the server doesn't crash out?", 21:37 "is that a quick update?"):** spawn_nodes.lua: F.tick
+now runs K.step under a TIME LIMIT PER STEP (K.STEP_BUDGET 0.08 s by os.clock): spawn_tick stops at it (one spawn always;
+the rest stays queued), hunt_tick stops at it and goes on next time where it stopped (K.hunt_i, at least one monster),
+the once-a-second block (trigger, protect, hold, spare, raid, time, persist) waits one step when the limit is used up
+(never two in a row: K.check_late). Every part is timed (K.part); a Spawn Nodes step over 50 ms logs "spawn nodes: slow
+step: N ms (part ms, ...); Q queued, A alive" (at most 200 lines a load). NOT limited: one single call that itself takes
+long (e.g. join_tick's world:entities() walk, mark_tick, clean_tick, one wave()): the slow-step line will show it. All 15
+sntests + run.lua OK; also with the limit forced to 0. G-Portal upload 21:40:05 -> reload 21:39:02 G-Portal time ("mod.json
+changed: 41 settings"; Group 6's raid ended by 0.15.555); installed locally (reload 21:40:18, no errors).

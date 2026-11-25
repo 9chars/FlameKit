@@ -180,6 +180,21 @@ local TAG_BASE, TAG_STEP = 0.996, 0.00002
 local SCAN_BUDGET, SCAN_MAX = 0.02, 3000   -- s and entities per server step for that scan
 local clock_ok, clock = pcall(function() return os.clock end)
 if not (clock_ok and type(clock) == "function" and pcall(clock)) then clock = nil end
+-- (0.15.556, owner 2026-11-24 21:36 "is there a way to stagger them briefly so the server doesn't crash out?": G-Portal
+-- 20:51 and 21:17, EMF paused FlameKit, "the script ran longer than 250 ms") A TIME LIMIT PER SERVER STEP: Spawn Nodes'
+-- tick stops its work for this step once it has used K.STEP_BUDGET s (os.clock); what is left waits for the next steps:
+-- the queued spawns stay queued (spawn_tick: one always), hunt_tick goes on next time where it stopped (K.hunt_i), and
+-- the once-a-second checks (triggers, protection, hold, spare, raid ends, persist) wait one step (never two in a row). K.part times each part; a step over K.SLOW_S is logged with the time of each part (at most K.SLOW_LOG lines),
+-- so the next slow step shows what took the time.
+K.STEP_BUDGET, K.SLOW_S, K.SLOW_LOG = 0.08, 0.05, 200
+function K.over() return clock ~= nil and K.t0 ~= nil and clock() - K.t0 > K.STEP_BUDGET end
+function K.part(name, fn, ...)
+  if not clock then return fn(...) end
+  local t = clock()
+  local a, b = fn(...)
+  K.times[#K.times + 1] = string.format("%s %.0f", name, (clock() - t) * 1000)
+  return a, b
+end
 -- (0.15.488, owner 13:32 "would there be a way to announce a message that a raid has begun, and then announce each
 -- wave of monster? and then also announce periodically how many monsters are left to kill? ... say where its near",
 -- 13:33 "they should be notice messages put in orange maybe?", 13:36 "yes and when a new wave happens it could say
@@ -1600,7 +1615,7 @@ end
 do_spawn_ref = do_spawn  -- (0.15.515) for check_timeouts
 local function spawn_tick(world)
   local done = 0
-  while #S.queue > 0 and done < SPAWN_PER_STEP do
+  while #S.queue > 0 and done < SPAWN_PER_STEP and (done == 0 or not K.over()) do  -- (0.15.556) and the step's time limit (one always)
     local q = table.remove(S.queue, 1)
     done = done + 1
     local qn1 = data().nodes[tostring(q.node)]
@@ -1830,7 +1845,13 @@ local THREAT_R = 50            -- m: (0.15.521, owner 17:21) every player this n
 local function hunt_tick(world)
   local spots = player_spots(world)
   local now0 = os.time()
-  for _, id in ipairs(mon_alive()) do  -- (0.15.526) the roster
+  local list = mon_alive()  -- (0.15.526) the roster
+  local n_all = #list
+  local start = ((K.hunt_i or 0) % math.max(1, n_all))  -- (0.15.556) on from where the last one stopped (the time limit)
+  for k = 1, n_all do
+    local id = list[(start + k - 1) % n_all + 1]
+    if k > 1 and K.over() then K.hunt_i = start + k - 1 break end  -- (one always)
+    K.hunt_i = start + k
     do
       -- (0.15.522, owner 17:21 "any player near like 50 m gets automatically added to the monsters threat table, one of
       -- their 5 or 6 slots", 17:22 "no hitting for +1 damage. I asked you to put me directly into their threat table.
@@ -2501,6 +2522,19 @@ end
 function F.tick(world)
   if not world:is_server() then return end
   S.steps = S.steps + 1
+  K.t0, K.times = clock and clock() or nil, {}  -- (0.15.556) the step's time limit starts
+  local okb, whyb = pcall(K.step, world)
+  if clock and K.t0 then
+    local used = clock() - K.t0
+    if used > K.SLOW_S and (K.slow_n or 0) < K.SLOW_LOG then
+      K.slow_n = (K.slow_n or 0) + 1
+      emf.log(string.format("spawn nodes: slow step: %.0f ms (%s); %d queued, %d alive", used * 1000, table.concat(K.times, ", "),
+        #S.queue, #mon_alive()))
+    end
+  end
+  if not okb then error(whyb, 0) end
+end
+function K.step(world)
   local session = emf.session()
   if session ~= S.session then  -- a new world (or this script just loaded): the old ids mean nothing; scan again
     S.session, S.queue, S.runs = session, {}, {}
@@ -2534,24 +2568,28 @@ function F.tick(world)
     end
     return
   end
-  if S.purge then purge_tick(world) end  -- (0.15.487)
-  pcall(K.reward.tick, world)  -- (0.15.547) Reward loot's chests and the game loot it removes (once per world step)
-  if S.steps % FAST_STEPS == 5 then check_timeouts(world) end  -- (0.15.515)
-  if S.steps % FAST_STEPS == 4 then local okt, why = pcall(trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
-  if S.verify then verify_tick(world) end  -- (0.15.505)
-  if S.steps % JOIN_EVERY == 7 then local okj, why = pcall(join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
-  spawn_tick(world)
+  if S.purge then K.part("purge", purge_tick, world) end  -- (0.15.487)
+  K.part("reward", pcall, K.reward.tick, world)  -- (0.15.547) Reward loot's chests and the game loot it removes (once per world step)
+  if S.steps % FAST_STEPS == 5 then K.part("timeouts", check_timeouts, world) end  -- (0.15.515)
+  if S.steps % FAST_STEPS == 4 then local okt, why = K.part("trickle", pcall, trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
+  if S.verify then K.part("verify", verify_tick, world) end  -- (0.15.505)
+  if S.steps % JOIN_EVERY == 7 then local okj, why = K.part("join", pcall, join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
+  K.part("spawn", spawn_tick, world)
   -- (0.15.515, owner 16:42 "the nodes are spawning monsters too slowly? if a node spawns a monster and it gets killed it
   -- needs to immediately spawn another one": a death was seen only every 2 s (clean_tick) and the next one queued every
   -- 0.5 s (trickle_tick)) deaths are seen and the next monster queued every 0.25 s
-  if S.steps % FAST_STEPS == 3 and S.steps % CLEAN_STEPS ~= 0 then clean_tick(world) end
-  if S.steps % FAST_STEPS == 3 then local okl, why = pcall(left_tick, world) if not okl then emf.log("spawn nodes: left_tick: " .. tostring(why)) end end  -- (0.15.544) the countdown as deaths are seen
+  if S.steps % FAST_STEPS == 3 and S.steps % CLEAN_STEPS ~= 0 then K.part("clean", clean_tick, world) end
+  if S.steps % FAST_STEPS == 3 then local okl, why = K.part("left", pcall, left_tick, world) if not okl then emf.log("spawn nodes: left_tick: " .. tostring(why)) end end  -- (0.15.544) the countdown as deaths are seen
   if S.steps % CLEAN_STEPS == 0 then
-    clean_tick(world) stuck_tick(world) pcall(mark_tick, world)  -- (0.15.493) stuck_tick, mark_tick
-    local okh, why = pcall(hunt_tick, world)  -- (0.15.503)
+    K.part("clean", clean_tick, world) K.part("stuck", stuck_tick, world) K.part("mark", pcall, mark_tick, world)  -- (0.15.493) stuck_tick, mark_tick
+    local okh, why = K.part("hunt", pcall, hunt_tick, world)  -- (0.15.503); (0.15.556) stops at the time limit, on next time
     if not okh then emf.log("spawn nodes: hunt_tick: " .. tostring(why)) end
   end
-  local need_spots = S.steps % CHECK_STEPS == 0 or S.steps % BREAK_STEPS == 0
+
+  -- (0.15.556) the once-a-second checks wait one step when this step's time is used up (never two in a row)
+  local check = S.steps % CHECK_STEPS == 0 or K.check_late
+  if check and K.over() and not K.check_late then K.check_late, check = true, false else K.check_late = false end
+  local need_spots = check or S.steps % BREAK_STEPS == 0
   for _ in pairs(S.runs) do need_spots = true break end
   if not need_spots then return end
   local spots = player_spots(world)
@@ -2571,19 +2609,19 @@ function F.tick(world)
         run.next_at = S.steps + ((g and g.wave_gap) or 0) * 60
       end
     end
-    if S.steps >= run.next_at and not run.in_wave and not run.wait_dead then wave(world, gid, spots) end  -- (0.15.512) not while a wave still spawns; (0.15.542) nor while its dead are awaited
+    if S.steps >= run.next_at and not run.in_wave and not run.wait_dead then K.part("wave", wave, world, gid, spots) end  -- (0.15.512) not while a wave still spawns; (0.15.542) nor while its dead are awaited
   end
-  if S.steps % CHECK_STEPS == 0 then
-    trigger_tick(world, spots)
-    protect_tick(world, spots)
-    local okhd, whyhd = pcall(hold_tick)  -- (0.15.538) the animal hold
+  if check then
+    K.part("trigger", trigger_tick, world, spots)
+    K.part("protect", protect_tick, world, spots)
+    local okhd, whyhd = K.part("hold", pcall, hold_tick)  -- (0.15.538) the animal hold
     if not okhd then emf.log("spawn nodes: animal hold: " .. tostring(whyhd)) end
-    pcall(spare_tick)  -- (0.15.525)
-    raid_tick(world)  -- (0.15.488)
-    time_tick(world)  -- (0.15.492)
-    pcall(persist)  -- (0.15.498)
+    K.part("spare", pcall, spare_tick)  -- (0.15.525)
+    K.part("raid", raid_tick, world)  -- (0.15.488)
+    K.part("time", time_tick, world)  -- (0.15.492)
+    K.part("persist", pcall, persist)  -- (0.15.498)
   end
-  if S.steps % BREAK_STEPS == 0 then break_tick(world, spots) end
+  if S.steps % BREAK_STEPS == 0 then K.part("break", break_tick, world, spots) end
 end
 
 -- ---- the player's game ----
