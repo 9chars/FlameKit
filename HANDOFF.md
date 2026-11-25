@@ -3021,3 +3021,13 @@ step: N ms (part ms, ...); Q queued, A alive" (at most 200 lines a load). NOT li
 long (e.g. join_tick's world:entities() walk, mark_tick, clean_tick, one wave()): the slow-step line will show it. All 15
 sntests + run.lua OK; also with the limit forced to 0. G-Portal upload 21:40:05 -> reload 21:39:02 G-Portal time ("mod.json
 changed: 41 settings"; Group 6's raid ended by 0.15.555); installed locally (reload 21:40:18, no errors).
+**21:45:47 fourth pause** (Group 6: 40 nodes, per_wave 1, level 100; ~8 spawned). **0.15.557** (21:49 G-Portal): kit.lua times
+each feature's server tick (logs "slow step: N ms used, now X's tick" BEFORE a feature runs once 50 ms are used, and "X's
+tick took N ms"); spawn_nodes K.part logs the part about to run once slow, and a part over 50 ms. **FOUND 21:54:57/21:55:07
+(G-Portal): "spawn nodes: slow step: join took 184/188 ms" (reward 0, join 188, spawn 0; 106 alive)**, every 10 s = the
+JOIN_FULL rescan; then the 5th pause 21:55:25 right after Group 6 (40 nodes) started (owner 21:56 "I tried one of the
+smaller spawn groups and it didn't crash so must be something with that node count"): join_tick = world:entities() of
+~64k entities + try_join (world.position, join_node over every node of every raid) for each id since the raid's first.
+**0.15.558:** join_tick spread over steps: the entity list taken once per look (K.jn), gone through K.JOIN_MS (15 ms) a step
+from where it stopped; the waiting ones and hits when through; a new look only when the last is through. sntests all OK
+(also with K.JOIN_MS = 0). G-Portal upload 21:59:52 -> reload 21:58:41 G-Portal time; no slow join line since (to 22:00:59).

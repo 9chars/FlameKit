@@ -191,8 +191,19 @@ function K.over() return clock ~= nil and K.t0 ~= nil and clock() - K.t0 > K.STE
 function K.part(name, fn, ...)
   if not clock then return fn(...) end
   local t = clock()
+  -- (0.15.557: the 21:45 pause logged nothing: EMF stops the script before the step's end) once the step is slow, the
+  -- part about to run is logged BEFORE it runs, and a part over K.SLOW_S right after it
+  if K.t0 and t - K.t0 > K.SLOW_S and (K.slow_n or 0) < K.SLOW_LOG then
+    K.slow_n = (K.slow_n or 0) + 1
+    emf.log(string.format("spawn nodes: slow step: %.0f ms used, now: %s", (t - K.t0) * 1000, name))
+  end
   local a, b = fn(...)
-  K.times[#K.times + 1] = string.format("%s %.0f", name, (clock() - t) * 1000)
+  local took = clock() - t
+  K.times[#K.times + 1] = string.format("%s %.0f", name, took * 1000)
+  if took > K.SLOW_S and (K.slow_n or 0) < K.SLOW_LOG then
+    K.slow_n = (K.slow_n or 0) + 1
+    emf.log(string.format("spawn nodes: slow step: %s took %.0f ms", name, took * 1000))
+  end
   return a, b
 end
 -- (0.15.488, owner 13:32 "would there be a way to announce a message that a raid has begun, and then announce each
@@ -979,33 +990,48 @@ local function try_join(world, id, engaged)
   end
   return false, wait
 end
+-- (0.15.558, owner 2026-11-24 21:56 "must be something with that node count"; G-Portal 21:54:57/21:55:07 "join took
+-- 184/188 ms" with 106 alive, then the pause 21:55:25 with Group 6's 40 nodes) THE LOOK IS SPREAD OVER STEPS: the list of
+-- entities is taken once per look (K.jn), then gone through K.JOIN_MS at a time each step, on from where it stopped;
+-- when it is through, the waiting ones and the hits are asked. A new look starts only when the last one is through.
+K.JOIN_MS = 0.015
 local function join_tick(world)
-  if next(S.raid) == nil then S.join_seen = nil return end
-  local low = nil
-  for _, r in pairs(S.raid) do if r.first_id and (not low or r.first_id < low) then low = r.first_id end end
-  if not low then return end
-  -- (0.15.509, 16:07-16:10: four Undead of the raid were joined only when a reload looked at every id again) every
-  -- JOIN_FULL-th look goes over every id since the raid's first monster again, not only the new ones
-  S.join_n = (S.join_n or 0) + 1
-  if S.join_n % JOIN_FULL == 0 then S.join_seen = nil end
-  local seen = S.join_seen or low
-  local ok, list = pcall(world.entities, world)
-  if not ok or type(list) ~= "table" then return end
-  local top = seen
-  local now = os.time()
-  for _, id in ipairs(list) do
-    if id > seen then
-      if id > top then top = id end
-      local _, wait = try_join(world, id, false)
-      if wait then S.join_wait[id] = now end  -- (0.15.507) asked again for up to 20 s
-    end
+  if next(S.raid) == nil then S.join_seen, K.jn = nil, nil return end
+  local jn = K.jn
+  if not jn then
+    local low = nil
+    for _, r in pairs(S.raid) do if r.first_id and (not low or r.first_id < low) then low = r.first_id end end
+    if not low then return end
+    -- (0.15.509, 16:07-16:10: four Undead of the raid were joined only when a reload looked at every id again) every
+    -- JOIN_FULL-th look goes over every id since the raid's first monster again, not only the new ones
+    S.join_n = (S.join_n or 0) + 1
+    if S.join_n % JOIN_FULL == 0 then S.join_seen = nil end
+    local ok, list = pcall(world.entities, world)
+    if not ok or type(list) ~= "table" then return end
+    jn = { list = list, i = 1, seen = S.join_seen or low, now = os.time() }
+    jn.top = jn.seen
+    K.jn = jn
   end
-  S.join_seen = top
-  local n = 0
+  local t0 = clock and clock() or nil
+  local list, n = jn.list, #jn.list
+  while jn.i <= n do
+    local id = list[jn.i]
+    jn.i = jn.i + 1
+    if id > jn.seen then
+      if id > jn.top then jn.top = id end
+      local _, wait = try_join(world, id, false)
+      if wait then S.join_wait[id] = jn.now end  -- (0.15.507) asked again for up to 20 s
+    end
+    if t0 and jn.i % 64 == 0 and clock() - t0 > K.JOIN_MS then return true end  -- the rest next step
+  end
+  K.jn = nil
+  S.join_seen = jn.top
+  local now = os.time()
+  local c = 0
   for id, at in pairs(S.join_wait) do
-    n = n + 1
+    c = c + 1
     local joined, wait = try_join(world, id, false)
-    if joined or not wait or now - at > 20 or n > 3000 then S.join_wait[id] = nil end
+    if joined or not wait or now - at > 20 or c > 3000 then S.join_wait[id] = nil end
   end
   for id in pairs(S.join_hits) do try_join(world, id, true) end
   S.join_hits = {}
@@ -2543,7 +2569,7 @@ function K.step(world)
     S.track, S.active_at, S.respawns, S.marked = {}, {}, {}, {}  -- (0.15.493)
     S.unmark = {}  -- (0.15.541) take-offs EMF has not taken yet
     S.wet, S.depth_said = {}, {}  -- (0.15.497)
-    S.join_hits, S.join_seen = {}, nil  -- (0.15.501)
+    S.join_hits, S.join_seen, K.jn = {}, nil, nil  -- (0.15.501); (0.15.558) K.jn
     S.orders = {}  -- (0.15.503)
     S.bad, S.verify = {}, nil  -- (0.15.505)
     S.join_wait = {}  -- (0.15.507)
@@ -2573,7 +2599,7 @@ function K.step(world)
   if S.steps % FAST_STEPS == 5 then K.part("timeouts", check_timeouts, world) end  -- (0.15.515)
   if S.steps % FAST_STEPS == 4 then local okt, why = K.part("trickle", pcall, trickle_tick, world) if not okt then emf.log("spawn nodes: trickle_tick: " .. tostring(why)) end end  -- (0.15.512)
   if S.verify then K.part("verify", verify_tick, world) end  -- (0.15.505)
-  if S.steps % JOIN_EVERY == 7 then local okj, why = K.part("join", pcall, join_tick, world) if not okj then emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501)
+  if K.jn or S.steps % JOIN_EVERY == 7 then local okj, why = K.part("join", pcall, join_tick, world) if not okj then K.jn = nil emf.log("spawn nodes: join_tick: " .. tostring(why)) end end  -- (0.15.501); (0.15.558) a look not through goes on each step
   K.part("spawn", spawn_tick, world)
   -- (0.15.515, owner 16:42 "the nodes are spawning monsters too slowly? if a node spawns a monster and it gets killed it
   -- needs to immediately spawn another one": a death was seen only every 2 s (clean_tick) and the next one queued every
