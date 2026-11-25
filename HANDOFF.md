@@ -92,6 +92,13 @@ to continue with it yet... just note it and put it on a list some place for me t
     named it as the biggest unused part; owner 13:19: still needed). When he picks it up: switch it on and test a raid
     with the animal hold, monsters spawned on slopes / near water.
 
+17. A WAY FOR THE OWNER TO BRING FLAMEKIT BACK ON G-PORTAL HIMSELF (owner 2026-11-24 21:09 "I need a way to easily remotely
+    restart EMF without having to bug you"; 21:13 "I don't have time to do anything now"). Today: the G-Portal panel's
+    restart (raids end: new session token). Offered, not chosen yet: (a) a one-click shortcut on his PC that re-uploads one
+    FlameKit file with the FTP tool (worked 20:55: README.md upload -> reload ~1 min later); (b) his account in G-Portal's
+    emf\emf_core.ini [chat] admins, then /lua.reload in the game's chat: NOT confirmed that lua.reload resumes a paused
+    mod with no file changed (EMF docs: paused "until you save one of its files again"); needs a test.
+
 **Releases:** the Development channel (dist-test) is still 0.15.525 and Stable (dist) 0.15.475; nothing since was
 packaged or signed. G-Portal untouched. Only the owner's word moves those (Rule 0g).
 
