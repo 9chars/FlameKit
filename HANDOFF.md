@@ -2982,3 +2982,17 @@ also update G-portal"):**
   errors; players on it (fast dive, free build lines 15:09). "slow: flamekit_native.dll took ~200 ms in one world step"
   once a minute (78 times 13:51-15:08): the SAME as on 0.15.475 (Nov 23 10:21-10:31: 188-245 ms once a minute), i.e. the
   known once-a-minute G-Portal step (see the 0.15.475 G-Portal test note), not new in this release.
+
+**G-PORTAL 2026-11-24 20:51 FLAMEKIT PAUSED (owner 20:52 "looks like the g-portal server crashed"):** not a crash: EMF's
+250 ms rule paused FlameKit ("the script ran longer than 250 ms ... paused until one of its files changes"), 20:51:28,
+2 s after player 2 started Group 4 (9 nodes all at the same spot ~3693 956 1280 "The Colosseum", 15 per node = 135 a
+wave, 10 waves, level 100). G-Portal Ent:66,620. The steps before the pause: 9 spawns per spawn step + threat writes +
+"joined" roster lines (join_tick: world:entities() over the whole world, try_join on every new id); which part took the
+time is NOT measured. README.md upload 20:55 -> reload 20:56:53 -> the raid was taken back -> paused again 20:56:56.
+0.15.555 (owner 21:01 "yes"): after a reload, every run taken back is ended as Stop does (finish, halted, cancel_checks;
+S.runs/S.queue/S.raid emptied; log "after the reload: N running raid(s) ended, not carried on"). tools/sntest/rl.lua now
+checks that. Uploaded to G-Portal 21:03:41 (spawn_nodes.lua, changes.txt, mod.json); G-Portal log 21:02:25/26 (its clock
+~1 min behind): "1 running raid(s) ended, not carried on", no pause since, players' lines at 21:05. Installed on the local
+server, game and work folder. NOT in the update channels (still 0.15.554; server-side only). Owner 21:02 "we've been
+running TONS of spawns tonight with no crashes", 21:04 "I deleted some nodes..". OPEN: the real fix (no single step over
+250 ms with a big raid on a big world: measure, then spread join_tick / the spawns over steps).

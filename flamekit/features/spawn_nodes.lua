@@ -2520,7 +2520,18 @@ function F.tick(world)
     S.hitby, S.lvl_said = {}, {}  -- (0.15.547)
   end
   if not S.scanned then  -- (0.15.483) find the nodes' monsters again first; nothing else until then
-    if scan_tick(world) then pcall(restore) end  -- (0.15.498) and the raids that were running
+    if scan_tick(world) then
+      pcall(restore)  -- (0.15.498) and the raids that were running
+      -- (0.15.555, owner 2026-11-24 21:01 "yes": G-Portal 20:51/20:56, a 135-a-wave raid paused FlameKit (EMF's 250 ms
+      -- rule) and each reload took the raid back and it paused again 2 s later) a raid running at a reload is NOT carried
+      -- on: every run taken back is stopped as its Stop button does (cooldown starts, no more waves or spawns) and the
+      -- raids' counts are forgotten. Its monsters still alive stay in the world (the protection holds while they live).
+      local ended = 0
+      S.halted = S.halted or {}
+      for gid in pairs(S.runs) do finish(gid) S.halted[gid] = true cancel_checks(gid) ended = ended + 1 end
+      S.runs, S.queue, S.raid = {}, {}, {}
+      if ended > 0 then emf.log(string.format("spawn nodes: after the reload: %d running raid(s) ended, not carried on", ended)) end
+    end
     return
   end
   if S.purge then purge_tick(world) end  -- (0.15.487)

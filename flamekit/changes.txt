@@ -1,3 +1,6 @@
+0.15.555 Nov 24, 2026
+- Spawn Nodes: a raid running when FlameKit reloads on the server now ends instead of carrying on.
+
 0.15.554 Nov 24, 2026
 - Spawn Nodes tab: the Nodes section is now at the top.
 

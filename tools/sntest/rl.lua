@@ -31,13 +31,13 @@ local S2 = F2._test_S
 local n_after, own_after = 0, 0 for _, m in pairs(S2.mon) do if not m.dead then n_after = n_after + 1 if m.own then own_after = own_after + 1 end end end
 ok(n_after == n_before and own_after == n_before, string.format("after a reload: the living tagged monsters are its own again (%d of %d)", own_after, n_before))
 ok(dead_one and S2.old_bodies[dead_one] == 1, "after a reload: the body is put aside")
-ok(S2.raid[1] ~= nil, "after a reload: the raid was taken back")
+ok(S2.raid[1] == nil and next(S2.runs) == nil and S2.halted[1] == true, "after a reload: the running raid is ended, not carried on (0.15.555)")
 for _ = 1, 40 do
   for id, m in pairs(S2.mon) do if not m.dead and M.ents[id] then M.ents[id].hp = 0 end end
   for _ = 1, 60 do F2.tick(W) M.advance(1 / 60) end
 end
 for _ = 1, 1200 do F2.tick(W) M.advance(1 / 60) end
-ok(S2.raid[1] == nil, "after a reload the raid still ends")
+ok(S2.raid[1] == nil, "after a reload no raid comes back")
 local err = 0 for _, l in ipairs(M.logs) do if l:find("tick: ", 1, true) or l:find("attempt to", 1, true) then err = err + 1 print("  " .. l) end end
 ok(err == 0, "no errors in the log")
 print(fails == 0 and "ALL OK" or (fails .. " FAILED"))
