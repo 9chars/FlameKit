@@ -3037,3 +3037,8 @@ Damage bonus setting?"):** glide.DAMAGE + 5000..50000 (scale 1 + bonus/100: +500
 limit on scale); tooltip and comments say up to +50000%. run.lua: 32 options, +50000% gives scale 501. Live on the local
 server and game 23:1x; NOT on G-Portal or the update channels (Stable/G-Portal only on the owner's word; the drop-down is
 built in the player's game and the server accepts only listed steps, so both need it).
+**0.15.559 released (owner 23:17 "yes do it now"):** flamekit_native/mod.json 0.15.559 (DLL f9102355 unchanged); dist-test signed
+23:18:15 (sig good), dist = dist-test (sig good), commit dd099d3 pushed. G-Portal upload 23:20:03 (changes.txt, mod.json, core/kit.lua,
+features/spawn_nodes.lua, features/experimental.lua, _flamekit_native/mod.json; md5 = dist). G-Portal stopped at ~23:17:42 (its
+log ends there; "SuperB left the server" 23:17:31); owner 23:25 "I started g-portal back up": 23:24:29 all hooks, 21 features,
+running, no errors. Package zip NOT rebuilt (release\FlameKit-0.15.554.zip is the newest).
