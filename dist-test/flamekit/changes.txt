@@ -1,3 +1,18 @@
+0.15.559 Nov 24, 2026
+- Experimental: Damage bonus also offers +5000%, +10000%, +20000%, +30000%, +40000% and +50000%.
+
+0.15.558 Nov 24, 2026
+- Spawn Nodes: the check for monsters joining a raid is spread over several server steps (it stalled the server script on big worlds with many nodes).
+
+0.15.557 Nov 24, 2026
+- Server log: a slow server step now names the part that took the time.
+
+0.15.556 Nov 24, 2026
+- Spawn Nodes: big raids are spread over more server steps (a time limit per step), so they no longer stall the server script.
+
+0.15.555 Nov 24, 2026
+- Spawn Nodes: a raid running when FlameKit reloads on the server now ends instead of carrying on.
+
 0.15.554 Nov 24, 2026
 - Spawn Nodes tab: the Nodes section is now at the top.
 

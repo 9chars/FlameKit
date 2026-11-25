@@ -174,11 +174,12 @@ function glide.apply(world, account, p)
 end
 
 -- (0.15.205, owner: "a huge damage multiplier ... up to 200% more than my usual damage ... a drop down") each player's
--- own damage bonus against creatures, +0% to +1000% (0.15.207; +200% before) (experimental.json damage_pct; 0 is not kept): an EMF hit rule
+-- own damage bonus against creatures, +0% to +50000% (0.15.559; +1000% from 0.15.207, +200% before) (experimental.json damage_pct; 0 is not kept): an EMF hit rule
 -- {from = the player, to = "creatures", scale = 1 + bonus}. Off while the player is in PvP (the PvP duelists and the
 -- leaderboard stay fair). Kept in this table with the glider speed (Lua's limit of 200 locals in this file).
 glide.DAMAGE = { 0, 10, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 600, 700,
-  800, 900, 1000 }  -- (0.15.207, owner: up to 1000%)
+  800, 900, 1000, 5000, 10000, 20000, 30000, 40000, 50000 }  -- (0.15.207, owner: up to 1000%); (0.15.559, owner 2026-11-24
+  -- 23:14 "add 5000%, 10000%, 20000%, 30000%, 40000%, and 50000% to the Damage bonus setting")
 function glide.damage(account)
   local d = tonumber(((saved or {})[account] or {}).damage_pct)
   return d and d > 0 and d or 0
@@ -2457,7 +2458,7 @@ local function panel_rows(world)
     rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur, d), same_line = true, tooltip = d.tip }
   end
   rows[#rows + 1] = { separator = true }
-  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +1000% (0.15.207)
+  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +50000% (0.15.559; +1000% 0.15.207)
     local dp = tonumber(v.damage_pct) or 0
     -- A damage bonus step as text.
     local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
@@ -2465,7 +2466,7 @@ local function panel_rows(world)
     for _, d in ipairs(glide.DAMAGE) do opts[#opts + 1] = { key = "dmg:" .. tostring(d), text = name(d), selected = d == dp } end
     rows[#rows + 1] = { label = true, text = "Damage bonus" }
     rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
-      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times. Only for you; off while you are in PvP." }
+      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times, +50000% 501 times. Only for you; off while you are in PvP." }
   end
   rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line before the glider speed
   do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x

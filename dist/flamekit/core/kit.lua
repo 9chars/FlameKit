@@ -494,10 +494,35 @@ function kit.start(modules)
     end
   end
 
+  -- (0.15.557, owner 2026-11-24 21:46 G-Portal: EMF paused FlameKit again, "the script ran longer than 250 ms", and no
+  -- line said what ran) on the server each feature's tick is timed: once the step has used SLOW_AT s, the feature about
+  -- to run is logged BEFORE it runs (so a pause still shows which one it was), and any feature tick over SLOW_AT is logged
+  -- with its time after. At most SLOW_LINES lines a load.
+  local clk_ok, clk = pcall(function() return os.clock end)
+  if not (clk_ok and type(clk) == "function" and pcall(clk)) then clk = nil end
+  local SLOW_AT, SLOW_LINES, slow_said = 0.05, 300, 0
   emf.on_tick(function(world)
     if world:is_server() then
       server_seen = os.time()
-      each("tick", world)
+      if not clk then each("tick", world)
+      else
+        local t0 = clk()
+        for _, f in ipairs(kit.features) do
+          if f.tick and kit.enabled(f) then
+            local t1 = clk()
+            if t1 - t0 > SLOW_AT and slow_said < SLOW_LINES then
+              slow_said = slow_said + 1
+              emf.log(string.format("slow step: %.0f ms used, now %s's tick", (t1 - t0) * 1000, tostring(f.id)))
+            end
+            kit.call(f, "tick", world)
+            local t2 = clk()
+            if t2 - t1 > SLOW_AT and slow_said < SLOW_LINES then
+              slow_said = slow_said + 1
+              emf.log(string.format("slow step: %s's tick took %.0f ms", tostring(f.id), (t2 - t1) * 1000))
+            end
+          end
+        end
+      end
     else
       each("client_tick", world)
       hud_tick(world)
