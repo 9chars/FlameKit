@@ -3031,3 +3031,9 @@ smaller spawn groups and it didn't crash so must be something with that node cou
 **0.15.558:** join_tick spread over steps: the entity list taken once per look (K.jn), gone through K.JOIN_MS (15 ms) a step
 from where it stopped; the waiting ones and hits when through; a new look only when the last is through. sntests all OK
 (also with K.JOIN_MS = 0). G-Portal upload 21:59:52 -> reload 21:58:41 G-Portal time; no slow join line since (to 22:00:59).
+
+**0.15.559 (owner 23:14 "Under Experimental settings tag, can you add 5000%, 10000%, 20000%, 30000%, 40000%, and 50000% to the
+Damage bonus setting?"):** glide.DAMAGE + 5000..50000 (scale 1 + bonus/100: +50000% = 501x; EMF hit_rule documents no
+limit on scale); tooltip and comments say up to +50000%. run.lua: 32 options, +50000% gives scale 501. Live on the local
+server and game 23:1x; NOT on G-Portal or the update channels (Stable/G-Portal only on the owner's word; the drop-down is
+built in the player's game and the server accepts only listed steps, so both need it).

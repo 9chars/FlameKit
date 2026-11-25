@@ -1407,7 +1407,7 @@ do  -- (0.15.200, owner) the glider speed: a drop-down in the Experimental tab, 
 end
 do  -- (0.15.205, owner) the damage bonus: a drop-down, a hit rule against creatures with the player's scale
   local dr = find_row("^Off %(%+0%%%)$")
-  check(dr and dr.options and #dr.options == 26, "the Experimental tab has the damage bonus drop-down, off")
+  check(dr and dr.options and #dr.options == 32, "the Experimental tab has the damage bonus drop-down, off")
   local function rule()
     for _, r in pairs(hit_rules) do if r.from == PLAYER and r.to == "creatures" and r.scale then return r end end
   end
@@ -1421,6 +1421,12 @@ do  -- (0.15.205, owner) the damage bonus: a drop-down, a hit rule against creat
   local n = 0
   for _, x in pairs(hit_rules) do if x.from == PLAYER and x.to == "creatures" then n = n + 1 end end
   check(r and r.scale == 1.5 and n == 1, "+50%: one rule, 1.5 times")
+  click("W:dmg:50000")  -- (0.15.559) the new top step
+  step(JOINED and 10 or 3)
+  r = rule()
+  check(r and r.scale == 501, "+50000%: a rule 501 times the damage")
+  click("W:dmg:50")
+  step(JOINED and 10 or 3)
   local jf = io.open(TMP .. "\\experimental.json"); local js = jf and jf:read("a") or ""; if jf then jf:close() end
   check(js:find('"damage_pct":50', 1, true) ~= nil, "the damage bonus is kept for the player")
   click("W:dmg:0")
