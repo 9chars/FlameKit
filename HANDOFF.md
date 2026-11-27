@@ -3056,3 +3056,8 @@ removed; the speed line (steps, average, slowest, process CPU via GetProcessTime
 DLL 83018759...; flamekit_native/mod.json and flamekit/mod.json 0.15.560. NOT installed anywhere yet (G-Portal must be
 stopped for the DLL; asked). 16:59 owner "Stopped: upload + channels": G-Portal upload 17:00:00 (DLL 83018759, native mod.json,
 mod.json, changes.txt); dist-test signed 17:00:26 (sig good), dist = dist-test (sig good): Development and Stable 0.15.560.
+**0.15.560 on G-Portal checked 17:14 (owner "pull the logs and check server performance"):** started 17:01:30, all hooks, 21
+features, no errors. No "slow: flamekit_native" line any more (was every minute). Minutes 1-9 average 50 ms / ~1197 steps
+(the server at 20 steps a second with nobody on); from minute 10 (players on): 3574-3596 steps, average 16.7-16.8 ms,
+SLOWEST 61-68 ms (this morning on 0.15.559: slowest 260-356 ms every minute). Game ecss Max 21-23 ms. No FlameKit slow
+step, no pause.
