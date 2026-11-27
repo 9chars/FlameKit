@@ -60,8 +60,8 @@
 //
 // (0.15.466) SERVER SPEED LOG (speed_tick): one line a minute in emf_core.log ("server speed, minute N"): the steps, the
 // average and the slowest step, the process's CPU, each Free build area that was on and the remembered spots; a minute
-// whose steps average more than kSlowMs is logged as SLOW with the threads that used the most CPU in it, each next to
-// what it uses in a normal minute. Logging only. (0.15.467) THE SAMPLER (see sampler_thread): with speed_sampler.txt "on",
+// whose steps average more than kSlowMs is logged as SLOW. Logging only. (0.15.560: the busiest threads are no longer
+// read: listing the machine's threads took 200-356 ms of the world step each minute on G-Portal.) (0.15.467) THE SAMPLER (see sampler_thread): with speed_sampler.txt "on",
 // where the world step thread is while the server runs slow; (0.15.468) and every exception raised, counted each minute;
 // (0.15.469) and how many terrain chunks the game unpacks each minute (see kUnpackSig).
 #include <windows.h>
@@ -981,64 +981,8 @@ void read_test_size() {
 // ---- (0.15.466) the server speed log (see the header) ----
 constexpr double kSlowMs = 20.0;      // a minute whose steps average more than this is SLOW (normal: 16.7 ms, 60 a second)
 constexpr double kMinuteS = 60.0;     // one line per this many seconds
-constexpr size_t kTopThreads = 6;     // threads named in a SLOW line
-constexpr uint32_t kListEvery = 30;   // also name the busiest threads in a normal minute every this many minutes
 uint64_t ft(const FILETIME& f) { return (uint64_t(f.dwHighDateTime) << 32) | f.dwLowDateTime; }
-struct ThreadUse { uint64_t last = 0; double normal = -1; std::string name; };  // CPU (100 ns), % of a core normally
 
-// A thread's name, when the game gave it one (GetThreadDescription, Windows 10 1607 and newer; looked up at run time).
-std::string thread_name(HANDLE h) {
-    using Fn = HRESULT(WINAPI*)(HANDLE, PWSTR*);
-    static Fn fn = reinterpret_cast<Fn>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetThreadDescription"));
-    std::string out;
-    PWSTR wname = nullptr;
-    if (fn && SUCCEEDED(fn(h, &wname)) && wname) {
-        char buf[96] = {};
-        WideCharToMultiByte(CP_UTF8, 0, wname, -1, buf, sizeof(buf) - 1, nullptr, nullptr);
-        out = buf;
-        LocalFree(wname);
-    }
-    return out;
-}
-
-// The CPU time (100 ns) each thread of this process used since the last call, as (thread id, time); a thread seen for
-// the first time counts with all its time. Threads that ended are forgotten.
-std::vector<std::pair<uint32_t, uint64_t>> thread_cpu(std::unordered_map<uint32_t, ThreadUse>& use) {
-    std::vector<std::pair<uint32_t, uint64_t>> out;
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-    if (snap == INVALID_HANDLE_VALUE) return out;
-    const DWORD pid = GetCurrentProcessId();
-    std::set<uint32_t> alive;
-    THREADENTRY32 te{};
-    te.dwSize = sizeof(te);
-    if (Thread32First(snap, &te)) {
-        do {
-            if (te.th32OwnerProcessID != pid) continue;
-            HANDLE h = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, te.th32ThreadID);
-            if (!h) continue;
-            FILETIME c, e, k, u;
-            if (GetThreadTimes(h, &c, &e, &k, &u)) {
-                const uint64_t now = ft(k) + ft(u);
-                auto it = use.find(te.th32ThreadID);
-                if (it == use.end()) {
-                    ThreadUse t;
-                    t.last = now;
-                    t.name = thread_name(h);
-                    use.emplace(te.th32ThreadID, t);
-                    out.emplace_back(te.th32ThreadID, now);
-                } else {
-                    out.emplace_back(te.th32ThreadID, now >= it->second.last ? now - it->second.last : 0);
-                    it->second.last = now;
-                }
-                alive.insert(te.th32ThreadID);
-            }
-            CloseHandle(h);
-        } while (Thread32Next(snap, &te));
-    }
-    CloseHandle(snap);
-    for (auto it = use.begin(); it != use.end();) it = alive.count(it->first) ? std::next(it) : use.erase(it);
-    return out;
-}
 
 uint64_t process_cpu() {
     FILETIME c, e, k, u;
@@ -1316,14 +1260,12 @@ void speed_tick() {
     static uint32_t steps = 0, minute = 0;
     static double slowest = 0;
     static uint64_t proc_last = 0;
-    static std::unordered_map<uint32_t, ThreadUse> use;
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
     if (!started) {  // the first step: only the starting values (the threads' time so far is not this minute's)
         QueryPerformanceFrequency(&freq);
         last = minute_start = now;
         proc_last = process_cpu();
-        thread_cpu(use);
         started = true;
         EMF_LOG(kMod, "server speed: logged once a minute from now (SLOW: steps averaging more than %.0f ms; normal 16.7 ms)", kSlowMs);
         return;
@@ -1358,34 +1300,11 @@ void speed_tick() {
     const bool slow = avg > kSlowMs;
     EMF_LOG(kMod, "server speed, minute %u%s: %u steps, average %.1f ms, slowest %.0f ms, process CPU %.2f cores; Free build areas: %s; remembered spots %zu (%.0f m)",
             minute, slow ? " SLOW" : "", steps, avg, slowest, cores, areas.empty() ? "none" : areas.c_str(), spots, g_spot_half.load() * 2);
-    // the threads: % of one core each used this minute
-    std::vector<std::pair<uint32_t, uint64_t>> t = thread_cpu(use);
-    std::sort(t.begin(), t.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+    // (0.15.560, owner 2026-11-27 16:45 "go ahead and remove that": players on G-Portal report gliding and other features
+    // working intermittently) the busiest threads are no longer read: thread_cpu's CreateToolhelp32Snapshot listed every
+    // thread of the whole machine, on the world step thread, once a minute: on G-Portal's shared host 200-356 ms each
+    // minute ("slow: flamekit_native.dll took ~200 ms in one world step", every minute since 0.15.466). Logging only.
     const uint32_t world_thread = GetCurrentThreadId();
-    if (slow || minute == 1 || minute % kListEvery == 0) {
-        std::string line;
-        char b[200];
-        for (size_t i = 0; i < t.size() && i < kTopThreads; ++i) {
-            const auto it = use.find(t[i].first);
-            const double pct = double(t[i].second) * 100.0 / (span * 1e7);
-            const std::string nm = it != use.end() ? it->second.name : "";
-            const double normal = it != use.end() ? it->second.normal : -1;
-            char nb[24] = "not known yet";
-            if (normal >= 0) snprintf(nb, sizeof(nb), "%.0f%%", normal);
-            snprintf(b, sizeof(b), "%sthread %u%s%s%s%s: %.0f%% of a core (normal %s)", line.empty() ? "" : "; ", t[i].first,
-                     nm.empty() ? "" : " '", nm.c_str(), nm.empty() ? "" : "'", t[i].first == world_thread ? " (the world step)" : "", pct, nb);
-            line += b;
-        }
-        EMF_LOG(kMod, "server speed, minute %u%s: busiest threads: %s", minute, slow ? " SLOW" : "", line.empty() ? "none read" : line.c_str());
-    }
-    if (!slow && minute > 1) {  // a normal minute (not the first, while the world comes up): what each thread normally uses
-        for (const auto& x : t) {
-            auto it = use.find(x.first);
-            if (it == use.end()) continue;
-            const double pct = double(x.second) * 100.0 / (span * 1e7);
-            it->second.normal = it->second.normal < 0 ? pct : it->second.normal * 0.7 + pct * 0.3;
-        }
-    }
     sampler_minute(minute, slow, world_thread);  // (0.15.467)
     minute_start = now;
     steps = 0;

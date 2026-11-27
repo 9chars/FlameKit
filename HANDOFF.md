@@ -3042,3 +3042,16 @@ built in the player's game and the server accepts only listed steps, so both nee
 features/spawn_nodes.lua, features/experimental.lua, _flamekit_native/mod.json; md5 = dist). G-Portal stopped at ~23:17:42 (its
 log ends there; "SuperB left the server" 23:17:31); owner 23:25 "I started g-portal back up": 23:24:29 all hooks, 21 features,
 running, no errors. Package zip NOT rebuilt (release\FlameKit-0.15.554.zip is the newest).
+
+**2026-11-27 16:39 owner: "the last changes you made to slow down the spawn nodes also seems to have impacted the performance
+of the rest of the mod. Players indicate problems gliding and other features on the mod working intermittently."** G-Portal
+log since its 04:10 start: NO FlameKit step over 50 ms (0.15.557's kit timing logs none), no pause since 0.15.558. What IS
+there: "slow: flamekit_native.dll took 200-356 ms in one world step" EVERY MINUTE (745 times today): speed_tick's
+thread_cpu = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD) lists every thread of the whole (shared G-Portal) machine, on the
+world step thread; the same on Nov 23 (0.15.475: 190-310 ms), i.e. since 0.15.466, not from the Spawn Nodes changes. Also
+seen: G-Portal runs emf_core 0.6.6 (since at least Nov 23); players and the local server 0.6.19. Owner 16:44 "Do we need that
+snap shot anymore?" -> no (logging only); 16:45 "go ahead and remove that".
+**0.15.560:** build_anywhere.cpp: thread_cpu, thread_name, ThreadUse, kTopThreads, kListEvery and the "busiest threads" lines
+removed; the speed line (steps, average, slowest, process CPU via GetProcessTimes) and sampler_minute stay. Built 16:46:33,
+DLL 83018759...; flamekit_native/mod.json and flamekit/mod.json 0.15.560. NOT installed anywhere yet (G-Portal must be
+stopped for the DLL; asked).
