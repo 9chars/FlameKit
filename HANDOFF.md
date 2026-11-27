@@ -3054,4 +3054,5 @@ snap shot anymore?" -> no (logging only); 16:45 "go ahead and remove that".
 **0.15.560:** build_anywhere.cpp: thread_cpu, thread_name, ThreadUse, kTopThreads, kListEvery and the "busiest threads" lines
 removed; the speed line (steps, average, slowest, process CPU via GetProcessTimes) and sampler_minute stay. Built 16:46:33,
 DLL 83018759...; flamekit_native/mod.json and flamekit/mod.json 0.15.560. NOT installed anywhere yet (G-Portal must be
-stopped for the DLL; asked).
+stopped for the DLL; asked). 16:59 owner "Stopped: upload + channels": G-Portal upload 17:00:00 (DLL 83018759, native mod.json,
+mod.json, changes.txt); dist-test signed 17:00:26 (sig good), dist = dist-test (sig good): Development and Stable 0.15.560.

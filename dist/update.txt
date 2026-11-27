@@ -1,8 +1,8 @@
-0.15.559
+0.15.560
 3731 f9394e44 flamekit/README.md
-161247 839d24a4 flamekit/changes.txt
+161495 4b829027 flamekit/changes.txt
 2536 8a219426 flamekit/main.lua
-15940 7aef4ff5 flamekit/mod.json
+15940 6568f341 flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -77,5 +77,5 @@
 52520 c75a5f99 flamekit/sounds/raid_all_clear.wav
 352844 3133a975 flamekit/sounds/raid_siren.wav
 705644 c44ea676 flamekit/sounds/raid_siren_twice.wav
-1188864 76c493e2 flamekit_native/flamekit_native.dll
-464 60efc658 flamekit_native/mod.json
+1180160 6b87f084 flamekit_native/flamekit_native.dll
+464 cc5650f4 flamekit_native/mod.json

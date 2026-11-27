@@ -1,3 +1,6 @@
+0.15.560 Nov 27, 2026
+- FlameKit Native: the once-a-minute server speed log no longer lists every thread on the machine (it froze the server for about a quarter second every minute on hosted servers). Needs FlameKit Native 0.15.560 on the server.
+
 0.15.559 Nov 24, 2026
 - Experimental: Damage bonus also offers +5000%, +10000%, +20000%, +30000%, +40000% and +50000%.
 
