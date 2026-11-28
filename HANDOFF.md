@@ -3061,3 +3061,9 @@ features, no errors. No "slow: flamekit_native" line any more (was every minute)
 (the server at 20 steps a second with nobody on); from minute 10 (players on): 3574-3596 steps, average 16.7-16.8 ms,
 SLOWEST 61-68 ms (this morning on 0.15.559: slowest 260-356 ms every minute). Game ecss Max 21-23 ms. No FlameKit slow
 step, no pause.
+
+**2026-11-27 20:34 a player's emf_core.log (game, account 0x05891a85470cffe2; "..." in the window, magic chests not working):** FlameKit
+PAUSED AT LOAD (20:06:07.882 flamekit_native loaded -> 20:06:08.200 "the script ran longer than 250 ms"): loading the Lua took
+>300 ms on his PC (25 ms on the owner's), so FlameKit's script never ran that session. Cause most likely antivirus scanning each
+of the ~80 files. Advice: an antivirus exclusion for the game folder. Owner 20:52 "looks like that might have fixed the issue".
+Offered, not asked for: loading FlameKit in pieces so a slow load cannot trip EMF's 250 ms rule.
