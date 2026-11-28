@@ -1,0 +1,8 @@
+{
+  "id": "fk_blocks",
+  "name": "FlameKit blocks",
+  "version": "0.1.0",
+  "capabilities": ["patch"],
+  "description": "New building blocks made from building materials the game already has but never gave players (FlameKit). Everyone in a game needs the same version: host, server and players.",
+  "authors": ["FlameKit"]
+}

@@ -3164,3 +3164,12 @@ each hidden material's side albedo (EML: image.decode_texture(buffer, FORMAT, w,
 187 Granite City Wall, 188 Granite House Wall, 189 / 190 Granite House Roof 1 / 2 (1024 / 2048 px), 175 Red glow dirt, 134
 white (1024). PLACEHOLDERS ONLY (the real textures are not in the shipped game): 129 blue, 131 green (32 px solid), 156 red,
 137 Old Loghouse, 139 Dungeon quarters wood wall (8 px solid red).
+
+**#21 TEST BLOCK (owner 09:41 "yes"): tools/content/fk_blocks** (EML patch mod with EMF's emf_content.lua): Block_T5_Stone_Granite_CityWall_FK,
+item GUID a15c1573-f6fe-480a-8bc8-36559e160767 (FIXED), name GUID 9bc453d8-0c10-4f5a-998d-22af8dff63f7, name "Granite City Wall", a copy
+of Block_T5_Stone_Granite (896ab2d5..., material 192) with equipment.voxelData.placeVoxelMaterialId = 187 (placeVoxelMaterial
+GUID left as the copy's). Installed D:\\...\\Enshrouded\\mods\\fk_blocks (the owner's EML applies it) and EnshroudedServer\\mods\\fk_blocks
+(EMF built it: "built 1 mod in 0.4 s"). fk_block_dump disabled: game mods\\.fk_block_dump, server _disabled_mods\\. Local server
+world backed up first: save_backups\\2026-11-28_*_local_server_before_fk_blocks (377 MB). Owner "Restart Both" 09:44; server:
+"items citywall" lists Block_T5_Stone_Granite_CityWall_FK (0xf012c490, stack 5000); 09:45:54 "put ... 200 1": 200 added to the
+owner (entity 1). Waiting for the owner's look in game.
