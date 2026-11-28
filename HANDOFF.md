@@ -105,7 +105,7 @@ to continue with it yet... just note it and put it on a list some place for me t
     so main.lua could load a few features per step (each run well under 250 ms) instead of all at once; a slow PC then
     only gets FlameKit a moment later. Not started.
 
-19. G-PORTAL STILL RUNS EMF 0.6.6 (owner 2026-11-27 22:28 "pretty sure g-portal should be on the latest version... didnt you
+19. (2026-11-28 07:28: EMF 0.6.19 UPLOADED, see the 11-28 note at the end) G-PORTAL STILL RUNS EMF 0.6.6 (owner 2026-11-27 22:28 "pretty sure g-portal should be on the latest version... didnt you
     update that???" -> no: only FlameKit's folders were ever uploaded; /emf/emf_core.dll and /dinput8.dll on G-Portal are
     from Nov 11; players and the local server are on 0.6.19 since the Nov 22 EMF updater). Owner: "tomorrow maybe".
     Seen 22:13:59: "hit_rule_add refused: scale must be between 0 and 100" -> the Damage bonus steps +10000%..+50000%
@@ -3086,3 +3086,16 @@ PAUSED AT LOAD (20:06:07.882 flamekit_native loaded -> 20:06:08.200 "the script 
 >300 ms on his PC (25 ms on the owner's), so FlameKit's script never ran that session. Cause most likely antivirus scanning each
 of the ~80 files. Advice: an antivirus exclusion for the game folder. Owner 20:52 "looks like that might have fixed the issue".
 Offered, not asked for: loading FlameKit in pieces so a slow load cannot trip EMF's 250 ms rule.
+
+**2026-11-28 07:26 owner: "I shut down g-portal I want you to adjust your upload script such that you can update EMF framework
+on there as well. I thought that was done already"** (it was not: rule 0g kept G-Portal on 0.6.6). FTP tool upload.ps1
+(release\FlameKit FTP tool, not in the repository; the old one kept as upload.ps1.before_emf_2026-11-28; README.txt updated):
+outbox _emf\ -> the server's emf folder (mod_dir without \mods\<name>), _game\dinput8.dll -> the game folder; refused (left in
+the outbox): _emf\config\*, _emf\mods\* except mods\lua\*, anything in _game but dinput8.dll; order: _emf, _game, native,
+flamekit, mod.json last. Uploaded 07:28:41 from the local server's EMF 0.6.19 (= EMF-0.6.19\game, md5 checked):
+emf/emf_core.dll 27d349e7 (5612544), emf/known_tools.txt, emf/mods/lua/lua.dll 6bda3d9d (1653248) + mod.json, (game folder)
+dinput8.dll 48e5e55f (803328); "ftplist" confirms all five at those paths, Nov 28 07:28. G-Portal's dbghelp.dll (EML) untouched.
+0.6.6 backup: emf_backups\2026-11-22_EMF-0.6.6\server. FOUND: emf_core 0.6.19 ALSO refuses hit_rule scale over 100 (the
+string "scale must be between 0 and 100" is in both DLLs): the Damage bonus steps +10000%..+50000% will not work on 0.6.19
+either.
+
