@@ -3187,3 +3187,6 @@ different from Granite). What a new block item needed, all in tools/content/fk_b
    the action bar by itself; to test whether it can go. It also applies to the Cold Heights city walls (same material).
 Still to check: breaking/drops (187's materialItem is 2f9dc768-2081-481c-a700-945c864eb6b0, Granite's 83101a9d...),
 save/restart, removing step 4. Owner 09:48: his runes are missing from his inventory (cause not found; the put only adds).
+**#21 (10:43)** step 4 (the material's known check) tested off by the owner: the block still works from the build menu and
+the action bar, so it is removed from fk_blocks. Owner 10:39: breaking, drops and restarts test fine. A new block item needs
+steps 1-3 only. The game's own materials are not changed.

@@ -58,35 +58,8 @@ local function material_guids()
 	return nil
 end
 local guid_of = material_guids()
--- (10:24) The action bar still refused it. keen::TerraformingEfficiencyRegistryResource.buildingConfigs holds one entry
--- per building material (buildingMaterial.value = material id - 128). Granite's (64) has knowledgeQuery
--- {type Extern, compareValue 0, id 2097986610}; the City Wall's (59) {type SimpleFlag, compareValue 1, id 1401630464},
--- a "the player knows this" flag no one gets. Only that check of the new block's material is set to its source's;
--- nothing else of the entry changes.
-local function building_config(material)
-	for _, r in ipairs(game.assets.get_resources_by_type("keen::TerraformingEfficiencyRegistryResource") or {}) do
-		for _, c in ipairs(r.data.buildingConfigs or {}) do
-			if tonumber(c.buildingMaterial and c.buildingMaterial.value) == material - 128 then return c end
-		end
-	end
-	return nil
-end
-
-local function copy_knowledge_check(material, from_material)
-	local c, src = building_config(material), building_config(from_material)
-	if not c or not src then
-		print(string.format("[fk_blocks] no building config for %d or %d: its known check is left as it is", material, from_material))
-		return
-	end
-	local q, sq = c.knowledgeQuery, src.knowledgeQuery
-	print(string.format("[fk_blocks] material %d known check was %s %s %s id %s; now %d's", material, tostring(q.type),
-		tostring(q.compareOperator), tostring(q.compareValue), tostring(q.knowledgeOrQueryId.value), from_material))
-	q.type = sq.type
-	q.compareOperator = sq.compareOperator
-	q.compareValue = sq.compareValue
-	q.isExplicitPlayerKnowledgeQuery = sq.isExplicitPlayerKnowledgeQuery
-	q.knowledgeOrQueryId = {value = sq.knowledgeOrQueryId.value}
-end
+-- (10:24-10:43) Setting the material's "known" check (TerraformingEfficiencyRegistryResource.buildingConfigs
+-- knowledgeQuery) to its source's was tried and is not needed: the owner tested the block without it. Removed.
 
 if not guid_of then print("[fk_blocks] no checked material list: placeVoxelMaterial left as copied") end
 
@@ -103,7 +76,6 @@ for _, b in ipairs(BLOCKS) do
 	print(string.format("[fk_blocks] added %s (%s) placing material %d", b.debug_name, b.guid, b.material))
 	-- (10:02) still not placeable or in build mode's block list: build mode offers only the items of a
 	-- keen::VoxelBlueprintMaterialPool (by ItemId). The new block goes into every pool that has its source, after it.
-	copy_knowledge_check(b.material, tonumber(game.assets.get_resource(b.clone_of, "keen::ItemInfo").data.equipment.voxelData.placeVoxelMaterialId))
 	local src_id = tonumber(game.assets.get_resource(b.clone_of, "keen::ItemInfo").data.itemId.value)
 	local pools = game.assets.get_resources_by_type("keen::VoxelBlueprintMaterialPoolRegistryResource") or {}
 	local added = 0
