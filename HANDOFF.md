@@ -3207,9 +3207,10 @@ Each block is now added under pcall (a failing one leaves the others).
 mod.lua): 188 House Wall, 189/190 House Roofs (they looked like the game's granite blocks), 134 White Block ("I don't want
 it"; it or the red one crashed the game at load, the red one runs fine, so most likely White Block). 175 is now "Red
 Luminescent Block" (owner 11:36: matches the blue one's name). Its icon: tools/content/fk_blocks/icons/red_luminescent.png
-(512 px: the blue block's icon hue-rotated to red, plus soft, diffuse fire-coloured glows; owner 11:49 "the second one is perfect"); mod.lua
+(512 px: the blue block's icon hue-rotated to red, flat crisp dark diamond lines with inner diamonds after the owner's close-up, darker patches, soft fire glows; owner 12:02 "much much better. go with that one"; made by icons/make_icon.py); mod.lua
 decodes it, builds the 10 levels (2x2 box average) and BC7-encodes each into the copied UiTextureResource's content
 (format BC7_unorm_block, size {x,y}, levelCount 10, levels back to back; must total the old size, else unchanged).
 EML's BC7 encoder PANICS (kills the game: "block_compression encode.rs:91 left 2 right 0") on a level under 4x4: those
 levels are encoded as a 4x4 tiled copy (one 16-byte block). Client only. 11:46:55 "icon from icons/red_luminescent.png:
 512x512, 10 levels, 349552 bytes".
+**#21 (12:02)** next: the Red Luminescent Block recipe; the owner will send what it should cost (now a copy of the blue one's: 5 + 5 of two items -> 100).
