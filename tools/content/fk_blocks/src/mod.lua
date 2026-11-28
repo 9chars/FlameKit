@@ -45,7 +45,9 @@ local BLOCKS = {
 		guid = "429f63c5-2e8f-4ba0-becd-646edf4cf8aa", name_guid = "3cde4eb8-1274-4b5a-8ebe-5e1c8b62f306",
 		recipe_guid = "660c49b9-cae4-4e06-abcb-726aef0ce322",
 		debug_name = "Block_T1_GlowDirt_Red_FK", name = "Red Luminescent Block",  -- (11:36, owner: the blue one's name)
-		icon_png = "icons/red_luminescent.png",  -- (11:35/11:44, owner: the copied icon is blue; a picture of its own)
+		icon_png = "icons/red_luminescent.png",
+		-- (12:34, owner: "Cinder's Cradle Sand" x5 and "Magma Gel" x1; it stays with the "Blocks - Luminescent")
+		recipe_inputs = {{"Build_TerrainMaterial_T7_Dirt_AncientLand_Sand", 5}, {"Material_T7_LavaPlant_Magma_Gel", 1}},  -- (11:35/11:44, owner: the copied icon is blue; a picture of its own)
 		clone_of = GLOWDIRT_BLUE, material = 175,
 	},
 	-- (11:35, owner: "forget about the white block I don't want it") 134 White Block removed (it was off: one of it or
@@ -57,7 +59,9 @@ local BLOCKS = {
 -- (each material id has its own SolidVoxelMaterial GUID, e.g. 143 = 03b9d9ad..., 192 = Granite's 6dbedd17...).
 -- The GUID of every material id is looked up below and checked against the game's own block items first.
 local KNOWN = {}  -- material id -> GUID, from the game's own block items
+local ITEM_GUID = {}  -- debug name -> GUID (for recipe inputs named by debug name)
 for _, r in ipairs(game.assets.get_resources_by_type("keen::ItemInfo") or {}) do
+	if r.data and r.data.debugName then ITEM_GUID[tostring(r.data.debugName)] = tostring(r.guid) end
 	local e = r.data and r.data.equipment
 	local vd = e and e.voxelData
 	local id = vd and tonumber(vd.placeVoxelMaterialId)
@@ -234,6 +238,16 @@ local function add_block(b)
 					print(string.format("[fk_blocks]   input %s x%d", inputs[#inputs][1], inputs[#inputs][2]))
 				end
 			end
+		end
+		if src and b.recipe_inputs then  -- the owner's own ingredients instead of the source recipe's
+			inputs = {}
+			for _, inp in ipairs(b.recipe_inputs) do
+				local g = ITEM_GUID[inp[1]]
+				if not g then error("no item " .. inp[1] .. " for the recipe") end
+				inputs[#inputs + 1] = {g, inp[2]}
+				print(string.format("[fk_blocks]   own input %s (%s) x%d", inp[1], g, inp[2]))
+			end
+			category = false
 		end
 		if not src then
 			print(string.format("[fk_blocks] %s: its source has no recipe: none added", b.debug_name))

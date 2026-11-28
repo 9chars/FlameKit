@@ -3214,3 +3214,5 @@ EML's BC7 encoder PANICS (kills the game: "block_compression encode.rs:91 left 2
 levels are encoded as a 4x4 tiled copy (one 16-byte block). Client only. 11:46:55 "icon from icons/red_luminescent.png:
 512x512, 10 levels, 349552 bytes".
 **#21 (12:02)** next: the Red Luminescent Block recipe; the owner will send what it should cost (now a copy of the blue one's: 5 + 5 of two items -> 100).
+**#21 (12:34-12:53) Red Luminescent Block recipe**: owner: "Cinder's Cradle Sand" x5 + "Magma Gel" x1, kept with the "Blocks - Luminescent" (right after the blue one). mod.lua recipe_inputs by debug name (resolved to GUIDs from every ItemInfo on both sides): Build_TerrainMaterial_T7_Dirt_AncientLand_Sand (57f712da-5ad3-4b31-b700-0f5761472b5e) x5, Material_T7_LavaPlant_Magma_Gel (aaaada0e-b056-4950-bead-71abb4a6d82e) x1; makes 100 (the blue one's). Owner 12:53: "it looks good".
+Open for #21: a FlameKit way to give the blocks; shipping fk_blocks to players and G-Portal (every player needs the same content mod; EML on the client).
