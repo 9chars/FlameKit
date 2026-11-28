@@ -3203,3 +3203,13 @@ Then the owner's game crashed again and again (EML starts 11:10:12, :29, :43, 11
 11:13:16-11:13:26), before the 200-each put at 11:13:25; no crash text in any log we can read. The five got off = true
 (owner 11:15 "go ahead"): 11:18 loaded with no crash. Next: turn them on in halves to find the one that crashes.
 Each block is now added under pcall (a failing one leaves the others).
+**#21 (11:29-11:47)** owner: only Granite City Wall and the red glow block stay. Removed (GUIDs retired, listed in
+mod.lua): 188 House Wall, 189/190 House Roofs (they looked like the game's granite blocks), 134 White Block ("I don't want
+it"; it or the red one crashed the game at load, the red one runs fine, so most likely White Block). 175 is now "Red
+Luminescent Block" (owner 11:36: matches the blue one's name). Its icon: tools/content/fk_blocks/icons/red_luminescent.png
+(512 px: the blue block's icon hue-rotated to red, plus fire-coloured sparkles; owner picked the version, 11:46); mod.lua
+decodes it, builds the 10 levels (2x2 box average) and BC7-encodes each into the copied UiTextureResource's content
+(format BC7_unorm_block, size {x,y}, levelCount 10, levels back to back; must total the old size, else unchanged).
+EML's BC7 encoder PANICS (kills the game: "block_compression encode.rs:91 left 2 right 0") on a level under 4x4: those
+levels are encoded as a 4x4 tiled copy (one 16-byte block). Client only. 11:46:55 "icon from icons/red_luminescent.png:
+512x512, 10 levels, 349552 bytes".

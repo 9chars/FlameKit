@@ -11,11 +11,18 @@ end
 
 local content = require("emf_content")
 
+-- a Buffer's bytes as a Lua string (EML's buffer API has changed between versions)
+local function buf_string(buf)
+	for _, f in ipairs({function() return buf:read_string(buf:tail() - buf:head()) end, function() return buf:read_string(#buf) end,
+	                    function() return buf:read_string(buf:len()) end}) do
+		local ok, r = pcall(f)
+		if ok and type(r) == "string" and #r > 0 then return r end
+	end
+	return nil
+end
+
 local GRANITE_BLOCK = "896ab2d5-58f7-4711-a313-a0b975a9a5a2"  -- Block_T5_Stone_Granite (material 192)
-local GRANITE_ROOF_1 = "77bfc638-dcc1-4d6f-bb6a-b893333b9c89"  -- Block_Roof_T5_Granite_Ornamented (194, roof)
-local GRANITE_ROOF_2 = "c91f1559-916d-49c4-a319-4eb279ee1c43"  -- Block_Roof_T5_Granite_Shingles (195, roof)
 local GLOWDIRT_BLUE = "40fcec7b-c55b-453d-b5b6-cefd042ddf77"   -- Block_T1_GlowDirt_Blue_CRAFTING (167)
-local ROUGH_STONE = "bea90ffd-00fb-4737-9d57-f87d7da49ca8"     -- Block_T1_Stone_Rough_CRAFTING (155)
 
 local BLOCKS = {
 	{  -- material 187: Building_64_buildings_set_Coldheights_GraniteCityWall_01 (no item in the game)
@@ -26,37 +33,24 @@ local BLOCKS = {
 	},
 	-- (11:05, owner "do it": the other five real hidden materials; each a copy of the closest game block, with its recipe)
 	-- (11:15) off = true: the owner's game crashed again and again (6 starts 11:10-11:13) once these five were in; only
-	-- the City Wall (fine 10:59-11:05) stays on until the crash is found.
-	{  -- material 188: Building_65_buildings_set_Coldheights_GraniteHouseWall_01
-		guid = "b7e9db6a-84d9-4a1c-8f1c-50ca5467f6d6", name_guid = "37928d8f-5cc1-447d-9215-7400ae6cf196",
-		recipe_guid = "77e83ac2-808e-4cb7-81d2-7ba858bb41f2",
-		debug_name = "Block_T5_Stone_Granite_HouseWall_FK", off = true, name = "Granite House Wall",
-		clone_of = GRANITE_BLOCK, material = 188,
-	},
-	{  -- material 189: Building_67_buildings_set_ColdHeights_GraniteHouseRoof_01 (roof mapping)
-		guid = "26bcadbc-0ba2-471e-964f-a61c11edc39d", name_guid = "dee8b40e-18a1-49c7-a6db-ae4086263ee7",
-		recipe_guid = "62785035-7c19-46ef-80c5-5eae9f5d1489",
-		debug_name = "Block_Roof_T5_Granite_HouseRoof1_FK", off = true, name = "Granite House Roof 1",
-		clone_of = GRANITE_ROOF_1, material = 189,
-	},
-	{  -- material 190: Building_68_buildings_set_ColdHeights_GraniteHouseRoof_02 (roof mapping)
-		guid = "a957e9dd-2408-4d9e-b18c-e32c0553a652", name_guid = "63da9546-d8a5-42df-9eba-60b07b75699f",
-		recipe_guid = "40e04632-7c67-4052-bbb7-72b18cd146b9",
-		debug_name = "Block_Roof_T5_Granite_HouseRoof2_FK", off = true, name = "Granite House Roof 2",
-		clone_of = GRANITE_ROOF_2, material = 190,
-	},
+	-- the City Wall (fine 10:59-11:05) stays on until the crash is found. (11:20, owner: test group 1 first: the
+	-- House Wall and both House Roofs are on again; Red Glow Dirt and White Block stay off: no crash.) (11:29, owner:
+	-- Red Glow Dirt next: on; White Block off.)
+	-- (11:29, owner: "take them all out except for the Granite city wall block") 188 House Wall, 189 / 190 House Roof 1 / 2
+	-- looked like the game's Granite and Granite roofs: removed. Their GUIDs are retired, never to be used again:
+	-- b7e9db6a-84d9-4a1c-8f1c-50ca5467f6d6 37928d8f-5cc1-447d-9215-7400ae6cf196 77e83ac2-808e-4cb7-81d2-7ba858bb41f2
+	-- 26bcadbc-0ba2-471e-964f-a61c11edc39d dee8b40e-18a1-49c7-a6db-ae4086263ee7 62785035-7c19-46ef-80c5-5eae9f5d1489
+	-- a957e9dd-2408-4d9e-b18c-e32c0553a652 63da9546-d8a5-42df-9eba-60b07b75699f 40e04632-7c67-4052-bbb7-72b18cd146b9
 	{  -- material 175: red glow dirt (Glowdirt_02)
 		guid = "429f63c5-2e8f-4ba0-becd-646edf4cf8aa", name_guid = "3cde4eb8-1274-4b5a-8ebe-5e1c8b62f306",
 		recipe_guid = "660c49b9-cae4-4e06-abcb-726aef0ce322",
-		debug_name = "Block_T1_GlowDirt_Red_FK", off = true, name = "Red Glow Dirt",
+		debug_name = "Block_T1_GlowDirt_Red_FK", name = "Red Luminescent Block",  -- (11:36, owner: the blue one's name)
+		icon_png = "icons/red_luminescent.png",  -- (11:35/11:44, owner: the copied icon is blue; a picture of its own)
 		clone_of = GLOWDIRT_BLUE, material = 175,
 	},
-	{  -- material 134: white (a DEPRECATED material with a real 1024 px texture)
-		guid = "8f2e04ad-0337-49a8-82d8-617c970106f2", name_guid = "a969dc13-3f13-4619-ac55-989cb0f97ab7",
-		recipe_guid = "4c7e8056-73c9-45ee-a869-38b5df25b252",
-		debug_name = "Block_T1_Stone_White_FK", off = true, name = "White Block",
-		clone_of = ROUGH_STONE, material = 134,
-	},
+	-- (11:35, owner: "forget about the white block I don't want it") 134 White Block removed (it was off: one of it or
+	-- the red one crashed the game, and the red one runs fine). Retired GUIDs, never to be used again:
+	-- 8f2e04ad-0337-49a8-82d8-617c970106f2 a969dc13-3f13-4619-ac55-989cb0f97ab7 4c7e8056-73c9-45ee-a869-38b5df25b252
 }
 
 -- (09:53) The block could not be placed or picked in build mode: the copy kept Granite's placeVoxelMaterial GUID
@@ -112,6 +106,68 @@ local function add_block(b)
 		end,
 	}
 	print(string.format("[fk_blocks] added %s (%s) placing material %d", b.debug_name, b.guid, b.material))
+	if b.icon_png and not loader.is_server then
+		-- (11:44, owner: "just provide a new graphic tile for that one") the icon is a picture shipped with the mod
+		-- (icons/*.png, 512 x 512: the blue block's icon turned red). The copied keen::UiTextureResource keeps its layout
+		-- (format BC7_unorm_block, size {x, y}, levelCount 10, the levels one after the other in one content); only its
+		-- content is replaced by the PNG and its smaller levels. EML's BC7 encoder stops the game on a level under 4 x 4
+		-- (11:43 crash: "block_compression encode.rs:91 left 2 right 0"): those are encoded as a 4 x 4 copy (one block,
+		-- the same 16 bytes). Any surprise (a size that does not add up): nothing is changed, the copied icon stays.
+		local ok, err = pcall(function()
+			local icon = game.assets.get_resource(b.guid, "keen::UiTextureResource")
+			if not icon then error("no icon under the item's GUID") end
+			local d = icon.data
+			local w, h, levels = tonumber(d.size.x), tonumber(d.size.y), tonumber(d.levelCount)
+			local path
+			for _, p in ipairs({b.icon_png, "../" .. b.icon_png, "mods/fk_blocks/" .. b.icon_png}) do
+				local okx, there = pcall(io.exists, p)
+				if okx and there then path = p break end
+			end
+			if not path then error("the picture " .. b.icon_png .. " is not found") end
+			local level = image.decode(io.read(path), "png")
+			if level.width ~= w or level.height ~= h then
+				error(string.format("the picture is %dx%d, the icon %dx%d", level.width, level.height, w, h))
+			end
+			local parts, total = {}, 0
+			for k = 1, levels do
+				local enc = level
+				if level.width < 4 or level.height < 4 then
+					enc = image.create(4, 4)
+					for y = 0, 3 do
+						for x = 0, 3 do
+							enc:set_pixel(x, y, level:get_pixel(x % level.width, y % level.height))
+						end
+					end
+				end
+				local str = buf_string(image.encode_texture(enc, d.format))
+				if not str then error("could not read level " .. k) end
+				parts[#parts + 1] = str
+				total = total + #str
+				if k < levels then  -- the next level: each pixel the average of four
+					local lw, lh = math.max(1, level.width // 2), math.max(1, level.height // 2)
+					local nxt = image.create(lw, lh)
+					for y = 0, lh - 1 do
+						for x = 0, lw - 1 do
+							local sr, sg, sb, sa = 0, 0, 0, 0
+							for dy = 0, 1 do
+								for dx = 0, 1 do
+									local r, g, bl, a = level:get_pixel(math.min(level.width - 1, 2 * x + dx), math.min(level.height - 1, 2 * y + dy))
+									sr, sg, sb, sa = sr + r, sg + g, sb + bl, sa + a
+								end
+							end
+							nxt:set_pixel(x, y, (sr + 2) // 4, (sg + 2) // 4, (sb + 2) // 4, (sa + 2) // 4)
+						end
+					end
+					level = nxt
+				end
+			end
+			local want = tonumber(d.data.hash.size)
+			if total ~= want then error(string.format("the new levels are %d bytes, the old %d: not changed", total, want)) end
+			d.data.hash = game.assets.create_content(buffer.wrap(table.concat(parts)))
+			print(string.format("[fk_blocks]   icon from %s: %dx%d, %d levels, %d bytes", path, w, h, levels, total))
+		end)
+		if not ok then print(string.format("[fk_blocks]   icon FAILED (the copied icon stays): %s", tostring(err))) end
+	end
 	-- (10:02) still not placeable or in build mode's block list: build mode offers only the items of a
 	-- keen::VoxelBlueprintMaterialPool (by ItemId). The new block goes into every pool that has its source, after it.
 	local src_id = tonumber(game.assets.get_resource(b.clone_of, "keen::ItemInfo").data.itemId.value)
