@@ -3207,7 +3207,7 @@ Each block is now added under pcall (a failing one leaves the others).
 mod.lua): 188 House Wall, 189/190 House Roofs (they looked like the game's granite blocks), 134 White Block ("I don't want
 it"; it or the red one crashed the game at load, the red one runs fine, so most likely White Block). 175 is now "Red
 Luminescent Block" (owner 11:36: matches the blue one's name). Its icon: tools/content/fk_blocks/icons/red_luminescent.png
-(512 px: the blue block's icon hue-rotated to red, plus fire-coloured sparkles; owner picked the version, 11:46); mod.lua
+(512 px: the blue block's icon hue-rotated to red, plus soft, diffuse fire-coloured glows; owner 11:49 "the second one is perfect"); mod.lua
 decodes it, builds the 10 levels (2x2 box average) and BC7-encodes each into the copied UiTextureResource's content
 (format BC7_unorm_block, size {x,y}, levelCount 10, levels back to back; must total the old size, else unchanged).
 EML's BC7 encoder PANICS (kills the game: "block_compression encode.rs:91 left 2 right 0") on a level under 4x4: those
