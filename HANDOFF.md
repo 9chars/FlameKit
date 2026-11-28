@@ -118,6 +118,17 @@ to continue with it yet... just note it and put it on a list some place for me t
     upload). /lua.reload from the game chat 22:25:20 was REFUSED: account 0x485890b753e75ad1 is not in G-Portal's
     emf\emf_core.ini [chat] admins (none there).
 
+21. CUSTOM BLOCKS (owner 2026-11-28 08:35 "experiment with adding new block textures into the game using existing assets
+    the game already has"). Plan: an EML content mod (EMF builds it into emf\content\client|server, the game's files
+    untouched): a NEW block item (copy of a block item, new fixed GUID, name, icon) + a NEW voxel material (copy of a
+    block material pointed at other existing textures); never replacing or removing existing blocks (owner 08:40). Owner
+    08:49: players get them BOTH ways: a crafting recipe in the game's menu ("so it feels like its part of the game") and
+    from FlameKit (e.g. a give, "so the testing can go faster"). Unknowns to research first: how block materials link to
+    textures, whether new materials can be added (a fixed table / id limit?), the dedicated server's side (no textures).
+    Later: brand-new images (create_content; community texture mods exist). Delivery: FlameKit's updater would ship the
+    content mod to players; G-Portal needs it too (G-Portal has its own dbghelp.dll = EML/ShroudForge, so EMF defers to
+    it there). Test only on a COPY of a world on the local server.
+
 **Releases:** the Development channel (dist-test) is still 0.15.525 and Stable (dist) 0.15.475; nothing since was
 packaged or signed. G-Portal untouched. Only the owner's word moves those (Rule 0g).
 
