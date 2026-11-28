@@ -3103,3 +3103,15 @@ either.
 glide.DAMAGE top step +9900% (scale 100), 10000..50000 removed; glide.damage caps a kept higher value at +9900%. run.lua: 28
 options, +9900% scale 100; both modes ALL PASSED. Owner "Yes: G-Portal + channels": G-Portal upload 07:38:43 (experimental.lua,
 changes.txt, mod.json, native mod.json; G-Portal stopped), dist-test signed 07:38:45, dist = dist-test, both sigs good.
+
+**0.15.562 THE WAKE (owner 07:47 "yes do #1": FlameKit restarts itself after EMF paused it).** core/kit.lua writes
+alive_server.txt every 300 server steps; main.lua requires core/wake.lua (the console-only test command "flamekit.stall":
+runs 300 ms) which requires core/wake_mark.lua. FlameKit Native build_anywhere.cpp wake_tick (dedicated only, every 60 x 15
+steps): after 90 s, a heartbeat older than 30 s (or none) -> rewrites flamekit\core\wake_mark.lua + appends "lua.reload" to
+emf\commands.txt; at most one per 120 s, 10 an hour; logs "wake: ...". DLL c627a25a. LOCAL TEST (owner "Restart Both",
+07:52): "flamekit.stall" in emf\commands.txt 07:54:45 -> paused 07:54:45.437 -> 07:55:26.313 "wake: FlameKit's script gave
+no heartbeat for 43 s: woken (rewrote core\wake_mark.lua, put lua.reload in emf\commands.txt; 1 this hour)" -> 07:55:26.482
+"21 feature(s) loaded", "Lua mod flamekit reloaded"; heartbeat again. Local server + game have 0.15.562 (old DLL kept as
+.old_553). G-Portal (stopped since 07:26) upload 07:56:40: DLL, native mod.json, core/kit.lua, core/wake.lua,
+core/wake_mark.lua, main.lua, changes.txt, mod.json. dist-test signed 07:57:12, dist = dist-test (sigs good). G-Portal also
+gets EMF 0.6.19 at this start (uploaded 07:28).

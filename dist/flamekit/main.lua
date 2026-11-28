@@ -7,6 +7,7 @@
 -- Save any file while the game runs and EMF reloads the mod within a second.
 
 local kit = require("core.kit")
+pcall(require, "core.wake")  -- (0.15.562) FlameKit Native rewrites it to wake FlameKit after EMF paused it
 
 kit.start({
   "features.changes",       -- the update message (no tab since 0.15.193). The tabs of FlameKit's window come in this order (then the DLL's own Windows and About tabs)

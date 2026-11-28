@@ -1343,6 +1343,72 @@ PathUpdateFn g_path_update = nullptr;
 // the animals are never left standing by a dead script); nothing is saved, a restart starts with the animals free.
 // Logged: "animal hold: ..." on every change.
 // ======================================================================================================================
+// ======================================================================================================================
+// (0.15.562, owner 2026-11-28 07:47 "yes do #1") THE WAKE: on a DEDICATED server, FlameKit Native brings FlameKit's
+// script back when EMF paused it ("the script ran longer than 250 ms ... paused until one of its files changes", or its
+// memory limit; G-Portal 2026-11-24/27 needed an upload or a restart each time). core/kit.lua writes
+// alive_server.txt every ~5 s while the script runs (the heartbeat). wake_tick (every 15 s of server steps): once the
+// world has run kWakeGraceS, a heartbeat older than kWakeStaleS (or none) means the script stopped: FlameKit Native
+// rewrites flamekit\core\wake_mark.lua (a file of the mod: EMF loads the mod again when one changes) and adds
+// "lua.reload" to emf\commands.txt (EMF runs it as the server owner: it looks at the files at once). At most one wake per
+// kWakeGapS and kWakeMaxHour an hour (a script that pauses again at once is not reloaded without end). Logged:
+// "wake: ..." each time. Only on a dedicated server (a player's own game never).
+// ======================================================================================================================
+std::atomic<bool> g_dedicated{false};
+constexpr int64_t kWakeGraceS = 90, kWakeStaleS = 30, kWakeGapS = 120;
+constexpr int kWakeMaxHour = 10;
+std::wstring emf_file(const wchar_t* name) {  // <this DLL's folder>\..\..\<name> (the emf folder)
+    std::wstring s = lua_file(L"");                // <emf>\mods\flamekit\ ...
+    s = s.substr(0, s.find_last_of(L"\\/"));     // <emf>\mods\flamekit
+    s = s.substr(0, s.find_last_of(L"\\/"));     // <emf>\mods
+    s = s.substr(0, s.find_last_of(L"\\/"));     // <emf>
+    return s + L"\\" + name;
+}
+int64_t unix_now() {
+    FILETIME now{};
+    GetSystemTimeAsFileTime(&now);
+    return ((int64_t(now.dwHighDateTime) << 32 | now.dwLowDateTime) - 116444736000000000LL) / 10000000;
+}
+int64_t file_age_s(const std::wstring& path) {  // -1: no such file
+    WIN32_FILE_ATTRIBUTE_DATA fa{};
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fa)) return -1;
+    const int64_t t = ((int64_t(fa.ftLastWriteTime.dwHighDateTime) << 32 | fa.ftLastWriteTime.dwLowDateTime) - 116444736000000000LL) / 10000000;
+    return unix_now() - t;
+}
+void wake_tick() {
+    if (!g_dedicated.load()) return;
+    static int64_t started = 0, last_wake = 0, hour_start = 0;
+    static int hour_n = 0;
+    const int64_t now = unix_now();
+    if (!started) started = now;
+    if (now - started < kWakeGraceS) return;
+    const int64_t age = file_age_s(lua_file(L"alive_server.txt"));
+    const bool stale = age < 0 || age > kWakeStaleS;
+    if (!stale || (last_wake && now - last_wake < kWakeGapS)) return;
+    if (now - hour_start >= 3600) hour_start = now, hour_n = 0;
+    if (hour_n >= kWakeMaxHour) {
+        static int64_t said = 0;
+        if (now - said >= 600) {
+            said = now;
+            EMF_LOG(kMod, "wake: FlameKit's script is stopped (no heartbeat for %lld s) but %d wakes this hour already: not again before the hour is over", (long long)age, hour_n);
+        }
+        return;
+    }
+    last_wake = now;
+    ++hour_n;
+    bool mark = false, cmd = false;
+    if (FILE* f = _wfopen(lua_file(L"core\\wake_mark.lua").c_str(), L"w")) {
+        fprintf(f, "-- core/wake_mark.lua: FlameKit Native rewrites this file to wake FlameKit after EMF paused it (see core/wake.lua).\n-- woken at %lld\nreturn true\n", (long long)now);
+        mark = fclose(f) == 0;
+    }
+    if (FILE* f = _wfopen(emf_file(L"commands.txt").c_str(), L"a")) {
+        fputs("lua.reload\n", f);
+        cmd = fclose(f) == 0;
+    }
+    EMF_LOG(kMod, "wake: FlameKit's script gave no heartbeat for %s: woken (%s core\\wake_mark.lua, %s lua.reload in emf\\commands.txt; %d this hour)",
+            age < 0 ? "ever (no alive_server.txt)" : (std::to_string(age) + " s").c_str(), mark ? "rewrote" : "could NOT write", cmd ? "put" : "could NOT put", hour_n);
+}
+
 std::atomic<bool> g_raid_hold{false};
 constexpr int64_t kHoldStaleS = 30;
 bool holding() { return g_raid_hold.load(std::memory_order_relaxed); }
@@ -1418,6 +1484,7 @@ void tame_tick(emf::World w) {
 }
 
 bool fk_build_anywhere_load(bool dedicated) {
+    g_dedicated = dedicated;  // (0.15.562) the wake runs only on a dedicated server
     // (0.15.423) the factor is read now, before the world loads (the game decides what to keep then)
     if (dedicated) read_spots("server, at start");  // (0.15.440) before the world loads
     if (dedicated) read_factor(L"altar_size_server.txt", "server, at start", kMaxFactor);
@@ -1510,6 +1577,8 @@ bool fk_build_anywhere_load(bool dedicated) {
                 read_test_size();  // (0.15.466)
                 read_raid_lock(w);  // (0.15.479)
                 read_animal_hold();  // (0.15.538) THE ANIMAL HOLD during raids (Spawn Nodes)
+                static uint32_t wake_n = 0;
+                if (wake_n++ % 60 == 30) wake_tick();  // (0.15.562) THE WAKE: every 15 s (60 x 15 steps)
                 read_raid_protect();  // (0.15.486)
                 read_spare();  // (0.15.525)
                 static uint32_t places_n = 0;

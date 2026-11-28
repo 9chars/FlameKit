@@ -1,8 +1,8 @@
-0.15.561
+0.15.562
 3731 f9394e44 flamekit/README.md
-161691 8070f765 flamekit/changes.txt
-2536 8a219426 flamekit/main.lua
-15940 5eb8742e flamekit/mod.json
+161891 5b28bee1 flamekit/changes.txt
+2644 e0b95c92 flamekit/main.lua
+15940 721237e3 flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -15,7 +15,7 @@
 9383 8c1df3d4 flamekit/core/ground_loot.lua
 52180 76b58e03 flamekit/core/item_db.lua
 8774 416e6469 flamekit/core/items.lua
-26031 cf3a7f42 flamekit/core/kit.lua
+26502 683b7dd3 flamekit/core/kit.lua
 12213 79ae9c05 flamekit/core/leap.lua
 14017 be6d3794 flamekit/core/loot_chest.lua
 5284 24bc34c1 flamekit/core/loot_news.lua
@@ -38,6 +38,8 @@
 3794 7588bc30 flamekit/core/test_players.lua
 629 1ebfa817 flamekit/core/test_tag.lua
 4567 d44f3ff2 flamekit/core/threat.lua
+982 348f8404 flamekit/core/wake.lua
+139 942d5e55 flamekit/core/wake_mark.lua
 1682 c64d052f flamekit/features/_template.lua
 30021 d9c248b9 flamekit/features/building.lua
 2925 f31bcd0b flamekit/features/changes.lua
@@ -77,5 +79,5 @@
 52520 c75a5f99 flamekit/sounds/raid_all_clear.wav
 352844 3133a975 flamekit/sounds/raid_siren.wav
 705644 c44ea676 flamekit/sounds/raid_siren_twice.wav
-1180160 6b87f084 flamekit_native/flamekit_native.dll
-464 335cad9b flamekit_native/mod.json
+1185792 6b6c663a flamekit_native/flamekit_native.dll
+464 f654beca flamekit_native/mod.json

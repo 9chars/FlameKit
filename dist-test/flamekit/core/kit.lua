@@ -501,9 +501,17 @@ function kit.start(modules)
   local clk_ok, clk = pcall(function() return os.clock end)
   if not (clk_ok and type(clk) == "function" and pcall(clk)) then clk = nil end
   local SLOW_AT, SLOW_LINES, slow_said = 0.05, 300, 0
+  -- (0.15.562) THE HEARTBEAT for FlameKit Native: on the server every 300 steps (~5 s) alive_server.txt gets the time.
+  -- A dedicated server's FlameKit Native sees it go stale when EMF paused this script and wakes it (core/wake.lua).
+  local beat_steps = 0
   emf.on_tick(function(world)
     if world:is_server() then
       server_seen = os.time()
+      beat_steps = beat_steps + 1
+      if beat_steps % 300 == 1 then
+        local f = io.open(emf.dir .. "\\alive_server.txt", "w")
+        if f then f:write(tostring(os.time()), "\n") f:close() end
+      end
       if not clk then each("tick", world)
       else
         local t0 = clk()

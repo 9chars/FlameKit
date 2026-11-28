@@ -1,3 +1,6 @@
+0.15.562 Nov 28, 2026
+- Servers: when EMF pauses FlameKit (the script ran too long), FlameKit Native now brings it back by itself within about a minute. Needs FlameKit Native 0.15.562 on the server.
+
 0.15.561 Nov 28, 2026
 - Experimental: Damage bonus goes up to +9900% (100 times), the most EMF allows; the +10000% to +50000% steps gave no bonus and are gone (a player who had one gets +9900%).
 
