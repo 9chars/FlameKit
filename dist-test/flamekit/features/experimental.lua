@@ -174,14 +174,18 @@ function glide.apply(world, account, p)
 end
 
 -- (0.15.205, owner: "a huge damage multiplier ... up to 200% more than my usual damage ... a drop down") each player's
--- own damage bonus against creatures, +0% to +50000% (0.15.559; +1000% from 0.15.207, +200% before) (experimental.json damage_pct; 0 is not kept): an EMF hit rule
+-- own damage bonus against creatures, +0% to +9900% (0.15.561; +50000% 0.15.559, +1000% from 0.15.207, +200% before) (experimental.json damage_pct; 0 is not kept): an EMF hit rule
 -- {from = the player, to = "creatures", scale = 1 + bonus}. Off while the player is in PvP (the PvP duelists and the
 -- leaderboard stay fair). Kept in this table with the glider speed (Lua's limit of 200 locals in this file).
 glide.DAMAGE = { 0, 10, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 600, 700,
-  800, 900, 1000, 5000, 10000, 20000, 30000, 40000, 50000 }  -- (0.15.207, owner: up to 1000%); (0.15.559, owner 2026-11-24
-  -- 23:14 "add 5000%, 10000%, 20000%, 30000%, 40000%, and 50000% to the Damage bonus setting")
+  800, 900, 1000, 5000, 9900 }  -- (0.15.207, owner: up to 1000%); (0.15.559, owner 2026-11-24 23:14: 5000% to 50000%);
+  -- (0.15.561, owner 2026-11-28 07:31 "adjust that setting to allow for the highest maximum damage and remove the values
+  -- that don't work") EMF's hit rule refuses a scale over 100 ("scale must be between 0 and 100", in EMF 0.6.6 and 0.6.19):
+  -- +9900% (100 times) is the most; 10000%..50000% are gone (they gave no bonus at all: G-Portal 2026-11-27 22:13:59)
 function glide.damage(account)
   local d = tonumber(((saved or {})[account] or {}).damage_pct)
+  -- (0.15.561) a bonus kept from 0.15.559-560 above the top step (10000%..50000%) counts as the top step (+9900%)
+  if d and d > glide.DAMAGE[#glide.DAMAGE] then d = glide.DAMAGE[#glide.DAMAGE] end
   return d and d > 0 and d or 0
 end
 -- Whether `d` is one of the damage bonus steps.
@@ -2458,7 +2462,7 @@ local function panel_rows(world)
     rows[#rows + 1] = { options = opts, text = glide.sbj_label(cur, d), same_line = true, tooltip = d.tip }
   end
   rows[#rows + 1] = { separator = true }
-  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +50000% (0.15.559; +1000% 0.15.207)
+  do  -- (0.15.205, owner) the damage bonus: a drop-down, +0% to +9900% (0.15.561; +1000% 0.15.207)
     local dp = tonumber(v.damage_pct) or 0
     -- A damage bonus step as text.
     local function name(d) return d == 0 and "Off (+0%)" or string.format("+%d%%", d) end
@@ -2466,7 +2470,7 @@ local function panel_rows(world)
     for _, d in ipairs(glide.DAMAGE) do opts[#opts + 1] = { key = "dmg:" .. tostring(d), text = name(d), selected = d == dp } end
     rows[#rows + 1] = { label = true, text = "Damage bonus" }
     rows[#rows + 1] = { options = opts, text = name(dp) .. (v.damage_pvp and dp > 0 and " (off in PvP)" or ""), same_line = true,
-      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times, +50000% 501 times. Only for you; off while you are in PvP." }
+      tooltip = "More damage to creatures with every hit: +100% is twice your damage, +1000% eleven times, +9900% (the most) 100 times. Only for you; off while you are in PvP." }
   end
   rows[#rows + 1] = { separator = true }  -- (0.15.207, owner) a line before the glider speed
   do  -- (0.15.200, owner) the glider speed: a drop-down, 0.1x to 5x

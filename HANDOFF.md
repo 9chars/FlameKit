@@ -3099,3 +3099,7 @@ dinput8.dll 48e5e55f (803328); "ftplist" confirms all five at those paths, Nov 2
 string "scale must be between 0 and 100" is in both DLLs): the Damage bonus steps +10000%..+50000% will not work on 0.6.19
 either.
 
+**0.15.561 (owner 07:31 "adjust that setting to allow for the highest maximum damage and remove the values that don't work"):**
+glide.DAMAGE top step +9900% (scale 100), 10000..50000 removed; glide.damage caps a kept higher value at +9900%. run.lua: 28
+options, +9900% scale 100; both modes ALL PASSED. Owner "Yes: G-Portal + channels": G-Portal upload 07:38:43 (experimental.lua,
+changes.txt, mod.json, native mod.json; G-Portal stopped), dist-test signed 07:38:45, dist = dist-test, both sigs good.

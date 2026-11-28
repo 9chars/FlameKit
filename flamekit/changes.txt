@@ -1,3 +1,6 @@
+0.15.561 Nov 28, 2026
+- Experimental: Damage bonus goes up to +9900% (100 times), the most EMF allows; the +10000% to +50000% steps gave no bonus and are gone (a player who had one gets +9900%).
+
 0.15.560 Nov 27, 2026
 - FlameKit Native: the once-a-minute server speed log no longer lists every thread on the machine (it froze the server for about a quarter second every minute on hosted servers). Needs FlameKit Native 0.15.560 on the server.
 

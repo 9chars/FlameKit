@@ -1,8 +1,8 @@
-0.15.560
+0.15.561
 3731 f9394e44 flamekit/README.md
-161495 4b829027 flamekit/changes.txt
+161691 8070f765 flamekit/changes.txt
 2536 8a219426 flamekit/main.lua
-15940 6568f341 flamekit/mod.json
+15940 5eb8742e flamekit/mod.json
 1518 633bba5a flamekit/core/admins.lua
 6327 c4c833c5 flamekit/core/bag.lua
 4327 ef29fe94 flamekit/core/bases.lua
@@ -44,7 +44,7 @@
 7671 497c5ce2 flamekit/features/chat.lua
 8526 d675a1d5 flamekit/features/chest_overflow.lua
 2180 9ece9151 flamekit/features/companions.lua
-177151 aa06fee8 flamekit/features/experimental.lua
+177642 c1e5200e flamekit/features/experimental.lua
 10750 8e025f5a flamekit/features/leaderboard.lua
 13236 ff3508fa flamekit/features/loose_loot.lua
 38423 12c61832 flamekit/features/loot_drop.lua
@@ -78,4 +78,4 @@
 352844 3133a975 flamekit/sounds/raid_siren.wav
 705644 c44ea676 flamekit/sounds/raid_siren_twice.wav
 1180160 6b87f084 flamekit_native/flamekit_native.dll
-464 cc5650f4 flamekit_native/mod.json
+464 335cad9b flamekit_native/mod.json
