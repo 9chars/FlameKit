@@ -3195,3 +3195,11 @@ Block_T5_Stone_Granite: workshop 1302892403, 10 x 83101a9d... (granite stone) ->
 emf_content.add_recipe (like = the source recipe, listed right after it), recipe GUID 7de822f7-cb42-4f34-aab1-966fd06aaffb
 FIXED. Category inputs or a missing source recipe: no recipe, logged; a failure keeps the block (pcall).
 Still to do: crafting it once (owner), the other five materials, a FlameKit way to give blocks, shipping to players/G-Portal.
+**#21 (11:05-11:18) five more blocks, then crashes**: fk_blocks got 188 Granite House Wall (copy of Granite), 189 / 190
+Granite House Roof 1 / 2 (copies of Block_Roof_T5_Granite_Ornamented 77bfc638... / _Shingles c91f1559...), 175 Red Glow
+Dirt (copy of Block_T1_GlowDirt_Blue_CRAFTING 40fcec7b...), 134 White Block (copy of Block_T1_Stone_Rough_CRAFTING
+bea90ffd...), each with its source's recipe and fixed GUIDs (in mod.lua). Server and client both built all six (11:08).
+Then the owner's game crashed again and again (EML starts 11:10:12, :29, :43, 11:11:44, 11:12:23, 11:13:17; one join
+11:13:16-11:13:26), before the 200-each put at 11:13:25; no crash text in any log we can read. The five got off = true
+(owner 11:15 "go ahead"): 11:18 loaded with no crash. Next: turn them on in halves to find the one that crashes.
+Each block is now added under pcall (a failing one leaves the others).

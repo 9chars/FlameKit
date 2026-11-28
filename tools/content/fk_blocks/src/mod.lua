@@ -12,6 +12,10 @@ end
 local content = require("emf_content")
 
 local GRANITE_BLOCK = "896ab2d5-58f7-4711-a313-a0b975a9a5a2"  -- Block_T5_Stone_Granite (material 192)
+local GRANITE_ROOF_1 = "77bfc638-dcc1-4d6f-bb6a-b893333b9c89"  -- Block_Roof_T5_Granite_Ornamented (194, roof)
+local GRANITE_ROOF_2 = "c91f1559-916d-49c4-a319-4eb279ee1c43"  -- Block_Roof_T5_Granite_Shingles (195, roof)
+local GLOWDIRT_BLUE = "40fcec7b-c55b-453d-b5b6-cefd042ddf77"   -- Block_T1_GlowDirt_Blue_CRAFTING (167)
+local ROUGH_STONE = "bea90ffd-00fb-4737-9d57-f87d7da49ca8"     -- Block_T1_Stone_Rough_CRAFTING (155)
 
 local BLOCKS = {
 	{  -- material 187: Building_64_buildings_set_Coldheights_GraniteCityWall_01 (no item in the game)
@@ -19,6 +23,39 @@ local BLOCKS = {
 		debug_name = "Block_T5_Stone_Granite_CityWall_FK", name = "Granite City Wall",
 		clone_of = GRANITE_BLOCK, material = 187,
 		recipe_guid = "7de822f7-cb42-4f34-aab1-966fd06aaffb",  -- FIXED as well (a save marks crafted recipes by its id)
+	},
+	-- (11:05, owner "do it": the other five real hidden materials; each a copy of the closest game block, with its recipe)
+	-- (11:15) off = true: the owner's game crashed again and again (6 starts 11:10-11:13) once these five were in; only
+	-- the City Wall (fine 10:59-11:05) stays on until the crash is found.
+	{  -- material 188: Building_65_buildings_set_Coldheights_GraniteHouseWall_01
+		guid = "b7e9db6a-84d9-4a1c-8f1c-50ca5467f6d6", name_guid = "37928d8f-5cc1-447d-9215-7400ae6cf196",
+		recipe_guid = "77e83ac2-808e-4cb7-81d2-7ba858bb41f2",
+		debug_name = "Block_T5_Stone_Granite_HouseWall_FK", off = true, name = "Granite House Wall",
+		clone_of = GRANITE_BLOCK, material = 188,
+	},
+	{  -- material 189: Building_67_buildings_set_ColdHeights_GraniteHouseRoof_01 (roof mapping)
+		guid = "26bcadbc-0ba2-471e-964f-a61c11edc39d", name_guid = "dee8b40e-18a1-49c7-a6db-ae4086263ee7",
+		recipe_guid = "62785035-7c19-46ef-80c5-5eae9f5d1489",
+		debug_name = "Block_Roof_T5_Granite_HouseRoof1_FK", off = true, name = "Granite House Roof 1",
+		clone_of = GRANITE_ROOF_1, material = 189,
+	},
+	{  -- material 190: Building_68_buildings_set_ColdHeights_GraniteHouseRoof_02 (roof mapping)
+		guid = "a957e9dd-2408-4d9e-b18c-e32c0553a652", name_guid = "63da9546-d8a5-42df-9eba-60b07b75699f",
+		recipe_guid = "40e04632-7c67-4052-bbb7-72b18cd146b9",
+		debug_name = "Block_Roof_T5_Granite_HouseRoof2_FK", off = true, name = "Granite House Roof 2",
+		clone_of = GRANITE_ROOF_2, material = 190,
+	},
+	{  -- material 175: red glow dirt (Glowdirt_02)
+		guid = "429f63c5-2e8f-4ba0-becd-646edf4cf8aa", name_guid = "3cde4eb8-1274-4b5a-8ebe-5e1c8b62f306",
+		recipe_guid = "660c49b9-cae4-4e06-abcb-726aef0ce322",
+		debug_name = "Block_T1_GlowDirt_Red_FK", off = true, name = "Red Glow Dirt",
+		clone_of = GLOWDIRT_BLUE, material = 175,
+	},
+	{  -- material 134: white (a DEPRECATED material with a real 1024 px texture)
+		guid = "8f2e04ad-0337-49a8-82d8-617c970106f2", name_guid = "a969dc13-3f13-4619-ac55-989cb0f97ab7",
+		recipe_guid = "4c7e8056-73c9-45ee-a869-38b5df25b252",
+		debug_name = "Block_T1_Stone_White_FK", off = true, name = "White Block",
+		clone_of = ROUGH_STONE, material = 134,
 	},
 }
 
@@ -64,7 +101,7 @@ local guid_of = material_guids()
 
 if not guid_of then print("[fk_blocks] no checked material list: placeVoxelMaterial left as copied") end
 
-for _, b in ipairs(BLOCKS) do
+local function add_block(b)
 	local new_id = content.add_item{
 		guid = b.guid, name_guid = b.name_guid, debug_name = b.debug_name, name = b.name, clone_of = b.clone_of,
 		edit = function(it)
@@ -155,6 +192,13 @@ for _, b in ipairs(BLOCKS) do
 			print(string.format("[fk_blocks] %s: recipe %s %s", b.debug_name, b.recipe_guid, ok and "added" or ("FAILED: " .. tostring(err))))
 		end
 	end
+end
+
+-- one block failing (a game update moved its source) leaves the others in place
+for _, b in ipairs(BLOCKS) do
+	local ok, err = true, nil
+	if b.off then print(string.format("[fk_blocks] %s is off", b.debug_name)) else ok, err = pcall(add_block, b) end
+	if not ok then print(string.format("[fk_blocks] %s FAILED: %s", b.debug_name, tostring(err))) end
 end
 
 content.finish()
