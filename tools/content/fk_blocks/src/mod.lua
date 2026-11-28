@@ -58,10 +58,40 @@ local function material_guids()
 	return nil
 end
 local guid_of = material_guids()
+-- (10:24) The action bar still refused it. keen::TerraformingEfficiencyRegistryResource.buildingConfigs holds one entry
+-- per building material (buildingMaterial.value = material id - 128). Granite's (64) has knowledgeQuery
+-- {type Extern, compareValue 0, id 2097986610}; the City Wall's (59) {type SimpleFlag, compareValue 1, id 1401630464},
+-- a "the player knows this" flag no one gets. Only that check of the new block's material is set to its source's;
+-- nothing else of the entry changes.
+local function building_config(material)
+	for _, r in ipairs(game.assets.get_resources_by_type("keen::TerraformingEfficiencyRegistryResource") or {}) do
+		for _, c in ipairs(r.data.buildingConfigs or {}) do
+			if tonumber(c.buildingMaterial and c.buildingMaterial.value) == material - 128 then return c end
+		end
+	end
+	return nil
+end
+
+local function copy_knowledge_check(material, from_material)
+	local c, src = building_config(material), building_config(from_material)
+	if not c or not src then
+		print(string.format("[fk_blocks] no building config for %d or %d: its known check is left as it is", material, from_material))
+		return
+	end
+	local q, sq = c.knowledgeQuery, src.knowledgeQuery
+	print(string.format("[fk_blocks] material %d known check was %s %s %s id %s; now %d's", material, tostring(q.type),
+		tostring(q.compareOperator), tostring(q.compareValue), tostring(q.knowledgeOrQueryId.value), from_material))
+	q.type = sq.type
+	q.compareOperator = sq.compareOperator
+	q.compareValue = sq.compareValue
+	q.isExplicitPlayerKnowledgeQuery = sq.isExplicitPlayerKnowledgeQuery
+	q.knowledgeOrQueryId = {value = sq.knowledgeOrQueryId.value}
+end
+
 if not guid_of then print("[fk_blocks] no checked material list: placeVoxelMaterial left as copied") end
 
 for _, b in ipairs(BLOCKS) do
-	content.add_item{
+	local new_id = content.add_item{
 		guid = b.guid, name_guid = b.name_guid, debug_name = b.debug_name, name = b.name, clone_of = b.clone_of,
 		edit = function(it)
 			it.equipment.voxelData.placeVoxelMaterialId = b.material
@@ -71,6 +101,51 @@ for _, b in ipairs(BLOCKS) do
 		end,
 	}
 	print(string.format("[fk_blocks] added %s (%s) placing material %d", b.debug_name, b.guid, b.material))
+	-- (10:02) still not placeable or in build mode's block list: build mode offers only the items of a
+	-- keen::VoxelBlueprintMaterialPool (by ItemId). The new block goes into every pool that has its source, after it.
+	copy_knowledge_check(b.material, tonumber(game.assets.get_resource(b.clone_of, "keen::ItemInfo").data.equipment.voxelData.placeVoxelMaterialId))
+	local src_id = tonumber(game.assets.get_resource(b.clone_of, "keen::ItemInfo").data.itemId.value)
+	local pools = game.assets.get_resources_by_type("keen::VoxelBlueprintMaterialPoolRegistryResource") or {}
+	local added = 0
+	for _, r in ipairs(pools) do
+		for _, pool in ipairs(r.data.materialPools or {}) do
+			for i, m in ipairs(pool.materials) do
+				if tonumber(m.value) == src_id then
+					table.insert(pool.materials, i + 1, {value = new_id})
+					added = added + 1
+					print(string.format("[fk_blocks]   into pool %s (%d items now)", tostring(pool.debugName), #pool.materials))
+					break
+				end
+			end
+		end
+	end
+	print(string.format("[fk_blocks] %s: %d pool registries, put into %d pools", b.debug_name, #pools, added))
+	-- (10:32) From the action bar the preview shows, the swing plays and nothing is placed (the "not allowed" sound).
+	-- keen::VoxelBlueprintItemRegistryResource.blueprintItems holds the shape of every placeable item by ItemId (the
+	-- build menu's shapes are registered items; a block placed from the action bar is its own shape). The new block
+	-- gets a copy of its source's entry under its own ItemId, in id order when the list is sorted.
+	for _, r in ipairs(game.assets.get_resources_by_type("keen::VoxelBlueprintItemRegistryResource") or {}) do
+		local list = r.data.blueprintItems or {}
+		local src_at, sorted = nil, true
+		for i, e in ipairs(list) do
+			local v = tonumber(e.itemId.value)
+			if v == src_id then src_at = i end
+			if i > 1 and v < tonumber(list[i - 1].itemId.value) then sorted = false end
+		end
+		if src_at then
+			local at = #list + 1
+			if sorted then
+				at = 1
+				while at <= #list and tonumber(list[at].itemId.value) < new_id do at = at + 1 end
+			end
+			table.insert(list, at, list[src_at])  -- EML inserts a copy
+			list[at].itemId = {value = new_id}
+			print(string.format("[fk_blocks] %s: shape copied from its source (%d shapes, sorted %s, at %d)", b.debug_name, #list,
+				tostring(sorted), at))
+		else
+			print(string.format("[fk_blocks] %s: its source has no shape entry (%d shapes)", b.debug_name, #list))
+		end
+	end
 end
 
 content.finish()

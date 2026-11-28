@@ -3173,3 +3173,17 @@ GUID left as the copy's). Installed D:\\...\\Enshrouded\\mods\\fk_blocks (the ow
 world backed up first: save_backups\\2026-11-28_*_local_server_before_fk_blocks (377 MB). Owner "Restart Both" 09:44; server:
 "items citywall" lists Block_T5_Stone_Granite_CityWall_FK (0xf012c490, stack 5000); 09:45:54 "put ... 200 1": 200 added to the
 owner (entity 1). Waiting for the owner's look in game.
+
+**#21 TEST BLOCK WORKS (owner 10:37 "yup it works")**: build menu and action bar both place Granite City Wall (it looks
+different from Granite). What a new block item needed, all in tools/content/fk_blocks/src/mod.lua, on server and client:
+1. placeVoxelMaterialId AND placeVoxelMaterial = that material's own GUID: keen::VoxelWorldResource.materialGuids[id+1],
+   checked against every game block item first (187 = a4c745ae-b452-45f0-82f1-e0a23e88072b; 134 97c414c7..., 175 7a195af2...,
+   188 6810789f..., 189 d487aa86..., 190 a5f1165b...). keen::VoxelMaterialResolvedList and SolidVoxelMaterial are no resources.
+2. its ItemId in keen::VoxelBlueprintMaterialPoolRegistryResource pool BuildingDefaultMaterials, after its source: the build menu.
+3. a copy of its source's keen::VoxelBlueprintItemRegistryResource.blueprintItems entry under its ItemId (list not sorted;
+   appended): the action bar (without it: preview, swing, "not allowed" sound, nothing placed).
+4. (10:24, maybe not needed) TerraformingEfficiencyRegistryResource.buildingConfigs[material-128].knowledgeQuery set to
+   the source material's (187 had SimpleFlag Equals 1 id 1401630464; Granite Extern Equals 0 id 2097986610). It did not fix
+   the action bar by itself; to test whether it can go. It also applies to the Cold Heights city walls (same material).
+Still to check: breaking/drops (187's materialItem is 2f9dc768-2081-481c-a700-945c864eb6b0, Granite's 83101a9d...),
+save/restart, removing step 4. Owner 09:48: his runes are missing from his inventory (cause not found; the put only adds).
