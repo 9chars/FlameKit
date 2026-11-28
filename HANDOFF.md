@@ -3115,3 +3115,7 @@ no heartbeat for 43 s: woken (rewrote core\wake_mark.lua, put lua.reload in emf\
 .old_553). G-Portal (stopped since 07:26) upload 07:56:40: DLL, native mod.json, core/kit.lua, core/wake.lua,
 core/wake_mark.lua, main.lua, changes.txt, mod.json. dist-test signed 07:57:12, dist = dist-test (sigs good). G-Portal also
 gets EMF 0.6.19 at this start (uploaded 07:28).
+**G-Portal started 08:08:23 (owner 08:17 "its up"): emf_core 0.6.19 starting**, signatures 71 of 98 (the same as the local
+dedicated server: 27 are client-only), all FlameKit Native hooks, 21 features, no errors. The 250 ms rule is fixed in EMF's
+lua.dll (docs/modding/lua.md: "A call that runs longer than 250 ms ... is stopped"); no setting changes it. Owner 08:17
+"this 250 ms limit really sucks ass"; last night's pause = 22:18:20 (OPEN #20, outside the tick).
