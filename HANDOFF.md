@@ -99,6 +99,12 @@ to continue with it yet... just note it and put it on a list some place for me t
     emf\emf_core.ini [chat] admins, then /lua.reload in the game's chat: NOT confirmed that lua.reload resumes a paused
     mod with no file changed (EMF docs: paused "until you save one of its files again"); needs a test.
 
+18. LOAD FLAMEKIT IN PIECES (owner 2026-11-27 22:24 "we may need to do that.. add it to the list for now..."). A player's game
+    paused FlameKit AT LOAD (2026-11-27 20:06:08: "the script ran longer than 250 ms"; loading took >300 ms on his PC vs
+    25 ms on the owner's, antivirus scanning each of the ~80 files; an exclusion fixed it). EMF's rule is per script run,
+    so main.lua could load a few features per step (each run well under 250 ms) instead of all at once; a slow PC then
+    only gets FlameKit a moment later. Not started.
+
 **Releases:** the Development channel (dist-test) is still 0.15.525 and Stable (dist) 0.15.475; nothing since was
 packaged or signed. G-Portal untouched. Only the owner's word moves those (Rule 0g).
 
