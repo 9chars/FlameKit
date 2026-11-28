@@ -1,0 +1,402 @@
+server: false
+146 resource types in all; the first one: Type: 000001c55184be68 (userdata)
+type Type: 000001c55184aa28: -1
+type Type: 000001c55184b628: -1
+type Type: 000001c55184b688: -1
+type Type: 000001c55184b748: -1
+type Type: 000001c55184b808: -1
+type Type: 000001c55184be68: -1
+type Type: 000001c55184c108: -1
+type Type: 000001c55184c168: -1
+type Type: 000001c55184c1c8: -1
+type Type: 000001c55184c228: -1
+type Type: 000001c55184c288: -1
+type Type: 000001c55184c2e8: -1
+type Type: 000001c55184c348: -1
+type Type: 000001c55184c3a8: -1
+type Type: 000001c55184c408: -1
+type Type: 000001c55184c468: -1
+type Type: 000001c55184c4c8: -1
+type Type: 000001c55184c528: -1
+type Type: 000001c55184c588: -1
+type Type: 000001c55184c5e8: -1
+type Type: 000001c55184c648: -1
+type Type: 000001c55184c6a8: -1
+type Type: 000001c55184c708: -1
+type Type: 000001c55184c768: -1
+type Type: 000001c55184c7c8: -1
+type Type: 000001c55184c828: -1
+type Type: 000001c55184c888: -1
+type Type: 000001c55184c8e8: -1
+type Type: 000001c55184c948: -1
+type Type: 000001c55184c9a8: -1
+type Type: 000001c55184ca08: -1
+type Type: 000001c55184ca68: -1
+type Type: 000001c55184cac8: -1
+type Type: 000001c55184cb28: -1
+type Type: 000001c55184cb88: -1
+type Type: 000001c55184cbe8: -1
+type Type: 000001c55184cc48: -1
+type Type: 000001c55184cca8: -1
+type Type: 000001c55184cd08: -1
+type Type: 000001c55184cd68: -1
+type Type: 000001c55184cdc8: -1
+type Type: 000001c55184ce28: -1
+type Type: 000001c55184ce88: -1
+type Type: 000001c55184cee8: -1
+type Type: 000001c55184cf48: -1
+type Type: 000001c55184cfa8: -1
+type Type: 000001c55184d008: -1
+type Type: 000001c55184d068: -1
+type Type: 000001c55184d0c8: -1
+type Type: 000001c55184d128: -1
+type Type: 000001c55184d188: -1
+type Type: 000001c55184d1e8: -1
+type Type: 000001c55184d248: -1
+type Type: 000001c55184d2a8: -1
+type Type: 000001c55184d308: -1
+type Type: 000001c55184d368: -1
+type Type: 000001c55184d3c8: -1
+type Type: 000001c55184d428: -1
+type Type: 000001c55184d488: -1
+type Type: 000001c55184d4e8: -1
+type Type: 000001c55184d548: -1
+type Type: 000001c55184d5a8: -1
+type Type: 000001c55184d608: -1
+type Type: 000001c55184d668: -1
+type Type: 000001c55184d6c8: -1
+type Type: 000001c55184d728: -1
+type Type: 000001c55184d788: -1
+type Type: 000001c55184d7e8: -1
+type Type: 000001c55184d848: -1
+type Type: 000001c55184d8a8: -1
+type Type: 000001c55184d908: -1
+type Type: 000001c55184d968: -1
+type Type: 000001c55184d9c8: -1
+type Type: 000001c55184da28: -1
+type Type: 000001c55184da88: -1
+type Type: 000001c55184dae8: -1
+type Type: 000001c55184db48: -1
+type Type: 000001c55184dba8: -1
+type Type: 000001c55184dc08: -1
+type Type: 000001c55184dc68: -1
+type Type: 000001c55184dcc8: -1
+type Type: 000001c55184dd28: -1
+type Type: 000001c55184dd88: -1
+type Type: 000001c55184dde8: -1
+type Type: 000001c55184de48: -1
+type Type: 000001c55184dea8: -1
+type Type: 000001c55184df08: -1
+type Type: 000001c55184df68: -1
+type Type: 000001c55184dfc8: -1
+type Type: 000001c55184e028: -1
+type Type: 000001c55184e088: -1
+type Type: 000001c55184e0e8: -1
+type Type: 000001c55184e148: -1
+type Type: 000001c55184e1a8: -1
+type Type: 000001c55184e208: -1
+type Type: 000001c55184e268: -1
+type Type: 000001c55184e2c8: -1
+type Type: 000001c55184e328: -1
+type Type: 000001c55184e388: -1
+type Type: 000001c55184e3e8: -1
+type Type: 000001c55184e448: -1
+type Type: 000001c55184e4a8: -1
+type Type: 000001c55184e508: -1
+type Type: 000001c55184e568: -1
+type Type: 000001c55184e5c8: -1
+type Type: 000001c55184e628: -1
+type Type: 000001c55184e688: -1
+type Type: 000001c55184e6e8: -1
+type Type: 000001c55184e748: -1
+type Type: 000001c55184e7a8: -1
+type Type: 000001c55184e808: -1
+type Type: 000001c55184e868: -1
+type Type: 000001c55184e8c8: -1
+type Type: 000001c55184e928: -1
+type Type: 000001c55184e988: -1
+type Type: 000001c55184e9e8: -1
+type Type: 000001c55184ea48: -1
+type Type: 000001c55184eaa8: -1
+type Type: 000001c55184eb08: -1
+type Type: 000001c55184eb68: -1
+type Type: 000001c55184ebc8: -1
+type Type: 000001c55184ec28: -1
+type Type: 000001c55184ec88: -1
+type Type: 000001c55184ece8: -1
+type Type: 000001c55184ed48: -1
+type Type: 000001c55184eda8: -1
+type Type: 000001c55184ee08: -1
+type Type: 000001c55184ee68: -1
+type Type: 000001c55184eec8: -1
+type Type: 000001c55184ef28: -1
+type Type: 000001c55184ef88: -1
+type Type: 000001c55184efe8: -1
+type Type: 000001c55184f048: -1
+type Type: 000001c55184f0a8: -1
+type Type: 000001c55184f4c8: -1
+type Type: 000001c55184f708: -1
+type Type: 000001c55184f768: -1
+type Type: 000001c55184f828: -1
+type Type: 000001c55184fb28: -1
+type Type: 000001c55184fca8: -1
+type Type: 000001c551850068: -1
+type Type: 000001c5518501e8: -1
+type Type: 000001c5518502a8: -1
+type Type: 000001c551850488: -1
+type Type: 000001c5518504e8: -1
+type Type: 000001c551850788: -1
+SolidVoxelMaterial: 0
+PbrBuildingMaterial: 0
+blending 1 guid 15506ca1-f0b2-8a43-a087-75a7c83d5596 layerCount 85 debugName building material blending rendering data 50176 bytes, patchPoints 4102, textures 3596, feedbacks 506
+blending texture 1: {\"texture\":{\"width\":2048,\"height\":2048,\"levelCount\":12,\"format\":\"BC7_srgb_block\",\"content\":{\"hash\":{\"size\":5592432,\"hash0\":3613242099,\"hash1\":1466766341,\"hash2\":2032989811},\"category\":{\"value\":1013777168},\"bundleId\":2873730175,\"sortKey\":1},\"mipTailContent\":{\"hash\":{\"size\":1392,\"hash0\":1228724128,\"hash1\":4230679324,\"hash2\":1776681855},\"category\":{\"value\":1185060183},\"bundleId\":0,\"sortKey\":1776681855},\"mipChainContentRanges\":[{\"start\":0,\"count\":5592432},{\"start\":4194304,\"count\":1398128},{\"start\":5242880,\"count\":349552},{\"start\":5505024,\"count\":87408},{\"start\":5570560,\"count\":21872},{\"start\":5586944,\"count\":5488}],\"debugName\":\"Building_47_buildings_set_Stone_Castle_01_baseSide_albedo\"},\"category\":\"BuildingMaterial\"}
+patch point 1: {\"type\":\"Texture\",\"offset\":12,\"size\":4,\"parameterIndex\":0}
+patch point 2: {\"type\":\"Texture\",\"offset\":16,\"size\":4,\"parameterIndex\":1}
+patch point 3: {\"type\":\"Texture\",\"offset\":20,\"size\":4,\"parameterIndex\":2}
+patch point 4: {\"type\":\"Texture\",\"offset\":24,\"size\":4,\"parameterIndex\":3}
+patch point 5: {\"type\":\"Texture\",\"offset\":28,\"size\":4,\"parameterIndex\":4}
+patch point 6: {\"type\":\"Texture\",\"offset\":32,\"size\":4,\"parameterIndex\":5}
+patch point 7: {\"type\":\"Texture\",\"offset\":36,\"size\":4,\"parameterIndex\":6}
+patch point 8: {\"type\":\"TextureFeedback\",\"offset\":40,\"size\":4,\"parameterIndex\":0}
+BuildingMaterialPaletteResource: 0
+params 1 guid 15506ca1-f0b2-8a43-a087-75a7c83d5596 materials 85
+voxel item Block_Roof_T4_Desert_Shingles_01_Reward guid 0053eff3-98f1-4c9c-9227-3db7c336659d building true material 857e4251-5cd7-443f-9e8c-f47613f98380 id 200 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T4_Stone_HighlyPolished_REWARD guid 02b3fe3f-cb8f-4119-bf41-8c0a466eff93 building true material 54fb7165-7d36-4191-a089-01e3f53bb626 id 132 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_Wood_Deadwood_CRAFTING guid 03b5c5ba-e1b8-42c4-b7f7-07b704330bfd building true material 3f27f905-cc1e-4ee6-891e-246e09c78de8 id 147 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item _Block_T7_Dark_Circles_Ancient_REWARD guid 054fd0c6-27f5-4e4d-8b3d-2e372aac1e5e building true material eba015ee-ce35-40b5-92e5-147954cb1454 id 141 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T6_Wood_Bamboo guid 06fd097a-4ef8-47b2-8403-5f0ac0d236f8 building true material 1a5661a7-e324-4261-8ad5-f7f1f38485ac id 203 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Road_Stone_1 guid 08e61e2f-91bc-4288-bd47-701ead1aea20 building false material 7223406b-6e12-4c0d-9261-062890f69f43 id 21 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T3_Stone_CastleWall_REWARD guid 0e4b0b24-2ffe-4423-b55c-83ef094788cd building true material ff3c0d5a-843f-4ce9-bfbe-3048abb1ede2 id 165 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T5_Stone_StarMaterial_REWARD guid 10a59fa5-6756-463c-9214-479d8b332b26 building true material d29ede0f-09cb-4b3f-b4df-a53bb4c0f946 id 199 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_Roof_T1_Wood_TaredShingles_CRAFTING guid 115e307c-aecf-436c-9bf0-3411ac622d23 building true material 19bf9141-364f-443d-846f-8ef72e2c8629 id 133 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T3_Dungeon_Fancy_REWARD guid 11eb85d9-0a6f-4a75-b2c5-9b87f434596f building true material e2d500c4-51f6-4fef-b443-d2ddc89fd60a id 145 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T6_Stone_Shelllime_PirateBay_wall_REWARD guid 12714b36-51c7-48f0-9701-7919b86b299c building true material 5e55cebf-252d-4949-8315-d3c186420249 id 209 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T7_AncientLand_fertile_Highgrass guid 15dc6c3d-4839-497e-a0fc-54a5c769be90 building false material faa249e1-302d-4ad4-886e-2969a432ddb3 id 103 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T4_Dirt_Desert_fine_sand guid 165a08b2-3f51-4802-8fb8-fa6791af06c2 building false material 3778135f-9784-4887-85c0-25f24c4eb450 id 46 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_GlowDirt_Green_CRAFTING guid 1884ed75-3322-477a-9cc3-1bca87247d30 building true material a30783b6-444e-4801-89b5-6f98c0d3eac4 id 181 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_Metal_Sheets_CRAFTING guid 1ae57631-0761-4f83-8e98-4406a95e4aa2 building true material f11b20c3-3b5d-4815-9bc7-548c15a122c5 id 172 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T2_Stone_Vukah_PlaitedWalll_REWARD guid 1b1e0bf9-8c76-4fde-bc14-5c26c441de5f building true material 4ab2ac23-2714-4d03-b063-a780fe068f19 id 185 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Blueprint_Terrain_05m guid 1b3bbd16-0300-41ed-8214-0313a0fc807d building true material 00000000-0000-0000-0000-000000000000 id 0 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T3_Tarred_Straw guid 1cb1a310-503e-4959-9c68-8e9b980b77a2 building true material 024150fb-87bd-43be-9304-4955c7cd095c id 168 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T5_Ice guid 1e063ee2-9707-4e5f-a919-6b50df247453 building false material 14b0e422-df69-4494-9ceb-eac821898fad id 57 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T3_Stone_Brittle_MixedSizes_REWARD guid 1e45ecb6-93f1-41b1-b566-e64c36361b1b building true material aae206fd-a464-497e-aa81-a34f6204ac6b id 151 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Dirt_Grassland guid 20292e7b-858b-4e5f-bdc8-e921190eb0f4 building false material d0122ac2-e754-6d46-a4f6-8ef1e3844253 id 1 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T6_ShellLime_LizardTemple_Shingles_REWARD guid 2037966a-d2cb-4976-950e-08639f1bbcc9 building true material c969044c-248a-483c-b7f7-f760563d9eba id 204 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_Stone_Nation01_Basement_REWARD guid 2263e72c-bbd4-44a8-9152-1aba8df33bf0 building true material 2930379d-d155-44a9-a936-84974571ea8e id 138 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T7_AncientLand_fertile_Ancientgrass guid 22e430dd-6bcc-4849-bc3c-a374b3bd2bf1 building false material a11431fc-6f2a-4651-99de-aa70e5015013 id 110 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T5_Wood_Pine guid 236c647d-3568-4683-aab6-704ed1cafe88 building true material fa014cd0-8d39-4b49-a56f-326381560c28 id 191 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T4_Sandstone guid 2f9dc768-2081-481c-a700-945c864eb6b0 building false material 40fc4fcb-ee20-4e0d-879d-5c3a104f02e5 id 28 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T5_Dirt_ColdHeights guid 323c469c-004b-4a49-89a4-f204d2100b04 building false material c397bfac-543c-4e58-a0b6-1604281089ed id 58 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T4_Desert_fertile_Highgrass guid 328888fd-1f3f-474c-a0e6-c681f6f14333 building false material abab640e-1d8c-4af9-ae1a-11832ca2edbd id 75 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T2_TallTree_BoxTree guid 35e9569e-f0b4-4d1e-82da-0f10b23a4771 building false material 764edfd2-0834-42ce-b1e3-07ee7fdbe2c2 id 52 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T4_SandStone_Sandstone_Fancy_CRAFTING guid 361a3da1-1091-4629-8ebe-3784c86d6e2c building true material e051ad12-8e70-4a0f-ac6f-dbaf1b86e1c6 id 158 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T3_GreenGlow_HallowHalls_Cairn_REWARD guid 36b7635d-1fc5-49f9-81e9-81994de9fd65 building true material d0e51fd9-6068-452f-a267-4a49418a0d33 id 178 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T4_Metal_Iron_CRAFTING guid 380001e6-10e2-40f8-b6cd-dd89797daa2b building true material 3ac19ef0-3a93-48e5-bc37-4900773db3e3 id 135 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T4_Dungeon_Stone_WellWall_REWARD guid 39029279-f6c0-41a3-b377-ae28f773fc3e building true material 515d8e5a-26a2-4927-b654-991adc137ccd id 146 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_TallTree_GiantMushroom guid 393edeff-3624-4302-af2e-1ce9ed93ace5 building false material d2a988cc-206f-4976-8650-a6b337256aa9 id 54 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_Stone_Vukah_DungeonWall_REWARD guid 3b9718f3-ec9a-4a52-a823-de9b635378fc building true material 6a6ff696-6264-4ca0-8174-6a6b4c3ec129 id 183 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Blueprint_Voxel_Block_05m guid 3c9dcc98-2e90-47e7-abf5-5dd934f5442e building true material 00000000-0000-0000-0000-000000000000 id 0 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T6_Dirt_Wetlands_Sand guid 3d7591c2-b912-4d64-adca-587f31706b82 building false material bcc844f9-6a55-4191-a120-4fd5c6a0df9e id 95 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T1_GlowDirt_Blue_CRAFTING guid 40fcec7b-c55b-453d-b5b6-cefd042ddf77 building true material ea92531b-8e45-47e8-83a3-c63979d1f43c id 167 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_Flintstone_Rough_CRAFTING guid 421fab1c-9a94-416c-b0c1-1ecd00ca4563 building true material 37726d08-671c-4d06-9d83-db070bab3ca8 id 166 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T5_Stone_Granite_Polished_REWARD guid 42a6957d-f515-45ed-aa1c-5dc1fbaf01d6 building true material ef0fedcf-d7ec-48c4-9ef1-764930edfaf1 id 193 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T4_Dirt_Desert_sand guid 439cbec1-cbc8-4c71-851f-af38642a4e5d building false material 346e9207-169c-5649-9ff0-168327e050aa id 9 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T6_ShellLime_Castle_WallAndRoof guid 4451eef2-f838-4237-903a-78e75291cc6f building true material 3094b0f8-3eae-4640-95bb-964159f85bb0 id 208 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Dirt_Underwater_mud guid 4b0b95da-96be-4276-be70-6dcee302f71f building false material eb25bd4b-87fa-4ab2-abed-87c8448e8faa id 91 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T2_Dirt_Talltrees guid 4fab9d8b-bdae-4969-898f-ff8b3c2ae2ce building false material a0f375db-5bdd-4fda-93a6-6c00324d7d31 id 104 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item _Block_T7_Full_Gold_Ancient_REWARD guid 4fb460c1-6eb9-4ee5-9378-b2f2e9fdb1e5 building true material f3a0a460-ceef-4ca7-ac14-ecc117aacb6a id 160 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T2_Stone_Nation01_Citywall01_REWARD guid 51db7827-0f9d-4560-9f88-a02cc29a6409 building true material e9bcc4c6-3452-44ff-8b75-1ba1ef1146c1 id 148 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T6_Wood_Palmwood_Shelllime_PirateBay_REWARD guid 53ba1cfa-6d2c-44b4-b446-8c78fcf323c8 building true material 8382658c-9a84-4afc-a431-1d81e352fdea id 206 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T6_Stone_Shelllime_Castle_wall_Foundation guid 57ee75c0-7227-4409-88c8-197bcc7f1663 building true material 91f50d22-0f81-4b3a-ac45-23734d567915 id 202 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T7_Dirt_AncientLand_Sand guid 57f712da-5ad3-4b31-b700-0f5761472b5e building false material 5848511c-df5e-4577-9aa7-88af45c82cd7 id 108 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_Wood_Deepforest_WoodPlanks_REWARD guid 580c7ae6-a60b-4548-a1d3-6a41003dc695 building true material 772ed27f-78a2-4744-a20a-ebe0a3d486eb id 176 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T3_Stone_Steppes_Limestone guid 584bbcbe-8ed6-4a5f-97dd-409f9660214e building false material 67f875a7-721c-4b16-acc9-5d51010682f2 id 42 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item _Block_T7_YellowGlow_AncientEnergy_REWARD guid 59324da0-16d2-494b-a56e-2e45d3cf6b6f building true material c095dfeb-450b-46e1-ae07-a9d8127253aa id 211 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T4_Dungeon_Sandstone_Temple_REWARD guid 59cfa244-0b00-4c1c-a094-eaadd23d9f49 building true material 3568bc30-5603-4c9c-ac52-b0e6f566b718 id 161 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T5_Stone_Obsidian_Polished_REWARD guid 5a1e8b66-56aa-471d-9fca-e2737ce98134 building true material 8c90138f-86e5-4243-8368-0a0066e1fa6f id 196 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_TallTree_Bark guid 5e097ebc-e204-4d11-94bf-ddbde62ae7c2 building false material 177fb2d2-e724-48d1-987c-66de8974244a id 47 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T7_Road_Stone_5 guid 5eb0a2b8-b0e6-4b0b-b7c9-8c4642bf6f67 building false material 91ba54f7-cf61-448d-8d09-751a8df6566b id 112 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T5_Dungeon_HollowHalls_Decoration_REWARD guid 5f9af503-6cd7-4935-98a9-290d2399bb67 building true material 23528d78-9d58-4712-9fee-df1c3ead2687 id 198 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_Bones_REWARD guid 6044a21f-3129-47bc-90f9-fc2302ade519 building true material cb8726ab-d8ac-41e7-9be0-da845d19a341 id 174 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T7_AncientLand_Stone_Basalt guid 62e33c3d-041f-4435-b58f-de8c58184cbd building false material fec9173c-2061-476e-a012-2a98fd35972c id 109 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T1_Wood_Rough_CRAFTING guid 63524189-7473-4437-b366-0a0462afa1f9 building true material 03b9d9ad-d704-46b3-ae97-2dc40e1677fd id 143 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Farmsoil_Flowerbed guid 66186619-2279-4a0f-a517-a5558ba25c4a building false material 5fcd990b-ca94-4a4e-8bec-7741e924764b id 45 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T1_PlantFibre guid 668045d9-515c-45fe-9248-baabc3803402 building true material ab46dba1-7792-41b2-9bbb-e662daa18c2c id 130 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T2_Wood_TimberframeBrick_REWARD guid 6926b49b-782b-4bfb-b545-592770f4b7ad building true material de59dffd-22e1-4f19-aa14-cfa47144a7f2 id 180 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_Roof_T5_Granite_Ornamented guid 77bfc638-dcc1-4d6f-bb6a-b893333b9c89 building true material a950f40d-f68a-49ec-bfd9-91ff45a09f85 id 194 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_Roof_T1_StoneShingles_CRAFTING guid 7890df35-64d7-41cd-aa44-79379e4c7727 building true material f37f6f2e-8c1c-4175-b49e-ab0fa1b713a5 id 173 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Road_Stone_2 guid 795e6a6c-1d76-44fe-85b8-58a7e7d34c13 building false material 63f9cfa6-eee9-4341-ada5-8e97356ba905 id 22 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T6_Fabric_CastleCarpet_REWARD guid 79b7fdc2-01b3-4244-97a6-f6f224fde196 building true material b32bc9ad-a4cc-44d9-b769-aa4fd2de8f22 id 210 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_GlowDirt_Blue_ActiveMycelium guid 7e92d0d4-f313-465b-9bfa-017fe544b6ab building false material d887b635-323b-499e-9509-01d4626c377c id 32 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T3_Steppes_fertile_Highgrass guid 7eee2738-ac1b-4f99-9a41-1ad5dd5c0266 building false material 6d804b79-571f-463e-9b76-ee660a6a8b3d id 70 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T7_Stone_Ancient_SunkenCity_REWARD guid 82ef65f8-2282-444f-b834-b39e5c8a521d building true material 73921582-e53f-439c-a99d-721cf1f5416e id 184 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T5_Granite guid 83101a9d-572a-4427-bdb1-817811f770fb building false material afaabd59-436c-cf4b-95e1-4501ee0a2ae6 id 13 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_Metal_Copper_CRAFTING guid 8381da88-69e3-4bda-abbb-bcd2adb968da building true material ffe77ab8-d76f-4d2a-9e68-f9b5930e4109 id 171 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Stone guid 8870fa83-04e6-4b5a-ac2a-ea13205ce469 building false material 32f356d7-1d8b-8f48-b78a-78a7c6270ae9 id 2 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T5_Stone_Granite guid 896ab2d5-58f7-4711-a313-a0b975a9a5a2 building true material 6dbedd17-03b4-4c00-9083-72e3c4b654a4 id 192 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_Roof_T3_Straw guid 89f9b81e-5f0e-4212-8199-83927efcb89b building true material 0b8b598e-b398-4c99-87ca-8b904a693e9f id 169 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T6_Wetlands_fertile_Highgrass guid 8b0bfe50-bf0c-42d6-b242-1485f4cc5488 building false material c62c4793-f7bb-4fc1-9fa2-fab6da4a41f6 id 88 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item BuildTool_Block_Remove guid 8e8c76e8-d418-4a2b-9e16-d4f53161b875 building true material 00000000-0000-0000-0000-000000000000 id 0 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T7_Dirt_AncientLand guid 8fe78325-7ad3-46cf-9e65-15286ce85e8a building false material a21d6147-4959-4454-96da-6dc74d6dffd6 id 101 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T3_Steppes_Rubble guid 92860252-0baa-4df6-ba60-79cf3e0b46c1 building false material 59e63420-4881-4d1a-b3a0-294f5e9de00c id 69 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T3_Road_Stone_3 guid 934e6f3c-0b9b-41cc-ad92-7631ad6a7cac building false material 09508b93-187a-492c-b05d-e44f6c4e2511 id 78 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T6_Dirt_Wetlands guid 95652556-6b4d-46b4-a6ce-9a4b997b792d building false material b2b55117-a985-3a46-89f8-047ffe257fcc id 10 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T1_Grassland_fertile_Highgrass guid 9898623d-fc22-4233-979b-fe048df29ab3 building false material 82ff7597-fdac-4ad9-afa9-87386a0eb0f7 id 79 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T1_Stone_Mycelium_CRAFTING guid 99e13e4c-ca97-4f49-b6f1-7d7759cfcd42 building true material 9e361246-0892-46d1-be2a-a15846079670 id 149 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_Wood_TarredWood_CRAFTING guid 99f26ef9-f358-4ad9-91a3-c45d7c1427c8 building true material 769cb144-324b-4ba4-b412-6137d537da80 id 163 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T5_Snow guid 9a459ec5-b9c3-4a5d-8df1-b153531a9d55 building false material 84548f0a-c168-414a-91dd-f59ba0599e62 id 56 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T4_SandStone_Polished_REWARD guid 9ad972b0-2e86-4e19-bc68-01931aa4aa24 building true material 96fb618a-1aa4-4daa-be09-3c8b87eafe1c id 164 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T6_Road_Stone_4 guid 9fcaf537-95e8-4411-b9c1-9ef1acebac46 building false material 18524728-c85a-4d80-af9c-373f52a9134d id 99 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T7_Stone_Ancient_Dungeon_Basalt_CRAFTING guid a0691372-75d0-4d6c-bdf3-15d184918a44 building true material 63b3fbed-84fb-424c-bd08-7e23c6e87548 id 154 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_GlowDirt_WarmWhite_CRAFTING guid a4c0758d-8173-4da9-a571-7539dc5a2319 building true material f4093448-dfb3-4caf-8bbe-800aef273fe9 id 182 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T3_Stone_Nation01_Shed_Basement_REWARD guid a4c70053-8a76-406e-a2b9-ef6d2103dc87 building true material 89c7be20-3a46-482d-8668-fdc3217f44db id 162 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Grassland_Rubble guid a70d9b59-58f8-4b34-aa50-92da50f3a378 building false material b408b239-4058-4a9e-86b1-d05c15122844 id 66 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T2_Stone_DeepForest guid a95fac55-d6db-43b8-877c-05fe389effac building false material 312c94d9-8acd-4089-9932-d39537aee28d id 40 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T6_Wetlands_Rubble guid aca97be7-977f-4ce6-8982-10737b973ca2 building false material 0818c04b-cf59-4719-af36-b69d44404c99 id 87 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T5_Farmsoil_ShroudInfused guid ae257f98-d6c5-4b28-b36b-2d6f24511e48 building false material 68ce42d7-b385-40be-b8b5-89c27cdd5fec id 77 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Blueprint_Voxel_Roof_05m guid b10a162d-2a5a-43a7-b1f3-4c2133c9f42a building true material 00000000-0000-0000-0000-000000000000 id 0 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T1_HollowHalls_Stone_HallowHalls_REWARD guid b127212b-26ca-4476-9e10-bd42d388cdd0 building true material a67745a9-f63d-4eb2-883b-83a80e4bbe54 id 177 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T6_Stone_Shelllime_LizardTemple_REWARD guid b25ff633-f737-4c1b-a719-03b8f02b80a2 building true material 06b13b33-5f94-4eef-a09f-5f25a9477206 id 201 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item _Block_T7_Ancient_Gray_Stone_CRAFTING guid b43f361a-9af6-4e01-b581-4e1eb5357980 building true material e481e222-1139-4dff-8afd-707dc4e30669 id 157 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T6_Wetlands_Gold_Coins guid b5865535-a71e-49c9-b9c1-b0c06d8e105d building false material 79b2f875-9847-43b4-80ec-a016b06b6e16 id 90 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T2_Deepforest_fertile_Highgrass guid b5bcd0ce-20f8-4720-8a3b-fb31b1c289c0 building false material 06fcd68d-e164-46d1-931a-3cc1d2c03111 id 80 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T6_Palmleaves guid b5c70d2f-cdd2-4a99-bf92-45d2fb985842 building true material cdd2e9a4-abe1-496b-9f86-178ca01cd094 id 205 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T6_GlowDirt_Green_Underwater guid b713c274-b4da-465c-b040-3bfde4d01e61 building false material f786e42d-401f-47ea-ad8e-61ed7d04db21 id 93 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T1_FieldStoneWall guid ba15d094-af9e-483c-a06c-d9fe8b04687f building false material 16d644c3-0743-4fa5-8280-0939427b8fa4 id 67 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T4_Wood_Palmwood_CRAFTING guid bb1ab13d-b82b-4d7a-be86-a1ad6cdde587 building true material e3af9c35-c0aa-43d9-87a1-e9af5fc1d367 id 152 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_Talltree_fertile_Highgrass guid bb5ead2c-dd94-4178-b1bc-cfbbe6e53605 building false material 1073e91e-76b6-437a-b675-160a6e909b0e id 105 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T2_TallTree_Inner guid bd795410-93bc-47ff-95e5-6a2b72e9a235 building false material 8c0f4875-c038-4a35-a95c-05dbbcfe289e id 53 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T1_Stone_Rough_CRAFTING guid bea90ffd-00fb-4737-9d57-f87d7da49ca8 building true material bf0965e8-b422-4603-a0bb-97f5553f3c34 id 155 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T3_Stone_Fancy_CRAFTING guid beb17861-3c3e-4211-93ad-ca190305fe2b building true material 1610459a-580e-4358-8d2e-f8ec6631a858 id 128 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Rubble guid bef75256-bbd5-45ce-b8d8-eede3d82fbfd building false material 1ae68c4f-820c-1c48-9bdd-af76e8be74b6 id 8 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T3_Metal_Bronze_CRAFTING guid c295c0c8-38ed-4138-8110-ac8f1707f2b1 building true material b4136edb-c1c4-4a2a-9fc0-1aefc09bf434 id 170 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T7_Farmsoil_Basalt guid c31be4cc-3c52-4458-ba7e-4df722aff74c building false material 6d175e80-6942-474e-9bb9-c8d055d057ac id 111 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T4_Sandstone_Rough_CRAFTING guid c43a4a05-f5c3-49eb-8e8f-6cf2b991f917 building true material be12e6b7-fd94-4dc0-97ad-e0b29b371137 id 136 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T1_Road_Dirt_1 guid c571bb5b-be39-4d59-b994-dce2113bb228 building false material 5ea8fb8d-e6aa-4fe4-8e6d-b91b99a7b6ef id 20 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Blueprint_Terrain_Whitebox_1x1m_Cube guid c80d4694-ae85-4817-b333-5fb2cfeae263 building true material 00000000-0000-0000-0000-000000000000 id 0 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T5_Granite_Shingles guid c91f1559-916d-49c4-a319-4eb279ee1c43 building true material 1b8d42ad-b15d-4a45-9067-0274822aede0 id 195 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_Dirt_DeepForest guid ca261385-9aa6-4fa4-94c5-cd28f0565669 building false material 1da160f1-8db4-b744-b8c4-c4ef633f1515 id 12 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T4_SandStone_SandstonePlastered_01_CRAFTING guid cab91a45-ba30-4b68-bcd6-6f440782739d building true material 38682657-7760-449a-99e1-0b2ff7b2a75e id 150 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_Stone_Talltree guid cb1c819a-fe73-4e5c-afec-fdb505b401f4 building false material 0b7a42b0-e468-4e21-949d-38a92b5b4af1 id 106 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_Wood_Timberframe_REWARD guid cb7c6742-3d5f-458e-84d7-1bbfed5d0dd9 building true material cf32a524-9206-40c6-8f1d-cff92555bf68 id 140 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T4_YellowGlow_MemorialHall_CRAFTING guid d005c0fd-53db-4447-ae2c-82c6b7393eea building true material 4acc45de-dcbc-44e0-afea-a2dcedb60a2e id 197 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_TallTree_Rubble guid d0bfd90a-158f-40cd-8a34-23478531b661 building false material 022bd475-089a-43b8-b49a-2bcf2f0cd84f id 107 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_Dungeon_Marble_HallowHalls_REWARD guid d0da0b10-c7ad-41a9-a4bf-d534599b5a0c building true material 9c68004a-c199-44fe-980b-0b229dd2e0dc id 179 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T2_Wood_Fancy_CRAFTING guid d36833a5-99fd-4ca8-85e4-abf1ab99b046 building true material 7c7f3b09-39fb-4762-a44e-608794d69fc7 id 144 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T4_Desert_Rubble guid d368e950-3898-4281-bbab-fbbbac901eec building false material 4dff99b2-7b1b-4ae6-bf72-e6829f8998ae id 74 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T5_Road_Granite_Rubble guid d59e99f9-c6e2-4e5f-905a-04651a6a6ef1 building false material 0ad6899f-4b13-4e14-b3bf-9ea79c498fa1 id 64 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T7_AncientLand_Rubble guid d5c1e588-d83d-40e2-8c86-4514bbd7f751 building false material 2a457b8e-fb52-47a5-9c38-773267a1e759 id 102 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Blueprint_Voxel_Block_1m guid d69e2964-79c9-438a-9f87-37a8717d4b59 building true material 00000000-0000-0000-0000-000000000000 id 0 voxelObject 1573a442-ce08-4cd3-814c-659170b7e222
+voxel item Build_TerrainMaterial_T7_AncientLand_Stone guid dea7f8df-4d3c-4577-9744-2a22e34d1ced building false material 15116e5c-a3ad-4b23-9605-78498394008e id 100 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_T2_Dungeon_Stone_Catacombs_REWARD guid dfb621aa-5558-4acb-b8b8-6d3889925504 building true material 2e756784-0541-457a-9453-ce33c83db6a7 id 142 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T3_Dirt_Steppes guid e37da6be-626f-4232-846c-80be26a5adfb building false material ec2b40c4-9a63-8e4c-8cdd-29c531c20412 id 11 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T2_Loam_FiredShingle_CRAFTING guid e5ebb6bd-a06a-4db0-ba0a-f626c60cc12d building true material 103c9eb6-5ed6-43f7-8889-4b88d962c333 id 159 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T4_Farmsoil_Improved guid eb6a16c6-5cfc-4450-89ee-63c618fe547b building false material 9fbe4eb2-7eaa-471c-abce-05907a9f47f4 id 41 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Block_Roof_T6_Shellime_PirateBay_Shingles_REWARD guid efa55dfa-6c87-4c83-a33a-799929066962 building true material f3ac62e0-81b5-4ff8-b2d7-ad7bb2ddc76f id 207 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T3_Stone_CityWall_REWARD guid efbbd3fe-38b5-4f18-817e-d1f32655da07 building true material 2f85e641-a61a-4c97-9a63-006153e57883 id 186 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Block_T2_Loam_FiredBricks_CRAFTING guid f160f250-d595-4342-83a7-c1498d0e4cf6 building true material 169fcb13-a1d4-463d-8a3c-8f97ee491e7a id 153 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T2_Deepforest_Rubble guid f33c4114-d0e0-47e3-b091-9e87f56cc418 building false material 99d28b2b-ad96-4790-bf1e-7bef5bb8d104 id 81 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T1_Farmsoil guid fc39997f-43ad-415a-ac9b-e051d53608f6 building false material d309b0e2-6d97-45df-9349-0f061754bf1b id 39 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T2_TallTree_TreeHouseHull guid fc3b2cf4-f387-4345-99af-b44890d8255e building false material 2e02915b-32af-4201-8d27-96accc7593c1 id 55 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item _Block_T7_Stone_Ancient_Moonstone_CRAFTING guid fdcfade8-b088-4a81-874b-837c04d11e14 building true material 6529476c-0af1-4d16-bdf9-6e7c67398ded id 212 voxelObject 540d10da-b3c6-448b-90d2-b870d0f2e190
+voxel item Build_TerrainMaterial_T5_Moss guid fef84520-a052-4b52-a6cb-7af6668e5538 building false material 48e40e34-795c-4641-8802-167ddc5a0647 id 59 voxelObject 00000000-0000-0000-0000-000000000000
+voxel item Build_TerrainMaterial_T6_Wetlands_Stone_Limestone_Shells guid fefff736-a7ae-4865-b83a-bf4c99992160 building false material 8b239016-fd96-4e4f-b321-9b005d65acfd id 86 voxelObject 00000000-0000-0000-0000-000000000000
+items that place a voxel: 141
+material ids used by items: 0x6 1x1 2x1 8x1 9x1 10x1 11x1 12x1 13x1 20x1 21x1 22x1 28x1 32x1 39x1 40x1 41x1 42x1 45x1 46x1 47x1 52x1 53x1 54x1 55x1 56x1 57x1 58x1 59x1 64x1 66x1 67x1 69x1 70x1 74x1 75x1 77x1 78x1 79x1 80x1 81x1 86x1 87x1 88x1 90x1 91x1 93x1 95x1 99x1 100x1 101x1 102x1 103x1 104x1 105x1 106x1 107x1 108x1 109x1 110x1 111x1 112x1 128x1 130x1 132x1 133x1 135x1 136x1 138x1 140x1 141x1 142x1 143x1 144x1 145x1 146x1 147x1 148x1 149x1 150x1 151x1 152x1 153x1 154x1 155x1 157x1 158x1 159x1 160x1 161x1 162x1 163x1 164x1 165x1 166x1 167x1 168x1 169x1 170x1 171x1 172x1 173x1 174x1 176x1 177x1 178x1 179x1 180x1 181x1 182x1 183x1 184x1 185x1 186x1 191x1 192x1 193x1 194x1 195x1 196x1 197x1 198x1 199x1 200x1 201x1 202x1 203x1 204x1 205x1 206x1 207x1 208x1 209x1 210x1 211x1 212x1
+Block_T1_Wood_Rough_CRAFTING equipment in full: {\"slot\":\"BlueprintMaterial_Default\",\"repeatActionWhenPressed\":true,\"itemSequencesEntityTag\":\"00000000-0000-0000-0000-000000000000\",\"blendShapeMask\":[],\"hideMask\":[\"Shield\"],\"disableMask\":[\"Shield\"],\"waterUsability\":{\"outsideBuildzone\":{\"allowOutsideWater\":true,\"allowInsideWater\":false},\"insideBuildzone\":{\"allowOutsideWater\":true,\"allowInsideWater\":true}},\"impactEntity\":\"00000000-0000-0000-0000-000000000000\",\"program\":\"00000000-0000-0000-0000-000000000000\",\"visualEntity\":\"00000000-0000-0000-0000-000000000000\",\"visualModel\":\"00000000-0000-0000-0000-000000000000\",\"primaryAnimationSet\":\"None\",\"secondaryAnimationSet\":\"None\",\"crosshairType\":\"None\",\"cursorConfig\":{\"customCursorEntity\":\"00000000-0000-0000-0000-000000000000\",\"autoCenterPivot\":true,\"pivotOffset\":{\"x\":0,\"y\":0,\"z\":0},\"voxelGridSnappingDirective\":\"ForceVoxelCenterWhenSmallerThanVoxel\",\"snapToCenterWhenSmallerThanVoxel\":true,\"allowSnapToSnappingBoxes\":false,\"translationConfig\":{\"defaultSnapping\":false,\"canToggleSnapping\":true},\"axisRotationX\":{\"automatic\":\"WorldGrid\",\"manual\":\"WorldGrid\"},\"axisRotationY\":{\"automatic\":\"WorldGrid\",\"manual\":\"WorldGrid\"},\"axisRotationZ\":{\"automatic\":\"WorldGrid\",\"manual\":\"WorldGrid\"},\"smoothOutTerrainNormal\":false,\"alwaysFacePlayer\":false,\"addRandomYawAngleOffset\":false,\"primaryActionConfig\":{\"hideWhenUnused\":false,\"snapPositionToAddableVoxel\":false,\"snapPositionToRemovableVoxel\":false},\"attachAngleConfig\":{\"ceilingAngle\":\"Disabled\",\"wallAngle\":\"Disabled\",\"floorAngle\":\"Narrow\",\"defaultAttachDirection\":\"Floor\",\"secondaryAttachDirection\":\"Wall\",\"hasSecondaryAttachDirection\":false,\"forceUprightNormal\":false},\"checkRequiredMaterialsOnPrimaryAction\":true,\"secondaryActionConfig\":{\"hideWhenUnused\":false,\"snapPositionToAddableVoxel\":false,\"snapPositionToRemovableVoxel\":false},\"checkRequiredMaterialsOnSecondaryAction\":false,\"useSphereCast\":false,\"colliderMask\":[\"World\",\"Solid\",\"Interaction\"],\"collisionCheckFlags\":[],\"preferPositionInsideWater\":false,\"allowWaterPlacement\":true,\"keepSnappedToPlane\":false,\"checkBuildZoneEnemies\":false,\"checkSurfaceTopology\":false,\"allowedVoxels\":[],\"highlightHoveredEntity\":false,\"showVoxelBlock\":false,\"addFxConfig\":{\"loopedSfx\":\"00000000-0000-0000-0000-000000000000\",\"oneShotSfx\":\"00000000-0000-0000-0000-000000000000\",\"oneShotVfx\":\"00000000-0000-0000-0000-000000000000\",\"oneShotVfxOffset\":{\"localOffset\":{\"x\":0,\"y\":0.5,\"z\":0},\"worldOffset\":{\"x\":0,\"y\":0,\"z\":0},\"orientationOffset\":{\"x\":0,\"y\":0,\"z\":0,\"w\":1}},\"vfxParameters\":{\"data\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},\"vfxParameterOffset_boundingBoxMin\":-1,\"vfxParameterOffset_boundingBoxMax\":-1,\"vfxResourceReferences\":{\"meshes\":[],\"models\":[],\"jointCollections\":[]}},\"subFxConfig\":{\"loopedSfx\":\"00000000-0000-0000-0000-000000000000\",\"oneShotSfx\":\"00000000-0000-0000-0000-000000000000\",\"oneShotVfx\":\"00000000-0000-0000-0000-000000000000\",\"oneShotVfxOffset\":{\"localOffset\":{\"x\":0,\"y\":0,\"z\":0},\"worldOffset\":{\"x\":0,\"y\":0,\"z\":0},\"orientationOffset\":{\"x\":0,\"y\":0,\"z\":0,\"w\":1}},\"vfxParameters\":{\"data\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},\"vfxParameterOffset_boundingBoxMin\":-1,\"vfxParameterOffset_boundingBoxMax\":-1,\"vfxResourceReferences\":{\"meshes\":[],\"models\":[],\"jointCollections\":[]}},\"defaultCursorStaticModel\":\"00000000-0000-0000-0000-000000000000\",\"defaultCursorSkinnedModel\":\"00000000-0000-0000-0000-000000000000\",\"defaultCursorVfx\":\"00000000-0000-0000-0000-000000000000\",\"requiredEnergySourceDistance\":0,\"requiredEnergyAmount\":0},\"cursorModel\":\"00000000-0000-0000-0000-000000000000\",\"cursorSkinnedModel\":\"00000000-0000-0000-0000-000000000000\",\"cursorVfx\":\"afa9569e-564b-4c8d-bb93-0a4033001188\",\"cameraDistanceOverride\":{\"distance\":\"Near\",\"override\":false},\"buildingCameraMode\":\"Free\",\"defaultVerticalPlacementOffset\":0,\"maxTiltAngle\":180,\"restrictDistance\":true,\"directionalDistances\":false,\"maxDistance\":8,\"maxHorizontalDistance\":8,\"minVerticalRelativeHeight\":-1,\"maxVerticalRelativeHeight\":1,\"forceClampCursorToDistance\":false,\"placedEntity\":\"00000000-0000-0000-0000-000000000000\",\"placementAABBmin\":{\"x\":0,\"y\":0,\"z\":0},\"placementAABBmax\":{\"x\":0.5,\"y\":0.5,\"z\":0.5},\"snappingAABBmin\":{\"x\":0,\"y\":0,\"z\":0},\"snappingAABBmax\":{\"x\":0.5,\"y\":0.5,\"z\":0.5},\"placementColliders\":[{\"dataArray\":[MappedVariantValue: 000001c5587b6d28],\"combinedFlags\":{\"isA\":[],\"checkAgainst\":[]},\"resolveMask\":[],\"physicsSetup\":{\"physicsMode\":\"Static\",\"restitution\":0,\"buoyancy\":0,\"linearDrag\":0.5,\"angularDrag\":0.10000000149011612,\"gravityFactor\":2.0380001068115234},\"attachmentSlot\":\"Root\",\"joltObjects\":[]}],\"placementNoBuildZones\":{\"shapes\":[]},\"placementWaterEntityType\":\"None\",\"appliedBuff\":\"00000000-0000-0000-0000-000000000000\",\"allowPlacementBelowFog\":false,\"checkInhibitBuild\":\"Strict\",\"buildZoneRequired\":true,\"requiresAltarSlot\":false,\"requiredCraftingIngredients\":[],\"placedEntityLocalSpawnVelocity\":{\"x\":0,\"y\":0,\"z\":0},\"placementConsume\":true,\"voxelData\":{\"isBuildingVoxel\":true,\"placeVoxelMaterial\":\"03b9d9ad-d704-46b3-ae97-2dc40e1677fd\",\"placeVoxelMaterialId\":143},\"voxelObject\":\"540d10da-b3c6-448b-90d2-b870d0f2e190\",\"terrainVoxelObject\":\"00000000-0000-0000-0000-000000000000\",\"voxelSnappingConfig\":{\"snapBoxOffsetMin\":{\"x\":0,\"y\":0,\"z\":0},\"snapBoxOffsetMax\":{\"x\":0,\"y\":0,\"z\":0},\"basementHeight\":0},\"voxelBlueprintConfig\":\"00000000-0000-0000-0000-000000000000\",\"voxelBlueprintMaterialPool\":\"00000000-0000-0000-0000-000000000000\",\"voxelObjectMaterialOverride\":-1,\"visualModels\":[],\"gliderConfig\":{\"accelerationForward\":1,\"airResistanceLongitudinal\":0.20000000298023224,\"airResistanceLateral\":1.850000023841858,\"airResistanceVertical\":0.800000011920929,\"yawAngleSpeed\":70,\"pitchAngleSpeed\":70,\"rollAngleSpeed\":145,\"updraftStrengthChargeStartValue\":0.20000000298023224},\"overgrowthConfig\":{\"overgrowthId\":{\"value\":0},\"material\":\"00000000-0000-0000-0000-000000000000\"},\"terraformingType\":\"Remove\",\"equipmentEntityModelSetup\":{\"model\":\"00000000-0000-0000-0000-000000000000\",\"animation\":\"00000000-0000-0000-0000-000000000000\",\"offset\":{\"localOffset\":{\"x\":0,\"y\":0,\"z\":0},\"worldOffset\":{\"x\":0,\"y\":0,\"z\":0},\"orientationOffset\":{\"x\":0,\"y\":0,\"z\":0,\"w\":1}},\"isSet\":false}}
+patch points: 4102; the last: {\"type\":\"TextureFeedback\",\"offset\":33268,\"size\":4,\"parameterIndex\":505}
+patch point 1: {\"type\":\"Texture\",\"offset\":12,\"size\":4,\"parameterIndex\":0}
+patch point 49: {\"type\":\"Texture\",\"offset\":404,\"size\":4,\"parameterIndex\":42}
+patch point 97: {\"type\":\"Texture\",\"offset\":856,\"size\":4,\"parameterIndex\":84}
+patch point 145: {\"type\":\"Texture\",\"offset\":1248,\"size\":4,\"parameterIndex\":126}
+patch point 193: {\"type\":\"Texture\",\"offset\":1700,\"size\":4,\"parameterIndex\":168}
+patch point 241: {\"type\":\"Texture\",\"offset\":2092,\"size\":4,\"parameterIndex\":210}
+patch point 289: {\"type\":\"Texture\",\"offset\":2484,\"size\":4,\"parameterIndex\":252}
+patch point 337: {\"type\":\"Texture\",\"offset\":2936,\"size\":4,\"parameterIndex\":294}
+patch point 385: {\"type\":\"Texture\",\"offset\":3328,\"size\":4,\"parameterIndex\":336}
+patch point 433: {\"type\":\"Texture\",\"offset\":3720,\"size\":4,\"parameterIndex\":378}
+patch point 481: {\"type\":\"Texture\",\"offset\":4112,\"size\":4,\"parameterIndex\":420}
+patch point 529: {\"type\":\"Texture\",\"offset\":4504,\"size\":4,\"parameterIndex\":462}
+patch point 577: {\"type\":\"Texture\",\"offset\":4896,\"size\":4,\"parameterIndex\":504}
+patch point 625: {\"type\":\"Texture\",\"offset\":5288,\"size\":4,\"parameterIndex\":546}
+patch point 673: {\"type\":\"Texture\",\"offset\":5680,\"size\":4,\"parameterIndex\":588}
+patch point 721: {\"type\":\"Texture\",\"offset\":6072,\"size\":4,\"parameterIndex\":630}
+patch point 769: {\"type\":\"Texture\",\"offset\":6464,\"size\":4,\"parameterIndex\":672}
+patch point 817: {\"type\":\"Texture\",\"offset\":6856,\"size\":4,\"parameterIndex\":714}
+patch point 865: {\"type\":\"Texture\",\"offset\":7248,\"size\":4,\"parameterIndex\":756}
+patch point 913: {\"type\":\"Texture\",\"offset\":7640,\"size\":4,\"parameterIndex\":798}
+patch point 961: {\"type\":\"Texture\",\"offset\":8032,\"size\":4,\"parameterIndex\":840}
+patch point 1009: {\"type\":\"Texture\",\"offset\":8424,\"size\":4,\"parameterIndex\":882}
+patch point 1057: {\"type\":\"Texture\",\"offset\":8816,\"size\":4,\"parameterIndex\":924}
+patch point 1105: {\"type\":\"Texture\",\"offset\":9208,\"size\":4,\"parameterIndex\":966}
+patch point 1153: {\"type\":\"Texture\",\"offset\":9600,\"size\":4,\"parameterIndex\":1008}
+patch point 1201: {\"type\":\"Texture\",\"offset\":9992,\"size\":4,\"parameterIndex\":1050}
+patch point 1249: {\"type\":\"Texture\",\"offset\":10384,\"size\":4,\"parameterIndex\":1092}
+patch point 1297: {\"type\":\"Texture\",\"offset\":10776,\"size\":4,\"parameterIndex\":1134}
+patch point 1345: {\"type\":\"Texture\",\"offset\":11168,\"size\":4,\"parameterIndex\":1176}
+patch point 1393: {\"type\":\"Texture\",\"offset\":11620,\"size\":4,\"parameterIndex\":1218}
+patch point 1441: {\"type\":\"Texture\",\"offset\":12012,\"size\":4,\"parameterIndex\":1260}
+patch point 1489: {\"type\":\"Texture\",\"offset\":12404,\"size\":4,\"parameterIndex\":1302}
+patch point 1537: {\"type\":\"Texture\",\"offset\":12796,\"size\":4,\"parameterIndex\":1344}
+patch point 1585: {\"type\":\"Texture\",\"offset\":13188,\"size\":4,\"parameterIndex\":1386}
+patch point 1633: {\"type\":\"Texture\",\"offset\":13580,\"size\":4,\"parameterIndex\":1428}
+patch point 1681: {\"type\":\"Texture\",\"offset\":13972,\"size\":4,\"parameterIndex\":1470}
+patch point 1729: {\"type\":\"Texture\",\"offset\":14364,\"size\":4,\"parameterIndex\":1512}
+patch point 1777: {\"type\":\"Texture\",\"offset\":14756,\"size\":4,\"parameterIndex\":1554}
+patch point 1825: {\"type\":\"Texture\",\"offset\":15148,\"size\":4,\"parameterIndex\":1596}
+patch point 1873: {\"type\":\"Texture\",\"offset\":15496,\"size\":4,\"parameterIndex\":1639}
+patch point 1921: {\"type\":\"Texture\",\"offset\":15880,\"size\":4,\"parameterIndex\":1681}
+patch point 1969: {\"type\":\"Texture\",\"offset\":16272,\"size\":4,\"parameterIndex\":1723}
+patch point 2017: {\"type\":\"Texture\",\"offset\":16664,\"size\":4,\"parameterIndex\":1765}
+patch point 2065: {\"type\":\"Texture\",\"offset\":17056,\"size\":4,\"parameterIndex\":1807}
+patch point 2113: {\"type\":\"Texture\",\"offset\":17448,\"size\":4,\"parameterIndex\":1849}
+patch point 2161: {\"type\":\"Texture\",\"offset\":17840,\"size\":4,\"parameterIndex\":1891}
+patch point 2209: {\"type\":\"Texture\",\"offset\":18232,\"size\":4,\"parameterIndex\":1933}
+patch point 2257: {\"type\":\"TextureFeedback\",\"offset\":18584,\"size\":4,\"parameterIndex\":280}
+patch point 2305: {\"type\":\"Texture\",\"offset\":18964,\"size\":4,\"parameterIndex\":2018}
+patch point 2353: {\"type\":\"Texture\",\"offset\":19356,\"size\":4,\"parameterIndex\":2060}
+patch point 2401: {\"type\":\"Texture\",\"offset\":19736,\"size\":4,\"parameterIndex\":2102}
+patch point 2449: {\"type\":\"Texture\",\"offset\":20088,\"size\":4,\"parameterIndex\":2145}
+patch point 2497: {\"type\":\"Texture\",\"offset\":20480,\"size\":4,\"parameterIndex\":2187}
+patch point 2545: {\"type\":\"Texture\",\"offset\":20864,\"size\":4,\"parameterIndex\":2229}
+patch point 2593: {\"type\":\"TextureFeedback\",\"offset\":21208,\"size\":4,\"parameterIndex\":320}
+patch point 2641: {\"type\":\"Texture\",\"offset\":21580,\"size\":4,\"parameterIndex\":2314}
+patch point 2689: {\"type\":\"Texture\",\"offset\":21972,\"size\":4,\"parameterIndex\":2356}
+patch point 2737: {\"type\":\"Texture\",\"offset\":22364,\"size\":4,\"parameterIndex\":2398}
+patch point 2785: {\"type\":\"Texture\",\"offset\":22756,\"size\":4,\"parameterIndex\":2440}
+patch point 2833: {\"type\":\"Texture\",\"offset\":23148,\"size\":4,\"parameterIndex\":2482}
+patch point 2881: {\"type\":\"Texture\",\"offset\":23540,\"size\":4,\"parameterIndex\":2524}
+patch point 2929: {\"type\":\"Texture\",\"offset\":23932,\"size\":4,\"parameterIndex\":2566}
+patch point 2977: {\"type\":\"Texture\",\"offset\":24324,\"size\":4,\"parameterIndex\":2608}
+patch point 3025: {\"type\":\"Texture\",\"offset\":24716,\"size\":4,\"parameterIndex\":2650}
+patch point 3073: {\"type\":\"Texture\",\"offset\":25108,\"size\":4,\"parameterIndex\":2692}
+patch point 3121: {\"type\":\"Texture\",\"offset\":25500,\"size\":4,\"parameterIndex\":2734}
+patch point 3169: {\"type\":\"Texture\",\"offset\":25892,\"size\":4,\"parameterIndex\":2776}
+patch point 3217: {\"type\":\"Texture\",\"offset\":26284,\"size\":4,\"parameterIndex\":2818}
+patch point 3265: {\"type\":\"Texture\",\"offset\":26676,\"size\":4,\"parameterIndex\":2860}
+patch point 3313: {\"type\":\"Texture\",\"offset\":27064,\"size\":4,\"parameterIndex\":2902}
+patch point 3361: {\"type\":\"Texture\",\"offset\":27376,\"size\":4,\"parameterIndex\":2945}
+patch point 3409: {\"type\":\"Texture\",\"offset\":27768,\"size\":4,\"parameterIndex\":2987}
+patch point 3457: {\"type\":\"TextureFeedback\",\"offset\":28112,\"size\":4,\"parameterIndex\":426}
+patch point 3505: {\"type\":\"Texture\",\"offset\":28500,\"size\":4,\"parameterIndex\":3072}
+patch point 3553: {\"type\":\"Texture\",\"offset\":28892,\"size\":4,\"parameterIndex\":3114}
+patch point 3601: {\"type\":\"Texture\",\"offset\":29284,\"size\":4,\"parameterIndex\":3156}
+patch point 3649: {\"type\":\"Texture\",\"offset\":29676,\"size\":4,\"parameterIndex\":3198}
+patch point 3697: {\"type\":\"Texture\",\"offset\":30068,\"size\":4,\"parameterIndex\":3240}
+patch point 3745: {\"type\":\"Texture\",\"offset\":30460,\"size\":4,\"parameterIndex\":3282}
+patch point 3793: {\"type\":\"Texture\",\"offset\":30852,\"size\":4,\"parameterIndex\":3324}
+patch point 3841: {\"type\":\"Texture\",\"offset\":31244,\"size\":4,\"parameterIndex\":3366}
+patch point 3889: {\"type\":\"Texture\",\"offset\":31636,\"size\":4,\"parameterIndex\":3408}
+patch point 3937: {\"type\":\"Texture\",\"offset\":32028,\"size\":4,\"parameterIndex\":3450}
+patch point 3985: {\"type\":\"Texture\",\"offset\":32420,\"size\":4,\"parameterIndex\":3492}
+patch point 4033: {\"type\":\"Texture\",\"offset\":32792,\"size\":4,\"parameterIndex\":3534}
+patch point 4081: {\"type\":\"Texture\",\"offset\":33136,\"size\":4,\"parameterIndex\":3577}
+texture 2: {\"texture\":{\"width\":16,\"height\":16,\"levelCount\":5,\"format\":\"BC4_unorm_block\",\"content\":{\"hash\":{\"size\":184,\"hash0\":3905395496,\"hash1\":3253468627,\"hash2\":832491157},\"category\":{\"value\":1013777168},\"bundleId\":2873730175,\"sortKey\":2},\"mipTailContent\":{\"hash\":{\"size\":184,\"hash0\":3905395496,\"hash1\":3253468627,\"hash2\":832491157},\"category\":{\"value\":1185060183},\"bundleId\":0,\"sortKey\":832491157},\"mipChainContentRanges\":[],\"debugName\":\"Building_47_buildings_set_Stone_Castle_01_baseSide_metallic\"},\"category\":\"BuildingMaterial\"}
+texture 3596 (last): {\"texture\":{\"width\":2048,\"height\":2048,\"levelCount\":12,\"format\":\"BC4_unorm_block\",\"content\":{\"hash\":{\"size\":2796216,\"hash0\":1205738796,\"hash1\":1418053155,\"hash2\":791247864},\"category\":{\"value\":1013777168},\"bundleId\":1036293725,\"sortKey\":1031},\"mipTailContent\":{\"hash\":{\"size\":2744,\"hash0\":4172002810,\"hash1\":3121248822,\"hash2\":3802582597},\"category\":{\"value\":1185060183},\"bundleId\":0,\"sortKey\":3802582597},\"mipChainContentRanges\":[{\"start\":0,\"count\":2796216},{\"start\":2097152,\"count\":699064},{\"start\":2621440,\"count\":174776},{\"start\":2752512,\"count\":43704},{\"start\":2785280,\"count\":10936}],\"debugName...(692 chars)
+material params 1: {\"mapping\":\"Default\",\"edgeOnlySide\":true,\"decoObjectRules\":[{\"rule\":\"VoxelEdgeSide\",\"partMode\":\"MiddleOnly\",\"onDestructionEdge\":false,\"limitOnePerVoxel\":false,\"symmetrical\":false,\"density\":1,\"offset\":{\"x\":0.6000000238418579,\"y\":0,\"z\":0.6000000238418579},\"rotationVariation\":{\"x\":0.004000000189989805,\"y\":-0,\"z\":0.004000000189989805},\"fixedOrder\":true,\"hideUnderRoof\":false,\"startModels\":[],\"middleMod...(2158 chars)
+material params 2: {\"mapping\":\"Default\",\"edgeOnlySide\":false,\"decoObjectRules\":[]}
+material params 3: {\"mapping\":\"Roof\",\"edgeOnlySide\":false,\"decoObjectRules\":[{\"rule\":\"RoofSideLeft\",\"partMode\":\"StartEndAdd\",\"onDestructionEdge\":false,\"limitOnePerVoxel\":false,\"symmetrical\":false,\"density\":1,\"offset\":{\"x\":0.5,\"y\":-0.699999988079071,\"z\":0},\"rotationVariation\":{\"x\":-0,\"y\":-0,\"z\":-0},\"fixedOrder\":true,\"hideUnderRoof\":false,\"startModels\":[26],\"middleModels\":[27,28,29,30,31,32,33,34],\"endModels\":[35]},{\"...(2904 chars)
+material params 4: {\"mapping\":\"Default\",\"edgeOnlySide\":false,\"decoObjectRules\":[]}
+material params 5: {\"mapping\":\"Default\",\"edgeOnlySide\":true,\"decoObjectRules\":[{\"rule\":\"WallFloorCorner\",\"partMode\":\"MiddleOnly\",\"onDestructionEdge\":false,\"limitOnePerVoxel\":false,\"symmetrical\":false,\"density\":1,\"offset\":{\"x\":0.550000011920929,\"y\":-0.4000000059604645,\"z\":0},\"rotationVariation\":{\"x\":0.004999999888241291,\"y\":0.004999999888241291,\"z\":0.004999999888241291},\"fixedOrder\":false,\"hideUnderRoof\":false,\"start...(3478 chars)
+material params 6: {\"mapping\":\"Roof\",\"edgeOnlySide\":false,\"decoObjectRules\":[{\"rule\":\"RoofBottom\",\"partMode\":\"MiddleOnly\",\"onDestructionEdge\":false,\"limitOnePerVoxel\":false,\"symmetrical\":false,\"density\":1,\"offset\":{\"x\":0.5,\"y\":-0.6499999761581421,\"z\":0},\"rotationVariation\":{\"x\":-0,\"y\":-0,\"z\":-0},\"fixedOrder\":true,\"hideUnderRoof\":false,\"startModels\":[],\"middleModels\":[93,94,95,96,97,98,99,100],\"endModels\":[]},{\"rule\"...(2905 chars)
+done

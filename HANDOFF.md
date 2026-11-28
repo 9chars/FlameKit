@@ -3130,3 +3130,29 @@ gets EMF 0.6.19 at this start (uploaded 07:28).
 dedicated server: 27 are client-only), all FlameKit Native hooks, 21 features, no errors. The 250 ms rule is fixed in EMF's
 lua.dll (docs/modding/lua.md: "A call that runs longer than 250 ms ... is stopped"); no setting changes it. Owner 08:17
 "this 250 ms limit really sucks ass"; last night's pause = 22:18:20 (OPEN #20, outside the tick).
+
+**#21 CUSTOM BLOCKS: RESEARCH 2026-11-28 (owner 08:58 "yes lets start the process").** Read-only EML mod
+tools/content/fk_block_dump (patch capability, changes nothing; prints into the EML log: the game's
+<game>\logs\<date>.eml.log, the local server's emf\content.log). Installed: D:\...\Enshrouded\mods\fk_block_dump (folder
+access granted 09:0x: game mods + logs) and EnshroudedServer\mods\fk_block_dump (+ emf_content.dll copied to the local
+server's emf; EMF built it: "EML content: built 1 mod in 0.1 s"). The owner's game has its OWN EML (EMF: "applied by EML,
+so EMF leaves it alone"). Three runs (owner: Restart Both, Restart Both, Restart Client). FINDINGS:
+- Material ids are ONE byte (keen::VoxelMaterialId). Terrain materials 1..~112, BUILDING materials 128..212 (85).
+- A block item = ItemInfo.equipment.voxelData {isBuildingVoxel, placeVoxelMaterial (GUID ref), placeVoxelMaterialId}
+  (ItemInfo +260 +828; +0x454 = the id). 141 items place voxels; ids used listed in run2_client.txt.
+- SolidVoxelMaterial / PbrBuildingMaterial are NOT resources in either data (compiled away). The renderer's table is
+  keen::BuildingMaterialBlendingResource (guid 15506ca1-f0b2-8a43-a087-75a7c83d5596, client only): layerCount 85,
+  renderingDataBlock data 50176 bytes = 128 x 392 (ONE 392-byte BuildingMaterialBlendingMaterialLayerShaderData per
+  building id 128+layer; layers 85..127 all zero = ROOM FOR 43 MORE, ids 213..255), 4102 patch points (Texture /
+  TextureFeedback, offset into data, parameterIndex), 3596 textures (RenderStreamedTexture: BC7 2048x2048, content
+  hashes, debugName "Building_<set>_baseSide_albedo" ...), 506 feedbacks. keen::BuildingMaterialParametersResource (same
+  guid) has 85 entries (mapping Default/Roof, edgeOnlySide, decoObjectRules).
+- 11 building materials have textures but NO item (hidden from players): 129/131/134/156 DEPRECATED blue/green/white/red,
+  137 OLD loghouse_01, 139 dungeons quarters woodwall, 175 Glowdirt_02 red, 187 Coldheights GraniteCityWall_01, 188
+  Coldheights GraniteHouseWall_01, 189/190 ColdHeights GraniteHouseRoof_01/02 (mapping Roof).
+- The dedicated server's data has only 85 resource types (no blending, no materials) but every ItemInfo with its id.
+NEXT (to propose): step 1 block items for the hidden materials (an ItemInfo copy with placeVoxelMaterialId = 187 etc.,
+no new material); step 2 new materials in ids 213..255 (a layer + patch points + texture params copied from existing
+ones, layerCount + 1, a parameters entry). Open: what placeVoxelMaterial's GUID must be for a copy; whether the server
+needs anything for an id it has no material for (hardness, drops).
+
