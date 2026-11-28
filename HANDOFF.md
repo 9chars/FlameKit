@@ -105,6 +105,19 @@ to continue with it yet... just note it and put it on a list some place for me t
     so main.lua could load a few features per step (each run well under 250 ms) instead of all at once; a slow PC then
     only gets FlameKit a moment later. Not started.
 
+19. G-PORTAL STILL RUNS EMF 0.6.6 (owner 2026-11-27 22:28 "pretty sure g-portal should be on the latest version... didnt you
+    update that???" -> no: only FlameKit's folders were ever uploaded; /emf/emf_core.dll and /dinput8.dll on G-Portal are
+    from Nov 11; players and the local server are on 0.6.19 since the Nov 22 EMF updater). Owner: "tomorrow maybe".
+    Seen 22:13:59: "hit_rule_add refused: scale must be between 0 and 100" -> the Damage bonus steps +10000%..+50000%
+    (scale 101..501, 0.15.559) give NO bonus on G-Portal; +5000% (51) works. To do: test those steps on the local server
+    (0.6.19), then update G-Portal's EMF (stop G-Portal; dinput8.dll + emf\ core files + emf\mods\lua; the FTP tool only
+    writes FlameKit's folders: extend it or the owner uses G-Portal's file manager).
+20. G-Portal 2026-11-27 22:18:20 FlameKit PAUSED again, NOT in the server tick (no "slow step" line before it): while
+    players killed many raid monsters (loose loot "killed by 2" lines). Likely an event callback (on_hit / deaths / loot):
+    kit's timing covers only the tick. To do: the same slow logging for every kit dispatch (each()). Woken 22:26 (README
+    upload). /lua.reload from the game chat 22:25:20 was REFUSED: account 0x485890b753e75ad1 is not in G-Portal's
+    emf\emf_core.ini [chat] admins (none there).
+
 **Releases:** the Development channel (dist-test) is still 0.15.525 and Stable (dist) 0.15.475; nothing since was
 packaged or signed. G-Portal untouched. Only the owner's word moves those (Rule 0g).
 
