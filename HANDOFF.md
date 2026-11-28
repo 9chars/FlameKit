@@ -3190,3 +3190,8 @@ save/restart, removing step 4. Owner 09:48: his runes are missing from his inven
 **#21 (10:43)** step 4 (the material's known check) tested off by the owner: the block still works from the build menu and
 the action bar, so it is removed from fk_blocks. Owner 10:39: breaking, drops and restarts test fine. A new block item needs
 steps 1-3 only. The game's own materials are not changed.
+**#21 (11:02) recipe works**: owner "its there". fk_blocks copies its source block's own recipe (found by output ItemId;
+Block_T5_Stone_Granite: workshop 1302892403, 10 x 83101a9d... (granite stone) -> 100 blocks, Granite's unlock) with
+emf_content.add_recipe (like = the source recipe, listed right after it), recipe GUID 7de822f7-cb42-4f34-aab1-966fd06aaffb
+FIXED. Category inputs or a missing source recipe: no recipe, logged; a failure keeps the block (pcall).
+Still to do: crafting it once (owner), the other five materials, a FlameKit way to give blocks, shipping to players/G-Portal.

@@ -18,6 +18,7 @@ local BLOCKS = {
 		guid = "a15c1573-f6fe-480a-8bc8-36559e160767", name_guid = "9bc453d8-0c10-4f5a-998d-22af8dff63f7",
 		debug_name = "Block_T5_Stone_Granite_CityWall_FK", name = "Granite City Wall",
 		clone_of = GRANITE_BLOCK, material = 187,
+		recipe_guid = "7de822f7-cb42-4f34-aab1-966fd06aaffb",  -- FIXED as well (a save marks crafted recipes by its id)
 	},
 }
 
@@ -116,6 +117,42 @@ for _, b in ipairs(BLOCKS) do
 				tostring(sorted), at))
 		else
 			print(string.format("[fk_blocks] %s: its source has no shape entry (%d shapes)", b.debug_name, #list))
+		end
+	end
+	-- (10:56, owner: "add the custom recipes") the recipe: a copy of its source block's own recipe (the same station,
+	-- ingredients, amount made, unlock and time), listed right after it, making the new block instead.
+	if b.recipe_guid then
+		local zero = "00000000-0000-0000-0000-000000000000"
+		local src
+		for _, r in ipairs(game.assets.get_resources_by_type("keen::RecipeRegistryResource")[1].data.recipes) do
+			local out = r.output and r.output[1]
+			if out and tonumber(out.item.value) == src_id then
+				print(string.format("[fk_blocks] %s: source recipe %s (workshop %s, makes %d)", b.debug_name, tostring(r.debugName),
+					tostring(r.workshopId and r.workshopId.value), tonumber(out.count) or -1))
+				src = src or r
+			end
+		end
+		local inputs, category = {}, false
+		if src then
+			for _, slot in ipairs(src.input) do
+				if tostring(slot.inputItemCategory.categoryRef) ~= zero then category = true end
+				if tostring(slot.itemStack.itemRef) ~= zero then
+					inputs[#inputs + 1] = {tostring(slot.itemStack.itemRef), tonumber(slot.itemStack.count)}
+					print(string.format("[fk_blocks]   input %s x%d", inputs[#inputs][1], inputs[#inputs][2]))
+				end
+			end
+		end
+		if not src then
+			print(string.format("[fk_blocks] %s: its source has no recipe: none added", b.debug_name))
+		elseif category or #inputs < 1 or #inputs > 4 then
+			print(string.format("[fk_blocks] %s: the source recipe has %d item inputs%s: none added", b.debug_name, #inputs,
+				category and " and a category input" or ""))
+		else
+			local ok, err = pcall(content.add_recipe, {
+				guid = b.recipe_guid, debug_name = b.debug_name .. "_Recipe", like = src.debugName,
+				output = {b.guid, tonumber(src.output[1].count) or 1}, inputs = inputs,
+			})
+			print(string.format("[fk_blocks] %s: recipe %s %s", b.debug_name, b.recipe_guid, ok and "added" or ("FAILED: " .. tostring(err))))
 		end
 	end
 end
