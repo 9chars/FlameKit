@@ -1,7 +1,7 @@
 {
   "id": "fk_block_dump",
   "name": "FlameKit block research dump (changes nothing)",
-  "version": "0.3.0",
+  "version": "0.6.1",
   "capabilities": ["patch"],
   "description": "Research for custom blocks: prints the game's block materials, their items and textures into emf\\content.log. It changes no game data. Remove the folder when done.",
   "authors": ["FlameKit"]

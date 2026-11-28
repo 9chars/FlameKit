@@ -3156,3 +3156,11 @@ no new material); step 2 new materials in ids 213..255 (a layer + patch points +
 ones, layerCount + 1, a parameters entry). Open: what placeVoxelMaterial's GUID must be for a copy; whether the server
 needs anything for an id it has no material for (hardness, drops).
 
+
+**#21 pictures (owner 09:25 "can you show me here what each of the 11 textures look like?"):** fk_block_dump v0.6.1 decodes
+each hidden material's side albedo (EML: image.decode_texture(buffer, FORMAT, w, h) - the docs' order is wrong; image.encode(img,
+"png") lowercase; mipChainContentRanges are {start,count}, levels lie one after the other) and prints base64 PNGs
+(owner: Restart Client x4, two of them lost to my bugs). tools/content/fk_block_dump/hidden_block_textures.png. REAL textures:
+187 Granite City Wall, 188 Granite House Wall, 189 / 190 Granite House Roof 1 / 2 (1024 / 2048 px), 175 Red glow dirt, 134
+white (1024). PLACEHOLDERS ONLY (the real textures are not in the shipped game): 129 blue, 131 green (32 px solid), 156 red,
+137 Old Loghouse, 139 Dungeon quarters wood wall (8 px solid red).
